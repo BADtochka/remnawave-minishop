@@ -13,6 +13,10 @@ from bot.keyboards.inline.user_keyboards import (
     get_subscription_options_keyboard,
     get_back_to_main_menu_markup,
     get_autorenew_confirm_keyboard,
+    get_tariff_catalog_keyboard,
+    get_tariff_periods_keyboard,
+    get_tariff_packages_keyboard,
+    get_payment_method_keyboard,
 )
 from bot.services.subscription_service import SubscriptionService
 from bot.services.panel_api_service import PanelApiService
@@ -57,6 +61,21 @@ async def display_subscription_options(event: Union[types.Message, types.Callbac
         return
 
     currency_symbol_val = settings.DEFAULT_CURRENCY_SYMBOL
+    tariffs_config = getattr(settings, "tariffs_config", None)
+    if tariffs_config:
+        text_content = get_text("select_subscription_period")
+        reply_markup = get_tariff_catalog_keyboard(tariffs_config.enabled_tariffs, current_lang, i18n)
+        target_message_obj = event.message if isinstance(event, types.CallbackQuery) else event
+        if isinstance(event, types.CallbackQuery):
+            try:
+                await target_message_obj.edit_text(text_content, reply_markup=reply_markup)
+            except Exception:
+                await target_message_obj.answer(text_content, reply_markup=reply_markup)
+            await event.answer()
+        else:
+            await target_message_obj.answer(text_content, reply_markup=reply_markup)
+        return
+
     traffic_packages = getattr(settings, "traffic_packages", {}) or {}
     stars_traffic_packages = getattr(settings, "stars_traffic_packages", {}) or {}
     traffic_mode = bool(getattr(settings, "traffic_sale_mode", False) or stars_traffic_packages)
@@ -106,6 +125,199 @@ async def display_subscription_options(event: Union[types.Message, types.Callbac
 @router.callback_query(F.data == "main_action:subscribe")
 async def reshow_subscription_options_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, session: AsyncSession):
     await display_subscription_options(callback, i18n_data, settings, session)
+
+
+@router.callback_query(F.data.startswith("tariff:select:"))
+async def select_tariff_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, session: AsyncSession):
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
+    config = settings.tariffs_config
+    if not config or not callback.message:
+        await callback.answer(get_text("error_occurred_try_again"), show_alert=True)
+        return
+    tariff_key = callback.data.split(":", 2)[2]
+    try:
+        tariff = config.require(tariff_key)
+    except Exception:
+        await callback.answer(get_text("error_try_again"), show_alert=True)
+        return
+    if tariff.billing_model == "period":
+        markup = get_tariff_periods_keyboard(tariff, current_lang, i18n, settings)
+    else:
+        markup = get_tariff_packages_keyboard(tariff, tariff.traffic_packages.rub, current_lang, i18n)
+    text = f"{tariff.name(current_lang)}\n{tariff.description(current_lang)}".strip()
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("tariff:period:"))
+async def select_tariff_period_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, session: AsyncSession):
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
+    config = settings.tariffs_config
+    if not config or not callback.message:
+        await callback.answer(get_text("error_occurred_try_again"), show_alert=True)
+        return
+    _, _, tariff_key, months_raw = callback.data.split(":", 3)
+    tariff = config.require(tariff_key)
+    months = int(months_raw)
+    price_rub = tariff.period_price(months, "rub")
+    stars_price = tariff.period_price(months, "stars")
+    if price_rub is None:
+        await callback.answer(get_text("error_try_again"), show_alert=True)
+        return
+    markup = get_payment_method_keyboard(
+        months,
+        price_rub,
+        int(stars_price) if stars_price else None,
+        settings.DEFAULT_CURRENCY_SYMBOL,
+        current_lang,
+        i18n,
+        settings,
+        sale_mode=f"subscription@{tariff.key}",
+    )
+    await callback.message.edit_text(get_text("choose_payment_method"), reply_markup=markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("tariff:package:"))
+async def select_tariff_package_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, session: AsyncSession):
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
+    config = settings.tariffs_config
+    if not config or not callback.message:
+        await callback.answer(get_text("error_occurred_try_again"), show_alert=True)
+        return
+    _, _, tariff_key, gb_raw = callback.data.split(":", 3)
+    tariff = config.require(tariff_key)
+    gb = float(gb_raw)
+    packages = tariff.traffic_packages.rub if tariff.billing_model == "traffic" else (config.topup_packages_for(tariff).rub if config.topup_packages_for(tariff) else [])
+    package = next((pkg for pkg in packages if float(pkg.gb) == gb), None)
+    if not package:
+        await callback.answer(get_text("error_try_again"), show_alert=True)
+        return
+    sale_mode = f"{'traffic_package' if tariff.billing_model == 'traffic' else 'topup'}@{tariff.key}"
+    markup = get_payment_method_keyboard(
+        gb,
+        package.price,
+        None,
+        settings.DEFAULT_CURRENCY_SYMBOL,
+        current_lang,
+        i18n,
+        settings,
+        sale_mode=sale_mode,
+    )
+    await callback.message.edit_text(get_text("choose_payment_method_traffic"), reply_markup=markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "tariff_topup:list")
+async def tariff_topup_list_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, subscription_service: SubscriptionService, session: AsyncSession):
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
+    config = settings.tariffs_config
+    active = await subscription_service.get_active_subscription_details(session, callback.from_user.id)
+    if not config or not active or not active.get("tariff_key") or not callback.message:
+        await callback.answer(get_text("error_try_again"), show_alert=True)
+        return
+    tariff = config.require(active["tariff_key"])
+    packages = config.topup_packages_for(tariff)
+    rub_packages = packages.rub if packages else []
+    if not rub_packages:
+        await callback.answer(get_text("no_subscription_options_available"), show_alert=True)
+        return
+    markup = get_tariff_packages_keyboard(tariff, rub_packages, current_lang, i18n, back_callback="main_action:my_subscription")
+    await callback.message.edit_text(get_text("choose_payment_method_traffic"), reply_markup=markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "tariff_change:list")
+async def tariff_change_list_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, subscription_service: SubscriptionService, session: AsyncSession):
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    config = settings.tariffs_config
+    active = await subscription_service.get_active_subscription_details(session, callback.from_user.id)
+    if not config or not active or not callback.message:
+        await callback.answer("Error", show_alert=True)
+        return
+    rows = []
+    for tariff in config.enabled_tariffs:
+        if tariff.key == active.get("tariff_key"):
+            continue
+        rows.append([InlineKeyboardButton(text=tariff.name(current_lang), callback_data=f"tariff_change:select:{tariff.key}")])
+    rows.append([InlineKeyboardButton(text=i18n.gettext(current_lang, "back_to_main_menu_button"), callback_data="main_action:my_subscription")])
+    await callback.message.edit_text("Выберите тариф", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("tariff_change:select:"))
+async def tariff_change_select_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, subscription_service: SubscriptionService, session: AsyncSession):
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    config = settings.tariffs_config
+    if not config or not callback.message:
+        await callback.answer("Error", show_alert=True)
+        return
+    tariff_key = callback.data.split(":", 2)[2]
+    target = config.require(tariff_key)
+    db_sub = await subscription_dal.get_active_subscription_by_user_id(session, callback.from_user.id)
+    if not db_sub:
+        await callback.answer("Error", show_alert=True)
+        return
+    options = subscription_service.calculate_tariff_switch_options(db_sub, target)
+    rows = []
+    if options["mode"] == "period_to_period":
+        rows.append([InlineKeyboardButton(text=f"Без доплаты, дней станет {options['recalc_days']}", callback_data=f"tariff_change:apply:{target.key}:recalc_days")])
+        if options.get("paid_diff_rub", 0) > 0:
+            rows.append([InlineKeyboardButton(text=f"Доплатить {options['paid_diff_rub']} RUB", callback_data=f"tariff_change:pay:{target.key}:{options['paid_diff_rub']}")])
+    elif options["mode"] == "period_to_traffic":
+        rows.append([InlineKeyboardButton(text=f"Перейти без доплаты, получить {options['converted_gb']} GB", callback_data=f"tariff_change:apply:{target.key}:convert_days_to_gb")])
+        for package in target.traffic_packages.rub:
+            rows.append([InlineKeyboardButton(text=f"+ {package.gb:g} GB за {package.price:g} RUB", callback_data=f"tariff:package:{target.key}:{package.gb:g}")])
+    else:
+        for months in target.enabled_periods:
+            price = target.period_price(months, "rub")
+            if price:
+                rows.append([InlineKeyboardButton(text=f"{months} мес. за {price:g} RUB", callback_data=f"tariff:period:{target.key}:{months}")])
+    rows.append([InlineKeyboardButton(text=i18n.gettext(current_lang, "back_to_main_menu_button"), callback_data="tariff_change:list")])
+    await callback.message.edit_text(f"{target.name(current_lang)}\n{target.description(current_lang)}".strip(), reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("tariff_change:apply:"))
+async def tariff_change_apply_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, subscription_service: SubscriptionService, session: AsyncSession):
+    _, _, tariff_key, mode = callback.data.split(":", 3)
+    result = await subscription_service.switch_tariff_without_payment(session, callback.from_user.id, tariff_key, mode)
+    if result:
+        await session.commit()
+        await callback.answer("Готово", show_alert=True)
+        await my_subscription_command_handler(callback, i18n_data, settings, subscription_service.panel_service, subscription_service, session, callback.bot)
+    else:
+        await callback.answer("Error", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("tariff_change:pay:"))
+async def tariff_change_pay_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, session: AsyncSession):
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    _, _, tariff_key, amount_raw = callback.data.split(":", 3)
+    amount = float(amount_raw)
+    markup = get_payment_method_keyboard(
+        1,
+        amount,
+        None,
+        settings.DEFAULT_CURRENCY_SYMBOL,
+        current_lang,
+        i18n,
+        settings,
+        sale_mode=f"tariff_upgrade@{tariff_key}",
+    )
+    await callback.message.edit_text("Выберите способ оплаты", reply_markup=markup)
+    await callback.answer()
 
 
 async def my_subscription_command_handler(
@@ -215,6 +427,11 @@ async def my_subscription_command_handler(
             config_link=config_link_value,
         )
     else:
+        tariff_prefix = ""
+        if active.get("tariff_name"):
+            tariff_prefix = f"🎟 {active.get('tariff_name')}\n"
+            if active.get("tariff_description"):
+                tariff_prefix += f"{active.get('tariff_description')}\n"
         text = get_text(
             "my_subscription_details",
             end_date=end_date.strftime("%Y-%m-%d") if end_date else "N/A",
@@ -230,6 +447,8 @@ async def my_subscription_command_handler(
             ),
             traffic_period=period_label,
         )
+        if tariff_prefix:
+            text = tariff_prefix + "\n" + text
 
     base_markup = get_back_to_main_menu_markup(current_lang, i18n)
     kb = base_markup.inline_keyboard
@@ -322,6 +541,12 @@ async def my_subscription_command_handler(
         if not traffic_mode and settings.yookassa_autopayments_active:
             prepend_rows.append([
                 InlineKeyboardButton(text=get_text("payment_methods_manage_button"), callback_data="pm:manage")
+            ])
+
+        if settings.tariffs_config and local_sub and local_sub.tariff_key:
+            prepend_rows.append([
+                InlineKeyboardButton(text="Сменить тариф", callback_data="tariff_change:list"),
+                InlineKeyboardButton(text="Докупить трафик", callback_data="tariff_topup:list"),
             ])
 
         if prepend_rows:

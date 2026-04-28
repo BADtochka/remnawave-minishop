@@ -2205,6 +2205,14 @@ def _serialize_subscription(
         "traffic_used": _format_bytes(active.get("traffic_used_bytes")),
         "traffic_limit_bytes": _coerce_int_or_none(active.get("traffic_limit_bytes")),
         "traffic_used_bytes": _coerce_int_or_none(active.get("traffic_used_bytes")),
+        "tariff_key": active.get("tariff_key"),
+        "tariff_name": active.get("tariff_name"),
+        "tariff_description": active.get("tariff_description"),
+        "billing_model": active.get("billing_model"),
+        "tier_baseline_bytes": _coerce_int_or_none(active.get("tier_baseline_bytes")),
+        "topup_balance_bytes": _coerce_int_or_none(active.get("topup_balance_bytes")),
+        "period_start_at": active.get("period_start_at").isoformat() if active.get("period_start_at") else None,
+        "is_throttled": bool(active.get("is_throttled")),
         "auto_renew_enabled": bool(getattr(local_sub, "auto_renew_enabled", False)),
         "provider": getattr(local_sub, "provider", None),
     }
@@ -2217,6 +2225,34 @@ def _serialize_plans(
     subscription_options: Optional[Dict[int, float]] = None,
     stars_subscription_options: Optional[Dict[int, int]] = None,
 ) -> List[Dict[str, Any]]:
+    if settings.tariffs_config:
+        plans: List[Dict[str, Any]] = []
+        for tariff in settings.tariffs_config.enabled_tariffs:
+            item: Dict[str, Any] = {
+                "tariff_key": tariff.key,
+                "billing_model": tariff.billing_model,
+                "title": tariff.name(lang),
+                "description": tariff.description(lang),
+                "squad_uuids": tariff.squad_uuids,
+            }
+            if tariff.billing_model == "period":
+                item["periods"] = [
+                    {
+                        "months": int(months),
+                        "price": tariff.period_price(int(months), "rub"),
+                        "stars_price": tariff.period_price(int(months), "stars"),
+                    }
+                    for months in tariff.enabled_periods
+                ]
+                item["monthly_gb"] = tariff.monthly_gb
+            else:
+                item["traffic_packages"] = [
+                    {"gb": package.gb, "price": package.price}
+                    for package in (tariff.traffic_packages.rub if tariff.traffic_packages else [])
+                ]
+            plans.append(item)
+        return plans
+
     active_subscription_options = subscription_options or settings.subscription_options
     active_stars_subscription_options = stars_subscription_options or settings.stars_subscription_options
     plans: List[Dict[str, Any]] = []

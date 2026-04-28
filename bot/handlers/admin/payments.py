@@ -67,20 +67,23 @@ def format_payment_text(payment: Payment, i18n: JsonI18n, lang: str, settings: S
         'platega': 'Platega',
     }.get(payment.provider, payment.provider or 'Unknown')
 
-    traffic_mode = getattr(settings, "traffic_sale_mode", False)
-    if traffic_mode:
-        traffic_val = payment.subscription_duration_months or 0
+    sale_base = (payment.sale_mode or "").split("@", 1)[0].split("|", 1)[0]
+    traffic_like = sale_base in {"traffic", "traffic_package", "topup"}
+    if traffic_like:
+        traffic_val = payment.purchased_gb or payment.subscription_duration_months or 0
         traffic_display = str(int(traffic_val)) if float(traffic_val).is_integer() else f"{traffic_val:g}"
         period_line = _("admin_payment_traffic_label", traffic_gb=traffic_display)
     else:
         period_line = _("admin_payment_months_label", months=payment.subscription_duration_months or 0)
+    tariff_line = f"\nTariff: {payment.tariff_key}" if payment.tariff_key else ""
+    sale_line = f"\nSale mode: {payment.sale_mode}" if payment.sale_mode else ""
     
     return (
         f"{status_emoji} <b>{payment.amount} {payment.currency}</b>\n"
         f"👤 {user_info}\n"
         f"💳 {provider_text}\n"
         f"📅 {payment_date}\n"
-        f"{period_line}\n"
+        f"{period_line}{tariff_line}{sale_line}\n"
         f"📋 {payment.status}\n"
         f"📝 {payment.description or 'N/A'}"
     )
@@ -212,20 +215,21 @@ async def export_payments_csv_handler(callback: types.CallbackQuery, i18n_data: 
             _("admin_csv_status"),
             _("admin_csv_description"),
             _("admin_csv_units"),
+            "sale_mode",
+            "tariff_key",
+            "purchased_gb",
             _("admin_csv_created_at"),
             _("admin_csv_provider_payment_id")
         ])
 
-        traffic_mode = getattr(settings, "traffic_sale_mode", False)
-        
         # Write payment data
         for payment in all_payments:
-            units_val = payment.subscription_duration_months or ""
-            if traffic_mode and units_val not in ("", None):
+            units_val = payment.purchased_gb or payment.subscription_duration_months or ""
+            if (payment.purchased_gb is not None) and units_val not in ("", None):
                 try:
                     units_val = str(int(units_val)) if float(units_val).is_integer() else f"{units_val:g}"
                 except Exception:
-                    units_val = payment.subscription_duration_months or ""
+                    units_val = payment.purchased_gb or payment.subscription_duration_months or ""
             writer.writerow([
                 payment.payment_id,
                 payment.user_id,
@@ -237,6 +241,9 @@ async def export_payments_csv_handler(callback: types.CallbackQuery, i18n_data: 
                 payment.status,
                 payment.description or "",
                 units_val,
+                payment.sale_mode or "",
+                payment.tariff_key or "",
+                payment.purchased_gb or "",
                 payment.created_at.strftime('%Y-%m-%d %H:%M:%S') if payment.created_at else "",
                 payment.provider_payment_id or ""
             ])

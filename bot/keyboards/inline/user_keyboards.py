@@ -1,6 +1,6 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 from aiogram.types import InlineKeyboardMarkup, WebAppInfo
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, Optional, List, Tuple, Any
 
 from config.settings import Settings
 
@@ -182,6 +182,54 @@ def get_subscription_options_keyboard(subscription_options: Dict[
     builder.row(
         InlineKeyboardButton(text=_(key="back_to_main_menu_button"),
                              callback_data="main_action:back_to_main"))
+    return builder.as_markup()
+
+
+def get_tariff_catalog_keyboard(tariffs: List[Any], lang: str, i18n_instance) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for tariff in tariffs:
+        label = tariff.name(lang)
+        if tariff.billing_model == "period":
+            min_price = tariff.min_period_price_rub()
+            if min_price is not None:
+                label = f"{label} от {min_price:g}"
+        else:
+            package = tariff.min_traffic_package_rub()
+            if package:
+                label = f"{label} от {package.price:g} / {package.gb:g} GB"
+        builder.row(InlineKeyboardButton(text=label, callback_data=f"tariff:select:{tariff.key}"))
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+    builder.row(InlineKeyboardButton(text=_(key="back_to_main_menu_button"), callback_data="main_action:back_to_main"))
+    return builder.as_markup()
+
+
+def get_tariff_periods_keyboard(tariff: Any, lang: str, i18n_instance, settings: Settings) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+    for months in tariff.enabled_periods:
+        rub_price = tariff.period_price(months, "rub")
+        if rub_price and rub_price > 0:
+            builder.row(
+                InlineKeyboardButton(
+                    text=_("subscribe_for_months_button", months=months, price=rub_price, currency_symbol=settings.DEFAULT_CURRENCY_SYMBOL),
+                    callback_data=f"tariff:period:{tariff.key}:{months}",
+                )
+            )
+    builder.row(InlineKeyboardButton(text=_(key="back_to_main_menu_button"), callback_data="main_action:subscribe"))
+    return builder.as_markup()
+
+
+def get_tariff_packages_keyboard(tariff: Any, packages: List[Any], lang: str, i18n_instance, back_callback: str = "main_action:subscribe") -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+    for package in packages:
+        builder.row(
+            InlineKeyboardButton(
+                text=_("buy_traffic_package_button", traffic_gb=f"{package.gb:g}", price=package.price, currency_symbol="RUB"),
+                callback_data=f"tariff:package:{tariff.key}:{package.gb:g}",
+            )
+        )
+    builder.row(InlineKeyboardButton(text=_(key="back_to_main_menu_button"), callback_data=back_callback))
     return builder.as_markup()
 
 
