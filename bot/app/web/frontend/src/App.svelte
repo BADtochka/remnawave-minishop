@@ -1,4 +1,4 @@
-﻿<script>
+<script>
   import {
     ArrowLeft,
     ArrowRight,
@@ -1673,9 +1673,15 @@
 
   function openPaymentModal() {
     if (tariffMode) {
-      paymentStep = "tariff";
-      selectedTariffKey = "";
-      selectedPlan = null;
+      if (subscription?.active && subscription?.tariff_key && tariffCatalog.some((t) => t.key === subscription.tariff_key)) {
+        selectedTariffKey = subscription.tariff_key;
+        selectedPlan = plans.find((plan) => plan?.tariff_key === selectedTariffKey) || null;
+        paymentStep = "checkout";
+      } else {
+        paymentStep = "tariff";
+        selectedTariffKey = "";
+        selectedPlan = null;
+      }
     } else {
       paymentStep = "checkout";
     }
@@ -1822,6 +1828,9 @@
   }
 
   function backToTariffList() {
+    if (subscription?.active && subscription?.tariff_key && tariffCatalog.some((t) => t.key === subscription.tariff_key)) {
+      return;
+    }
     paymentStep = "tariff";
   }
 
@@ -2773,10 +2782,12 @@
             {/if}
           {:else}
             {#if tariffMode}
-              <button class="back-inline" type="button" on:click={backToTariffList}>
-                <ArrowLeft size={16} />
-                {t("wa_back_to_tariffs")}
-              </button>
+              {#if !(subscription?.active && subscription?.tariff_key && tariffCatalog.some((t) => t.key === subscription.tariff_key))}
+                <button class="back-inline" type="button" on:click={backToTariffList}>
+                  <ArrowLeft size={16} />
+                  {t("wa_back_to_tariffs")}
+                </button>
+              {/if}
               {#if selectedTariff}
                 <p class="tariff-step-caption">{t("wa_selected_tariff", { tariff: selectedTariff.title })}</p>
               {/if}
