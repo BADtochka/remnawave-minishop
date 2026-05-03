@@ -26,6 +26,11 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
                                 "squad_uuids": ["uuid"],
                                 "billing_model": "period",
                                 "monthly_gb": 100,
+                                "hwid_device_limit": 5,
+                                "hwid_device_packages": {
+                                    "rub": [{"count": 1, "price": 99}],
+                                    "stars": [{"count": 1, "price": 2500}],
+                                },
                                 "prices_rub": {"1": 150},
                                 "prices_stars": {"1": 0},
                                 "enabled_periods": [1],
@@ -62,6 +67,8 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([plan["tariff_key"] for plan in plans], ["standard", "traffic"])
         self.assertEqual(plans[0]["sale_mode"], "subscription")
         self.assertEqual(plans[0]["months"], 1)
+        self.assertEqual(plans[0]["hwid_device_limit"], 5)
+        self.assertEqual(plans[0]["hwid_device_packages"][0]["device_count"], 1)
         self.assertEqual(plans[1]["sale_mode"], "traffic_package")
         self.assertEqual(plans[1]["traffic_gb"], 50.0)
         self.assertEqual(plans[1]["stars_price"], 2500)

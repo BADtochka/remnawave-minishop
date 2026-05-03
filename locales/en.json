@@ -765,5 +765,17 @@
   "wa_traffic_reset_yearly": "Yearly reset",
   "wa_traffic_reset_policy": "Traffic reset policy",
   "wa_plan_one_year": "1 year",
-  "wa_link_email_modal_desc": "Enter your email and get a verification code"
+  "wa_link_email_modal_desc": "Enter your email and get a verification code",
+  "buy_hwid_devices_menu_button": "+ HWID devices",
+  "buy_hwid_devices_button": "+{count} HWID for {price} {currency_symbol}",
+  "select_hwid_device_package": "Select HWID device package:",
+  "choose_payment_method_hwid_devices": "Choose a payment method for extra HWID devices:",
+  "no_hwid_device_packages_available": "Extra HWID devices are not configured for this tariff.",
+  "hwid_devices_unlimited_no_topup": "Your device limit is already unlimited.",
+  "payment_description_hwid_devices": "Extra HWID devices +{count}",
+  "wa_buy_hwid_devices": "Buy devices",
+  "wa_device_topup_for_tariff": "Device packages for {tariff}",
+  "wa_hwid_devices_package": "+{count} devices",
+  "wa_no_hwid_device_options": "No device packages available",
+  "wa_device_topup_options_failed": "Could not load device packages"
 }

@@ -93,6 +93,8 @@ class Subscription(Base):
     period_start_at = Column(DateTime(timezone=True), nullable=True)
     is_throttled = Column(Boolean, nullable=False, default=False, index=True)
     effective_monthly_price_rub = Column(Numeric, nullable=True)
+    hwid_device_limit = Column(Integer, nullable=True)
+    extra_hwid_devices = Column(Integer, nullable=False, default=0)
 
     user = relationship("User", back_populates="subscriptions")
 
@@ -167,6 +169,7 @@ class Payment(Base):
     sale_mode = Column(String, nullable=True, index=True)
     tariff_key = Column(String, nullable=True, index=True)
     purchased_gb = Column(Float, nullable=True)
+    purchased_hwid_devices = Column(Integer, nullable=True)
     promo_code_id = Column(Integer,
                            ForeignKey("promo_codes.promo_code_id"),
                            nullable=True)
@@ -188,6 +191,19 @@ class TrafficTopup(Base):
     payment_id = Column(Integer, ForeignKey("payments.payment_id"), nullable=True, index=True)
     purchased_bytes = Column(BigInteger, nullable=False)
     kind = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    subscription = relationship("Subscription")
+    payment = relationship("Payment")
+
+
+class HwidDevicePurchase(Base):
+    __tablename__ = "hwid_device_purchases"
+
+    purchase_id = Column(Integer, primary_key=True, autoincrement=True)
+    subscription_id = Column(Integer, ForeignKey("subscriptions.subscription_id"), nullable=False, index=True)
+    payment_id = Column(Integer, ForeignKey("payments.payment_id"), nullable=True, index=True)
+    purchased_devices = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     subscription = relationship("Subscription")

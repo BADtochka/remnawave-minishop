@@ -320,6 +320,10 @@ def _migration_0011_add_tariffs_schema(connection: Connection) -> None:
         sub_statements.append("ALTER TABLE subscriptions ADD COLUMN is_throttled BOOLEAN NOT NULL DEFAULT FALSE")
     if "effective_monthly_price_rub" not in sub_columns:
         sub_statements.append("ALTER TABLE subscriptions ADD COLUMN effective_monthly_price_rub NUMERIC")
+    if "hwid_device_limit" not in sub_columns:
+        sub_statements.append("ALTER TABLE subscriptions ADD COLUMN hwid_device_limit INTEGER")
+    if "extra_hwid_devices" not in sub_columns:
+        sub_statements.append("ALTER TABLE subscriptions ADD COLUMN extra_hwid_devices INTEGER NOT NULL DEFAULT 0")
     for stmt in sub_statements:
         connection.execute(text(stmt))
 
@@ -331,6 +335,8 @@ def _migration_0011_add_tariffs_schema(connection: Connection) -> None:
         payment_statements.append("ALTER TABLE payments ADD COLUMN tariff_key VARCHAR")
     if "purchased_gb" not in payment_columns:
         payment_statements.append("ALTER TABLE payments ADD COLUMN purchased_gb DOUBLE PRECISION")
+    if "purchased_hwid_devices" not in payment_columns:
+        payment_statements.append("ALTER TABLE payments ADD COLUMN purchased_hwid_devices INTEGER")
     for stmt in payment_statements:
         connection.execute(text(stmt))
 
@@ -366,6 +372,19 @@ def _migration_0011_add_tariffs_schema(connection: Connection) -> None:
     connection.execute(
         text(
             """
+            CREATE TABLE IF NOT EXISTS hwid_device_purchases (
+                purchase_id SERIAL PRIMARY KEY,
+                subscription_id INTEGER NOT NULL REFERENCES subscriptions(subscription_id),
+                payment_id INTEGER NULL REFERENCES payments(payment_id),
+                purchased_devices INTEGER NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
             CREATE TABLE IF NOT EXISTS tariff_changes (
                 change_id SERIAL PRIMARY KEY,
                 subscription_id INTEGER NOT NULL REFERENCES subscriptions(subscription_id),
@@ -393,6 +412,8 @@ def _migration_0011_add_tariffs_schema(connection: Connection) -> None:
         "CREATE INDEX IF NOT EXISTS ix_traffic_topups_kind ON traffic_topups (kind)",
         "CREATE INDEX IF NOT EXISTS ix_traffic_warnings_subscription_id ON traffic_warnings (subscription_id)",
         "CREATE INDEX IF NOT EXISTS ix_tariff_changes_subscription_id ON tariff_changes (subscription_id)",
+        "CREATE INDEX IF NOT EXISTS ix_hwid_device_purchases_subscription_id ON hwid_device_purchases (subscription_id)",
+        "CREATE INDEX IF NOT EXISTS ix_hwid_device_purchases_payment_id ON hwid_device_purchases (payment_id)",
     ]:
         connection.execute(text(stmt))
 

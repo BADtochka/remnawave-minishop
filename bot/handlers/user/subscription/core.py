@@ -1,4 +1,5 @@
 import hashlib
+import hashlib
 import logging
 from aiogram import Router, F, types, Bot
 from aiogram.filters import Command
@@ -17,6 +18,7 @@ from bot.keyboards.inline.user_keyboards import (
     get_tariff_periods_keyboard,
     get_tariff_packages_keyboard,
     get_payment_method_keyboard,
+    get_hwid_device_packages_keyboard,
 )
 from bot.services.subscription_service import SubscriptionService
 from bot.services.panel_api_service import PanelApiService
@@ -247,6 +249,70 @@ async def tariff_topup_list_callback(callback: types.CallbackQuery, i18n_data: d
         return
     markup = get_tariff_packages_keyboard(tariff, rub_packages, current_lang, i18n, back_callback="main_action:my_subscription")
     await callback.message.edit_text(get_text("choose_payment_method_traffic"), reply_markup=markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "hwid_devices:list")
+async def hwid_devices_list_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, subscription_service: SubscriptionService, session: AsyncSession):
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
+    config = settings.tariffs_config
+    active = await subscription_service.get_active_subscription_details(session, callback.from_user.id)
+    if not config or not active or not active.get("tariff_key") or not callback.message:
+        await callback.answer(get_text("error_try_again"), show_alert=True)
+        return
+    max_devices = active.get("max_devices")
+    if max_devices == 0:
+        await callback.answer(get_text("hwid_devices_unlimited_no_topup"), show_alert=True)
+        return
+    tariff = config.require(active["tariff_key"])
+    packages = tariff.hwid_device_packages.rub if tariff.hwid_device_packages else []
+    if not packages:
+        await callback.answer(get_text("no_hwid_device_packages_available"), show_alert=True)
+        return
+    markup = get_hwid_device_packages_keyboard(
+        tariff,
+        packages,
+        current_lang,
+        i18n,
+        settings,
+        back_callback="main_action:my_devices",
+    )
+    await callback.message.edit_text(get_text("select_hwid_device_package"), reply_markup=markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("hwid_devices:package:"))
+async def hwid_devices_package_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, session: AsyncSession):
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
+    config = settings.tariffs_config
+    if not config or not callback.message:
+        await callback.answer(get_text("error_occurred_try_again"), show_alert=True)
+        return
+    _, _, tariff_key, count_raw = callback.data.split(":", 3)
+    tariff = config.require(tariff_key)
+    count = int(count_raw)
+    package = next(
+        (pkg for pkg in (tariff.hwid_device_packages.rub if tariff.hwid_device_packages else []) if int(pkg.count) == count),
+        None,
+    )
+    if not package:
+        await callback.answer(get_text("error_try_again"), show_alert=True)
+        return
+    markup = get_payment_method_keyboard(
+        count,
+        package.price,
+        None,
+        settings.DEFAULT_CURRENCY_SYMBOL,
+        current_lang,
+        i18n,
+        settings,
+        sale_mode=f"hwid_devices@{tariff.key}",
+    )
+    await callback.message.edit_text(get_text("choose_payment_method_hwid_devices"), reply_markup=markup)
     await callback.answer()
 
 
@@ -601,6 +667,18 @@ async def my_subscription_command_handler(
                     callback_data="main_action:my_devices",
                 )
             ])
+            if settings.tariffs_config and local_sub and local_sub.tariff_key:
+                try:
+                    tariff_for_devices = settings.tariffs_config.require(local_sub.tariff_key)
+                    if tariff_for_devices.hwid_device_packages and tariff_for_devices.hwid_device_packages.rub:
+                        prepend_rows.append([
+                            InlineKeyboardButton(
+                                text=get_text("buy_hwid_devices_menu_button"),
+                                callback_data="hwid_devices:list",
+                            )
+                        ])
+                except Exception:
+                    pass
 
         # 2) Auto-renew toggle (YooKassa only)
         if not traffic_mode and local_sub and local_sub.provider == "yookassa" and settings.yookassa_autopayments_active:
@@ -747,6 +825,18 @@ async def my_devices_command_handler(
     kb = base_markup.inline_keyboard
 
     devices_kb = []
+    if settings.tariffs_config and active.get("tariff_key") and max_devices_value != 0:
+        try:
+            tariff_for_devices = settings.tariffs_config.require(active["tariff_key"])
+            if tariff_for_devices.hwid_device_packages and tariff_for_devices.hwid_device_packages.rub:
+                devices_kb.append([
+                    InlineKeyboardButton(
+                        text=get_text("buy_hwid_devices_menu_button"),
+                        callback_data="hwid_devices:list",
+                    )
+                ])
+        except Exception:
+            pass
     for index, device in enumerate(devices_list_raw, start=1):
         hwid = device.get('hwid')
         if not hwid:

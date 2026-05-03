@@ -251,6 +251,20 @@ def get_tariff_packages_keyboard(tariff: Any, packages: List[Any], lang: str, i1
     return builder.as_markup()
 
 
+def get_hwid_device_packages_keyboard(tariff: Any, packages: List[Any], lang: str, i18n_instance, settings: Settings, back_callback: str = "main_action:my_subscription") -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+    for package in packages:
+        builder.row(
+            InlineKeyboardButton(
+                text=_("buy_hwid_devices_button", count=package.count, price=package.price, currency_symbol=settings.DEFAULT_CURRENCY_SYMBOL),
+                callback_data=f"hwid_devices:package:{tariff.key}:{package.count}",
+            )
+        )
+    builder.row(InlineKeyboardButton(text=_(key="back_to_main_menu_button"), callback_data=back_callback))
+    return builder.as_markup()
+
+
 def get_payment_method_keyboard(months: int, price: float,
                                 stars_price: Optional[int],
                                 currency_symbol_val: str, lang: str,

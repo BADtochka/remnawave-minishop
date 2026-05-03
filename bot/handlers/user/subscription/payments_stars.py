@@ -57,7 +57,7 @@ async def pay_stars_callback_handler(
     payment_description = (
         get_text("payment_description_traffic", traffic_gb=human_value)
         if sale_base in {"traffic", "traffic_package", "topup"}
-        else get_text("payment_description_subscription", months=int(months))
+        else (get_text("payment_description_hwid_devices", count=int(months)) if sale_base in {"hwid_device", "hwid_devices"} else get_text("payment_description_subscription", months=int(months)))
     )
 
     payment_db_id = await stars_service.create_invoice(

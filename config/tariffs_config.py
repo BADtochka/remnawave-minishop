@@ -23,11 +23,35 @@ class TrafficPackage(BaseModel):
         return self
 
 
+class HwidDevicePackage(BaseModel):
+    count: int
+    price: float
+
+    @model_validator(mode="after")
+    def validate_values(self) -> "HwidDevicePackage":
+        if self.count <= 0:
+            raise ValueError("device package count must be greater than zero")
+        if self.price < 0:
+            raise ValueError("device package price must be non-negative")
+        return self
+
+
 class PackageSet(BaseModel):
     rub: List[TrafficPackage] = Field(default_factory=list)
     stars: List[TrafficPackage] = Field(default_factory=list)
 
     def for_currency(self, currency: Currency) -> List[TrafficPackage]:
+        return list(getattr(self, currency) or [])
+
+    def has_any(self) -> bool:
+        return bool(self.rub or self.stars)
+
+
+class HwidDevicePackageSet(BaseModel):
+    rub: List[HwidDevicePackage] = Field(default_factory=list)
+    stars: List[HwidDevicePackage] = Field(default_factory=list)
+
+    def for_currency(self, currency: Currency) -> List[HwidDevicePackage]:
         return list(getattr(self, currency) or [])
 
     def has_any(self) -> bool:
@@ -50,6 +74,8 @@ class Tariff(BaseModel):
 
     traffic_packages: Optional[PackageSet] = None
     conversion_rate_rub_per_gb: Optional[float] = None
+    hwid_device_limit: Optional[int] = None
+    hwid_device_packages: Optional[HwidDevicePackageSet] = None
 
     @model_validator(mode="after")
     def validate_tariff(self) -> "Tariff":
@@ -57,6 +83,8 @@ class Tariff(BaseModel):
             raise ValueError("tariff key must not be empty")
         self.key = self.key.strip()
         self.squad_uuids = [uuid.strip() for uuid in self.squad_uuids if uuid.strip()]
+        if self.hwid_device_limit is not None and self.hwid_device_limit < 0:
+            raise ValueError(f"tariff {self.key}: hwid_device_limit must be >= 0")
 
         if self.billing_model == "period":
             if self.monthly_gb is None or self.monthly_gb < 0:
@@ -118,6 +146,9 @@ class Tariff(BaseModel):
             return float(self.conversion_rate_rub_per_gb)
         packages = self.traffic_packages.rub if self.traffic_packages else []
         return min(float(pkg.price) / float(pkg.gb) for pkg in packages)
+
+    def has_hwid_device_packages(self) -> bool:
+        return bool(self.hwid_device_packages and self.hwid_device_packages.has_any())
 
 
 class TariffsConfig(BaseModel):

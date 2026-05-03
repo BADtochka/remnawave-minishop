@@ -88,3 +88,25 @@ class TariffsConfigTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             TariffsConfig.model_validate(data)
+
+    def test_hwid_device_limit_and_packages_load(self):
+        data = _valid_config()
+        data["tariffs"][0]["hwid_device_limit"] = 5
+        data["tariffs"][0]["hwid_device_packages"] = {
+            "rub": [{"count": 1, "price": 99}],
+            "stars": [{"count": 1, "price": 2500}],
+        }
+
+        config = TariffsConfig.model_validate(data)
+
+        tariff = config.require("standard")
+        self.assertEqual(tariff.hwid_device_limit, 5)
+        self.assertTrue(tariff.has_hwid_device_packages())
+        self.assertEqual(tariff.hwid_device_packages.rub[0].count, 1)
+
+    def test_negative_hwid_device_limit_rejected(self):
+        data = _valid_config()
+        data["tariffs"][0]["hwid_device_limit"] = -1
+
+        with self.assertRaises(ValueError):
+            TariffsConfig.model_validate(data)

@@ -108,6 +108,7 @@ class WebAppPaymentCreatePayload(BaseModel):
     method: str = ""
     months: Any = None
     traffic_gb: Any = None
+    device_count: Any = None
     tariff_key: Optional[constr(max_length=128)] = None
     sale_mode: Optional[constr(max_length=64)] = None
     description: Optional[constr(max_length=4096)] = None
@@ -213,6 +214,7 @@ def setup_subscription_webapp_routes(app: web.Application) -> None:
     app.router.add_post("/api/trial/activate", activate_trial_route)
     app.router.add_get("/api/devices", devices_route)
     app.router.add_post("/api/devices/disconnect", disconnect_device_route)
+    app.router.add_get("/api/devices/topup-options", device_topup_options_route)
     app.router.add_get("/api/tariffs/topup-options", tariff_topup_options_route)
     app.router.add_get("/api/tariffs/change-options", tariff_change_options_route)
     app.router.add_post("/api/tariffs/change", tariff_change_route)
@@ -1665,7 +1667,34 @@ async def create_payment_route(request: web.Request) -> web.Response:
     traffic_gb_for_payment: Optional[float] = None
     requested_sale_mode = _sale_mode_base(str(payment_payload.sale_mode or ""))
 
-    if tariffs_config and requested_sale_mode == "topup":
+    if tariffs_config and requested_sale_mode in {"hwid_device", "hwid_devices"}:
+        tariff_key = str(payment_payload.tariff_key or "").strip()
+        if not tariff_key:
+            return _json_error(400, "invalid_plan", "Tariff is not selected")
+        try:
+            tariff = tariffs_config.require(tariff_key)
+        except Exception:
+            return _json_error(400, "invalid_plan", "Tariff is not available")
+        try:
+            device_count = int(float(
+                payment_payload.device_count
+                if payment_payload.device_count is not None
+                else payment_payload.months
+            ))
+        except (TypeError, ValueError):
+            return _json_error(400, "invalid_plan", "Invalid device package")
+        packages = tariff.hwid_device_packages
+        rub_packages = {int(package.count): float(package.price) for package in (packages.rub if packages else [])}
+        stars_packages = {int(package.count): int(float(package.price)) for package in (packages.stars if packages else [])}
+        price = rub_packages.get(device_count)
+        stars_price = stars_packages.get(device_count)
+        if price is None and method != "stars":
+            return _json_error(400, "invalid_plan", "Device package is not available")
+        if method == "stars" and (stars_price is None or int(stars_price) <= 0):
+            return _json_error(400, "invalid_plan", "Stars price is not configured")
+        payment_units = device_count
+        sale_mode = f"hwid_devices@{tariff.key}"
+    elif tariffs_config and requested_sale_mode == "topup":
         tariff_key = str(payment_payload.tariff_key or "").strip()
         if not tariff_key:
             return _json_error(400, "invalid_plan", "Tariff is not selected")
@@ -2125,6 +2154,44 @@ async def disconnect_device_route(request: web.Request) -> web.Response:
         await session.commit()
 
     return web.json_response({"ok": True})
+
+
+async def device_topup_options_route(request: web.Request) -> web.Response:
+    user_id = _require_user_id(request)
+    settings: Settings = request.app["settings"]
+    config = settings.tariffs_config
+    if not settings.MY_DEVICES_SECTION_ENABLED:
+        return _json_error(404, "devices_disabled", "Devices section is disabled")
+    if not config:
+        return _json_error(404, "tariffs_unavailable", "Tariffs are not configured")
+
+    async_session_factory: sessionmaker = request.app["async_session_factory"]
+    subscription_service: SubscriptionService = request.app["subscription_service"]
+    async with async_session_factory() as session:
+        db_user = await user_dal.get_user_by_id(session, user_id)
+        if not db_user or db_user.is_banned:
+            return _json_error(403, "access_denied", "Access denied")
+        sub = await subscription_dal.get_active_subscription_by_user_id(session, user_id, db_user.panel_user_uuid)
+        if not sub or not sub.tariff_key:
+            return _json_error(400, "subscription_required", "Active tariff subscription is required")
+        tariff = config.require(sub.tariff_key)
+        active = await subscription_service.get_active_subscription_details(session, user_id)
+        plans = _serialize_hwid_device_packages(
+            settings,
+            tariff,
+            tariff.hwid_device_packages,
+            db_user.language_code or settings.DEFAULT_LANGUAGE,
+        )
+        return web.json_response(
+            {
+                "ok": True,
+                "tariff_key": tariff.key,
+                "tariff_name": tariff.name(db_user.language_code or settings.DEFAULT_LANGUAGE),
+                "current_limit": _coerce_int_or_none(active.get("max_devices")) if active else None,
+                "extra_hwid_devices": int(sub.extra_hwid_devices or 0),
+                "plans": plans,
+            }
+        )
 
 
 async def payment_status_route(request: web.Request) -> web.Response:
@@ -2879,6 +2946,8 @@ def _serialize_subscription(
         "period_start_at": active.get("period_start_at").isoformat() if active.get("period_start_at") else None,
         "is_throttled": bool(active.get("is_throttled")),
         "max_devices": _coerce_int_or_none(active.get("max_devices")),
+        "base_hwid_device_limit": _coerce_int_or_none(active.get("base_hwid_device_limit")),
+        "extra_hwid_devices": _coerce_int_or_none(active.get("extra_hwid_devices")) or 0,
         "auto_renew_enabled": bool(getattr(local_sub, "auto_renew_enabled", False)),
         "provider": getattr(local_sub, "provider", None),
     }
@@ -2904,6 +2973,13 @@ def _serialize_plans(
                 "description": tariff.description(lang),
                 "squad_uuids": tariff.squad_uuids,
                 "currency": settings.DEFAULT_CURRENCY_SYMBOL or "RUB",
+                "hwid_device_limit": tariff.hwid_device_limit,
+                "hwid_device_packages": _serialize_hwid_device_packages(
+                    settings,
+                    tariff,
+                    tariff.hwid_device_packages,
+                    lang,
+                ),
             }
             if tariff.billing_model == "period":
                 for months in sorted(tariff.enabled_periods):
@@ -3041,6 +3117,39 @@ def _serialize_topup_packages(
     return plans
 
 
+def _serialize_hwid_device_packages(
+    settings: Settings,
+    tariff: Any,
+    packages: Optional[Any],
+    lang: str,
+) -> List[Dict[str, Any]]:
+    rub_packages = {int(package.count): float(package.price) for package in (packages.rub if packages else [])}
+    stars_packages = {int(package.count): int(float(package.price)) for package in (packages.stars if packages else [])}
+    plans: List[Dict[str, Any]] = []
+    for count in sorted(set(rub_packages) | set(stars_packages)):
+        price = rub_packages.get(count)
+        stars_price = stars_packages.get(count)
+        if price is None and (stars_price is None or int(stars_price) <= 0):
+            continue
+        plan: Dict[str, Any] = {
+            "id": f"{tariff.key}:hwid:{count}",
+            "tariff_key": tariff.key,
+            "tariff_name": tariff.name(lang),
+            "billing_model": tariff.billing_model,
+            "sale_mode": "hwid_devices",
+            "months": int(count),
+            "device_count": int(count),
+            "price": float(price or 0),
+            "currency": settings.DEFAULT_CURRENCY_SYMBOL or "RUB",
+            "title": f"+{count}",
+            "subtitle": tariff.name(lang),
+        }
+        if stars_price is not None and int(stars_price) > 0:
+            plan["stars_price"] = int(stars_price)
+        plans.append(plan)
+    return plans
+
+
 def _serialize_tariff_change_target(
     settings: Settings,
     config: Any,
@@ -3169,6 +3278,10 @@ def _sale_mode_is_traffic(sale_mode: str) -> bool:
     return _sale_mode_base(sale_mode) in {"traffic", "traffic_package", "topup"}
 
 
+def _sale_mode_is_hwid_devices(sale_mode: str) -> bool:
+    return _sale_mode_base(sale_mode) in {"hwid_device", "hwid_devices"}
+
+
 async def _create_subscription_payment(
     *,
     request: web.Request,
@@ -3185,9 +3298,12 @@ async def _create_subscription_payment(
     settings: Settings = request.app["settings"]
     sale_mode = str(sale_mode or "subscription")
     traffic_sale = _sale_mode_is_traffic(sale_mode)
+    hwid_devices_sale = _sale_mode_is_hwid_devices(sale_mode)
     description = (
         _traffic_payment_description(float(traffic_gb if traffic_gb is not None else months), lang)
         if traffic_sale
+        else _hwid_devices_payment_description(int(float(months)), lang)
+        if hwid_devices_sale
         else _payment_description(int(months), lang)
     )
 
@@ -3248,6 +3364,7 @@ async def _create_base_payment_record(
     sale_mode: Optional[str] = None,
     tariff_key: Optional[str] = None,
     purchased_gb: Optional[float] = None,
+    purchased_hwid_devices: Optional[int] = None,
 ) -> Payment:
     payment = await payment_dal.create_payment_record(
         session,
@@ -3262,6 +3379,7 @@ async def _create_base_payment_record(
             "sale_mode": sale_mode,
             "tariff_key": tariff_key,
             "purchased_gb": purchased_gb,
+            "purchased_hwid_devices": purchased_hwid_devices,
         },
     )
     await session.commit()
@@ -3286,6 +3404,7 @@ async def _create_yookassa_payment(
 
     try:
         traffic_sale = _sale_mode_is_traffic(sale_mode)
+        hwid_devices_sale = _sale_mode_is_hwid_devices(sale_mode)
         payment = await _create_base_payment_record(
             session,
             user_id=user_id,
@@ -3298,16 +3417,19 @@ async def _create_yookassa_payment(
             sale_mode=sale_mode,
             tariff_key=_sale_mode_tariff_key(sale_mode),
             purchased_gb=float(traffic_gb or months) if traffic_sale else None,
+            purchased_hwid_devices=int(float(months)) if hwid_devices_sale else None,
         )
         metadata = {
             "user_id": str(user_id),
-            "subscription_months": str(int(float(months)) if not traffic_sale else 0),
+            "subscription_months": str(int(float(months)) if not traffic_sale and not hwid_devices_sale else 0),
             "payment_db_id": str(payment.payment_id),
             "sale_mode": sale_mode,
             "source": "webapp",
         }
         if traffic_sale:
             metadata["traffic_gb"] = _format_number_for_payload(traffic_gb or months)
+        if hwid_devices_sale:
+            metadata["hwid_devices"] = str(int(float(months)))
         if _sale_mode_tariff_key(sale_mode):
             metadata["tariff_key"] = _sale_mode_tariff_key(sale_mode)
         response = await service.create_payment(
@@ -3368,6 +3490,7 @@ async def _create_freekassa_payment(
 
     try:
         traffic_sale = _sale_mode_is_traffic(sale_mode)
+        hwid_devices_sale = _sale_mode_is_hwid_devices(sale_mode)
         payment = await _create_base_payment_record(
             session,
             user_id=user_id,
@@ -3380,6 +3503,7 @@ async def _create_freekassa_payment(
             sale_mode=sale_mode,
             tariff_key=_sale_mode_tariff_key(sale_mode),
             purchased_gb=float(traffic_gb or months) if traffic_sale else None,
+            purchased_hwid_devices=int(float(months)) if hwid_devices_sale else None,
         )
         success, response_data = await service.create_order(
             payment_db_id=payment.payment_id,
@@ -3444,6 +3568,7 @@ async def _create_platega_payment(
 
     try:
         traffic_sale = _sale_mode_is_traffic(sale_mode)
+        hwid_devices_sale = _sale_mode_is_hwid_devices(sale_mode)
         payment = await _create_base_payment_record(
             session,
             user_id=user_id,
@@ -3456,6 +3581,7 @@ async def _create_platega_payment(
             sale_mode=sale_mode,
             tariff_key=_sale_mode_tariff_key(sale_mode),
             purchased_gb=float(traffic_gb or months) if traffic_sale else None,
+            purchased_hwid_devices=int(float(months)) if hwid_devices_sale else None,
         )
         months_for_provider = int(float(months)) if not traffic_sale else int(float(traffic_gb or months))
         payload = json.dumps(
@@ -3465,6 +3591,7 @@ async def _create_platega_payment(
                 "months": months_for_provider if not traffic_sale else 0,
                 "sale_mode": sale_mode,
                 "traffic_gb": _format_number_for_payload(traffic_gb or months) if traffic_sale else None,
+                "hwid_devices": int(float(months)) if hwid_devices_sale else None,
                 "source": "webapp",
                 "platega_variant": "crypto" if variant == "platega_crypto" else "sbp",
             }
@@ -3531,6 +3658,7 @@ async def _create_severpay_payment(
 
     try:
         traffic_sale = _sale_mode_is_traffic(sale_mode)
+        hwid_devices_sale = _sale_mode_is_hwid_devices(sale_mode)
         payment = await _create_base_payment_record(
             session,
             user_id=user_id,
@@ -3543,6 +3671,7 @@ async def _create_severpay_payment(
             sale_mode=sale_mode,
             tariff_key=_sale_mode_tariff_key(sale_mode),
             purchased_gb=float(traffic_gb or months) if traffic_sale else None,
+            purchased_hwid_devices=int(float(months)) if hwid_devices_sale else None,
         )
         success, response_data = await service.create_payment(
             payment_db_id=payment.payment_id,
@@ -3596,6 +3725,7 @@ async def _create_stars_payment(
     bot: Bot = request.app["bot"]
     try:
         traffic_sale = _sale_mode_is_traffic(sale_mode)
+        hwid_devices_sale = _sale_mode_is_hwid_devices(sale_mode)
         payment = await _create_base_payment_record(
             session,
             user_id=user_id,
@@ -3608,6 +3738,7 @@ async def _create_stars_payment(
             sale_mode=sale_mode,
             tariff_key=_sale_mode_tariff_key(sale_mode),
             purchased_gb=float(traffic_gb or months) if traffic_sale else None,
+            purchased_hwid_devices=int(float(months)) if hwid_devices_sale else None,
         )
         payload_units = traffic_gb if traffic_sale and traffic_gb is not None else months
         payload = f"{payment.payment_id}:{_format_number_for_payload(payload_units)}:{sale_mode}"
@@ -3791,6 +3922,12 @@ def _traffic_payment_description(traffic_gb: float, lang: str) -> str:
     if lang == "en":
         return f"Traffic package {_format_traffic_title(traffic_gb, lang)}"
     return f"Пакет трафика {_format_traffic_title(traffic_gb, lang)}"
+
+
+def _hwid_devices_payment_description(device_count: int, lang: str) -> str:
+    if lang == "en":
+        return f"HWID device package +{device_count}"
+    return f"Докупка устройств HWID +{device_count}"
 
 
 def _resolve_numeric_option_key(options: Dict[Any, Any], target: float) -> Optional[Any]:

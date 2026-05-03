@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import TariffChange, TrafficTopup, TrafficWarning
+from db.models import HwidDevicePurchase, TariffChange, TrafficTopup, TrafficWarning
 
 
 async def create_traffic_topup(
@@ -19,6 +19,24 @@ async def create_traffic_topup(
         payment_id=payment_id,
         purchased_bytes=purchased_bytes,
         kind=kind,
+    )
+    session.add(record)
+    await session.flush()
+    await session.refresh(record)
+    return record
+
+
+async def create_hwid_device_purchase(
+    session: AsyncSession,
+    *,
+    subscription_id: int,
+    payment_id: Optional[int],
+    purchased_devices: int,
+) -> HwidDevicePurchase:
+    record = HwidDevicePurchase(
+        subscription_id=subscription_id,
+        payment_id=payment_id,
+        purchased_devices=purchased_devices,
     )
     session.add(record)
     await session.flush()

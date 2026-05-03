@@ -17,6 +17,7 @@
     Home,
     LockKeyhole,
     Mail,
+    Plus,
     RefreshCw,
     Send,
     Smartphone,
@@ -215,10 +216,13 @@
   let paymentStep = "tariff";
   let selectedTariffKey = "";
   let topupModalOpen = query.get("topup") === "1";
+  let deviceTopupModalOpen = query.get("device_topup") === "1";
   let changeModalOpen = query.get("change") === "1";
   let topupOptions = null;
+  let deviceTopupOptions = null;
   let changeOptions = null;
   let selectedTopupPlan = null;
+  let selectedDeviceTopupPlan = null;
   let selectedChangeTarget = null;
   let selectedChangeAction = null;
   let changeConfirmOpen = false;
@@ -409,6 +413,16 @@
           { id: "standard:topup:200", tariff_key: "standard", tariff_name: "Стандарт", sale_mode: "topup", traffic_gb: 200, months: 200, price: 1299, currency: "RUB", title: "200 GB", subtitle: "Стандарт" },
         ],
       };
+      DEV_MOCK.data.device_topup_options = {
+        ok: true,
+        tariff_key: "standard",
+        tariff_name: "Стандарт",
+        current_limit: 5,
+        plans: [
+          { id: "standard:hwid:1", tariff_key: "standard", tariff_name: "Стандарт", sale_mode: "hwid_devices", device_count: 1, months: 1, price: 99, currency: "RUB", title: "+1", subtitle: "Стандарт" },
+          { id: "standard:hwid:3", tariff_key: "standard", tariff_name: "Стандарт", sale_mode: "hwid_devices", device_count: 3, months: 3, price: 249, currency: "RUB", title: "+3", subtitle: "Стандарт" },
+        ],
+      };
     } else if (mode === "devices") {
       DEV_MOCK.data.settings.my_devices_enabled = true;
       DEV_MOCK.data.subscription = {
@@ -482,7 +496,7 @@
   $: telegramLoginBotId = Number(CFG.telegramLoginBotId || 0);
   $: telegramOAuthClientId = Number(CFG.telegramOAuthClientId || telegramLoginBotId || 0);
   $: applyFavicon(CFG.logoUrl, brandEmoji);
-  $: syncBodyScrollLock(paymentModalOpen || changeModalOpen || changeConfirmOpen || topupModalOpen || linkEmailOpen);
+  $: syncBodyScrollLock(paymentModalOpen || changeModalOpen || changeConfirmOpen || topupModalOpen || deviceTopupModalOpen || linkEmailOpen);
   $: if (!tariffMode && !selectedPlan && plans.length) selectedPlan = plans[Math.min(1, plans.length - 1)];
   $: if (tariffMode && selectedTariffKey && !tariffCatalog.some((tariff) => tariff.key === selectedTariffKey)) {
     selectedTariffKey = "";
@@ -753,6 +767,7 @@
       await loadDevices();
     }
     if (topupModalOpen) await loadTopupOptions();
+    if (deviceTopupModalOpen) await loadDeviceTopupOptions();
     if (changeModalOpen) await loadTariffChangeOptions();
   }
 
@@ -805,6 +820,7 @@
     }
     if (path === "/promo/apply") return { ok: true, end_date_text: "31.05.2026" };
     if (path === "/devices") return structuredCloneSafe(DEV_MOCK.data.devices);
+    if (path === "/devices/topup-options") return structuredCloneSafe(DEV_MOCK.data.device_topup_options || { ok: true, plans: [] });
     if (path === "/tariffs/topup-options") return structuredCloneSafe(DEV_MOCK.data.topup_options || { ok: true, plans: [] });
     if (path === "/tariffs/change-options") return structuredCloneSafe(DEV_MOCK.data.tariff_change_options || { ok: true, targets: [] });
     if (path === "/devices/disconnect" && String(options.method || "").toUpperCase() === "POST") {
@@ -1327,6 +1343,7 @@
         body: JSON.stringify({
           months: selectedPlan.months,
           traffic_gb: selectedPlan.traffic_gb,
+          device_count: selectedPlan.device_count,
           tariff_key: selectedPlan.tariff_key,
           sale_mode: selectedPlan.sale_mode,
           method: selectedMethod,
@@ -1403,6 +1420,47 @@
       showToast(t("wa_payment_created"));
       openExternalLink(response.payment_url);
       topupModalOpen = false;
+    } catch (error) {
+      showToast(error?.message || t("wa_payment_create_failed"));
+    } finally {
+      payBusy = false;
+    }
+  }
+
+  async function loadDeviceTopupOptions() {
+    if (deviceTopupOptions || tariffActionBusy) return;
+    tariffActionBusy = true;
+    try {
+      const response = await api("/devices/topup-options");
+      if (!response?.ok) throw response;
+      deviceTopupOptions = response;
+      selectedDeviceTopupPlan = response.plans?.[0] || null;
+    } catch (error) {
+      showToast(error?.message || t("wa_device_topup_options_failed"));
+      deviceTopupModalOpen = false;
+    } finally {
+      tariffActionBusy = false;
+    }
+  }
+
+  async function createDeviceTopupPayment() {
+    if (!selectedDeviceTopupPlan || !selectedMethod || payBusy) return;
+    payBusy = true;
+    try {
+      const response = await api("/payments", {
+        method: "POST",
+        body: JSON.stringify({
+          months: selectedDeviceTopupPlan.device_count || selectedDeviceTopupPlan.months,
+          device_count: selectedDeviceTopupPlan.device_count || selectedDeviceTopupPlan.months,
+          tariff_key: selectedDeviceTopupPlan.tariff_key || deviceTopupOptions?.tariff_key,
+          sale_mode: "hwid_devices",
+          method: selectedMethod,
+        }),
+      });
+      if (!response.ok || !response.payment_url) throw response;
+      showToast(t("wa_payment_created"));
+      openExternalLink(response.payment_url);
+      deviceTopupModalOpen = false;
     } catch (error) {
       showToast(error?.message || t("wa_payment_create_failed"));
     } finally {
@@ -1674,6 +1732,16 @@
     screen = "devices";
     syncSectionPath("devices");
     loadDevices();
+  }
+
+  function openDeviceTopupModal() {
+    selectedMethod = methods[0]?.id || "";
+    deviceTopupModalOpen = true;
+    loadDeviceTopupOptions();
+  }
+
+  function closeDeviceTopupModal() {
+    deviceTopupModalOpen = false;
   }
 
   function goSettings() {
@@ -2539,6 +2607,12 @@
               <div class="progress devices-progress">
                 <span style={`width: ${devicesPercent()}%`}></span>
               </div>
+              {#if subscription?.active && subscription?.max_devices !== 0}
+                <Button variant="secondary" class="wide" onclick={openDeviceTopupModal}>
+                  <Plus size={17} />
+                  {t("wa_buy_hwid_devices")}
+                </Button>
+              {/if}
             </Card>
 
             {#if devicesBusy && !devicesLoaded}
@@ -3088,6 +3162,65 @@
             </Button>
           {:else}
             <Card class="empty-card">{tariffActionBusy ? t("wa_tariff_options_loading") : t("wa_no_topup_options")}</Card>
+          {/if}
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={deviceTopupModalOpen}
+        title={t("wa_buy_hwid_devices")}
+        description={deviceTopupOptions?.tariff_name ? t("wa_device_topup_for_tariff", { tariff: deviceTopupOptions.tariff_name }) : t("wa_tariff_options_loading")}
+        closeLabel={t("wa_close")}
+        onclose={closeDeviceTopupModal}
+        class="payment-dialog-card"
+      >
+        <div class="payment-dialog-body">
+          {#if deviceTopupOptions?.plans?.length}
+            <div class="option-list">
+              {#each deviceTopupOptions.plans as plan}
+                <button
+                  class:active={planKey(selectedDeviceTopupPlan) === planKey(plan)}
+                  class="option-row plan-row"
+                  type="button"
+                  on:click={() => (selectedDeviceTopupPlan = plan)}
+                >
+                  <span class="option-row-main">
+                    <strong>{t("wa_hwid_devices_package", { count: Number(plan.device_count || plan.months || 0) })}</strong>
+                    <small>{plan.subtitle || deviceTopupOptions.tariff_name}</small>
+                  </span>
+                  <span class="option-row-meta">
+                    <em>{priceLabel(plan)}</em>
+                    {#if planKey(selectedDeviceTopupPlan) === planKey(plan)}
+                      <CheckCircle2 size={18} />
+                    {/if}
+                  </span>
+                </button>
+              {/each}
+            </div>
+            <div class="method-grid">
+              {#each methods as method}
+                {@const meta = methodMeta(method)}
+                <button
+                  class:active={selectedMethod === method.id}
+                  class="method-card"
+                  type="button"
+                  on:click={() => (selectedMethod = method.id)}
+                >
+                  <span class="method-card-main">
+                    {#if meta.icon}
+                      <svelte:component this={meta.icon} size={19} />
+                    {/if}
+                    <strong>{meta.title}</strong>
+                  </span>
+                </button>
+              {/each}
+            </div>
+            <Button class="wide bottom-action payment-submit-button" onclick={createDeviceTopupPayment} disabled={!selectedDeviceTopupPlan || !methods.length || payBusy}>
+              {t("wa_pay")} {selectedDeviceTopupPlan ? priceLabel(selectedDeviceTopupPlan) : ""}
+              <LockKeyhole size={17} />
+            </Button>
+          {:else}
+            <Card class="empty-card">{tariffActionBusy ? t("wa_tariff_options_loading") : t("wa_no_hwid_device_options")}</Card>
           {/if}
         </div>
       </Dialog>

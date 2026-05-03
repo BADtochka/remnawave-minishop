@@ -81,12 +81,12 @@ async def _initiate_yk_payment(
     if not callback.message:
         return False
 
+    sale_base = _sale_mode_base(sale_mode)
     payment_description = (
         get_text("payment_description_traffic", traffic_gb=_format_value(months))
-        if _sale_mode_base(sale_mode) in {"traffic", "traffic_package", "topup"}
-        else get_text("payment_description_subscription", months=int(months))
+        if sale_base in {"traffic", "traffic_package", "topup"}
+        else (get_text("payment_description_hwid_devices", count=int(months)) if sale_base in {"hwid_device", "hwid_devices"} else get_text("payment_description_subscription", months=int(months)))
     )
-    sale_base = _sale_mode_base(sale_mode)
     payment_record_data = {
         "user_id": user_id,
         "amount": price_rub,
@@ -97,6 +97,7 @@ async def _initiate_yk_payment(
         "sale_mode": sale_base,
         "tariff_key": sale_mode.split("@", 1)[1] if "@" in sale_mode else None,
         "purchased_gb": float(months) if sale_base in {"traffic", "traffic_package", "topup"} else None,
+        "purchased_hwid_devices": int(months) if sale_base in {"hwid_device", "hwid_devices"} else None,
     }
 
     db_payment_record = None

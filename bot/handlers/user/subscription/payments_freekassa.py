@@ -65,7 +65,7 @@ async def pay_fk_callback_handler(
     payment_description = (
         get_text("payment_description_traffic", traffic_gb=human_value)
         if sale_base in {"traffic", "traffic_package", "topup"}
-        else get_text("payment_description_subscription", months=int(months))
+        else (get_text("payment_description_hwid_devices", count=int(months)) if sale_base in {"hwid_device", "hwid_devices"} else get_text("payment_description_subscription", months=int(months)))
     )
     currency_code = getattr(freekassa_service, "default_currency", None) or settings.DEFAULT_CURRENCY_SYMBOL or "RUB"
 
@@ -80,6 +80,7 @@ async def pay_fk_callback_handler(
         "sale_mode": sale_mode,
         "tariff_key": sale_mode.split("@", 1)[1] if "@" in sale_mode else None,
         "purchased_gb": float(months) if sale_base in {"traffic", "traffic_package", "topup"} else None,
+        "purchased_hwid_devices": int(months) if sale_base in {"hwid_device", "hwid_devices"} else None,
     }
 
     try:
