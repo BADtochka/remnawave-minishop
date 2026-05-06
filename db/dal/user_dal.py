@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ..models import (
     User,
+    UserTelegramAvatar,
     Subscription,
     Payment,
     PromoCodeActivation,
@@ -110,6 +111,45 @@ async def get_user_by_telegram_id(
     stmt = select(User).where(User.telegram_id == telegram_id)
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def get_user_telegram_avatar(
+    session: AsyncSession,
+    user_id: int,
+) -> Optional[UserTelegramAvatar]:
+    stmt = select(UserTelegramAvatar).where(UserTelegramAvatar.user_id == user_id)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def upsert_user_telegram_avatar(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    file_unique_id: Optional[str],
+    content_type: str,
+    image_bytes: bytes,
+) -> UserTelegramAvatar:
+    avatar = await get_user_telegram_avatar(session, user_id)
+    if avatar is None:
+        avatar = UserTelegramAvatar(
+            user_id=user_id,
+            file_unique_id=file_unique_id,
+            content_type=content_type,
+            image_bytes=image_bytes,
+            size_bytes=len(image_bytes),
+            updated_at=datetime.now(timezone.utc),
+        )
+        session.add(avatar)
+    else:
+        avatar.file_unique_id = file_unique_id
+        avatar.content_type = content_type
+        avatar.image_bytes = image_bytes
+        avatar.size_bytes = len(image_bytes)
+        avatar.updated_at = datetime.now(timezone.utc)
+    await session.flush()
+    await session.refresh(avatar)
+    return avatar
 
 
 async def get_user_by_panel_uuid(
@@ -426,6 +466,22 @@ async def merge_users(
             .values(user_id=target_user_id)
         )
 
+    target_has_avatar = (
+        await session.execute(
+            select(UserTelegramAvatar.user_id).where(UserTelegramAvatar.user_id == target_user_id)
+        )
+    ).scalar_one_or_none()
+    if target_has_avatar:
+        await session.execute(
+            delete(UserTelegramAvatar).where(UserTelegramAvatar.user_id == source_user_id)
+        )
+    else:
+        await session.execute(
+            update(UserTelegramAvatar)
+            .where(UserTelegramAvatar.user_id == source_user_id)
+            .values(user_id=target_user_id)
+        )
+
     subscription_update_values: Dict[str, Any] = {"user_id": target_user_id}
     if panel_uuid_to_keep:
         subscription_update_values["panel_user_uuid"] = panel_uuid_to_keep
@@ -684,6 +740,7 @@ async def delete_user_and_relations(session: AsyncSession, user_id: int) -> bool
     )
     await session.execute(delete(UserBilling).where(UserBilling.user_id == user_id))
     await session.execute(delete(AdAttribution).where(AdAttribution.user_id == user_id))
+    await session.execute(delete(UserTelegramAvatar).where(UserTelegramAvatar.user_id == user_id))
 
     await session.delete(user)
     await session.flush()

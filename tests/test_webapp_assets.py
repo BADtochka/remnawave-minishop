@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -10,6 +11,40 @@ from config.settings import Settings
 
 
 class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
+    def test_subscription_template_does_not_block_on_telegram_sdk(self):
+        html = subscription_webapp.TEMPLATE_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn("https://telegram.org/js/telegram-web-app.js", html)
+        self.assertNotIn("https://fonts.googleapis.com", html)
+        self.assertLess(html.index("/subscription_webapp.css"), html.index("WEBAPP_JS_SCRIPT"))
+
+    def test_https_webapp_logo_uses_same_origin_proxy(self):
+        settings = SimpleNamespace(WEBAPP_LOGO_URL="https://cdn.example.com/logo.png")
+
+        self.assertEqual(subscription_webapp._resolve_webapp_logo_url(settings), "/webapp-logo")
+
+    def test_telegram_avatar_url_uses_same_origin_account_route(self):
+        avatar = SimpleNamespace(
+            user_id=123,
+            image_bytes=b"avatar",
+            updated_at=datetime(2026, 5, 6, 12, 0, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(
+            subscription_webapp._telegram_avatar_url(avatar),
+            f"/api/account/avatar?v={int(avatar.updated_at.timestamp())}",
+        )
+
+    def test_select_compact_telegram_photo_size_prefers_small_suitable_photo(self):
+        small = SimpleNamespace(width=80, height=80, file_size=5000)
+        medium = SimpleNamespace(width=160, height=160, file_size=12000)
+        large = SimpleNamespace(width=640, height=640, file_size=90000)
+
+        self.assertIs(
+            subscription_webapp._select_compact_telegram_photo_size([small, large, medium]),
+            medium,
+        )
+
     def test_serialize_plans_uses_traffic_packages_in_traffic_mode(self):
         settings = Settings(
             _env_file=None,

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, UniqueConstraint, Text, BigInteger, Index
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, UniqueConstraint, Text, BigInteger, Index, LargeBinary
 from sqlalchemy.orm import relationship, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.sql import func
@@ -57,6 +57,29 @@ class User(Base):
 
     def __repr__(self):
         return f"<User(user_id={self.user_id}, username='{self.username}')>"
+
+
+class UserTelegramAvatar(Base):
+    __tablename__ = "user_telegram_avatars"
+
+    user_id = Column(
+        BigInteger,
+        ForeignKey("users.user_id"),
+        primary_key=True,
+        index=True,
+    )
+    file_unique_id = Column(String, nullable=True, index=True)
+    content_type = Column(String(64), nullable=False, default="image/jpeg")
+    image_bytes = Column(LargeBinary, nullable=False)
+    size_bytes = Column(Integer, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user = relationship("User")
 
 
 class Subscription(Base):

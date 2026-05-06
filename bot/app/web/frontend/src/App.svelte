@@ -30,6 +30,7 @@
   import { Select, Tooltip } from "bits-ui";
 
   import Button from "./lib/components/ui/button.svelte";
+  import BrandMark from "./BrandMark.svelte";
   import Card from "./lib/components/ui/card.svelte";
   import Dialog from "./lib/components/ui/dialog.svelte";
   import Input from "./lib/components/ui/input.svelte";
@@ -61,6 +62,12 @@
     devices: "/devices",
     settings: "/settings",
   };
+  const TELEGRAM_WEBAPP_SCRIPT_URL = "https://telegram.org/js/telegram-web-app.js";
+  const TELEGRAM_OAUTH_AVAILABILITY_URL = "https://oauth.telegram.org/";
+  const TELEGRAM_SDK_BOOT_TIMEOUT_MS = 900;
+  const TELEGRAM_SDK_ACTION_TIMEOUT_MS = 1800;
+  const TELEGRAM_OAUTH_AVAILABILITY_TIMEOUT_MS = 15000;
+  const TELEGRAM_MINI_APP_AUTH_TIMEOUT_MS = 15000;
 
   const DEV_MOCK = {
     config: {
@@ -203,7 +210,11 @@
     ...(injectedConfig || {}),
   };
   const I18N = injectedI18n || {};
-  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  let tg = resolveTelegramWebApp();
+  let telegramSdkStatus = tg ? "ready" : "idle";
+  let telegramSdkPromise = null;
+  let telegramLaunchParamsDetected = false;
+  let telegramOAuthUnavailable = false;
 
   let mode = isPreviewBoard ? "preview" : "loading";
   let activeTab = "home";
@@ -241,6 +252,9 @@
   let authStatus = "";
   let authIsError = false;
   let authBusy = false;
+  let telegramLoginBusy = false;
+  let telegramLoginWatchdogTimer = null;
+  let telegramLoginAttemptId = 0;
   let loginEmailFieldError = "";
   let loginEmailTooltipOpen = false;
   let authResendCooldown = 0;
@@ -349,6 +363,27 @@
   $: supportUrl = String(appSettings?.support_url || CFG.supportUrl || "").trim();
   $: telegramLoginBotId = Number(CFG.telegramLoginBotId || 0);
   $: telegramOAuthClientId = Number(CFG.telegramOAuthClientId || telegramLoginBotId || 0);
+  $: telegramMiniAppAuthAvailable = Boolean(tg?.initData);
+  $: telegramMiniAppSdkUnavailable =
+    telegramLaunchParamsDetected && !telegramMiniAppAuthAvailable && telegramSdkStatus === "unavailable";
+  $: telegramLoginUnavailable =
+    telegramOAuthUnavailable ||
+    telegramMiniAppSdkUnavailable ||
+    (!telegramMiniAppAuthAvailable && !telegramOAuthClientId && telegramSdkStatus !== "loading");
+  $: telegramLoginChecking = telegramLoginBusy || (authBusy && authStatus === t("wa_auth_checking_telegram"));
+  $: telegramLoginLabel = telegramLoginUnavailable
+    ? t("wa_login_telegram_unavailable_button")
+    : telegramLoginChecking
+      ? t("wa_auth_checking_telegram")
+      : t("wa_login_telegram_button");
+  $: telegramLoginUnavailableMessage =
+    telegramOAuthUnavailable
+      ? t("wa_auth_telegram_timeout")
+      : telegramLoginUnavailable && telegramSdkStatus === "unavailable"
+        ? t("wa_auth_telegram_unavailable")
+        : telegramLoginUnavailable
+          ? t("wa_auth_telegram_not_configured")
+          : "";
   $: applyFavicon(CFG.logoUrl, brandEmoji);
   $: syncBodyScrollLock(paymentModalOpen || linkEmailOpen);
   $: if (!selectedPlan && plans.length) selectedPlan = plans[Math.min(1, plans.length - 1)];
@@ -386,6 +421,7 @@
     return () => {
       window.removeEventListener("popstate", onPopState);
       window.removeEventListener("pointerdown", onAnyPointerDown);
+      stopTelegramLoginWatchdog();
       clearCooldownTimer("auth");
       clearCooldownTimer("link_email");
       clearLanguageClickGuard();
@@ -534,8 +570,156 @@
     window.history[replace ? "replaceState" : "pushState"](null, "", nextUrl);
   }
 
+  function resolveTelegramWebApp() {
+    return window.Telegram?.WebApp || null;
+  }
+
+  function refreshTelegramWebApp() {
+    tg = resolveTelegramWebApp();
+    if (tg) telegramSdkStatus = "ready";
+    if (tg?.initData) telegramLaunchParamsDetected = true;
+    return tg;
+  }
+
+  function hasTelegramLaunchParams() {
+    refreshTelegramWebApp();
+    if (telegramLaunchParamsDetected || tg?.initData) {
+      telegramLaunchParamsDetected = true;
+      return true;
+    }
+    const queryText = window.location.search.replace(/^\?/, "");
+    const hashText = window.location.hash.replace(/^#/, "");
+    const detected = [queryText, hashText].some((text) => {
+      if (!text) return false;
+      const params = new URLSearchParams(text);
+      return ["tgWebAppData", "tgWebAppVersion", "tgWebAppPlatform", "tgWebAppThemeParams"].some((key) =>
+        params.has(key),
+      );
+    });
+    if (detected) telegramLaunchParamsDetected = true;
+    return detected;
+  }
+
+  function loadTelegramSdk(timeoutMs = TELEGRAM_SDK_BOOT_TIMEOUT_MS) {
+    if (refreshTelegramWebApp()) return Promise.resolve(tg);
+    if (telegramSdkPromise) return telegramSdkPromise;
+    if (typeof document === "undefined") return Promise.resolve(null);
+
+    telegramSdkStatus = "loading";
+    telegramSdkPromise = new Promise((resolve) => {
+      const existingScript = document.querySelector("script[data-rw-telegram-web-app-sdk]");
+      const script = existingScript || document.createElement("script");
+      let resolved = false;
+      let timeoutId = null;
+
+      const resolveOnce = (value) => {
+        if (resolved) return;
+        resolved = true;
+        if (timeoutId) window.clearTimeout(timeoutId);
+        resolve(value);
+      };
+
+      const refreshFromScript = () => {
+        tg = resolveTelegramWebApp();
+        telegramSdkStatus = tg ? "ready" : "unavailable";
+        return tg;
+      };
+
+      script.addEventListener("load", () => resolveOnce(refreshFromScript()), { once: true });
+      script.addEventListener(
+        "error",
+        () => {
+          telegramSdkStatus = "unavailable";
+          resolveOnce(null);
+        },
+        { once: true },
+      );
+
+      if (!existingScript) {
+        script.src = TELEGRAM_WEBAPP_SCRIPT_URL;
+        script.async = true;
+        script.defer = true;
+        script.dataset.rwTelegramWebAppSdk = "1";
+        document.head.appendChild(script);
+      }
+
+      timeoutId = window.setTimeout(() => {
+        if (!tg) telegramSdkStatus = "unavailable";
+        resolveOnce(tg);
+      }, timeoutMs);
+    }).finally(() => {
+      telegramSdkPromise = null;
+    });
+    return telegramSdkPromise;
+  }
+
+  async function ensureTelegramSdkForAction() {
+    if (refreshTelegramWebApp()) return tg;
+    return await loadTelegramSdk(TELEGRAM_SDK_ACTION_TIMEOUT_MS);
+  }
+
+  async function ensureTelegramOAuthAvailable() {
+    telegramOAuthUnavailable = false;
+    const controller = typeof AbortController === "undefined" ? null : new AbortController();
+    const timeoutId = window.setTimeout(() => controller?.abort(), TELEGRAM_OAUTH_AVAILABILITY_TIMEOUT_MS);
+    try {
+      await fetch(`${TELEGRAM_OAUTH_AVAILABILITY_URL}?rw_check=${Date.now()}`, {
+        method: "GET",
+        mode: "no-cors",
+        cache: "no-store",
+        signal: controller?.signal,
+      });
+      return true;
+    } catch {
+      telegramSdkStatus = "unavailable";
+      telegramOAuthUnavailable = true;
+      return false;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
+  function createTelegramMiniAppAuthTimeout() {
+    const controller = typeof AbortController === "undefined" ? null : new AbortController();
+    let timedOut = false;
+    let timeoutId = null;
+    let timeoutPromise = new Promise(() => {});
+
+    if (typeof window !== "undefined") {
+      timeoutPromise = new Promise((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          timedOut = true;
+          controller?.abort();
+          const error = new Error("telegram_mini_app_auth_timeout");
+          error.name = "AbortError";
+          reject(error);
+        }, TELEGRAM_MINI_APP_AUTH_TIMEOUT_MS);
+      });
+    }
+
+    return {
+      promise: timeoutPromise,
+      get signal() {
+        return controller?.signal;
+      },
+      get timedOut() {
+        return timedOut;
+      },
+      clear() {
+        if (timeoutId) window.clearTimeout(timeoutId);
+        timeoutId = null;
+      },
+    };
+  }
+
+  function shouldWaitForTelegramSdkBeforeOAuth() {
+    return hasTelegramLaunchParams() || !telegramOAuthClientId;
+  }
+
   async function boot() {
     mode = "loading";
+    if (hasTelegramLaunchParams()) await loadTelegramSdk(TELEGRAM_SDK_BOOT_TIMEOUT_MS);
+
     if (tg) {
       try {
         tg.ready();
@@ -637,7 +821,7 @@
     return payload;
   }
 
-  async function publicApi(path, payload = {}) {
+  async function publicApi(path, payload = {}, options = {}) {
     if (MOCK) {
       return mockApi(path, { method: "POST", body: JSON.stringify(payload) });
     }
@@ -645,6 +829,7 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: options.signal,
     });
     return response.json();
   }
@@ -834,7 +1019,7 @@
     return false;
   }
 
-  async function finalizeTelegramAuth(authData, source = "auth_data") {
+  async function finalizeTelegramAuth(authData, source = "auth_data", options = {}) {
     if (authBusy) return false;
     authBusy = true;
     setAuthStatus(t("wa_auth_checking_telegram"));
@@ -847,7 +1032,7 @@
             : { auth_data: authData };
       const referralParam = readReferralParam();
       if (referralParam) payload.referral_code = referralParam;
-      const response = await publicApi("/auth/token", payload);
+      const response = await publicApi("/auth/token", payload, { signal: options.signal });
       if (response.ok && response.token) {
         setToken(response.token, response.csrf_token);
         clearAuthQuery();
@@ -856,8 +1041,11 @@
         return true;
       }
       setAuthStatus(response.error === "banned" ? t("wa_auth_access_denied") : t("wa_auth_telegram_not_confirmed"), true);
-    } catch {
-      setAuthStatus(t("wa_auth_telegram_unavailable"), true);
+    } catch (error) {
+      setAuthStatus(
+        error?.name === "AbortError" ? t("wa_auth_telegram_timeout") : t("wa_auth_telegram_unavailable"),
+        true,
+      );
     } finally {
       authBusy = false;
     }
@@ -986,21 +1174,114 @@
     return url.toString();
   }
 
+  function startTelegramLoginWatchdog() {
+    stopTelegramLoginWatchdog();
+    telegramLoginAttemptId += 1;
+    const attemptId = telegramLoginAttemptId;
+    telegramLoginWatchdogTimer = window.setTimeout(() => {
+      if (attemptId !== telegramLoginAttemptId) return;
+      telegramLoginWatchdogTimer = null;
+      telegramSdkStatus = "unavailable";
+      telegramOAuthUnavailable = true;
+      telegramLoginBusy = false;
+      authBusy = false;
+      setAuthStatus(t("wa_auth_telegram_timeout"), true);
+    }, TELEGRAM_OAUTH_AVAILABILITY_TIMEOUT_MS);
+    return attemptId;
+  }
+
+  function stopTelegramLoginWatchdog(attemptId = null) {
+    if (attemptId !== null && attemptId !== telegramLoginAttemptId) return;
+    if (telegramLoginWatchdogTimer) {
+      window.clearTimeout(telegramLoginWatchdogTimer);
+      telegramLoginWatchdogTimer = null;
+    }
+  }
+
+  function isActiveTelegramLoginAttempt(attemptId) {
+    return attemptId === telegramLoginAttemptId && telegramLoginBusy;
+  }
+
   async function openTelegramLogin() {
-    if (authBusy) return;
-    if (tg?.initData) {
-      await finalizeTelegramAuth(tg.initData, "init_data");
+    if (authBusy || telegramLoginBusy || telegramLoginUnavailable) return;
+    setAuthStatus("");
+
+    const isTelegramMiniAppAttempt = hasTelegramLaunchParams();
+    if (!isTelegramMiniAppAttempt && telegramOAuthClientId) {
+      telegramLoginBusy = true;
+      const attemptId = startTelegramLoginWatchdog();
+      try {
+        const available = await ensureTelegramOAuthAvailable();
+        if (!isActiveTelegramLoginAttempt(attemptId)) return;
+        if (!available) {
+          setAuthStatus(t("wa_auth_telegram_timeout"), true);
+          return;
+        }
+        stopTelegramLoginWatchdog(attemptId);
+        telegramLoginBusy = false;
+        authBusy = false;
+        window.location.assign(buildTelegramOAuthStartUrl("login"));
+      } catch {
+        if (!isActiveTelegramLoginAttempt(attemptId)) return;
+        telegramSdkStatus = "unavailable";
+        telegramOAuthUnavailable = true;
+        setAuthStatus(t("wa_auth_telegram_timeout"), true);
+      } finally {
+        if (isActiveTelegramLoginAttempt(attemptId)) {
+          stopTelegramLoginWatchdog(attemptId);
+          telegramLoginBusy = false;
+        }
+      }
       return;
     }
 
-    if (!telegramOAuthClientId) {
-      setAuthStatus(t("wa_auth_telegram_not_configured"), true);
-      return;
-    }
+    telegramLoginBusy = true;
+    const attemptId = startTelegramLoginWatchdog();
+    const loginTimeout = createTelegramMiniAppAuthTimeout();
+    try {
+      await Promise.race([
+        (async () => {
+          await ensureTelegramSdkForAction();
+          if (!isActiveTelegramLoginAttempt(attemptId)) return;
+          if (tg?.initData) {
+            await finalizeTelegramAuth(tg.initData, "init_data", { signal: loginTimeout.signal });
+            return;
+          }
 
-    authBusy = true;
-    setAuthStatus(t("wa_auth_checking_telegram"));
-    window.location.assign(buildTelegramOAuthStartUrl("login"));
+          if (!telegramOAuthClientId || isTelegramMiniAppAttempt) {
+            setAuthStatus(
+              telegramSdkStatus === "unavailable"
+                ? t("wa_auth_telegram_unavailable")
+                : isTelegramMiniAppAttempt
+                  ? t("wa_auth_telegram_not_confirmed")
+                  : t("wa_auth_telegram_not_configured"),
+              true,
+            );
+            return;
+          }
+        })(),
+        loginTimeout.promise,
+      ]);
+    } catch (error) {
+      if (!isActiveTelegramLoginAttempt(attemptId)) return;
+      if (error?.name === "AbortError") {
+        telegramSdkStatus = "unavailable";
+        setAuthStatus(t("wa_auth_telegram_timeout"), true);
+      } else {
+        setAuthStatus(t("wa_auth_telegram_unavailable"), true);
+      }
+    } finally {
+      loginTimeout.clear();
+      if (loginTimeout.timedOut) {
+        telegramSdkStatus = "unavailable";
+        setAuthStatus(t("wa_auth_telegram_timeout"), true);
+        authBusy = false;
+      }
+      if (isActiveTelegramLoginAttempt(attemptId)) {
+        stopTelegramLoginWatchdog(attemptId);
+        telegramLoginBusy = false;
+      }
+    }
   }
 
   function setLinkEmailStatus(message, isError = false) {
@@ -1109,12 +1390,15 @@
 
   async function linkTelegramAccount() {
     if (linkTelegramBusy) return;
+    if (shouldWaitForTelegramSdkBeforeOAuth()) await ensureTelegramSdkForAction();
     if (tg?.initData) {
       await linkTelegramAccountWithPayload({ init_data: tg.initData });
       return;
     }
     if (!telegramOAuthClientId) {
-      showToast(t("wa_auth_telegram_not_configured"));
+      showToast(
+        telegramSdkStatus === "unavailable" ? t("wa_auth_telegram_unavailable") : t("wa_auth_telegram_not_configured"),
+      );
       return;
     }
     linkTelegramBusy = true;
@@ -1691,13 +1975,7 @@
       <div class="app-shell" style={`--accent: ${accent};`}>
       {#if mode === "loading"}
         <div class="loader">
-          <div class="brand-mark brand-mark-lg">
-            {#if CFG.logoUrl}
-              <img src={CFG.logoUrl} alt="" />
-            {:else}
-              <span>{brandEmoji}</span>
-            {/if}
-          </div>
+          <BrandMark class="brand-mark-lg" logoUrl={CFG.logoUrl} emoji={brandEmoji} />
           <div>{t("wa_loading")}</div>
         </div>
       {:else if mode === "login"}
@@ -1747,13 +2025,7 @@
         {:else}
           <div class="auth-card-wrap">
             <div class="login-brand login-brand-auth">
-              <div class="brand-mark brand-mark-xl">
-                {#if CFG.logoUrl}
-                  <img src={CFG.logoUrl} alt="" />
-                {:else}
-                  <span>{brandEmoji}</span>
-                {/if}
-              </div>
+              <BrandMark class="brand-mark-xl" logoUrl={CFG.logoUrl} emoji={brandEmoji} />
               <h1>{brandTitle}</h1>
             </div>
             <Card class="auth-card">
@@ -1797,15 +2069,30 @@
                 <div class="or-line"><span></span>{t("wa_or")}<span></span></div>
               {/if}
               <div class="auth-pane">
-                <Button variant="telegram" class="wide telegram-login-button" onclick={openTelegramLogin} disabled={authBusy}>
+                <Button
+                  variant="telegram"
+                  class={`wide telegram-login-button${telegramLoginUnavailable ? " unavailable" : ""}${telegramLoginChecking ? " checking" : ""}`}
+                  onclick={openTelegramLogin}
+                  disabled={authBusy || telegramLoginBusy || telegramLoginUnavailable}
+                  aria-label={telegramLoginLabel}
+                >
                   <span class="telegram-login-text">
-                    <Send size={17} />
-                    {t("wa_login_telegram_button")}
+                    {#if telegramLoginChecking}
+                      <span class="telegram-button-spinner" aria-hidden="true"></span>
+                    {:else}
+                      <Send size={17} />
+                    {/if}
+                    {telegramLoginLabel}
                   </span>
                 </Button>
               </div>
-              {#if authStatus}
-                <div class:error={authIsError} class="status-line auth-login-status">{authStatus}</div>
+              {#if !telegramLoginChecking && (authStatus || telegramLoginUnavailableMessage)}
+                <div
+                  class:error={authIsError || Boolean(telegramLoginUnavailableMessage)}
+                  class="status-line auth-login-status"
+                >
+                  {authStatus || telegramLoginUnavailableMessage}
+                </div>
               {/if}
             </Card>
             {#if userAgreementUrl || privacyPolicyUrl}
@@ -1846,13 +2133,7 @@
         {#if screen === "invite" || screen === "devices" || screen === "settings"}
           <header class="app-header accent-title">
             <div class="brand-row">
-              <div class="brand-mark">
-                {#if CFG.logoUrl}
-                  <img src={CFG.logoUrl} alt="" />
-                {:else}
-                  <span>{brandEmoji}</span>
-                {/if}
-              </div>
+              <BrandMark logoUrl={CFG.logoUrl} emoji={brandEmoji} />
               <strong>{brandTitle}</strong>
             </div>
           </header>
@@ -1861,13 +2142,7 @@
         {#if screen === "home"}
           <main class="home-layout">
             <div class="login-brand home-brand">
-              <div class="brand-mark brand-mark-xl">
-                {#if CFG.logoUrl}
-                  <img src={CFG.logoUrl} alt="" />
-                {:else}
-                  <span>{brandEmoji}</span>
-                {/if}
-              </div>
+              <BrandMark class="brand-mark-xl" logoUrl={CFG.logoUrl} emoji={brandEmoji} />
               <h1>{brandTitle}</h1>
             </div>
 

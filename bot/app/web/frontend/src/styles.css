@@ -17,7 +17,7 @@
 }
 
 :root {
-  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
   color-scheme: dark;
   --accent: #00fe7a;
@@ -190,10 +190,12 @@ a {
 }
 
 .brand-mark {
+  position: relative;
   display: grid;
   width: 38px;
   height: 38px;
   flex: 0 0 auto;
+  overflow: hidden;
   place-items: center;
   color: var(--accent);
   font-size: 26px;
@@ -204,6 +206,28 @@ a {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.brand-mark img.loaded {
+  opacity: 1;
+}
+
+.brand-mark-spinner {
+  position: absolute;
+  width: 42%;
+  height: 42%;
+  border: 2px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 999px;
+  animation: brand-mark-spin 0.72s linear infinite;
+}
+
+@keyframes brand-mark-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .brand-mark-lg {
@@ -1350,12 +1374,35 @@ a {
   padding-right: 14px;
 }
 
+.telegram-login-button.unavailable:disabled {
+  cursor: not-allowed;
+}
+
+.telegram-login-button.checking:disabled {
+  opacity: 0.82;
+}
+
 .telegram-login-text {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   width: 100%;
+}
+
+.telegram-button-spinner {
+  width: 17px;
+  height: 17px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 999px;
+  animation: telegram-button-spin 0.72s linear infinite;
+}
+
+@keyframes telegram-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .auth-legal {

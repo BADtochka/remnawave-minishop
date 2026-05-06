@@ -2,6 +2,7 @@ import asyncio
 import base64
 import hashlib
 import hmac
+import io
 import ipaddress
 import json
 import logging
@@ -49,7 +50,7 @@ from bot.utils.request_security import request_client_ip
 from config.settings import Settings
 from db.dal import payment_dal, subscription_dal, user_dal
 from db.dal.user_dal import UserMergeConflictError
-from db.models import Payment, User
+from db.models import Payment, User, UserTelegramAvatar
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,9 @@ DEV_MOCK_END_MARKER = "<!-- WEBAPP_DEV_MOCK_END -->"
 WEBAPP_RATE_LIMIT_WINDOW_SECONDS = 60
 WEBAPP_RATE_LIMIT_MAX_REQUESTS = 30
 WEBAPP_LOGO_MAX_BYTES = 2 * 1024 * 1024
+WEBAPP_TELEGRAM_AVATAR_MAX_BYTES = 128 * 1024
+WEBAPP_TELEGRAM_AVATAR_REFRESH_SECONDS = 24 * 60 * 60
+WEBAPP_TELEGRAM_AVATAR_FETCH_TIMEOUT_SECONDS = 4
 WEBAPP_SESSION_COOKIE_NAME = "rw_webapp_session"
 WEBAPP_CSRF_COOKIE_NAME = "rw_webapp_csrf"
 WEBAPP_CSRF_HEADER_NAME = "X-CSRF-Token"
@@ -196,6 +200,7 @@ def setup_subscription_webapp_routes(app: web.Application) -> None:
     app.router.add_post("/api/auth/email/magic", email_auth_magic_route)
     app.router.add_post("/api/auth/logout", logout_route)
     app.router.add_get("/api/me", me_route)
+    app.router.add_get("/api/account/avatar", account_avatar_route)
     app.router.add_post("/api/account/language", account_language_route)
     app.router.add_post("/api/account/email/request", account_email_request_route)
     app.router.add_post("/api/account/email/verify", account_email_verify_route)
@@ -222,7 +227,9 @@ def _resolve_webapp_logo_url(settings: Settings) -> str:
         return ""
 
     parsed_logo_url = urlsplit(raw_logo_url)
-    if parsed_logo_url.scheme in {"https", "http", "data"}:
+    if parsed_logo_url.scheme == "https":
+        return WEBAPP_LOGO_PROXY_PATH
+    if parsed_logo_url.scheme in {"http", "data"}:
         return raw_logo_url
     if raw_logo_url.startswith("/"):
         return raw_logo_url
@@ -364,7 +371,7 @@ async def webapp_logo_route(request: web.Request) -> web.Response:
 
     body, content_type = logo_cache
     response = web.Response(body=body, content_type=content_type)
-    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Cache-Control"] = "public, max-age=3600"
     return response
 
 
@@ -372,7 +379,7 @@ async def _fetch_webapp_logo(logo_url: str) -> Optional[Tuple[bytes, str]]:
     """Fetch and cache the configured logo on the server side."""
     try:
         session = await _get_shared_http_session()
-        timeout = ClientTimeout(total=5)
+        timeout = ClientTimeout(total=3)
         async with session.get(logo_url, allow_redirects=False, timeout=timeout) as response:
             if response.status != 200:
                 logger.warning(
@@ -492,10 +499,10 @@ async def _security_headers_middleware(request: web.Request, handler):
             f"script-src 'self' 'nonce-{nonce}' 'unsafe-eval' https://telegram.org; "
             "frame-src https://oauth.telegram.org; "
             "frame-ancestors https://web.telegram.org https://t.me; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; "
+            "style-src 'self' 'unsafe-inline'; "
+            "font-src 'self' https://cdn.jsdelivr.net data:; "
             "img-src 'self' data: https: http:; "
-            "connect-src 'self'; "
+            "connect-src 'self' https://oauth.telegram.org; "
             "object-src 'none'; "
             "base-uri 'self'; "
             "form-action 'self'"
@@ -1562,6 +1569,35 @@ async def me_route(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, **data})
 
 
+async def account_avatar_route(request: web.Request) -> web.Response:
+    user_id = _require_user_id(request)
+    async_session_factory: sessionmaker = request.app["async_session_factory"]
+    async with async_session_factory() as session:
+        db_user = await user_dal.get_user_by_id(session, user_id)
+        if not db_user or db_user.is_banned:
+            await session.rollback()
+            return _json_error(403, "access_denied", "Access denied")
+
+        avatar = await _ensure_cached_telegram_avatar(request, session, db_user)
+        await session.commit()
+
+    if not avatar:
+        raise web.HTTPNotFound(text="avatar_not_cached")
+
+    etag = _telegram_avatar_etag(avatar)
+    if etag and request.headers.get("If-None-Match") == etag:
+        return web.Response(status=304, headers={"ETag": etag})
+
+    response = web.Response(
+        body=bytes(avatar.image_bytes),
+        content_type=avatar.content_type or "image/jpeg",
+    )
+    response.headers["Cache-Control"] = "private, max-age=3600"
+    if etag:
+        response.headers["ETag"] = etag
+    return response
+
+
 async def account_language_route(request: web.Request) -> web.Response:
     user_id = _require_user_id(request)
     payload = await _read_json(request)
@@ -2184,6 +2220,106 @@ def _telegram_photo_url_value(telegram_user: Dict[str, Any]) -> Optional[str]:
     return value or None
 
 
+def _telegram_avatar_is_stale(avatar: Optional[UserTelegramAvatar]) -> bool:
+    if not avatar or not avatar.updated_at:
+        return True
+    updated_at = avatar.updated_at
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - updated_at).total_seconds() >= WEBAPP_TELEGRAM_AVATAR_REFRESH_SECONDS
+
+
+def _telegram_avatar_etag(avatar: UserTelegramAvatar) -> str:
+    digest = hashlib.sha256(bytes(avatar.image_bytes)).hexdigest()[:16]
+    return f'"tg-avatar-{int(avatar.user_id)}-{digest}"'
+
+
+def _telegram_avatar_url(avatar: Optional[UserTelegramAvatar]) -> str:
+    if not avatar:
+        return ""
+    updated_at = avatar.updated_at
+    if updated_at and updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    version = int(updated_at.timestamp()) if updated_at else hashlib.sha256(bytes(avatar.image_bytes)).hexdigest()[:8]
+    return f"/api/account/avatar?v={version}"
+
+
+def _select_compact_telegram_photo_size(sizes: List[Any]) -> Optional[Any]:
+    if not sizes:
+        return None
+    suitable = [size for size in sizes if int(getattr(size, "width", 0) or 0) >= 160]
+    candidates = suitable or sizes
+    return min(
+        candidates,
+        key=lambda size: (
+            int(getattr(size, "file_size", 0) or 0) or int(getattr(size, "width", 0) or 0) * int(getattr(size, "height", 0) or 0),
+            int(getattr(size, "width", 0) or 0),
+        ),
+    )
+
+
+def _telegram_file_content_type(file_path: Optional[str]) -> str:
+    path = str(file_path or "").lower()
+    if path.endswith(".png"):
+        return "image/png"
+    if path.endswith(".webp"):
+        return "image/webp"
+    return "image/jpeg"
+
+
+async def _fetch_compact_telegram_avatar(bot: Bot, telegram_id: int) -> Optional[Tuple[bytes, str, Optional[str]]]:
+    photos = await bot.get_user_profile_photos(user_id=telegram_id, limit=1)
+    if not photos or not photos.photos:
+        return None
+
+    photo_size = _select_compact_telegram_photo_size(list(photos.photos[0] or []))
+    if not photo_size:
+        return None
+
+    file_info = await bot.get_file(photo_size.file_id)
+    destination = io.BytesIO()
+    await bot.download_file(file_info.file_path, destination=destination)
+    body = destination.getvalue()
+    if not body or len(body) > WEBAPP_TELEGRAM_AVATAR_MAX_BYTES:
+        return None
+    return body, _telegram_file_content_type(file_info.file_path), getattr(photo_size, "file_unique_id", None)
+
+
+async def _ensure_cached_telegram_avatar(
+    request: web.Request,
+    session: AsyncSession,
+    user: User,
+) -> Optional[UserTelegramAvatar]:
+    avatar = await user_dal.get_user_telegram_avatar(session, int(user.user_id))
+    telegram_id = _telegram_id_for_user(user)
+    if not telegram_id:
+        return avatar
+    if avatar and not _telegram_avatar_is_stale(avatar):
+        return avatar
+
+    bot: Bot = request.app["bot"]
+    try:
+        fetched = await asyncio.wait_for(
+            _fetch_compact_telegram_avatar(bot, int(telegram_id)),
+            timeout=WEBAPP_TELEGRAM_AVATAR_FETCH_TIMEOUT_SECONDS,
+        )
+    except Exception as exc:
+        logger.info("Failed to refresh Telegram avatar for user %s: %s", user.user_id, exc)
+        return avatar
+
+    if not fetched:
+        return avatar
+
+    body, content_type, file_unique_id = fetched
+    return await user_dal.upsert_user_telegram_avatar(
+        session,
+        user_id=int(user.user_id),
+        file_unique_id=file_unique_id,
+        content_type=content_type,
+        image_bytes=body,
+    )
+
+
 def _apply_telegram_profile_to_user(
     user: User,
     telegram_user: Dict[str, Any],
@@ -2481,6 +2617,7 @@ async def _build_user_payload(request: web.Request, user_id: int) -> Dict[str, A
             and settings.TRIAL_DURATION_DAYS > 0
             and not await subscription_service.has_had_any_subscription(session, user_id)
         )
+        avatar = await _ensure_cached_telegram_avatar(request, session, db_user)
         try:
             await session.commit()
         except Exception:
@@ -2495,7 +2632,7 @@ async def _build_user_payload(request: web.Request, user_id: int) -> Dict[str, A
             "email_verified": bool(db_user.email_verified_at),
             "telegram_id": db_user.telegram_id,
             "telegram_linked": bool(_telegram_id_for_user(db_user)),
-            "telegram_photo_url": db_user.telegram_photo_url,
+            "telegram_photo_url": _telegram_avatar_url(avatar),
             "first_name": db_user.first_name,
             "language_code": lang,
         },
