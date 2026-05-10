@@ -109,6 +109,11 @@ async def init_db(settings: Settings, session_factory: sessionmaker):
                             tariff_key = COALESCE(s.tariff_key, :tariff_key),
                             tier_baseline_bytes = COALESCE(s.tier_baseline_bytes, s.traffic_limit_bytes, :baseline),
                             topup_balance_bytes = COALESCE(s.topup_balance_bytes, 0),
+                            premium_baseline_bytes = COALESCE(s.premium_baseline_bytes, :premium_baseline),
+                            premium_topup_balance_bytes = COALESCE(s.premium_topup_balance_bytes, 0),
+                            premium_topup_used_bytes = COALESCE(s.premium_topup_used_bytes, 0),
+                            premium_used_bytes = COALESCE(s.premium_used_bytes, 0),
+                            premium_is_limited = COALESCE(s.premium_is_limited, FALSE),
                             period_start_at = NULL,
                             effective_monthly_price_rub = COALESCE(
                                 s.effective_monthly_price_rub,
@@ -130,6 +135,7 @@ async def init_db(settings: Settings, session_factory: sessionmaker):
                     {
                         "tariff_key": default_tariff.key,
                         "baseline": default_tariff.monthly_bytes,
+                        "premium_baseline": default_tariff.premium_monthly_bytes,
                         "default_price": default_price,
                     },
                 )

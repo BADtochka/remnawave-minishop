@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import json
 import asyncio
 from datetime import datetime, timezone, timedelta
@@ -238,7 +238,7 @@ async def process_successful_payment(session: AsyncSession, bot: Bot,
             promo_code_id_from_payment=promo_code_id,
             provider="yookassa",
             sale_mode=sale_mode,
-            traffic_gb=traffic_amount_gb if sale_mode_base in {"traffic", "traffic_package", "topup"} else None,
+            traffic_gb=traffic_amount_gb if sale_mode_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
         )
 
         if not activation_details or not activation_details.get('end_date'):

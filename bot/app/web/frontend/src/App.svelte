@@ -127,6 +127,14 @@
         traffic_limit: "100 GB",
         traffic_used_bytes: 19756849561,
         traffic_limit_bytes: 107374182400,
+        premium_used: "32.0 GB",
+        premium_limit: "50.0 GB",
+        premium_used_bytes: 34359738368,
+        premium_limit_bytes: 53687091200,
+        premium_baseline_bytes: 53687091200,
+        premium_topup_balance_bytes: 0,
+        premium_is_limited: false,
+        premium_node_labels: ["Premium NL-1", "Premium DE-1"],
         max_devices: 5,
       },
       devices: {
@@ -496,9 +504,16 @@
   $: devicesEnabled = Boolean(appSettings?.my_devices_enabled);
   $: subscription = data?.subscription || DEV_MOCK.data.subscription;
   $: hasActiveTariffSubscription = Boolean(tariffMode && subscription?.active && subscription?.tariff_key);
+  $: canChangeTariff = Boolean(hasActiveTariffSubscription && hasMultipleTariffs);
   $: currentTariffName = activeTariffName(subscription, plans);
+  $: canOpenTopupModal = Boolean(
+    hasActiveTariffSubscription &&
+      subscription?.can_topup_traffic &&
+      (Number(subscription?.traffic_limit_bytes || 0) > 0 || Number(subscription?.premium_limit_bytes || 0) > 0),
+  );
   $: canShowTopupButton = Boolean(
-    hasActiveTariffSubscription && Number(subscription?.traffic_limit_bytes || 0) > 0 && trafficPercent(subscription) >= 85,
+    canOpenTopupModal &&
+      (trafficPercent(subscription) >= 85 || premiumTrafficPercent(subscription) >= 85),
   );
   $: user = data?.user || {};
   $: isAdmin = Boolean(user?.is_admin);
@@ -1845,7 +1860,7 @@
           months: selectedTopupPlan.months,
           traffic_gb: selectedTopupPlan.traffic_gb,
           tariff_key: selectedTopupPlan.tariff_key || topupOptions?.tariff_key,
-          sale_mode: "topup",
+          sale_mode: selectedTopupPlan.sale_mode || "topup",
           method: selectedMethod,
         }),
       });
@@ -2231,6 +2246,7 @@
   }
 
   function openTopupModal() {
+    if (!canOpenTopupModal) return;
     topupModalOpen = true;
     loadTopupOptions();
   }
@@ -2311,6 +2327,11 @@
     const numeric = Number(value || 0);
     const formatted = Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
     return `${formatted} GB`;
+  }
+
+  function formatTrafficBytes(value) {
+    const gb = Number(value || 0) / 1073741824;
+    return formatTrafficGb(gb);
   }
 
   function planKey(plan) {
@@ -2421,6 +2442,33 @@
     return t("wa_traffic_reset_policy");
   }
 
+  function premiumTrafficPercent(sub) {
+    const used = Number(sub?.premium_used_bytes || 0);
+    const limit = Number(sub?.premium_limit_bytes || 0);
+    if (!limit || limit <= 0) return 0;
+    return Math.max(0, Math.min(100, Math.round((used / limit) * 100)));
+  }
+
+  function premiumTrafficLabel(sub) {
+    return t("wa_traffic_of", { used: sub?.premium_used || "0 GB", limit: sub?.premium_limit || "0 GB" });
+  }
+
+  function premiumTrafficLeftLabel(sub) {
+    const left = Math.max(0, Number(sub?.premium_limit_bytes || 0) - Number(sub?.premium_used_bytes || 0));
+    return formatTrafficBytes(left);
+  }
+
+  function premiumTopupBalanceLabel(sub) {
+    return formatTrafficBytes(Number(sub?.premium_topup_balance_bytes || 0));
+  }
+
+  function premiumServerLabels(sub) {
+    const labels = Array.isArray(sub?.premium_node_labels) && sub.premium_node_labels.length
+      ? sub.premium_node_labels
+      : sub?.premium_squad_labels || [];
+    return labels.map((label) => String(label || "").trim()).filter(Boolean);
+  }
+
   function planDisplayTitle(plan) {
     if (plan?.tariff_key) {
       return plan?.tariff_name || plan?.title || plan?.tariff_key;
@@ -2438,14 +2486,14 @@
   function planSubtitle(plan) {
     if (!plan?.tariff_key) return "";
     if (plan?.subtitle) return plan.subtitle;
-    if (plan?.sale_mode === "traffic_package" || plan?.sale_mode === "topup" || plan?.billing_model === "traffic") {
+    if (plan?.sale_mode === "traffic_package" || plan?.sale_mode === "topup" || plan?.sale_mode === "premium_topup" || plan?.billing_model === "traffic") {
       return formatTrafficGb(plan?.traffic_gb || plan?.months);
     }
     return _formatMonthsForClient(plan?.months);
   }
 
   function planUnitHint(plan) {
-    if (trafficMode || plan?.sale_mode === "traffic" || plan?.sale_mode === "traffic_package" || plan?.sale_mode === "topup") {
+    if (trafficMode || plan?.sale_mode === "traffic" || plan?.sale_mode === "traffic_package" || plan?.sale_mode === "topup" || plan?.sale_mode === "premium_topup") {
       const gb = Number(plan?.traffic_gb || plan?.months || 0);
       if (!gb) return "";
       if (String(selectedMethod || "").toLowerCase().includes("stars") && Number(plan?.stars_price || 0) > 0) {
@@ -2535,6 +2583,34 @@
     if (percent >= 90) return t("wa_topup_warning_high", { percent, levels });
     if (percent >= 85) return t("wa_topup_warning_medium", { percent, levels });
     return t("wa_topup_warning_levels", { levels });
+  }
+
+  function topupModalDescription() {
+    if (!topupOptions) return "";
+    if (singleTariffMode) return "";
+    return topupOptions?.tariff_name ? t("wa_topup_for_tariff", { tariff: topupOptions.tariff_name }) : "";
+  }
+
+  function topupCarryoverNotes() {
+    const plans = topupOptions?.plans || [];
+    if (!plans.length) return [];
+    return [
+      t(
+        "wa_topup_carryover",
+        {},
+        "Докупленный трафик не сгорает: сначала расходуется месячный лимит, затем докупленный остаток."
+      ),
+    ];
+  }
+
+  function deviceTopupModalDescription() {
+    if (!deviceTopupOptions) return "";
+    return deviceTopupOptions?.tariff_name ? t("wa_device_topup_for_tariff", { tariff: deviceTopupOptions.tariff_name }) : "";
+  }
+
+  function tariffChangeModalDescription() {
+    if (!changeOptions) return "";
+    return changeOptions?.current ? t("wa_current_tariff", { tariff: changeOptions.current.title }) : "";
   }
 
   function _formatMonthsForClient(value) {
@@ -2913,7 +2989,10 @@
               </Card>
 
               {#if subscription.active}
-                <Card>
+                <Card class={canOpenTopupModal ? "traffic-card-clickable" : ""}>
+                  {#if canOpenTopupModal}
+                    <button class="card-click-target" type="button" on:click={openTopupModal} aria-label={t("wa_topup_traffic")}></button>
+                  {/if}
                   <div class="traffic-top">
                     <span>{t("wa_home_traffic_used")}</span>
                     <strong>{trafficLabel(subscription)}</strong>
@@ -2926,6 +3005,44 @@
                     <span class="traffic-percent">{trafficPercent(subscription)}%</span>
                   </div>
                 </Card>
+                {#if Number(subscription?.premium_limit_bytes || 0) > 0}
+                  <Card class={`${canOpenTopupModal ? "traffic-card-clickable " : ""}premium-traffic-card${subscription?.premium_is_limited ? " premium-traffic-card-limited" : ""}`}>
+                    {#if canOpenTopupModal}
+                      <button class="card-click-target" type="button" on:click={openTopupModal} aria-label={t("wa_topup_traffic")}></button>
+                    {/if}
+                    <div class="traffic-top">
+                      <span>{t("wa_premium_traffic_title", {}, "Premium-серверы")}</span>
+                      <strong>{premiumTrafficLabel(subscription)}</strong>
+                    </div>
+                    <div class="progress premium-progress">
+                      <span style={`width: ${premiumTrafficPercent(subscription)}%`}></span>
+                    </div>
+                    <div class="traffic-meta">
+                      <span>{subscription?.premium_is_limited ? t("wa_premium_access_limited", {}, "Доступ к premium временно ограничен") : t("wa_premium_reset_monthly", {}, "Отдельный лимит на месяц")}</span>
+                      <span class="traffic-percent">{premiumTrafficPercent(subscription)}%</span>
+                    </div>
+                    <div class="premium-detail-grid">
+                      <span>
+                        <small>{t("wa_premium_left", {}, "Осталось")}</small>
+                        <strong>{premiumTrafficLeftLabel(subscription)}</strong>
+                      </span>
+                      <span>
+                        <small>{t("wa_premium_topup_balance", {}, "Докупленный остаток")}</small>
+                        <strong>{premiumTopupBalanceLabel(subscription)}</strong>
+                      </span>
+                    </div>
+                    {#if premiumServerLabels(subscription).length}
+                      <div class="premium-server-list">
+                        <small>{t("wa_premium_servers_limited", {}, "Отдельный лимит действует на")}</small>
+                        <div>
+                          {#each premiumServerLabels(subscription).slice(0, 8) as label}
+                            <span>{label}</span>
+                          {/each}
+                        </div>
+                      </div>
+                    {/if}
+                  </Card>
+                {/if}
               {:else if appSettings?.trial_enabled && appSettings?.trial_available}
                 <Card class="trial-card">
                   <div class="trial-card-head">
@@ -2959,7 +3076,7 @@
                     {t("wa_activate_trial")}
                   </Button>
                 {/if}
-                {#if hasActiveTariffSubscription}
+                {#if canChangeTariff}
                   <Button class="wide" variant="secondary" onclick={openTariffChangeModal}>
                     <RefreshCw size={18} />
                     {t("wa_change_tariff")}
@@ -3159,7 +3276,6 @@
                   </span>
                   <ArrowRight size={17} />
                 </button>
-                <div class="settings-divider" aria-hidden="true"></div>
               </div>
             {/if}
             <div class="settings-links-block">
@@ -3480,13 +3596,39 @@
       <Dialog
         open={changeModalOpen}
         title={t("wa_change_tariff")}
-        description={changeOptions?.current ? t("wa_current_tariff", { tariff: changeOptions.current.title }) : t("wa_tariff_options_loading")}
+        description={tariffChangeModalDescription()}
         closeLabel={t("wa_close")}
         onclose={closeTariffChangeModal}
         class="payment-dialog-card"
       >
         <div class="payment-dialog-body">
-          {#if changeOptions?.targets?.length}
+          {#if !changeOptions}
+            <div class="dialog-skeleton" aria-label={t("wa_tariff_options_loading")}>
+              <div class="tariff-action-list">
+                {#each [1, 2] as _}
+                  <div class="tariff-action-card skeleton-row">
+                    <span>
+                      <span class="skeleton-line skeleton-line-title"></span>
+                      <span class="skeleton-line skeleton-line-short"></span>
+                    </span>
+                    <span class="skeleton-line skeleton-line-price"></span>
+                  </div>
+                {/each}
+              </div>
+              <div class="payment-divider" aria-hidden="true"></div>
+              <div class="option-list">
+                {#each [1, 2] as _}
+                  <div class="option-row change-action-row skeleton-row">
+                    <span class="option-row-main">
+                      <span class="skeleton-line skeleton-line-title"></span>
+                      <span class="skeleton-line skeleton-line-short"></span>
+                    </span>
+                  </div>
+                {/each}
+              </div>
+              <div class="skeleton-pay-button"></div>
+            </div>
+          {:else if changeOptions?.targets?.length}
             <p class="section-kicker">{t("wa_tariff_change_targets_title")}</p>
             <div class="tariff-action-list">
               {#each changeOptions.targets as target}
@@ -3562,7 +3704,7 @@
               <Card class="empty-card">{t("wa_no_tariff_change_options")}</Card>
             {/if}
           {:else}
-            <Card class="empty-card">{tariffActionBusy ? t("wa_tariff_options_loading") : t("wa_no_tariff_change_options")}</Card>
+            <Card class="empty-card">{t("wa_no_tariff_change_options")}</Card>
           {/if}
         </div>
       </Dialog>
@@ -3594,13 +3736,39 @@
       <Dialog
         open={topupModalOpen}
         title={t("wa_topup_traffic")}
-        description={topupOptions?.tariff_name ? t("wa_topup_for_tariff", { tariff: topupOptions.tariff_name }) : t("wa_tariff_options_loading")}
+        description={topupModalDescription()}
         closeLabel={t("wa_close")}
         onclose={closeTopupModal}
         class="payment-dialog-card"
       >
         <div class="payment-dialog-body">
-          {#if topupOptions?.plans?.length}
+          {#if !topupOptions}
+            <div class="dialog-skeleton" aria-label={t("wa_tariff_options_loading")}>
+              <div class="option-list">
+                {#each [1, 2, 3] as _}
+                  <div class="option-row plan-row skeleton-row">
+                    <span class="option-row-main">
+                      <span class="skeleton-line skeleton-line-title"></span>
+                      <span class="skeleton-line skeleton-line-short"></span>
+                    </span>
+                    <span class="option-row-meta">
+                      <span class="skeleton-line skeleton-line-price"></span>
+                      <span class="skeleton-line skeleton-line-tiny"></span>
+                    </span>
+                  </div>
+                {/each}
+              </div>
+              <div class="method-grid">
+                {#each [1, 2] as _}
+                  <div class="method-card skeleton-method">
+                    <span class="skeleton-dot"></span>
+                    <span class="skeleton-line skeleton-line-method"></span>
+                  </div>
+                {/each}
+              </div>
+              <div class="skeleton-pay-button"></div>
+            </div>
+          {:else if topupOptions?.plans?.length}
             <div class="option-list">
               {#each topupOptions.plans as plan}
                 <button
@@ -3611,20 +3779,27 @@
                 >
                   <span class="option-row-main">
                     <strong>{plan.title}</strong>
-                    <small>{plan.subtitle || topupOptions.tariff_name}</small>
+                    {#if !singleTariffMode || plan.sale_mode === "premium_topup"}
+                      <small>{plan.subtitle || topupOptions.tariff_name}</small>
+                    {/if}
                   </span>
                   <span class="option-row-meta">
                     <em>{priceLabel(plan)}</em>
                     {#if planUnitHint(plan)}
                       <small>{planUnitHint(plan)}</small>
                     {/if}
-                    {#if planKey(selectedTopupPlan) === planKey(plan)}
-                      <CheckCircle2 size={18} />
-                    {/if}
                   </span>
                 </button>
               {/each}
             </div>
+            {@const carryoverNotes = topupCarryoverNotes()}
+            {#if carryoverNotes.length}
+              <div class="topup-carryover-note">
+                {#each carryoverNotes as note}
+                  <p>{note}</p>
+                {/each}
+              </div>
+            {/if}
             <div class="method-grid">
               {#each methods as method}
                 {@const meta = methodMeta(method)}
@@ -3648,7 +3823,7 @@
               <LockKeyhole size={17} />
             </Button>
           {:else}
-            <Card class="empty-card">{tariffActionBusy ? t("wa_tariff_options_loading") : t("wa_no_topup_options")}</Card>
+            <Card class="empty-card">{t("wa_no_topup_options")}</Card>
           {/if}
         </div>
       </Dialog>
@@ -3656,13 +3831,38 @@
       <Dialog
         open={deviceTopupModalOpen}
         title={t("wa_buy_hwid_devices")}
-        description={deviceTopupOptions?.tariff_name ? t("wa_device_topup_for_tariff", { tariff: deviceTopupOptions.tariff_name }) : t("wa_tariff_options_loading")}
+        description={deviceTopupModalDescription()}
         closeLabel={t("wa_close")}
         onclose={closeDeviceTopupModal}
         class="payment-dialog-card"
       >
         <div class="payment-dialog-body">
-          {#if deviceTopupOptions?.plans?.length}
+          {#if !deviceTopupOptions}
+            <div class="dialog-skeleton" aria-label={t("wa_tariff_options_loading")}>
+              <div class="option-list">
+                {#each [1, 2, 3] as _}
+                  <div class="option-row plan-row skeleton-row">
+                    <span class="option-row-main">
+                      <span class="skeleton-line skeleton-line-title"></span>
+                      <span class="skeleton-line skeleton-line-short"></span>
+                    </span>
+                    <span class="option-row-meta">
+                      <span class="skeleton-line skeleton-line-price"></span>
+                    </span>
+                  </div>
+                {/each}
+              </div>
+              <div class="method-grid">
+                {#each [1, 2] as _}
+                  <div class="method-card skeleton-method">
+                    <span class="skeleton-dot"></span>
+                    <span class="skeleton-line skeleton-line-method"></span>
+                  </div>
+                {/each}
+              </div>
+              <div class="skeleton-pay-button"></div>
+            </div>
+          {:else if deviceTopupOptions?.plans?.length}
             <div class="option-list">
               {#each deviceTopupOptions.plans as plan}
                 <button
@@ -3707,7 +3907,7 @@
               <LockKeyhole size={17} />
             </Button>
           {:else}
-            <Card class="empty-card">{tariffActionBusy ? t("wa_tariff_options_loading") : t("wa_no_hwid_device_options")}</Card>
+            <Card class="empty-card">{t("wa_no_hwid_device_options")}</Card>
           {/if}
         </div>
       </Dialog>

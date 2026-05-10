@@ -253,11 +253,20 @@ def _write_tariffs_config_file(path: Path, config: TariffsConfig) -> None:
     data = _tariffs_config_payload(config)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(f"{path.suffix}.tmp")
-    tmp_path.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    tmp_path.replace(path)
+    payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    try:
+        tmp_path.write_text(payload, encoding="utf-8")
+        tmp_path.replace(path)
+    except PermissionError:
+        # A docker-compose single-file bind mount can make /app/config
+        # unwritable while the mounted tariffs.json itself is writable.
+        # Fall back to updating the existing file in-place.
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+        path.write_text(payload, encoding="utf-8")
 
 
 # ─── Routes ────────────────────────────────────────────────────────
@@ -1225,6 +1234,36 @@ async def admin_tariffs_save_route(request: web.Request) -> web.Response:
     return _ok({"exists": True, "path": str(path), "catalog": _tariffs_config_payload(config)})
 
 
+async def admin_panel_internal_squads_route(request: web.Request) -> web.Response:
+    _require_admin_user_id(request)
+    panel_service = request.app.get("panel_service")
+    if panel_service is None:
+        return _error(503, "panel_unavailable", "Panel service unavailable")
+    try:
+        squads = await panel_service.get_internal_squads()
+    except Exception as exc:
+        logger.exception("Failed to load internal squads from panel")
+        return _error(502, "panel_request_failed", str(exc))
+    if squads is None:
+        return _error(502, "panel_request_failed", "Unable to load internal squads")
+    items = []
+    for squad in squads:
+        if not isinstance(squad, dict):
+            continue
+        uuid = squad.get("uuid") or squad.get("id")
+        if not uuid:
+            continue
+        items.append(
+            {
+                "uuid": str(uuid),
+                "name": squad.get("name") or squad.get("title") or str(uuid),
+                "members_count": squad.get("membersCount") or squad.get("usersCount") or squad.get("members_count"),
+                "active_inbounds_count": squad.get("activeInboundsCount") or squad.get("active_inbounds_count"),
+            }
+        )
+    return _ok({"squads": items})
+
+
 # ─── Router setup ──────────────────────────────────────────────────
 
 
@@ -1265,3 +1304,4 @@ def setup_admin_routes(app: web.Application) -> None:
 
     router.add_get("/api/admin/tariffs", admin_tariffs_get_route)
     router.add_put("/api/admin/tariffs", admin_tariffs_save_route)
+    router.add_get("/api/admin/panel/internal-squads", admin_panel_internal_squads_route)

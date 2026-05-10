@@ -76,6 +76,9 @@ class Tariff(BaseModel):
     conversion_rate_rub_per_gb: Optional[float] = None
     hwid_device_limit: Optional[int] = None
     hwid_device_packages: Optional[HwidDevicePackageSet] = None
+    premium_squad_uuids: List[str] = Field(default_factory=list)
+    premium_monthly_gb: Optional[float] = None
+    premium_topup_packages: Optional[PackageSet] = None
 
     @model_validator(mode="after")
     def validate_tariff(self) -> "Tariff":
@@ -83,8 +86,17 @@ class Tariff(BaseModel):
             raise ValueError("tariff key must not be empty")
         self.key = self.key.strip()
         self.squad_uuids = [uuid.strip() for uuid in self.squad_uuids if uuid.strip()]
+        self.premium_squad_uuids = [
+            uuid.strip() for uuid in self.premium_squad_uuids if uuid.strip()
+        ]
         if self.hwid_device_limit is not None and self.hwid_device_limit < 0:
             raise ValueError(f"tariff {self.key}: hwid_device_limit must be >= 0")
+        if self.premium_monthly_gb is not None and self.premium_monthly_gb < 0:
+            raise ValueError(f"tariff {self.key}: premium_monthly_gb must be >= 0")
+        if self.premium_topup_packages and not self.premium_squad_uuids:
+            raise ValueError(f"tariff {self.key}: premium_topup_packages require premium_squad_uuids")
+        if self.premium_monthly_gb and self.premium_monthly_gb > 0 and not self.premium_squad_uuids:
+            raise ValueError(f"tariff {self.key}: premium_monthly_gb requires premium_squad_uuids")
 
         if self.billing_model == "period":
             if self.monthly_gb is None or self.monthly_gb < 0:
@@ -150,6 +162,15 @@ class Tariff(BaseModel):
     def has_hwid_device_packages(self) -> bool:
         return bool(self.hwid_device_packages and self.hwid_device_packages.has_any())
 
+    @property
+    def premium_monthly_bytes(self) -> int:
+        if self.premium_monthly_gb is None or self.premium_monthly_gb <= 0:
+            return 0
+        return int(float(self.premium_monthly_gb) * (1024**3))
+
+    def has_premium_squad_limit(self) -> bool:
+        return bool(self.premium_squad_uuids and (self.premium_monthly_bytes > 0 or self.premium_topup_packages))
+
 
 class TariffsConfig(BaseModel):
     default_tariff: str
@@ -189,7 +210,7 @@ class TariffsConfig(BaseModel):
     def topup_packages_for(self, tariff: Tariff) -> Optional[PackageSet]:
         if tariff.billing_model == "traffic":
             return tariff.traffic_packages
-        return tariff.topup_packages if tariff.topup_packages is not None else self.topup_packages_default
+        return tariff.topup_packages
 
 
 def load_tariffs_config(path: str | Path) -> Optional[TariffsConfig]:

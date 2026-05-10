@@ -1,23 +1,34 @@
 {
   "default_tariff": "standard",
-  "topup_packages_default": {
-    "rub": [
-      { "gb": 10, "price": 99 },
-      { "gb": 50, "price": 399 },
-      { "gb": 200, "price": 1299 }
-    ],
-    "stars": [
-      { "gb": 10, "price": 2500 }
-    ]
-  },
   "tariffs": [
     {
       "key": "standard",
       "names": { "ru": "Стандарт", "en": "Standard" },
       "descriptions": { "ru": "Базовый набор серверов", "en": "Base server pool" },
       "squad_uuids": ["uuid-1", "uuid-2"],
+      "premium_squad_uuids": ["premium-squad-uuid"],
+      "premium_monthly_gb": 50,
+      "premium_topup_packages": {
+        "rub": [
+          { "gb": 10, "price": 99 },
+          { "gb": 50, "price": 399 }
+        ],
+        "stars": [
+          { "gb": 10, "price": 2500 }
+        ]
+      },
       "billing_model": "period",
       "monthly_gb": 500,
+      "topup_packages": {
+        "rub": [
+          { "gb": 10, "price": 99 },
+          { "gb": 50, "price": 399 },
+          { "gb": 200, "price": 1299 }
+        ],
+        "stars": [
+          { "gb": 10, "price": 2500 }
+        ]
+      },
       "hwid_device_limit": 5,
       "hwid_device_packages": {
         "rub": [

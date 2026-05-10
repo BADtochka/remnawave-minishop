@@ -1744,7 +1744,7 @@ async def create_payment_route(request: web.Request) -> web.Response:
             return _json_error(400, "invalid_plan", "Stars price is not configured")
         payment_units = device_count
         sale_mode = f"hwid_devices@{tariff.key}"
-    elif tariffs_config and requested_sale_mode == "topup":
+    elif tariffs_config and requested_sale_mode in {"topup", "premium_topup"}:
         tariff_key = str(payment_payload.tariff_key or "").strip()
         if not tariff_key:
             return _json_error(400, "invalid_plan", "Tariff is not selected")
@@ -1760,7 +1760,11 @@ async def create_payment_route(request: web.Request) -> web.Response:
             )
         except (TypeError, ValueError):
             return _json_error(400, "invalid_plan", "Invalid traffic package")
-        packages = tariffs_config.topup_packages_for(tariff)
+        packages = (
+            tariff.premium_topup_packages
+            if requested_sale_mode == "premium_topup"
+            else tariffs_config.topup_packages_for(tariff)
+        )
         rub_packages = {float(package.gb): float(package.price) for package in (packages.rub if packages else [])}
         stars_packages = {float(package.gb): int(float(package.price)) for package in (packages.stars if packages else [])}
         package_key = _resolve_numeric_option_key(rub_packages, traffic_gb)
@@ -1773,7 +1777,7 @@ async def create_payment_route(request: web.Request) -> web.Response:
             return _json_error(400, "invalid_plan", "Stars price is not configured")
         payment_units = int(traffic_gb) if float(traffic_gb).is_integer() else traffic_gb
         traffic_gb_for_payment = float(payment_units)
-        sale_mode = f"topup@{tariff.key}"
+        sale_mode = f"{requested_sale_mode}@{tariff.key}"
     elif tariffs_config:
         tariff_key = str(payment_payload.tariff_key or "").strip()
         if not tariff_key:
@@ -1980,14 +1984,40 @@ async def tariff_topup_options_route(request: web.Request) -> web.Response:
         lang = db_user.language_code or settings.DEFAULT_LANGUAGE
         tariff = config.require(sub.tariff_key)
         plans = _serialize_topup_packages(settings, tariff, config.topup_packages_for(tariff), lang)
+        premium_plans = _serialize_topup_packages(
+            settings,
+            tariff,
+            tariff.premium_topup_packages,
+            lang,
+            sale_mode="premium_topup",
+            title_prefix="Premium ",
+        ) if tariff.premium_squad_uuids else []
+        premium_limit_bytes = (
+            int(sub.premium_baseline_bytes or 0)
+            + int(sub.premium_topup_balance_bytes or 0)
+            + int(getattr(sub, "premium_topup_used_bytes", 0) or 0)
+        )
+        premium_access = await request.app["subscription_service"].premium_access_for_tariff(tariff)
         return web.json_response(
             {
                 "ok": True,
                 "tariff_key": tariff.key,
                 "tariff_name": tariff.name(lang),
                 "traffic_percent": _traffic_percent(sub.traffic_used_bytes, sub.traffic_limit_bytes),
+                "premium_traffic_percent": _traffic_percent(
+                    sub.premium_used_bytes,
+                    premium_limit_bytes,
+                ),
+                "premium_limit_bytes": premium_limit_bytes,
+                "premium_used_bytes": int(sub.premium_used_bytes or 0),
+                "premium_baseline_bytes": int(sub.premium_baseline_bytes or 0),
+                "premium_topup_balance_bytes": int(sub.premium_topup_balance_bytes or 0),
+                "premium_topup_used_bytes": int(getattr(sub, "premium_topup_used_bytes", 0) or 0),
+                "premium_is_limited": bool(sub.premium_is_limited),
+                "premium_squad_labels": premium_access.get("squad_labels") or [],
+                "premium_node_labels": premium_access.get("node_labels") or [],
                 "warning_levels": settings.tariff_traffic_warning_levels,
-                "plans": plans,
+                "plans": plans + premium_plans,
             }
         )
 
@@ -2971,7 +3001,7 @@ async def _build_user_payload(request: web.Request, user_id: int) -> Dict[str, A
             "language_code": lang,
             "is_admin": is_admin,
         },
-        "subscription": _serialize_subscription(active, local_sub, lang),
+        "subscription": _serialize_subscription(settings, active, local_sub, lang),
         "referral": {
             "code": referral_code,
             "bot_link": referral_link,
@@ -3052,6 +3082,7 @@ def _build_webapp_referral_link(
 
 
 def _serialize_subscription(
+    settings: Settings,
     active: Optional[Dict[str, Any]],
     local_sub: Optional[Any],
     lang: str,
@@ -3077,6 +3108,18 @@ def _serialize_subscription(
             int((end_date - datetime.now(timezone.utc)).total_seconds()),
         )
 
+    can_topup_traffic = False
+    if settings.tariffs_config and active.get("tariff_key"):
+        try:
+            tariff = settings.tariffs_config.require(str(active.get("tariff_key")))
+            packages = settings.tariffs_config.topup_packages_for(tariff)
+            can_topup_traffic = bool(
+                (packages and packages.has_any())
+                or (tariff.premium_topup_packages and tariff.premium_topup_packages.has_any())
+            )
+        except Exception:
+            can_topup_traffic = False
+
     return {
         "active": seconds_left > 0,
         "status": active.get("status_from_panel") or "UNKNOWN",
@@ -3097,6 +3140,17 @@ def _serialize_subscription(
         "traffic_limit_strategy": str(active.get("traffic_limit_strategy") or ""),
         "tier_baseline_bytes": _coerce_int_or_none(active.get("tier_baseline_bytes")),
         "topup_balance_bytes": _coerce_int_or_none(active.get("topup_balance_bytes")),
+        "premium_limit": _format_bytes(active.get("premium_limit_bytes")),
+        "premium_used": _format_bytes(active.get("premium_used_bytes")),
+        "premium_limit_bytes": _coerce_int_or_none(active.get("premium_limit_bytes")),
+        "premium_used_bytes": _coerce_int_or_none(active.get("premium_used_bytes")),
+        "premium_baseline_bytes": _coerce_int_or_none(active.get("premium_baseline_bytes")),
+        "premium_topup_balance_bytes": _coerce_int_or_none(active.get("premium_topup_balance_bytes")),
+        "premium_topup_used_bytes": _coerce_int_or_none(active.get("premium_topup_used_bytes")),
+        "premium_is_limited": bool(active.get("premium_is_limited")),
+        "premium_squad_labels": list(active.get("premium_squad_labels") or []),
+        "premium_node_labels": list(active.get("premium_node_labels") or []),
+        "can_topup_traffic": can_topup_traffic,
         "period_start_at": active.get("period_start_at").isoformat() if active.get("period_start_at") else None,
         "is_throttled": bool(active.get("is_throttled")),
         "max_devices": _coerce_int_or_none(active.get("max_devices")),
@@ -3242,6 +3296,9 @@ def _serialize_topup_packages(
     tariff: Any,
     packages: Optional[Any],
     lang: str,
+    *,
+    sale_mode: str = "topup",
+    title_prefix: str = "",
 ) -> List[Dict[str, Any]]:
     rub_packages = {float(package.gb): float(package.price) for package in (packages.rub if packages else [])}
     stars_packages = {float(package.gb): int(float(package.price)) for package in (packages.stars if packages else [])}
@@ -3253,17 +3310,17 @@ def _serialize_topup_packages(
             continue
         traffic_value = float(traffic_gb)
         plan: Dict[str, Any] = {
-            "id": f"{tariff.key}:topup:{_format_number_for_payload(traffic_value)}",
+            "id": f"{tariff.key}:{sale_mode}:{_format_number_for_payload(traffic_value)}",
             "tariff_key": tariff.key,
             "tariff_name": tariff.name(lang),
             "billing_model": tariff.billing_model,
-            "sale_mode": "topup",
+            "sale_mode": sale_mode,
             "months": int(traffic_value) if traffic_value.is_integer() else traffic_value,
             "traffic_gb": traffic_value,
             "price": float(price or 0),
             "currency": settings.DEFAULT_CURRENCY_SYMBOL or "RUB",
-            "title": _format_traffic_title(traffic_value, lang),
-            "subtitle": tariff.name(lang),
+            "title": f"{title_prefix}{_format_traffic_title(traffic_value, lang)}",
+            "subtitle": ("Premium-серверы" if lang == "ru" else "Premium servers") if sale_mode == "premium_topup" else tariff.name(lang),
         }
         if stars_price is not None and int(stars_price) > 0:
             plan["stars_price"] = int(stars_price)
@@ -3396,19 +3453,19 @@ def _serialize_payment_methods(
     methods: List[Dict[str, Any]] = []
     for method in settings.payment_methods_order:
         method = method.lower()
-        if method == "severpay" and _service_configured(app, "severpay_service"):
+        if method == "severpay" and settings.SEVERPAY_ENABLED and _service_configured(app, "severpay_service"):
             methods.append({"id": method, "name": labels[method]})
-        elif method == "freekassa" and _service_configured(app, "freekassa_service"):
+        elif method == "freekassa" and settings.FREEKASSA_ENABLED and _service_configured(app, "freekassa_service"):
             methods.append({"id": method, "name": labels[method]})
-        elif method == "platega_sbp" and settings.PLATEGA_SBP_ENABLED and _service_configured(app, "platega_service"):
+        elif method == "platega_sbp" and settings.PLATEGA_ENABLED and settings.PLATEGA_SBP_ENABLED and _service_configured(app, "platega_service"):
             methods.append({"id": method, "name": labels[method]})
-        elif method == "platega_crypto" and settings.PLATEGA_CRYPTO_ENABLED and _service_configured(app, "platega_service"):
+        elif method == "platega_crypto" and settings.PLATEGA_ENABLED and settings.PLATEGA_CRYPTO_ENABLED and _service_configured(app, "platega_service"):
             methods.append({"id": method, "name": labels[method]})
-        elif method == "yookassa" and _service_configured(app, "yookassa_service"):
+        elif method == "yookassa" and settings.YOOKASSA_ENABLED and _service_configured(app, "yookassa_service"):
             methods.append({"id": method, "name": labels[method]})
         elif method == "stars" and settings.STARS_ENABLED:
             methods.append({"id": method, "name": labels[method]})
-        elif method == "cryptopay" and _service_configured(app, "cryptopay_service"):
+        elif method == "cryptopay" and settings.CRYPTOPAY_ENABLED and _service_configured(app, "cryptopay_service"):
             methods.append({"id": method, "name": labels[method]})
     return methods
 
@@ -3429,7 +3486,7 @@ def _sale_mode_tariff_key(sale_mode: str) -> Optional[str]:
 
 
 def _sale_mode_is_traffic(sale_mode: str) -> bool:
-    return _sale_mode_base(sale_mode) in {"traffic", "traffic_package", "topup"}
+    return _sale_mode_base(sale_mode) in {"traffic", "traffic_package", "topup", "premium_topup"}
 
 
 def _sale_mode_is_hwid_devices(sale_mode: str) -> bool:
@@ -3462,24 +3519,36 @@ async def _create_subscription_payment(
     )
 
     if method == "yookassa":
+        if not settings.YOOKASSA_ENABLED:
+            return _json_error(400, "payment_unavailable", "Payment method unavailable")
         return await _create_yookassa_payment(
             request, session, user_id, months, price, description, sale_mode=sale_mode, traffic_gb=traffic_gb
         )
     if method == "freekassa":
+        if not settings.FREEKASSA_ENABLED:
+            return _json_error(400, "payment_unavailable", "Payment method unavailable")
         return await _create_freekassa_payment(
             request, session, user_id, months, price, description, sale_mode=sale_mode, traffic_gb=traffic_gb
         )
     if method in ("platega", "platega_sbp", "platega_crypto"):
+        if not settings.PLATEGA_ENABLED:
+            return _json_error(400, "payment_unavailable", "Payment method unavailable")
+        if method == "platega_sbp" and not settings.PLATEGA_SBP_ENABLED:
+            return _json_error(400, "payment_unavailable", "Payment method unavailable")
+        if method == "platega_crypto" and not settings.PLATEGA_CRYPTO_ENABLED:
+            return _json_error(400, "payment_unavailable", "Payment method unavailable")
         return await _create_platega_payment(
             request, session, user_id, months, price, description, variant=method, sale_mode=sale_mode, traffic_gb=traffic_gb
         )
     if method == "severpay":
+        if not settings.SEVERPAY_ENABLED:
+            return _json_error(400, "payment_unavailable", "Payment method unavailable")
         return await _create_severpay_payment(
             request, session, user_id, months, price, description, sale_mode=sale_mode, traffic_gb=traffic_gb
         )
     if method == "cryptopay":
         service: CryptoPayService = request.app["cryptopay_service"]
-        if not service or not service.configured:
+        if not settings.CRYPTOPAY_ENABLED or not service or not service.configured:
             return _json_error(400, "payment_unavailable", "Payment method unavailable")
         url = await service.create_invoice(
             session=session,

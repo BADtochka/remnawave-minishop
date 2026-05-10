@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from datetime import datetime
 import hashlib
 import hmac
@@ -286,7 +286,7 @@ class FreeKassaService:
                     payment.payment_id,
                     provider="freekassa",
                     sale_mode=sale_mode,
-                    traffic_gb=float(months) if sale_base in {"traffic", "traffic_package", "topup"} else None,
+                    traffic_gb=float(months) if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
                 )
 
                 referral_bonus = None
@@ -331,7 +331,7 @@ class FreeKassaService:
 
             traffic_label = str(int(months)) if float(months).is_integer() else f"{months:g}"
 
-            if sale_mode.split("@", 1)[0].split("|", 1)[0] in {"traffic", "traffic_package", "topup"}:
+            if sale_mode.split("@", 1)[0].split("|", 1)[0] in {"traffic", "traffic_package", "topup", "premium_topup"}:
                 text = _("payment_successful_traffic_full",
                          traffic_gb=traffic_label,
                          end_date=end_date_str if final_end else "",

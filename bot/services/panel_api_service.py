@@ -564,6 +564,76 @@ class PanelApiService:
         logging.error("Failed to get bandwidth stats for user %s. Response: %s", user_uuid, response_data)
         return None
 
+    async def get_node_users_bandwidth_stats(
+        self,
+        node_uuid: str,
+        *,
+        start: str,
+        end: str,
+        top_users_limit: int = 10000,
+    ) -> Optional[Dict[str, Any]]:
+        endpoint = f"/bandwidth-stats/nodes/{node_uuid}/users"
+        response_data = await self._request(
+            "GET",
+            endpoint,
+            params={"start": start, "end": end, "topUsersLimit": top_users_limit},
+            log_full_response=False,
+        )
+        if response_data and not response_data.get("error") and "response" in response_data:
+            response = response_data.get("response")
+            if isinstance(response, dict):
+                return response
+            if isinstance(response, list):
+                return {"topUsers": response}
+        logging.error(
+            "Failed to get node bandwidth stats for node %s. Response: %s",
+            node_uuid,
+            response_data,
+        )
+        return None
+
+    async def get_internal_squads(self) -> Optional[List[Dict[str, Any]]]:
+        response_data = await self._request("GET", "/internal-squads", log_full_response=False)
+        if response_data and not response_data.get("error") and "response" in response_data:
+            response = response_data.get("response")
+            if isinstance(response, list):
+                return response
+            if isinstance(response, dict):
+                for key in ("internalSquads", "squads", "items", "data"):
+                    value = response.get(key)
+                    if isinstance(value, list):
+                        return value
+        logging.error("Failed to get internal squads. Response: %s", response_data)
+        return None
+
+    async def get_internal_squad_accessible_nodes(
+        self,
+        squad_uuid: str,
+    ) -> Optional[List[Dict[str, Any]]]:
+        endpoints = (
+            f"/internal-squads/{squad_uuid}/accessible-nodes",
+            f"/internal-squads/{squad_uuid}/nodes",
+        )
+        last_response = None
+        for endpoint in endpoints:
+            response_data = await self._request("GET", endpoint, log_full_response=False)
+            last_response = response_data
+            if response_data and not response_data.get("error") and "response" in response_data:
+                response = response_data.get("response")
+                if isinstance(response, list):
+                    return response
+                if isinstance(response, dict):
+                    for key in ("nodes", "accessibleNodes", "items", "data"):
+                        value = response.get(key)
+                        if isinstance(value, list):
+                            return value
+        logging.error(
+            "Failed to get accessible nodes for internal squad %s. Response: %s",
+            squad_uuid,
+            last_response,
+        )
+        return None
+
     async def reset_user_traffic(self, user_uuid: str) -> bool:
         endpoint = f"/users/{user_uuid}/actions/reset-traffic"
         response_data = await self._request("POST", endpoint, log_full_response=False)

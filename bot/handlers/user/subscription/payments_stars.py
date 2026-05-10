@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from typing import Optional
 
 from aiogram import F, Router, types
@@ -56,7 +56,7 @@ async def pay_stars_callback_handler(
     sale_base = sale_mode.split("@", 1)[0].split("|", 1)[0]
     payment_description = (
         get_text("payment_description_traffic", traffic_gb=human_value)
-        if sale_base in {"traffic", "traffic_package", "topup"}
+        if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
         else (get_text("payment_description_hwid_devices", count=int(months)) if sale_base in {"hwid_device", "hwid_devices"} else get_text("payment_description_subscription", months=int(months)))
     )
 
@@ -73,7 +73,7 @@ async def pay_stars_callback_handler(
         try:
             await callback.message.edit_text(
                 get_text(
-                    "payment_invoice_sent_message_traffic" if sale_base in {"traffic", "traffic_package", "topup"} else "payment_invoice_sent_message",
+                    "payment_invoice_sent_message_traffic" if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else "payment_invoice_sent_message",
                     months=int(months),
                     traffic_gb=human_value,
                 ),

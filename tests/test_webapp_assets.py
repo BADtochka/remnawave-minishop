@@ -126,6 +126,33 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plans[0]["price"], 199.0)
         self.assertEqual(plans[1]["stars_price"], 2500)
 
+    def test_serialize_payment_methods_respects_runtime_provider_toggles(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+            TARIFFS_CONFIG_PATH="missing-tariffs.json",
+            CRYPTOPAY_ENABLED=False,
+            FREEKASSA_ENABLED=False,
+            SEVERPAY_ENABLED=False,
+            YOOKASSA_ENABLED=False,
+            PLATEGA_ENABLED=False,
+            STARS_ENABLED=False,
+        )
+        configured_service = SimpleNamespace(configured=True)
+        app = {
+            "cryptopay_service": configured_service,
+            "freekassa_service": configured_service,
+            "severpay_service": configured_service,
+            "yookassa_service": configured_service,
+            "platega_service": configured_service,
+        }
+
+        methods = subscription_webapp._serialize_payment_methods(settings, app)
+
+        self.assertEqual(methods, [])
+
     def test_serialize_plans_includes_stars_only_subscription_options(self):
         settings = Settings(
             _env_file=None,

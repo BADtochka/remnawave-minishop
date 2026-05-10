@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import csv
 import io
 from aiogram import Router, F, types
@@ -68,7 +68,7 @@ def format_payment_text(payment: Payment, i18n: JsonI18n, lang: str, settings: S
     }.get(payment.provider, payment.provider or 'Unknown')
 
     sale_base = (payment.sale_mode or "").split("@", 1)[0].split("|", 1)[0]
-    traffic_like = sale_base in {"traffic", "traffic_package", "topup"}
+    traffic_like = sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
     if traffic_like:
         traffic_val = payment.purchased_gb or payment.subscription_duration_months or 0
         traffic_display = str(int(traffic_val)) if float(traffic_val).is_integer() else f"{traffic_val:g}"

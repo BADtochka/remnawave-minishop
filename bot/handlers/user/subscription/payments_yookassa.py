@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from typing import List, Optional, Tuple
 
 from aiogram import F, Router, types
@@ -84,7 +84,7 @@ async def _initiate_yk_payment(
     sale_base = _sale_mode_base(sale_mode)
     payment_description = (
         get_text("payment_description_traffic", traffic_gb=_format_value(months))
-        if sale_base in {"traffic", "traffic_package", "topup"}
+        if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
         else (get_text("payment_description_hwid_devices", count=int(months)) if sale_base in {"hwid_device", "hwid_devices"} else get_text("payment_description_subscription", months=int(months)))
     )
     payment_record_data = {
@@ -96,7 +96,7 @@ async def _initiate_yk_payment(
         "subscription_duration_months": int(months),
         "sale_mode": sale_base,
         "tariff_key": sale_mode.split("@", 1)[1] if "@" in sale_mode else None,
-        "purchased_gb": float(months) if sale_base in {"traffic", "traffic_package", "topup"} else None,
+        "purchased_gb": float(months) if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
         "purchased_hwid_devices": int(months) if sale_base in {"hwid_device", "hwid_devices"} else None,
     }
 
@@ -132,7 +132,7 @@ async def _initiate_yk_payment(
         "payment_db_id": str(db_payment_record.payment_id),
         "sale_mode": sale_mode,
     }
-    if sale_base in {"traffic", "traffic_package", "topup"}:
+    if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}:
         yookassa_metadata["traffic_gb"] = str(months)
     if payment_method_id:
         yookassa_metadata["used_saved_payment_method_id"] = payment_method_id

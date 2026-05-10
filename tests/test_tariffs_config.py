@@ -53,6 +53,24 @@ class TariffsConfigTests(unittest.TestCase):
             self.assertEqual(config.default.key, "standard")
             self.assertEqual(config.require("traffic").rub_per_gb_for_conversion(), 19.9)
 
+    def test_period_tariff_without_topup_packages_has_no_topup(self):
+        config = TariffsConfig.model_validate(_valid_config())
+
+        self.assertIsNone(config.topup_packages_for(config.require("standard")))
+
+    def test_period_tariff_uses_only_own_topup_packages(self):
+        data = _valid_config()
+        data["tariffs"][0]["topup_packages"] = {
+            "rub": [{"gb": 25, "price": 199}],
+            "stars": [],
+        }
+        config = TariffsConfig.model_validate(data)
+
+        packages = config.topup_packages_for(config.require("standard"))
+
+        self.assertIsNotNone(packages)
+        self.assertEqual(packages.rub[0].gb, 25)
+
     def test_missing_config_returns_none(self):
         import tempfile
         from pathlib import Path
@@ -107,6 +125,29 @@ class TariffsConfigTests(unittest.TestCase):
     def test_negative_hwid_device_limit_rejected(self):
         data = _valid_config()
         data["tariffs"][0]["hwid_device_limit"] = -1
+
+        with self.assertRaises(ValueError):
+            TariffsConfig.model_validate(data)
+
+    def test_premium_squad_limit_and_topups_load(self):
+        data = _valid_config()
+        data["tariffs"][0]["premium_squad_uuids"] = [" premium-squad "]
+        data["tariffs"][0]["premium_monthly_gb"] = 50
+        data["tariffs"][0]["premium_topup_packages"] = {
+            "rub": [{"gb": 10, "price": 99}],
+            "stars": [],
+        }
+
+        config = TariffsConfig.model_validate(data)
+        tariff = config.require("standard")
+
+        self.assertEqual(tariff.premium_squad_uuids, ["premium-squad"])
+        self.assertEqual(tariff.premium_monthly_bytes, 50 * 1024**3)
+        self.assertTrue(tariff.has_premium_squad_limit())
+
+    def test_premium_limit_requires_premium_squad(self):
+        data = _valid_config()
+        data["tariffs"][0]["premium_monthly_gb"] = 50
 
         with self.assertRaises(ValueError):
             TariffsConfig.model_validate(data)

@@ -1,4 +1,4 @@
-import json
+﻿import json
 import logging
 import secrets
 import hmac
@@ -210,7 +210,7 @@ class SeverPayService:
                         payment.payment_id,
                         provider="severpay",
                         sale_mode=sale_mode,
-                        traffic_gb=float(payment_months) if sale_base in {"traffic", "traffic_package", "topup"} else None,
+                        traffic_gb=float(payment_months) if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
                     )
 
                     referral_bonus = None
@@ -246,7 +246,7 @@ class SeverPayService:
 
                 traffic_label = str(int(payment_months)) if float(payment_months).is_integer() else f"{payment_months:g}"
 
-                if sale_base in {"traffic", "traffic_package", "topup"}:
+                if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}:
                     text = _(
                         "payment_successful_traffic_full",
                         traffic_gb=traffic_label,

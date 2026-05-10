@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from typing import Optional
 
 from aiogram import Bot, types
@@ -39,7 +39,7 @@ class StarsService:
             "provider": "telegram_stars",
             "sale_mode": sale_mode,
             "tariff_key": sale_mode.split("@", 1)[1] if "@" in sale_mode else None,
-            "purchased_gb": float(months) if sale_base in {"traffic", "traffic_package", "topup"} else None,
+            "purchased_gb": float(months) if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
         }
         try:
             db_payment_record = await payment_dal.create_payment_record(
@@ -103,7 +103,7 @@ class StarsService:
             payment_db_id,
             provider="telegram_stars",
             sale_mode=sale_mode,
-            traffic_gb=months if sale_base in {"traffic", "traffic_package", "topup"} else None,
+            traffic_gb=months if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
         )
         if not activation_details or not activation_details.get("end_date"):
             logging.error(
@@ -136,7 +136,7 @@ class StarsService:
         config_link_display, connect_button_url = await prepare_config_links(self.settings, raw_config_link)
         config_link_text = config_link_display or _("config_link_not_available")
 
-        if sale_base in {"traffic", "traffic_package", "topup"}:
+        if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}:
             success_msg = _(
                 "payment_successful_traffic_full",
                 traffic_gb=str(int(months)) if float(months).is_integer() else f"{months:g}",
@@ -201,7 +201,7 @@ class StarsService:
                 months=int(months) if sale_base == "subscription" else 0,
                 payment_provider="stars",
                 username=user.username if user else None,
-                traffic_gb=months if sale_base in {"traffic", "traffic_package", "topup"} else None,
+                traffic_gb=months if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
             )
         except Exception as e:
             logging.error(f"Failed to send stars payment notification: {e}")

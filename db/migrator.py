@@ -339,6 +339,18 @@ def _migration_0012_add_tariffs_schema(connection: Connection) -> None:
         sub_statements.append("ALTER TABLE subscriptions ADD COLUMN tier_baseline_bytes BIGINT")
     if "topup_balance_bytes" not in sub_columns:
         sub_statements.append("ALTER TABLE subscriptions ADD COLUMN topup_balance_bytes BIGINT NOT NULL DEFAULT 0")
+    if "premium_baseline_bytes" not in sub_columns:
+        sub_statements.append("ALTER TABLE subscriptions ADD COLUMN premium_baseline_bytes BIGINT NOT NULL DEFAULT 0")
+    if "premium_topup_balance_bytes" not in sub_columns:
+        sub_statements.append("ALTER TABLE subscriptions ADD COLUMN premium_topup_balance_bytes BIGINT NOT NULL DEFAULT 0")
+    if "premium_topup_used_bytes" not in sub_columns:
+        sub_statements.append("ALTER TABLE subscriptions ADD COLUMN premium_topup_used_bytes BIGINT NOT NULL DEFAULT 0")
+    if "premium_used_bytes" not in sub_columns:
+        sub_statements.append("ALTER TABLE subscriptions ADD COLUMN premium_used_bytes BIGINT NOT NULL DEFAULT 0")
+    if "premium_is_limited" not in sub_columns:
+        sub_statements.append("ALTER TABLE subscriptions ADD COLUMN premium_is_limited BOOLEAN NOT NULL DEFAULT FALSE")
+    if "premium_period_start_at" not in sub_columns:
+        sub_statements.append("ALTER TABLE subscriptions ADD COLUMN premium_period_start_at TIMESTAMPTZ")
     if "period_start_at" not in sub_columns:
         sub_statements.append("ALTER TABLE subscriptions ADD COLUMN period_start_at TIMESTAMPTZ")
     if "is_throttled" not in sub_columns:
@@ -430,6 +442,7 @@ def _migration_0012_add_tariffs_schema(connection: Connection) -> None:
     for stmt in [
         "CREATE INDEX IF NOT EXISTS ix_subscriptions_tariff_key ON subscriptions (tariff_key)",
         "CREATE INDEX IF NOT EXISTS ix_subscriptions_is_throttled ON subscriptions (is_throttled)",
+        "CREATE INDEX IF NOT EXISTS ix_subscriptions_premium_is_limited ON subscriptions (premium_is_limited)",
         "CREATE INDEX IF NOT EXISTS ix_payments_sale_mode ON payments (sale_mode)",
         "CREATE INDEX IF NOT EXISTS ix_payments_tariff_key ON payments (tariff_key)",
         "CREATE INDEX IF NOT EXISTS ix_traffic_topups_subscription_id ON traffic_topups (subscription_id)",
@@ -468,6 +481,43 @@ def _migration_0009_add_composite_indexes(connection: Connection) -> None:
             """
         )
     )
+
+
+def _migration_0014_add_premium_squad_traffic_fields(connection: Connection) -> None:
+    inspector = inspect(connection)
+    sub_columns: Set[str] = {col["name"] for col in inspector.get_columns("subscriptions")}
+    statements: List[str] = []
+    if "premium_baseline_bytes" not in sub_columns:
+        statements.append("ALTER TABLE subscriptions ADD COLUMN premium_baseline_bytes BIGINT NOT NULL DEFAULT 0")
+    if "premium_topup_balance_bytes" not in sub_columns:
+        statements.append("ALTER TABLE subscriptions ADD COLUMN premium_topup_balance_bytes BIGINT NOT NULL DEFAULT 0")
+    if "premium_topup_used_bytes" not in sub_columns:
+        statements.append("ALTER TABLE subscriptions ADD COLUMN premium_topup_used_bytes BIGINT NOT NULL DEFAULT 0")
+    if "premium_used_bytes" not in sub_columns:
+        statements.append("ALTER TABLE subscriptions ADD COLUMN premium_used_bytes BIGINT NOT NULL DEFAULT 0")
+    if "premium_is_limited" not in sub_columns:
+        statements.append("ALTER TABLE subscriptions ADD COLUMN premium_is_limited BOOLEAN NOT NULL DEFAULT FALSE")
+    if "premium_period_start_at" not in sub_columns:
+        statements.append("ALTER TABLE subscriptions ADD COLUMN premium_period_start_at TIMESTAMPTZ")
+    for stmt in statements:
+        connection.execute(text(stmt))
+    connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_subscriptions_premium_is_limited ON subscriptions (premium_is_limited)"
+        )
+    )
+
+
+def _migration_0015_add_premium_topup_carryover_fields(connection: Connection) -> None:
+    inspector = inspect(connection)
+    sub_columns: Set[str] = {col["name"] for col in inspector.get_columns("subscriptions")}
+    statements: List[str] = []
+    if "premium_topup_used_bytes" not in sub_columns:
+        statements.append("ALTER TABLE subscriptions ADD COLUMN premium_topup_used_bytes BIGINT NOT NULL DEFAULT 0")
+    if "premium_period_start_at" not in sub_columns:
+        statements.append("ALTER TABLE subscriptions ADD COLUMN premium_period_start_at TIMESTAMPTZ")
+    for stmt in statements:
+        connection.execute(text(stmt))
 
 
 MIGRATIONS: List[Migration] = [
@@ -546,6 +596,16 @@ MIGRATIONS: List[Migration] = [
                 """
             )
         ),
+    ),
+    Migration(
+        id="0014_add_premium_squad_traffic_fields",
+        description="Track premium squad traffic limits and top-ups per subscription",
+        upgrade=_migration_0014_add_premium_squad_traffic_fields,
+    ),
+    Migration(
+        id="0015_add_premium_topup_carryover_fields",
+        description="Track premium top-up usage within the current monthly period",
+        upgrade=_migration_0015_add_premium_topup_carryover_fields,
     ),
 ]
 

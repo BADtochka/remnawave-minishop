@@ -1,4 +1,4 @@
-import hashlib
+﻿import hashlib
 import logging
 import json
 import hmac
@@ -91,7 +91,7 @@ class CryptoPayService:
                     "provider": "cryptopay",
                     "sale_mode": sale_mode,
                     "tariff_key": sale_mode.split("@", 1)[1] if "@" in sale_mode else None,
-                    "purchased_gb": float(months) if sale_base in {"traffic", "traffic_package", "topup"} else None,
+                    "purchased_gb": float(months) if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
                 },
             )
             await session.commit()
@@ -107,7 +107,7 @@ class CryptoPayService:
             "subscription_months": str(months),
             "payment_db_id": str(payment_record.payment_id),
             "sale_mode": sale_mode,
-            "traffic_gb": str(months) if sale_base in {"traffic", "traffic_package", "topup"} else None,
+            "traffic_gb": str(months) if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
         })
         try:
             invoice = await self.client.create_invoice(
@@ -184,7 +184,7 @@ class CryptoPayService:
                     payment_db_id,
                     provider="cryptopay",
                     sale_mode=sale_mode,
-                    traffic_gb=traffic_gb if sale_base in {"traffic", "traffic_package", "topup"} else None,
+                    traffic_gb=traffic_gb if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
                 )
                 referral_bonus = None
                 if sale_base == "subscription":
@@ -215,7 +215,7 @@ class CryptoPayService:
                 final_end = referral_bonus["referee_new_end_date"]
                 applied_days = referral_bonus.get("referee_bonus_applied_days", 0)
 
-            if sale_base in {"traffic", "traffic_package", "topup"}:
+            if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}:
                 text = _("payment_successful_traffic_full",
                          traffic_gb=str(int(traffic_gb)) if float(traffic_gb).is_integer() else f"{traffic_gb:g}",
                          end_date=final_end.strftime('%Y-%m-%d') if final_end else "—",
@@ -271,7 +271,7 @@ class CryptoPayService:
                     amount=float(invoice.amount),
                     currency=invoice.asset or settings.DEFAULT_CURRENCY_SYMBOL,
                     months=int(months) if sale_base == "subscription" else 0,
-                    traffic_gb=traffic_gb if sale_base in {"traffic", "traffic_package", "topup"} else None,
+                    traffic_gb=traffic_gb if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
                     payment_provider="crypto_pay",
                     username=user.username if user else None
                 )

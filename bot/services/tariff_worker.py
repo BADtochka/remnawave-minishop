@@ -17,6 +17,8 @@ from config.settings import Settings
 from db.dal import subscription_dal, tariff_dal
 from db.models import Subscription
 
+PREMIUM_WARNING_LEVEL_OFFSET = 1000
+
 
 class TariffTrafficWorker:
     def __init__(
@@ -35,6 +37,7 @@ class TariffTrafficWorker:
         self.bot = bot
         self.i18n = i18n
         self._stopped = asyncio.Event()
+        self._premium_nodes_cache = {}
 
     async def run(self) -> None:
         if not self.settings.tariffs_config:
@@ -93,6 +96,8 @@ class TariffTrafficWorker:
                 warning_period_start=warning_period_start if tariff.billing_model == "period" else None,
             )
 
+            await self._sync_premium_squad_limit(session, sub, tariff, now)
+
     async def _ensure_period_reset_strategy(
         self,
         sub: Subscription,
@@ -109,7 +114,10 @@ class TariffTrafficWorker:
             traffic_limit_bytes=traffic_limit_bytes,
             traffic_limit_strategy="MONTH",
         )
-        payload["activeInternalSquads"] = tariff.squad_uuids
+        payload["activeInternalSquads"] = self.subscription_service._panel_squads_for_tariff(
+            tariff,
+            include_premium=not bool(getattr(sub, "premium_is_limited", False)),
+        )
         await self.panel_service.update_user_details_on_panel(sub.panel_user_uuid, payload, log_response=False)
 
     async def _maybe_warn_or_throttle(
@@ -175,6 +183,236 @@ class TariffTrafficWorker:
                 sub.user_id,
                 sub.subscription_id,
             )
+
+    async def _sync_premium_squad_limit(
+        self,
+        session: AsyncSession,
+        sub: Subscription,
+        tariff,
+        now: datetime,
+    ) -> None:
+        if not getattr(tariff, "premium_squad_uuids", None):
+            if any(
+                int(value or 0) > 0
+                for value in (
+                    sub.premium_baseline_bytes,
+                    sub.premium_topup_balance_bytes,
+                    sub.premium_used_bytes,
+                )
+            ) or sub.premium_is_limited:
+                sub.premium_baseline_bytes = 0
+                sub.premium_topup_balance_bytes = 0
+                sub.premium_used_bytes = 0
+                sub.premium_is_limited = False
+            return
+
+        premium_period_start = month_start(now)
+        same_period = bool(getattr(sub, "premium_period_start_at", None) == premium_period_start)
+        premium_baseline = int(tariff.premium_monthly_bytes or 0)
+        premium_topup_balance = int(sub.premium_topup_balance_bytes or 0)
+        premium_topup_used = int(getattr(sub, "premium_topup_used_bytes", 0) or 0) if same_period else 0
+        premium_limit = premium_baseline + premium_topup_balance + premium_topup_used
+        if premium_limit <= 0:
+            return
+
+        node_uuids = await self._premium_node_uuids_for_tariff(tariff)
+        if not node_uuids:
+            logging.warning("Premium squads for tariff %s have no accessible nodes", tariff.key)
+            return
+
+        start_date = now.date().replace(day=1).isoformat()
+        end_date = now.date().isoformat()
+        premium_used = await self._premium_usage_for_user(sub.panel_user_uuid, node_uuids, start_date, end_date)
+        if premium_used is None:
+            return
+
+        overflow = max(0, int(premium_used) - premium_baseline)
+        delta_overflow = max(0, overflow - premium_topup_used)
+        consume_from_topup = min(premium_topup_balance, delta_overflow)
+        if consume_from_topup > 0:
+            premium_topup_balance -= consume_from_topup
+            premium_topup_used += consume_from_topup
+            premium_limit = premium_baseline + premium_topup_balance + premium_topup_used
+
+        should_limit = premium_used >= premium_limit
+        changed = (
+            int(sub.premium_baseline_bytes or 0) != premium_baseline
+            or int(sub.premium_topup_balance_bytes or 0) != premium_topup_balance
+            or int(getattr(sub, "premium_topup_used_bytes", 0) or 0) != premium_topup_used
+            or int(sub.premium_used_bytes or 0) != premium_used
+            or bool(sub.premium_is_limited) != should_limit
+            or getattr(sub, "premium_period_start_at", None) != premium_period_start
+        )
+        sub.premium_baseline_bytes = premium_baseline
+        sub.premium_topup_balance_bytes = premium_topup_balance
+        sub.premium_topup_used_bytes = premium_topup_used
+        sub.premium_used_bytes = int(premium_used)
+        sub.premium_is_limited = bool(should_limit)
+        sub.premium_period_start_at = premium_period_start
+        await self._maybe_warn_premium_squad_limit(
+            session,
+            sub,
+            tariff,
+            premium_used,
+            premium_limit,
+            premium_period_start,
+        )
+        if not changed:
+            return
+
+        squads = self.subscription_service._panel_squads_for_tariff(
+            tariff,
+            include_premium=not should_limit,
+        )
+        await self.panel_service.update_user_details_on_panel(
+            sub.panel_user_uuid,
+            {"uuid": sub.panel_user_uuid, "activeInternalSquads": squads},
+            log_response=False,
+        )
+        logging.info(
+            "Premium squad access %s for user %s tariff %s: %s/%s bytes",
+            "limited" if should_limit else "restored",
+            sub.user_id,
+            tariff.key,
+            premium_used,
+            premium_limit,
+        )
+
+    @staticmethod
+    def _fmt_bytes(value: int) -> str:
+        size = float(max(0, int(value or 0)))
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if size < 1024 or unit == "TB":
+                return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
+            size /= 1024
+        return f"{size:.1f} TB"
+
+    async def _maybe_warn_premium_squad_limit(
+        self,
+        session: AsyncSession,
+        sub: Subscription,
+        tariff,
+        used: int,
+        limit: int,
+        period_start_at: datetime,
+    ) -> None:
+        if limit <= 0:
+            return
+        ratio = int(used or 0) / int(limit)
+        levels = list(getattr(self.settings, "tariff_traffic_warning_levels", [85, 90, 95]))
+        for level in levels:
+            if ratio < level / 100:
+                continue
+            storage_level = PREMIUM_WARNING_LEVEL_OFFSET + int(level)
+            warning = await tariff_dal.get_warning(
+                session,
+                subscription_id=sub.subscription_id,
+                period_start_at=period_start_at,
+                level=storage_level,
+            )
+            if warning:
+                continue
+            await tariff_dal.create_warning(
+                session,
+                subscription_id=sub.subscription_id,
+                period_start_at=period_start_at,
+                level=storage_level,
+                traffic_limit_bytes=None,
+            )
+            if not self.bot:
+                continue
+            try:
+                access = await self.subscription_service.premium_access_for_tariff(tariff)
+                labels = access.get("node_labels") or access.get("squad_labels") or []
+                if labels:
+                    visible = labels[:8]
+                    servers = "\n".join(f"• {label}" for label in visible)
+                    if len(labels) > len(visible):
+                        servers += f"\n• ... еще {len(labels) - len(visible)}"
+                else:
+                    servers = "• premium-серверы тарифа"
+                text = (
+                    "⚠️ Отдельный лимит premium-серверов почти закончился.\n\n"
+                    f"Тариф: {tariff.name(self.settings.DEFAULT_LANGUAGE)}\n"
+                    f"Использовано: {self._fmt_bytes(used)} из {self._fmt_bytes(limit)} ({level}%).\n\n"
+                    "Этот лимит действует на:\n"
+                    f"{servers}\n\n"
+                    "Можно докупить premium-трафик. Докупленный остаток переносится на следующие месяцы, пока не израсходуется."
+                )
+                markup = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text="Докупить premium-трафик",
+                                callback_data="tariff_topup:list",
+                            )
+                        ]
+                    ]
+                )
+                await self.bot.send_message(sub.user_id, text, reply_markup=markup)
+            except Exception:
+                logging.exception("Failed to send premium traffic warning to user %s", sub.user_id)
+
+    async def _premium_node_uuids_for_tariff(self, tariff) -> list[str]:
+        cache_key = tuple(sorted(tariff.premium_squad_uuids or []))
+        cached = self._premium_nodes_cache.get(cache_key)
+        now_ts = datetime.now(timezone.utc).timestamp()
+        if cached and now_ts - cached["ts"] < 600:
+            return list(cached["nodes"])
+
+        nodes: list[str] = []
+        for squad_uuid in tariff.premium_squad_uuids or []:
+            accessible = await self.panel_service.get_internal_squad_accessible_nodes(squad_uuid) or []
+            for node in accessible:
+                if not isinstance(node, dict):
+                    continue
+                node_uuid = node.get("uuid") or node.get("nodeUuid") or node.get("node_uuid")
+                if node_uuid:
+                    nodes.append(str(node_uuid))
+        deduped = list(dict.fromkeys(nodes))
+        self._premium_nodes_cache[cache_key] = {"ts": now_ts, "nodes": deduped}
+        return deduped
+
+    async def _premium_usage_for_user(
+        self,
+        user_uuid: str,
+        node_uuids: list[str],
+        start_date: str,
+        end_date: str,
+    ) -> Optional[int]:
+        total = 0
+        found = False
+        for node_uuid in node_uuids:
+            stats = await self.panel_service.get_node_users_bandwidth_stats(
+                node_uuid,
+                start=start_date,
+                end=end_date,
+            )
+            if not stats:
+                continue
+            entries = stats.get("topUsers") or stats.get("usersStats") or stats.get("users") or []
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                user_obj = entry.get("user") if isinstance(entry.get("user"), dict) else {}
+                entry_uuid = (
+                    user_obj.get("uuid")
+                    or entry.get("userUuid")
+                    or entry.get("uuid")
+                    or entry.get("user_uuid")
+                )
+                if entry_uuid != user_uuid:
+                    continue
+                value = entry.get("total")
+                if value is None:
+                    value = int(entry.get("download", 0) or 0) + int(entry.get("upload", 0) or 0)
+                total += int(value or 0)
+                found = True
+            if len(node_uuids) > 1:
+                await asyncio.sleep(0.1)
+        return total if found else 0
 
     async def legacy_throttle_recovery_tick(self, session: AsyncSession) -> None:
         """Recover subscriptions throttled by older bot versions.

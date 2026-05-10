@@ -124,3 +124,134 @@ class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
 
             panel_service.remove_users_from_internal_squad.assert_not_awaited()
             self.assertFalse(sub.is_throttled)
+
+    async def test_premium_limit_removes_only_premium_squad(self):
+        payload = _tariffs_config_payload()
+        payload["tariffs"][0]["premium_squad_uuids"] = ["premium-squad"]
+        payload["tariffs"][0]["premium_monthly_gb"] = 1
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "tariffs.json"
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            settings = Settings(
+                _env_file=None,
+                BOT_TOKEN="token",
+                POSTGRES_USER="app_user",
+                POSTGRES_PASSWORD="app_password",
+                TARIFFS_CONFIG_PATH=str(config_path),
+            )
+            panel_service = AsyncMock(spec=PanelApiService)
+            panel_service.get_internal_squad_accessible_nodes = AsyncMock(
+                return_value=[{"uuid": "node-1", "name": "Premium"}]
+            )
+            panel_service.get_node_users_bandwidth_stats = AsyncMock(
+                return_value={
+                    "topUsers": [
+                        {
+                            "user": {"uuid": "panel-uuid"},
+                            "total": 2 * (1024**3),
+                        }
+                    ]
+                }
+            )
+            panel_service.update_user_details_on_panel = AsyncMock(return_value={"response": {}})
+            subscription_service = SubscriptionService(settings, panel_service)
+            worker = TariffTrafficWorker(
+                settings=settings,
+                session_factory=SimpleNamespace(),
+                panel_service=panel_service,
+                subscription_service=subscription_service,
+            )
+            sub = SimpleNamespace(
+                subscription_id=1,
+                user_id=123,
+                panel_user_uuid="panel-uuid",
+                premium_baseline_bytes=1 * (1024**3),
+                premium_topup_balance_bytes=0,
+                premium_topup_used_bytes=0,
+                premium_used_bytes=0,
+                premium_is_limited=False,
+                premium_period_start_at=None,
+            )
+            tariff = settings.tariffs_config.require("standard")
+
+            with patch("bot.services.tariff_worker.tariff_dal.get_warning", new=AsyncMock(return_value=True)):
+                await worker._sync_premium_squad_limit(AsyncMock(), sub, tariff, datetime.now(timezone.utc))
+
+            self.assertTrue(sub.premium_is_limited)
+            panel_service.update_user_details_on_panel.assert_awaited_once()
+            payload = panel_service.update_user_details_on_panel.await_args.args[1]
+            self.assertEqual(payload["activeInternalSquads"], ["squad-1"])
+
+    async def test_premium_topup_balance_carries_over_and_is_spent_only_above_monthly_limit(self):
+        payload = _tariffs_config_payload()
+        payload["tariffs"][0]["premium_squad_uuids"] = ["premium-squad"]
+        payload["tariffs"][0]["premium_monthly_gb"] = 1
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "tariffs.json"
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            settings = Settings(
+                _env_file=None,
+                BOT_TOKEN="token",
+                POSTGRES_USER="app_user",
+                POSTGRES_PASSWORD="app_password",
+                TARIFFS_CONFIG_PATH=str(config_path),
+                TARIFF_TRAFFIC_WARNING_LEVELS="101",
+            )
+            panel_service = AsyncMock(spec=PanelApiService)
+            panel_service.get_internal_squad_accessible_nodes = AsyncMock(return_value=[{"uuid": "node-1"}])
+            panel_service.get_node_users_bandwidth_stats = AsyncMock(
+                return_value={
+                    "topUsers": [
+                        {
+                            "user": {"uuid": "panel-uuid"},
+                            "total": int(1.5 * (1024**3)),
+                        }
+                    ]
+                }
+            )
+            panel_service.update_user_details_on_panel = AsyncMock(return_value={"response": {}})
+            subscription_service = SubscriptionService(settings, panel_service)
+            worker = TariffTrafficWorker(
+                settings=settings,
+                session_factory=SimpleNamespace(),
+                panel_service=panel_service,
+                subscription_service=subscription_service,
+            )
+            now = datetime(2026, 5, 9, tzinfo=timezone.utc)
+            sub = SimpleNamespace(
+                subscription_id=1,
+                user_id=123,
+                panel_user_uuid="panel-uuid",
+                premium_baseline_bytes=1 * (1024**3),
+                premium_topup_balance_bytes=2 * (1024**3),
+                premium_topup_used_bytes=0,
+                premium_used_bytes=0,
+                premium_is_limited=False,
+                premium_period_start_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+            )
+            tariff = settings.tariffs_config.require("standard")
+
+            await worker._sync_premium_squad_limit(AsyncMock(), sub, tariff, now)
+
+            self.assertEqual(sub.premium_topup_balance_bytes, int(1.5 * (1024**3)))
+            self.assertEqual(sub.premium_topup_used_bytes, int(0.5 * (1024**3)))
+            self.assertFalse(sub.premium_is_limited)
+
+            panel_service.get_node_users_bandwidth_stats = AsyncMock(
+                return_value={
+                    "topUsers": [
+                        {
+                            "user": {"uuid": "panel-uuid"},
+                            "total": int(0.1 * (1024**3)),
+                        }
+                    ]
+                }
+            )
+            next_month = datetime(2026, 6, 2, tzinfo=timezone.utc)
+            await worker._sync_premium_squad_limit(AsyncMock(), sub, tariff, next_month)
+
+            self.assertEqual(sub.premium_topup_balance_bytes, int(1.5 * (1024**3)))
+            self.assertEqual(sub.premium_topup_used_bytes, 0)
+            self.assertEqual(sub.premium_period_start_at, datetime(2026, 6, 1, tzinfo=timezone.utc))

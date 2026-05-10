@@ -1,8 +1,10 @@
 import hashlib
+import html
 import logging
 from aiogram import Router, F, types, Bot
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from typing import Optional, Union
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -269,10 +271,80 @@ async def tariff_topup_list_callback(callback: types.CallbackQuery, i18n_data: d
     tariff = config.require(active["tariff_key"])
     packages = config.topup_packages_for(tariff)
     rub_packages = packages.rub if packages else []
-    if not rub_packages:
+    premium_packages = tariff.premium_topup_packages.rub if tariff.premium_topup_packages else []
+    if not rub_packages and not premium_packages:
         await callback.answer(get_text("no_subscription_options_available"), show_alert=True)
         return
-    markup = get_tariff_packages_keyboard(tariff, rub_packages, current_lang, i18n, back_callback="main_action:my_subscription")
+    builder = InlineKeyboardBuilder()
+    currency = settings.DEFAULT_CURRENCY_SYMBOL
+    for package in rub_packages:
+        builder.row(
+            InlineKeyboardButton(
+                text=f"Обычный трафик +{package.gb:g} GB — {package.price:g} {currency}",
+                callback_data=f"tariff:package:{tariff.key}:{package.gb:g}",
+            )
+        )
+    for package in premium_packages:
+        builder.row(
+            InlineKeyboardButton(
+                text=f"Premium-серверы +{package.gb:g} GB — {package.price:g} {currency}",
+                callback_data=f"tariff:premium_package:{tariff.key}:{package.gb:g}",
+            )
+        )
+    builder.row(InlineKeyboardButton(text=get_text("back_to_main_menu_button"), callback_data="main_action:my_subscription"))
+
+    premium_lines = []
+    carryover_lines = []
+    if rub_packages or premium_packages:
+        carryover_lines.append("Докупленный трафик не сгорает: сначала расходуется месячный лимит, затем докупленный остаток.")
+    if int(active.get("premium_limit_bytes") or 0) > 0:
+        premium_left = max(0, int(active.get("premium_limit_bytes") or 0) - int(active.get("premium_used_bytes") or 0))
+        labels = active.get("premium_node_labels") or active.get("premium_squad_labels") or []
+        if labels:
+            visible = [str(label) for label in labels[:8]]
+            premium_lines.append("Premium-лимит действует на:")
+            premium_lines.extend(f"• {label}" for label in visible)
+            if len(labels) > len(visible):
+                premium_lines.append(f"• ... еще {len(labels) - len(visible)}")
+        premium_lines.append(
+            f"Premium использовано: {active.get('premium_used')} из {active.get('premium_limit')}. Осталось: {premium_left / 2**30:.2f} GB."
+        )
+    text = get_text("choose_payment_method_traffic")
+    if carryover_lines:
+        text = text + "\n\n" + "\n".join(carryover_lines)
+    if premium_lines:
+        text = text + "\n\n" + "\n".join(premium_lines)
+    await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("tariff:premium_package:"))
+async def select_tariff_premium_package_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, session: AsyncSession):
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
+    config = settings.tariffs_config
+    if not config or not callback.message:
+        await callback.answer(get_text("error_occurred_try_again"), show_alert=True)
+        return
+    _, _, tariff_key, gb_raw = callback.data.split(":", 3)
+    tariff = config.require(tariff_key)
+    gb = float(gb_raw)
+    packages = tariff.premium_topup_packages.rub if tariff.premium_topup_packages else []
+    package = next((pkg for pkg in packages if float(pkg.gb) == gb), None)
+    if not package:
+        await callback.answer(get_text("error_try_again"), show_alert=True)
+        return
+    markup = get_payment_method_keyboard(
+        gb,
+        package.price,
+        None,
+        settings.DEFAULT_CURRENCY_SYMBOL,
+        current_lang,
+        i18n,
+        settings,
+        sale_mode=f"premium_topup@{tariff.key}",
+    )
     await callback.message.edit_text(get_text("choose_payment_method_traffic"), reply_markup=markup)
     await callback.answer()
 
@@ -349,6 +421,9 @@ async def tariff_change_list_callback(callback: types.CallbackQuery, i18n_data: 
     active = await subscription_service.get_active_subscription_details(session, callback.from_user.id)
     if not config or not active or not callback.message:
         await callback.answer("Error", show_alert=True)
+        return
+    if len(config.enabled_tariffs) <= 1:
+        await callback.answer("Смена тарифа недоступна: сейчас включен только один тариф.", show_alert=True)
         return
     rows = []
     for tariff in config.enabled_tariffs:
@@ -614,6 +689,31 @@ async def my_subscription_command_handler(
         if tariff_prefix:
             text = tariff_prefix + "\n" + text
 
+    if int(active.get("premium_limit_bytes") or 0) > 0:
+        premium_limit = int(active.get("premium_limit_bytes") or 0)
+        premium_used = int(active.get("premium_used_bytes") or 0)
+        premium_left = max(0, premium_limit - premium_used)
+        premium_balance = int(active.get("premium_topup_balance_bytes") or 0)
+        premium_status = "ограничен" if active.get("premium_is_limited") else "активен"
+        labels = active.get("premium_node_labels") or active.get("premium_squad_labels") or []
+        if labels:
+            visible = [html.escape(str(label)) for label in labels[:8]]
+            label_block = "\n".join(f"• {label}" for label in visible)
+            if len(labels) > len(visible):
+                label_block += f"\n• ... еще {len(labels) - len(visible)}"
+        else:
+            label_block = "• premium-серверы тарифа"
+        text += (
+            "\n\n🚀 <b>Premium-серверы</b>\n"
+            f"Статус: <b>{premium_status}</b>\n"
+            f"Лимит: <b>{active.get('premium_used')} из {active.get('premium_limit')}</b>\n"
+            f"Осталось: <b>{premium_left / 2**30:.2f} GB</b>\n"
+            f"Докупленный остаток: <b>{premium_balance / 2**30:.2f} GB</b>\n"
+            "Отдельный лимит действует на:\n"
+            f"{label_block}\n\n"
+            "Premium-докупка не сгорает: сначала расходуется месячный лимит premium-серверов, затем докупленный premium-трафик."
+        )
+
     base_markup = get_back_to_main_menu_markup(
         current_lang,
         i18n,
@@ -727,8 +827,19 @@ async def my_subscription_command_handler(
             tariff_actions = []
             if _has_multiple_enabled_tariffs(settings):
                 tariff_actions.append(InlineKeyboardButton(text="Сменить тариф", callback_data="tariff_change:list"))
-            tariff_actions.append(InlineKeyboardButton(text="Докупить трафик", callback_data="tariff_topup:list"))
-            prepend_rows.append(tariff_actions)
+            try:
+                tariff = settings.tariffs_config.require(local_sub.tariff_key)
+                topup_packages = settings.tariffs_config.topup_packages_for(tariff)
+                has_topup_packages = bool(
+                    (topup_packages and topup_packages.has_any())
+                    or (tariff.premium_topup_packages and tariff.premium_topup_packages.has_any())
+                )
+            except Exception:
+                has_topup_packages = False
+            if has_topup_packages:
+                tariff_actions.append(InlineKeyboardButton(text="Докупить трафик", callback_data="tariff_topup:list"))
+            if tariff_actions:
+                prepend_rows.append(tariff_actions)
 
         if prepend_rows:
             kb = prepend_rows + kb

@@ -1,4 +1,4 @@
-from typing import Optional
+﻿from typing import Optional
 
 from aiogram import F, Router, types
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +30,7 @@ async def pay_crypto_callback_handler(
             pass
         return
 
-    if not cryptopay_service or not getattr(cryptopay_service, "configured", False):
+    if not settings.CRYPTOPAY_ENABLED or not cryptopay_service or not getattr(cryptopay_service, "configured", False):
         try:
             await callback.answer(get_text("payment_service_unavailable_alert"), show_alert=True)
         except Exception:
@@ -55,7 +55,7 @@ async def pay_crypto_callback_handler(
     sale_base = sale_mode.split("@", 1)[0].split("|", 1)[0]
     payment_description = (
         get_text("payment_description_traffic", traffic_gb=human_value)
-        if sale_base in {"traffic", "traffic_package", "topup"}
+        if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
         else (get_text("payment_description_hwid_devices", count=int(months)) if sale_base in {"hwid_device", "hwid_devices"} else get_text("payment_description_subscription", months=int(months)))
     )
 
@@ -72,7 +72,7 @@ async def pay_crypto_callback_handler(
         try:
             await callback.message.edit_text(
                 get_text(
-                    key="payment_link_message_traffic" if sale_base in {"traffic", "traffic_package", "topup"} else "payment_link_message",
+                    key="payment_link_message_traffic" if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else "payment_link_message",
                     months=int(months),
                     traffic_gb=human_value,
                 ),
@@ -89,7 +89,7 @@ async def pay_crypto_callback_handler(
             try:
                 await callback.message.answer(
                     get_text(
-                        key="payment_link_message_traffic" if sale_base in {"traffic", "traffic_package", "topup"} else "payment_link_message",
+                        key="payment_link_message_traffic" if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else "payment_link_message",
                         months=int(months),
                         traffic_gb=human_value,
                     ),

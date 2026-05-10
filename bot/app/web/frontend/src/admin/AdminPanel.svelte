@@ -174,6 +174,10 @@
   let tariffDeleteOpen = false;
   let tariffDeleteTarget = null;
   let tariffDraft = emptyTariffDraft();
+  let panelSquads = [];
+  let panelSquadsLoading = false;
+  let selectedBaseSquad = "";
+  let selectedPremiumSquad = "";
 
   // Settings
   let settingsSections = [];
@@ -551,10 +555,12 @@
       nameEn: "",
       descriptionRu: "",
       descriptionEn: "",
-      squadUuids: "",
+      squadUuids: [],
+      premiumSquadUuids: [],
       billing_model: "period",
       enabled: true,
       monthly_gb: 500,
+      premium_monthly_gb: "",
       hwid_device_limit: "",
       conversion_rate_rub_per_gb: "",
       periodRows: [
@@ -565,6 +571,8 @@
       ],
       topupRubRows: [],
       topupStarsRows: [],
+      premiumTopupRubRows: [],
+      premiumTopupStarsRows: [],
       trafficRubRows: [
         { gb: 10, price: 199 },
         { gb: 50, price: 799 },
@@ -612,15 +620,19 @@
       nameEn: tariff.names?.en || "",
       descriptionRu: tariff.descriptions?.ru || "",
       descriptionEn: tariff.descriptions?.en || "",
-      squadUuids: (tariff.squad_uuids || []).join("\n"),
+      squadUuids: tariff.squad_uuids || [],
+      premiumSquadUuids: tariff.premium_squad_uuids || [],
       billing_model: tariff.billing_model || "period",
       enabled: tariff.enabled !== false,
       monthly_gb: tariff.monthly_gb ?? "",
+      premium_monthly_gb: tariff.premium_monthly_gb ?? "",
       hwid_device_limit: tariff.hwid_device_limit ?? "",
       conversion_rate_rub_per_gb: tariff.conversion_rate_rub_per_gb ?? "",
       periodRows: periodRows.length ? periodRows : emptyTariffDraft().periodRows,
       topupRubRows: rowsFromPackages(tariff.topup_packages, "rub", "gb"),
       topupStarsRows: rowsFromPackages(tariff.topup_packages, "stars", "gb"),
+      premiumTopupRubRows: rowsFromPackages(tariff.premium_topup_packages, "rub", "gb"),
+      premiumTopupStarsRows: rowsFromPackages(tariff.premium_topup_packages, "stars", "gb"),
       trafficRubRows: rowsFromPackages(tariff.traffic_packages, "rub", "gb"),
       trafficStarsRows: rowsFromPackages(tariff.traffic_packages, "stars", "gb"),
       hwidRubRows: rowsFromPackages(tariff.hwid_device_packages, "rub", "count"),
@@ -672,10 +684,8 @@
       key,
       names,
       descriptions,
-      squad_uuids: tariffDraft.squadUuids
-        .split(/[\n,]+/)
-        .map((item) => item.trim())
-        .filter(Boolean),
+      squad_uuids: normalizeUuidList(tariffDraft.squadUuids),
+      premium_squad_uuids: normalizeUuidList(tariffDraft.premiumSquadUuids),
       billing_model: tariffDraft.billing_model,
       enabled: Boolean(tariffDraft.enabled),
     };
@@ -684,6 +694,14 @@
     if (hwidLimit !== null) tariff.hwid_device_limit = hwidLimit;
     const hwidPackages = packageSetFromRows(tariffDraft.hwidRubRows, tariffDraft.hwidStarsRows, "count");
     if (hwidPackages) tariff.hwid_device_packages = hwidPackages;
+    const premiumMonthlyGb = parseNumber(tariffDraft.premium_monthly_gb);
+    if (premiumMonthlyGb !== null) tariff.premium_monthly_gb = premiumMonthlyGb;
+    const premiumTopupPackages = packageSetFromRows(
+      tariffDraft.premiumTopupRubRows,
+      tariffDraft.premiumTopupStarsRows,
+      "gb",
+    );
+    if (premiumTopupPackages) tariff.premium_topup_packages = premiumTopupPackages;
 
     if (tariff.billing_model === "period") {
       const seenMonths = new Set();
@@ -719,6 +737,7 @@
   async function loadTariffs() {
     tariffsLoading = true;
     try {
+      loadPanelSquads();
       const data = await api("/admin/tariffs");
       if (data?.ok) {
         tariffsCatalog = cloneCatalog(data.catalog);
@@ -729,6 +748,46 @@
     } finally {
       tariffsLoading = false;
     }
+  }
+
+  async function loadPanelSquads() {
+    if (panelSquadsLoading) return;
+    panelSquadsLoading = true;
+    try {
+      const data = await api("/admin/panel/internal-squads");
+      if (data?.ok) panelSquads = data.squads || [];
+    } catch (e) {
+      panelSquads = [];
+    } finally {
+      panelSquadsLoading = false;
+    }
+  }
+
+  function normalizeUuidList(value) {
+    if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+    return String(value || "")
+      .split(/[\n,]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  function squadLabel(uuid) {
+    const squad = panelSquads.find((item) => item.uuid === uuid);
+    return squad ? `${squad.name} · ${uuid.slice(0, 8)}…` : uuid;
+  }
+
+  function addSquadToDraft(field, uuid) {
+    if (!uuid) return;
+    const current = normalizeUuidList(tariffDraft[field]);
+    if (current.includes(uuid)) return;
+    tariffDraft = { ...tariffDraft, [field]: [...current, uuid] };
+  }
+
+  function removeSquadFromDraft(field, uuid) {
+    tariffDraft = {
+      ...tariffDraft,
+      [field]: normalizeUuidList(tariffDraft[field]).filter((item) => item !== uuid),
+    };
   }
 
   async function persistTariffs(nextCatalog, successText) {
@@ -757,6 +816,8 @@
     tariffEditingKey = "";
     tariffDraft = emptyTariffDraft();
     tariffEditorTab = "general";
+    selectedBaseSquad = "";
+    selectedPremiumSquad = "";
     tariffEditorOpen = true;
   }
 
@@ -764,6 +825,8 @@
     tariffEditingKey = tariff.key;
     tariffDraft = draftFromTariff(tariff);
     tariffEditorTab = "general";
+    selectedBaseSquad = "";
+    selectedPremiumSquad = "";
     tariffEditorOpen = true;
   }
 
@@ -1794,6 +1857,7 @@
                         <span>{tariff.billing_model === "traffic" ? "Трафик" : "Периоды"}</span>
                         <span>{tariffPriceSummary(tariff)}</span>
                         <span>Squads: {(tariff.squad_uuids || []).length}</span>
+                        <span>Premium: {(tariff.premium_squad_uuids || []).length ? `${tariff.premium_monthly_gb || 0} GB` : "—"}</span>
                         <span>Устройства: {tariff.hwid_device_limit ?? "env"}</span>
                       </div>
                       <div class="admin-tariff-actions">
@@ -1921,6 +1985,7 @@
       <Tabs.Trigger value="general" class="admin-tabs-trigger">Основное</Tabs.Trigger>
       <Tabs.Trigger value="pricing" class="admin-tabs-trigger">Цены</Tabs.Trigger>
       <Tabs.Trigger value="topup" class="admin-tabs-trigger">Докупки</Tabs.Trigger>
+      <Tabs.Trigger value="premium" class="admin-tabs-trigger">Premium</Tabs.Trigger>
       <Tabs.Trigger value="hwid" class="admin-tabs-trigger">Устройства</Tabs.Trigger>
     </Tabs.List>
 
@@ -1992,11 +2057,40 @@
         </Label.Root>
       </div>
 
-      <Label.Root class="admin-field-label">
-        <span>Internal Squads UUID</span>
-        <small>Один UUID на строку или через запятую</small>
-        <textarea class="admin-textarea" rows="3" placeholder="db786ee8-816b-4760-80aa-1fc7a3669ff2" bind:value={tariffDraft.squadUuids}></textarea>
-      </Label.Root>
+      <div class="admin-field-label">
+        <span>Основные Internal Squads</span>
+        <small>{panelSquadsLoading ? "Загружаю список из панели…" : "Выберите сквады из Remnawave"}</small>
+        <Select.Root
+          type="single"
+          bind:value={selectedBaseSquad}
+          onValueChange={(value) => {
+            addSquadToDraft("squadUuids", value);
+            selectedBaseSquad = "";
+          }}
+        >
+          <Select.Trigger class="admin-select-trigger" aria-label="Добавить основной сквад">
+            <span>Добавить сквад</span>
+            <ChevronDown size={14} class="admin-select-icon" />
+          </Select.Trigger>
+          <Select.Portal>
+            <Select.Content class="admin-select-content" sideOffset={6}>
+              {#each panelSquads as squad}
+                <Select.Item value={squad.uuid} class="admin-select-item">
+                  <span>{squad.name}</span>
+                  <Check size={14} class="admin-select-item-check" />
+                </Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Portal>
+        </Select.Root>
+        <div class="admin-chip-list">
+          {#each normalizeUuidList(tariffDraft.squadUuids) as uuid}
+            <button type="button" class="admin-chip" on:click={() => removeSquadFromDraft("squadUuids", uuid)}>
+              {squadLabel(uuid)} <X size={12} />
+            </button>
+          {/each}
+        </div>
+      </div>
 
       <div class="admin-form-row admin-form-row-2">
         <Label.Root class="admin-field-label">
@@ -2018,6 +2112,87 @@
           </Label.Root>
         {/if}
       </div>
+    </Tabs.Content>
+
+    <Tabs.Content value="premium" class="admin-tabs-content">
+      <section class="admin-editor-section">
+        <header class="admin-editor-section-head">
+          <strong>Premium-сквад и отдельный лимит</strong>
+        </header>
+        <div class="admin-form-row admin-form-row-2">
+          <div class="admin-field-label">
+            <span>Premium Internal Squads</span>
+            <small>Ноды для учета трафика будут взяты из accessible nodes этих сквадов</small>
+            <Select.Root
+              type="single"
+              bind:value={selectedPremiumSquad}
+              onValueChange={(value) => {
+                addSquadToDraft("premiumSquadUuids", value);
+                selectedPremiumSquad = "";
+              }}
+            >
+              <Select.Trigger class="admin-select-trigger" aria-label="Добавить premium-сквад">
+                <span>Добавить premium-сквад</span>
+                <ChevronDown size={14} class="admin-select-icon" />
+              </Select.Trigger>
+              <Select.Portal>
+                <Select.Content class="admin-select-content" sideOffset={6}>
+                  {#each panelSquads as squad}
+                    <Select.Item value={squad.uuid} class="admin-select-item">
+                      <span>{squad.name}</span>
+                      <Check size={14} class="admin-select-item-check" />
+                    </Select.Item>
+                  {/each}
+                </Select.Content>
+              </Select.Portal>
+            </Select.Root>
+            <div class="admin-chip-list">
+              {#each normalizeUuidList(tariffDraft.premiumSquadUuids) as uuid}
+                <button type="button" class="admin-chip" on:click={() => removeSquadFromDraft("premiumSquadUuids", uuid)}>
+                  {squadLabel(uuid)} <X size={12} />
+                </button>
+              {/each}
+            </div>
+          </div>
+          <Label.Root class="admin-field-label">
+            <span>Premium лимит, GB/мес.</span>
+            <small>0 или пусто — нет отдельного premium-лимита</small>
+            <input class="input" type="number" min="0" step="0.1" placeholder="50" bind:value={tariffDraft.premium_monthly_gb} />
+          </Label.Root>
+        </div>
+      </section>
+
+      <section class="admin-editor-section">
+        <header class="admin-editor-section-head">
+          <strong>Докупка premium-трафика</strong>
+          <div class="admin-editor-section-actions">
+            <button type="button" class="admin-btn admin-btn-sm" on:click={() => addDraftRow("premiumTopupRubRows", { gb: 10, price: "" })}><Plus size={12} /> RUB</button>
+            <button type="button" class="admin-btn admin-btn-sm" on:click={() => addDraftRow("premiumTopupStarsRows", { gb: 10, price: "" })}><Plus size={12} /> Stars</button>
+          </div>
+        </header>
+        <div class="admin-package-columns">
+          <div class="admin-row-editor">
+            <span class="admin-row-editor-caption">RUB</span>
+            {#each tariffDraft.premiumTopupRubRows as row, index}
+              <div class="admin-row-editor-line">
+                <input class="input" type="number" min="0.1" step="0.1" placeholder="GB" bind:value={row.gb} aria-label="Premium GB" />
+                <input class="input" type="number" min="0" step="0.01" placeholder="Цена" bind:value={row.price} aria-label="Цена RUB" />
+                <button type="button" class="admin-btn admin-btn-sm admin-btn-danger" on:click={() => removeDraftRow("premiumTopupRubRows", index)} aria-label="Удалить"><Trash2 size={13} /></button>
+              </div>
+            {/each}
+          </div>
+          <div class="admin-row-editor">
+            <span class="admin-row-editor-caption">Stars</span>
+            {#each tariffDraft.premiumTopupStarsRows as row, index}
+              <div class="admin-row-editor-line">
+                <input class="input" type="number" min="0.1" step="0.1" placeholder="GB" bind:value={row.gb} aria-label="Premium GB" />
+                <input class="input" type="number" min="0" step="1" placeholder="Stars" bind:value={row.price} aria-label="Цена Stars" />
+                <button type="button" class="admin-btn admin-btn-sm admin-btn-danger" on:click={() => removeDraftRow("premiumTopupStarsRows", index)} aria-label="Удалить"><Trash2 size={13} /></button>
+              </div>
+            {/each}
+          </div>
+        </div>
+      </section>
     </Tabs.Content>
 
     <Tabs.Content value="pricing" class="admin-tabs-content">

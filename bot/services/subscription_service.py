@@ -8,7 +8,7 @@ from bot.middlewares.i18n import JsonI18n
 
 from db.dal import user_dal, subscription_dal, promo_code_dal, payment_dal, user_billing_dal, tariff_dal
 from config.tariffs_config import Tariff
-from bot.utils.date_utils import add_months
+from bot.utils.date_utils import add_months, month_start
 from bot.utils.config_link import prepare_config_links
 from db.models import User, Subscription
 
@@ -31,6 +31,7 @@ class SubscriptionService:
         self.panel_service = panel_service
         self.bot = bot
         self.i18n = i18n
+        self._premium_access_cache: Dict[Tuple[str, ...], Dict[str, Any]] = {}
 
     @staticmethod
     def gb_to_bytes(gb: float) -> int:
@@ -71,15 +72,102 @@ class SubscriptionService:
             raise ValueError(f"Tariff {tariff.key} is {tariff.billing_model}, expected {billing_model}")
         return tariff
 
-    def _panel_squads_for_tariff(self, tariff: Optional[Tariff]) -> Optional[List[str]]:
+    def _panel_squads_for_tariff(
+        self,
+        tariff: Optional[Tariff],
+        *,
+        include_premium: bool = True,
+    ) -> Optional[List[str]]:
         if tariff:
-            return tariff.squad_uuids
+            squads = list(tariff.squad_uuids or [])
+            if include_premium:
+                squads.extend(tariff.premium_squad_uuids or [])
+            return list(dict.fromkeys(squads))
         return self.settings.parsed_user_squad_uuids
 
     def _traffic_limit_for_period_tariff(self, tariff: Optional[Tariff], topup_balance_bytes: int = 0) -> int:
         if tariff:
             return int(tariff.monthly_bytes + max(0, topup_balance_bytes))
         return self.settings.user_traffic_limit_bytes
+
+    def _premium_limit_for_tariff(self, tariff: Optional[Tariff], topup_balance_bytes: int = 0) -> int:
+        if not tariff:
+            return 0
+        return int(tariff.premium_monthly_bytes + max(0, topup_balance_bytes))
+
+    @staticmethod
+    def _premium_effective_limit_bytes(
+        premium_baseline_bytes: int,
+        premium_topup_balance_bytes: int = 0,
+        premium_topup_used_bytes: int = 0,
+    ) -> int:
+        return int(premium_baseline_bytes or 0) + max(0, int(premium_topup_balance_bytes or 0)) + max(
+            0, int(premium_topup_used_bytes or 0)
+        )
+
+    async def premium_access_for_tariff(self, tariff: Optional[Tariff]) -> Dict[str, Any]:
+        if not tariff or not tariff.premium_squad_uuids:
+            return {"squad_uuids": [], "squad_labels": [], "node_labels": []}
+
+        cache_key = tuple(sorted(str(uuid) for uuid in tariff.premium_squad_uuids))
+        now_ts = datetime.now(timezone.utc).timestamp()
+        cached = self._premium_access_cache.get(cache_key)
+        if cached and now_ts - float(cached.get("ts", 0)) < 600:
+            return {
+                "squad_uuids": list(cached.get("squad_uuids") or []),
+                "squad_labels": list(cached.get("squad_labels") or []),
+                "node_labels": list(cached.get("node_labels") or []),
+            }
+
+        squad_name_map: Dict[str, str] = {}
+        try:
+            squads = await self.panel_service.get_internal_squads() or []
+            for squad in squads:
+                if not isinstance(squad, dict):
+                    continue
+                squad_uuid = str(squad.get("uuid") or squad.get("id") or "")
+                if not squad_uuid:
+                    continue
+                squad_name_map[squad_uuid] = str(squad.get("name") or squad.get("title") or squad_uuid)
+        except Exception:
+            logging.debug("Failed to load internal squad names for premium display", exc_info=True)
+
+        node_labels: List[str] = []
+        for squad_uuid in tariff.premium_squad_uuids:
+            try:
+                nodes = await self.panel_service.get_internal_squad_accessible_nodes(squad_uuid) or []
+            except Exception:
+                logging.debug("Failed to load accessible nodes for premium squad %s", squad_uuid, exc_info=True)
+                nodes = []
+            for node in nodes:
+                if not isinstance(node, dict):
+                    continue
+                node_uuid = str(node.get("uuid") or node.get("nodeUuid") or node.get("node_uuid") or "")
+                node_name = str(node.get("name") or node.get("address") or node.get("host") or "").strip()
+                if node_name:
+                    label = node_name
+                elif node_uuid:
+                    label = f"{node_uuid[:8]}..."
+                else:
+                    continue
+                node_labels.append(label)
+
+        squad_labels = [
+            squad_name_map.get(str(uuid), f"{str(uuid)[:8]}...")
+            for uuid in tariff.premium_squad_uuids
+        ]
+        payload = {
+            "ts": now_ts,
+            "squad_uuids": list(tariff.premium_squad_uuids),
+            "squad_labels": list(dict.fromkeys(squad_labels)),
+            "node_labels": list(dict.fromkeys(node_labels)),
+        }
+        self._premium_access_cache[cache_key] = payload
+        return {
+            "squad_uuids": list(payload["squad_uuids"]),
+            "squad_labels": list(payload["squad_labels"]),
+            "node_labels": list(payload["node_labels"]),
+        }
 
     def _base_hwid_limit_for_tariff(self, tariff: Optional[Tariff]) -> Optional[int]:
         if tariff and tariff.hwid_device_limit is not None:
@@ -649,6 +737,12 @@ class SubscriptionService:
             "tariff_key": tariff.key if tariff else None,
             "tier_baseline_bytes": 0,
             "topup_balance_bytes": new_balance,
+            "premium_baseline_bytes": self._premium_limit_for_tariff(tariff, 0),
+            "premium_topup_balance_bytes": 0,
+            "premium_topup_used_bytes": 0,
+            "premium_used_bytes": 0,
+            "premium_is_limited": False,
+            "premium_period_start_at": None,
             "period_start_at": None,
             "is_throttled": False,
             "effective_monthly_price_rub": None,
@@ -671,7 +765,7 @@ class SubscriptionService:
             hwid_device_limit=effective_hwid_limit,
         )
         if tariff:
-            panel_update_payload["activeInternalSquads"] = tariff.squad_uuids
+            panel_update_payload["activeInternalSquads"] = self._panel_squads_for_tariff(tariff)
 
         panel_update_payload.update(self._panel_identity_payload_for_user(db_user))
 
@@ -785,7 +879,10 @@ class SubscriptionService:
             traffic_limit_bytes=new_limit,
             hwid_device_limit=effective_hwid_limit,
         )
-        panel_payload["activeInternalSquads"] = tariff.squad_uuids
+        panel_payload["activeInternalSquads"] = self._panel_squads_for_tariff(
+            tariff,
+            include_premium=not bool(getattr(updated_sub, "premium_is_limited", False)),
+        )
         panel_payload.update(self._panel_identity_payload_for_user(db_user))
         await self.panel_service.update_user_details_on_panel(db_user.panel_user_uuid, panel_payload)
         await tariff_dal.create_traffic_topup(
@@ -799,6 +896,93 @@ class SubscriptionService:
             "subscription_id": sub.subscription_id,
             "traffic_limit_bytes": new_limit,
             "topup_balance_bytes": new_topup_balance,
+            "tariff_key": tariff.key,
+        }
+
+    async def activate_premium_topup(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        tariff_key: str,
+        traffic_gb: float,
+        payment_amount: float,
+        payment_db_id: int,
+        provider: str = "yookassa",
+    ) -> Optional[Dict[str, Any]]:
+        tariff = self._resolve_tariff(tariff_key)
+        if not tariff or not tariff.premium_squad_uuids:
+            logging.error("Premium top-up requires a tariff with premium squads for user %s", user_id)
+            return None
+
+        await self._record_payment_context(
+            session,
+            payment_db_id,
+            sale_mode="premium_topup",
+            tariff_key=tariff.key,
+            purchased_gb=float(traffic_gb),
+        )
+        db_user = await user_dal.get_user_by_id(session, user_id)
+        if not db_user or not db_user.panel_user_uuid:
+            return None
+        sub = await subscription_dal.get_active_subscription_by_user_id(session, user_id, db_user.panel_user_uuid)
+        if not sub:
+            return None
+
+        purchase_bytes = self.gb_to_bytes(traffic_gb)
+        now = datetime.now(timezone.utc)
+        premium_period_start = month_start(now)
+        current_period_start = getattr(sub, "premium_period_start_at", None)
+        same_period = bool(current_period_start and current_period_start == premium_period_start)
+        previous_topup_used = int(sub.premium_topup_used_bytes or 0) if same_period else 0
+        premium_used = int(sub.premium_used_bytes or 0) if same_period else 0
+        premium_baseline = int(tariff.premium_monthly_bytes or sub.premium_baseline_bytes or 0)
+        premium_topup_balance = int(sub.premium_topup_balance_bytes or 0) + purchase_bytes
+        overflow_to_cover = max(0, premium_used - premium_baseline - previous_topup_used)
+        consume_now = min(premium_topup_balance, overflow_to_cover)
+        premium_topup_balance -= consume_now
+        premium_topup_used = previous_topup_used + consume_now
+        premium_limit = self._premium_effective_limit_bytes(
+            premium_baseline,
+            premium_topup_balance,
+            premium_topup_used,
+        )
+        premium_is_limited = premium_limit > 0 and premium_used >= premium_limit
+
+        updated_sub = await subscription_dal.update_subscription(
+            session,
+            sub.subscription_id,
+            {
+                "premium_baseline_bytes": premium_baseline,
+                "premium_topup_balance_bytes": premium_topup_balance,
+                "premium_topup_used_bytes": premium_topup_used,
+                "premium_used_bytes": premium_used,
+                "premium_is_limited": premium_is_limited,
+                "premium_period_start_at": premium_period_start,
+                "tariff_key": tariff.key,
+            },
+        )
+
+        panel_payload = {
+            "uuid": db_user.panel_user_uuid,
+            "activeInternalSquads": self._panel_squads_for_tariff(
+                tariff,
+                include_premium=not premium_is_limited,
+            ),
+        }
+        await self.panel_service.update_user_details_on_panel(db_user.panel_user_uuid, panel_payload)
+        await tariff_dal.create_traffic_topup(
+            session,
+            subscription_id=sub.subscription_id,
+            payment_id=payment_db_id,
+            purchased_bytes=purchase_bytes,
+            kind="premium_topup",
+        )
+        return {
+            "subscription_id": sub.subscription_id,
+            "premium_limit_bytes": premium_limit,
+            "premium_topup_balance_bytes": premium_topup_balance,
+            "premium_topup_used_bytes": premium_topup_used,
+            "premium_is_limited": premium_is_limited,
             "tariff_key": tariff.key,
         }
 
@@ -966,7 +1150,23 @@ class SubscriptionService:
         before_tariff_key = sub.tariff_key
         options = self.calculate_tariff_switch_options(sub, target)
         now = datetime.now(timezone.utc)
-        update_data: Dict[str, Any] = {"tariff_key": target.key, "is_throttled": False}
+        premium_topup_balance = int(sub.premium_topup_balance_bytes or 0)
+        premium_topup_used = int(getattr(sub, "premium_topup_used_bytes", 0) or 0)
+        premium_baseline = target.premium_monthly_bytes
+        premium_limit = self._premium_effective_limit_bytes(
+            premium_baseline,
+            premium_topup_balance,
+            premium_topup_used,
+        )
+        premium_used = int(sub.premium_used_bytes or 0)
+        update_data: Dict[str, Any] = {
+            "tariff_key": target.key,
+            "is_throttled": False,
+            "premium_baseline_bytes": premium_baseline,
+            "premium_topup_balance_bytes": premium_topup_balance,
+            "premium_topup_used_bytes": premium_topup_used,
+            "premium_is_limited": bool(premium_limit > 0 and premium_used >= premium_limit),
+        }
         converted_bytes = None
         base_hwid_limit = self._base_hwid_limit_for_tariff(target)
         extra_hwid_devices = int(sub.extra_hwid_devices or 0)
@@ -1011,7 +1211,10 @@ class SubscriptionService:
             traffic_limit_strategy="NO_RESET" if target.billing_model == "traffic" else "MONTH",
             hwid_device_limit=self._effective_hwid_limit(base_hwid_limit, extra_hwid_devices),
         )
-        panel_payload["activeInternalSquads"] = target.squad_uuids
+        panel_payload["activeInternalSquads"] = self._panel_squads_for_tariff(
+            target,
+            include_premium=not bool(updated.premium_is_limited),
+        )
         panel_payload.update(self._panel_identity_payload_for_user(db_user))
         await self.panel_service.update_user_details_on_panel(db_user.panel_user_uuid, panel_payload)
         if converted_bytes:
@@ -1084,6 +1287,29 @@ class SubscriptionService:
                 logging.error("Top-up activation requires tariff_key for user %s", user_id)
                 return None
             return await self.activate_topup(
+                session=session,
+                user_id=user_id,
+                tariff_key=tariff_key,
+                traffic_gb=traffic_gb if traffic_gb is not None else float(months),
+                payment_amount=payment_amount,
+                payment_db_id=payment_db_id,
+                provider=provider,
+            )
+        if sale_mode_base == "premium_topup":
+            if not tariff_key:
+                active_user = await user_dal.get_user_by_id(session, user_id)
+                active_sub = (
+                    await subscription_dal.get_active_subscription_by_user_id(
+                        session, user_id, active_user.panel_user_uuid
+                    )
+                    if active_user and active_user.panel_user_uuid
+                    else None
+                )
+                tariff_key = active_sub.tariff_key if active_sub else None
+            if not tariff_key:
+                logging.error("Premium top-up activation requires tariff_key for user %s", user_id)
+                return None
+            return await self.activate_premium_topup(
                 session=session,
                 user_id=user_id,
                 tariff_key=tariff_key,
@@ -1239,11 +1465,22 @@ class SubscriptionService:
 
         topup_balance_bytes = int(getattr(current_active_sub, "topup_balance_bytes", 0) or 0)
         extra_hwid_devices = int(getattr(current_active_sub, "extra_hwid_devices", 0) or 0)
+        premium_topup_balance_bytes = int(getattr(current_active_sub, "premium_topup_balance_bytes", 0) or 0)
+        premium_topup_used_bytes = int(getattr(current_active_sub, "premium_topup_used_bytes", 0) or 0)
+        premium_used_bytes = int(getattr(current_active_sub, "premium_used_bytes", 0) or 0)
+        premium_period_start_at = getattr(current_active_sub, "premium_period_start_at", None)
         tier_baseline_bytes = tariff.monthly_bytes if tariff else self.settings.user_traffic_limit_bytes
+        premium_baseline_bytes = tariff.premium_monthly_bytes if tariff else 0
+        premium_limit_bytes = self._premium_effective_limit_bytes(
+            premium_baseline_bytes,
+            premium_topup_balance_bytes,
+            premium_topup_used_bytes,
+        )
         effective_monthly_price = float(payment_amount) / max(1, months_int)
         traffic_limit_bytes = self._traffic_limit_for_period_tariff(tariff, topup_balance_bytes)
         base_hwid_limit = self._base_hwid_limit_for_tariff(tariff)
         effective_hwid_limit = self._effective_hwid_limit(base_hwid_limit, extra_hwid_devices)
+        premium_is_limited = bool(premium_limit_bytes > 0 and premium_used_bytes >= premium_limit_bytes)
         sub_payload = {
             "user_id": user_id,
             "panel_user_uuid": panel_user_uuid,
@@ -1260,6 +1497,12 @@ class SubscriptionService:
             "tariff_key": tariff.key if tariff else None,
             "tier_baseline_bytes": tier_baseline_bytes,
             "topup_balance_bytes": topup_balance_bytes,
+            "premium_baseline_bytes": premium_baseline_bytes,
+            "premium_topup_balance_bytes": premium_topup_balance_bytes,
+            "premium_topup_used_bytes": premium_topup_used_bytes,
+            "premium_used_bytes": premium_used_bytes,
+            "premium_is_limited": premium_is_limited,
+            "premium_period_start_at": premium_period_start_at,
             "period_start_at": None,
             "is_throttled": False,
             "effective_monthly_price_rub": effective_monthly_price,
@@ -1286,7 +1529,10 @@ class SubscriptionService:
             hwid_device_limit=effective_hwid_limit,
         )
         if tariff:
-            panel_update_payload["activeInternalSquads"] = tariff.squad_uuids
+            panel_update_payload["activeInternalSquads"] = self._panel_squads_for_tariff(
+                tariff,
+                include_premium=not premium_is_limited,
+            )
 
         panel_update_payload.update(self._panel_identity_payload_for_user(db_user))
 
@@ -1552,6 +1798,14 @@ class SubscriptionService:
                 tariff = None
         billing_model_display = tariff.billing_model if tariff else ("traffic" if getattr(self.settings, "traffic_sale_mode", False) else "period")
         traffic_limit_strategy = panel_traffic_strategy
+        premium_access = await self.premium_access_for_tariff(tariff) if tariff else {
+            "squad_uuids": [],
+            "squad_labels": [],
+            "node_labels": [],
+        }
+        premium_baseline = int(local_active_sub.premium_baseline_bytes or 0) if local_active_sub else 0
+        premium_topup_balance = int(local_active_sub.premium_topup_balance_bytes or 0) if local_active_sub else 0
+        premium_topup_used = int(getattr(local_active_sub, "premium_topup_used_bytes", 0) or 0) if local_active_sub else 0
 
         return {
             "user_id": panel_user_data.get("uuid"),
@@ -1568,6 +1822,19 @@ class SubscriptionService:
             "billing_model": billing_model_display,
             "tier_baseline_bytes": local_active_sub.tier_baseline_bytes if local_active_sub else None,
             "topup_balance_bytes": local_active_sub.topup_balance_bytes if local_active_sub else 0,
+            "premium_baseline_bytes": premium_baseline,
+            "premium_topup_balance_bytes": premium_topup_balance,
+            "premium_topup_used_bytes": premium_topup_used,
+            "premium_used_bytes": local_active_sub.premium_used_bytes if local_active_sub else 0,
+            "premium_limit_bytes": self._premium_effective_limit_bytes(
+                premium_baseline,
+                premium_topup_balance,
+                premium_topup_used,
+            ),
+            "premium_is_limited": bool(local_active_sub.premium_is_limited) if local_active_sub else False,
+            "premium_period_start_at": getattr(local_active_sub, "premium_period_start_at", None) if local_active_sub else None,
+            "premium_squad_labels": premium_access.get("squad_labels") or [],
+            "premium_node_labels": premium_access.get("node_labels") or [],
             "period_start_at": local_active_sub.period_start_at if local_active_sub else None,
             "is_throttled": bool(local_active_sub.is_throttled) if local_active_sub else False,
             "base_hwid_device_limit": local_active_sub.hwid_device_limit if local_active_sub else None,

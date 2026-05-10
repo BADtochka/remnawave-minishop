@@ -1,4 +1,4 @@
-import hmac
+﻿import hmac
 import json
 import logging
 from decimal import Decimal, ROUND_HALF_UP
@@ -214,7 +214,7 @@ class PlategaService:
                         payment.payment_id,
                         provider="platega",
                         sale_mode=sale_mode,
-                        traffic_gb=float(payment_months) if sale_base in {"traffic", "traffic_package", "topup"} else None,
+                        traffic_gb=float(payment_months) if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
                     )
 
                     referral_bonus = None
@@ -250,7 +250,7 @@ class PlategaService:
 
                 traffic_label = str(int(payment_months)) if float(payment_months).is_integer() else f"{payment_months:g}"
 
-                if sale_base in {"traffic", "traffic_package", "topup"}:
+                if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}:
                     text = _(
                         "payment_successful_traffic_full",
                         traffic_gb=traffic_label,
