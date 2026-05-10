@@ -2188,6 +2188,28 @@
     window.history.pushState(null, "", `${targetPath}${window.location.search}${window.location.hash}`);
   }
 
+  async function handleTariffsSaved() {
+    topupOptions = null;
+    deviceTopupOptions = null;
+    changeOptions = null;
+    try {
+      await loadData();
+    } catch {
+      // The admin save already succeeded; a later app refresh will pick up the new catalog.
+    }
+  }
+
+  async function handleSettingsSaved() {
+    topupOptions = null;
+    deviceTopupOptions = null;
+    changeOptions = null;
+    try {
+      await loadData();
+    } catch {
+      // Settings were saved; the next app refresh will pick up the runtime values.
+    }
+  }
+
   function openPaymentModal() {
     if (tariffMode) {
       if (singleTariffMode && tariffCatalog[0]?.key) {
@@ -2916,6 +2938,8 @@
         onToast={(text) => showToast(text)}
         initialSection={adminSectionFromPath(window.location.pathname)}
         onSectionChange={handleAdminSectionChange}
+        onSettingsSaved={handleSettingsSaved}
+        onTariffsSaved={handleTariffsSaved}
       />
     {:else}
       <div class="phone-screen" class:home-screen={screen === "home"}>

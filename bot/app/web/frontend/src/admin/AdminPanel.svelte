@@ -42,6 +42,8 @@
   export let onToast = () => {};
   export let initialSection = "stats";
   export let onSectionChange = () => {};
+  export let onSettingsSaved = () => {};
+  export let onTariffsSaved = () => {};
 
   const NAV_GROUPS = [
     {
@@ -800,6 +802,7 @@
       if (res?.ok) {
         tariffsCatalog = cloneCatalog(res.catalog);
         tariffsPath = res.path || tariffsPath;
+        await onTariffsSaved(res.catalog);
         flash(successText || "Тарифы сохранены");
         tariffEditorOpen = false;
         tariffDeleteOpen = false;
@@ -995,6 +998,7 @@
       if (res?.ok) {
         flash("Настройки сохранены");
         settingsDirty = {};
+        await onSettingsSaved({ updates, deletes });
         await loadSettings();
       } else if (res?.errors) {
         const summary = Object.entries(res.errors).map(([k, v]) => `${k}: ${v}`).join("; ");
