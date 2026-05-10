@@ -3,6 +3,7 @@
     ArrowLeft,
     BarChart3,
     Check,
+    ChevronsUpDown,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
@@ -15,7 +16,7 @@
     Eye,
     EyeOff,
     FileText,
-    Link2,
+    Globe2,
     LayoutDashboard,
     Megaphone,
     Menu,
@@ -54,53 +55,60 @@
   export let logoEmoji = "рџ«Ґ";
   export let appVersion = "dev+local";
   export let appRepositoryUrl = "https://github.com/3252a8/remnawave-minishop";
+  export let currentLang = "ru";
+  export let languageOptions = [];
+  export let languageBusy = false;
+  export let onLanguageChange = () => {};
+  export let t = (key, params = {}, fallback = "") => fallback || key;
+
+  const at = (key, params = {}, fallback = "") => t(`admin_${key}`, params, fallback || key);
 
   const NAV_GROUPS = [
     {
       id: "overview",
-      label: "Overview",
+      label: at("nav_overview", {}, "Overview"),
       items: [
-        { id: "stats", label: "Дашборд", icon: LayoutDashboard },
+        { id: "stats", label: at("nav_dashboard", {}, "Дашборд"), icon: LayoutDashboard },
       ],
     },
     {
       id: "operations",
-      label: "Управление",
+      label: at("nav_operations", {}, "Управление"),
       items: [
-        { id: "users", label: "Пользователи", icon: UsersRound },
-        { id: "payments", label: "Платежи", icon: CreditCard },
-        { id: "promos", label: "Промокоды", icon: Tag },
-        { id: "ads", label: "Реклама", icon: Sparkles },
+        { id: "users", label: at("nav_users", {}, "Пользователи"), icon: UsersRound },
+        { id: "payments", label: at("nav_payments", {}, "Платежи"), icon: CreditCard },
+        { id: "promos", label: at("nav_promos", {}, "Промокоды"), icon: Tag },
+        { id: "ads", label: at("nav_ads", {}, "Реклама"), icon: Sparkles },
       ],
     },
     {
       id: "communication",
-      label: "Коммуникации",
+      label: at("nav_communication", {}, "Коммуникации"),
       items: [
-        { id: "broadcast", label: "Рассылка", icon: Megaphone },
-        { id: "logs", label: "Логи", icon: FileText },
+        { id: "broadcast", label: at("nav_broadcast", {}, "Рассылка"), icon: Megaphone },
+        { id: "logs", label: at("nav_logs", {}, "Логи"), icon: FileText },
       ],
     },
     {
       id: "system",
-      label: "Система",
+      label: at("nav_system", {}, "Система"),
       items: [
-        { id: "tariffs", label: "Тарифы", icon: Coins },
-        { id: "settings", label: "Настройки", icon: Sliders },
+        { id: "tariffs", label: at("nav_tariffs", {}, "Тарифы"), icon: Coins },
+        { id: "settings", label: at("nav_settings", {}, "Настройки"), icon: Sliders },
       ],
     },
   ];
 
   const SECTION_META = {
-    stats: { title: "Дашборд", subtitle: "Сводка по магазину и панели" },
-    users: { title: "Пользователи", subtitle: "Поиск, баны, действия над аккаунтами" },
-    payments: { title: "Платежи", subtitle: "История транзакций и экспорт" },
-    promos: { title: "Промокоды", subtitle: "Создание и управление кодами" },
-    ads: { title: "Рекламные кампании", subtitle: "UTM-источники и атрибуция" },
-    broadcast: { title: "Рассылка", subtitle: "Массовая отправка сообщений в Telegram" },
-    logs: { title: "Логи активности", subtitle: "События пользователей и админ-действия" },
-    tariffs: { title: "Тарифы", subtitle: "Каталог продаж, периоды, пакеты и лимиты" },
-    settings: { title: "Настройки приложения", subtitle: "Оверрайды над .env, применяются мгновенно" },
+    stats: { title: at("section_stats_title", {}, "Дашборд"), subtitle: at("section_stats_subtitle", {}, "Сводка по магазину и панели") },
+    users: { title: at("section_users_title", {}, "Пользователи"), subtitle: at("section_users_subtitle", {}, "Поиск, баны, действия над аккаунтами") },
+    payments: { title: at("section_payments_title", {}, "Платежи"), subtitle: at("section_payments_subtitle", {}, "История транзакций и экспорт") },
+    promos: { title: at("section_promos_title", {}, "Промокоды"), subtitle: at("section_promos_subtitle", {}, "Создание и управление кодами") },
+    ads: { title: at("section_ads_title", {}, "Рекламные кампании"), subtitle: at("section_ads_subtitle", {}, "UTM-источники и атрибуция") },
+    broadcast: { title: at("section_broadcast_title", {}, "Рассылка"), subtitle: at("section_broadcast_subtitle", {}, "Массовая отправка сообщений в Telegram") },
+    logs: { title: at("section_logs_title", {}, "Логи активности"), subtitle: at("section_logs_subtitle", {}, "События пользователей и админ-действия") },
+    tariffs: { title: at("section_tariffs_title", {}, "Тарифы"), subtitle: at("section_tariffs_subtitle", {}, "Каталог продаж, периоды, пакеты и лимиты") },
+    settings: { title: at("section_settings_title", {}, "Настройки приложения"), subtitle: at("section_settings_subtitle", {}, "Оверрайды над .env, применяются мгновенно") },
   };
 
   const VALID_SECTIONS = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.id));
@@ -123,7 +131,42 @@
   const USERS_PAGE_SIZE = 25;
   let usersQuery = "";
   let usersFilter = "all";
+  let usersPanelStatus = "all";
+  let usersSort = "registered_desc";
   let usersLoading = false;
+
+  const USERS_FILTER_OPTIONS = [
+    { value: "all", label: at("filter_all", {}, "Все") },
+    { value: "active", label: at("filter_not_banned", {}, "Не забанены") },
+    { value: "banned", label: at("filter_banned", {}, "Забанены") },
+    { value: "tg_linked", label: at("filter_tg_linked", {}, "С Telegram") },
+    { value: "no_tg", label: at("filter_no_tg", {}, "Без Telegram") },
+    { value: "email_linked", label: at("filter_email_linked", {}, "С email") },
+    { value: "no_email", label: at("filter_no_email", {}, "Без email") },
+    { value: "panel_linked", label: at("filter_panel_linked", {}, "С панелью") },
+  ];
+
+  const USERS_SORT_OPTIONS = [
+    { value: "registered_desc", label: at("sort_registered_desc", {}, "Сначала новые") },
+    { value: "registered_asc", label: at("sort_registered_asc", {}, "Сначала старые") },
+    { value: "name_asc", label: at("sort_name_asc", {}, "Имя ↑") },
+    { value: "name_desc", label: at("sort_name_desc", {}, "Имя ↓") },
+    { value: "id_asc", label: at("sort_id_asc", {}, "ID ↑") },
+    { value: "id_desc", label: at("sort_id_desc", {}, "ID ↓") },
+  ];
+
+  const USERS_PANEL_STATUS_OPTIONS = [
+    { value: "all", label: at("panel_status_all", {}, "Все статусы") },
+    { value: "active", label: "active" },
+    { value: "expired", label: "expired" },
+    { value: "limited", label: "limited" },
+  ];
+
+  const BROADCAST_TARGET_OPTIONS = [
+    { value: "all", label: at("broadcast_target_all", {}, "Все активные") },
+    { value: "active", label: at("broadcast_target_active", {}, "С подпиской") },
+    { value: "inactive", label: at("broadcast_target_inactive", {}, "Без подписки") },
+  ];
   let openedUser = null;
   let openedUserDetail = null;
   let userDetailLoading = false;
@@ -132,6 +175,7 @@
   let userActionBusy = false;
   let userDeleteOpen = false;
   let userBanConfirmOpen = false;
+  let userMessageConfirmOpen = false;
   let userDetailTab = "profile";
   let tariffEditorTab = "general";
 
@@ -281,10 +325,10 @@
     try {
       const res = await api("/admin/sync", { method: "POST" });
       if (res?.ok) {
-        flash("Синхронизация запущена");
+        flash(at("sync_started", {}, "Синхронизация запущена"));
         await loadStats();
       } else {
-        flash(res?.error || "Ошибка синхронизации");
+        flash(res?.error || at("sync_error", {}, "Ошибка синхронизации"));
       }
     } finally {
       syncBusy = false;
@@ -300,7 +344,9 @@
         page_size: String(USERS_PAGE_SIZE),
       });
       if (usersQuery.trim()) params.set("q", usersQuery.trim());
-      if (usersFilter === "banned") params.set("filter", "banned");
+      if (usersFilter && usersFilter !== "all") params.set("filter", usersFilter);
+      if (usersPanelStatus && usersPanelStatus !== "all") params.set("panel_status", usersPanelStatus);
+      if (usersSort && usersSort !== "registered_desc") params.set("sort", usersSort);
       const data = await api(`/admin/users?${params.toString()}`);
       if (data?.ok) {
         users = data.users || [];
@@ -317,6 +363,7 @@
     openedUser = typeof userOrId === "object" && userOrId !== null ? userOrId : { user_id: userId };
     openedUserDetail = null;
     userMessageDraft = "";
+    userMessageConfirmOpen = false;
     userExtendDays = 30;
     userDetailLoading = true;
     userDetailTab = "subscription";
@@ -342,6 +389,7 @@
     openedUserDetail = null;
     userDeleteOpen = false;
     userBanConfirmOpen = false;
+    userMessageConfirmOpen = false;
     if (wasOpen && !opts.skipPush) _pushUserPath(null);
   }
 
@@ -354,7 +402,7 @@
     window.history.pushState(null, "", `${target}${window.location.search}${window.location.hash}`);
   }
 
-  function copyToClipboard(text, successMessage = "Ссылка скопирована") {
+  function copyToClipboard(text, successMessage = at("link_copied", {}, "Ссылка скопирована")) {
     if (!text) return;
     if (typeof navigator !== "undefined" && navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(text).then(
@@ -364,12 +412,6 @@
     } else {
       flash(text);
     }
-  }
-
-  function copyUserDeepLink() {
-    if (!openedUser || typeof window === "undefined") return;
-    const url = `${window.location.origin}/admin/users/${openedUser.user_id}`;
-    copyToClipboard(url);
   }
 
   function requestBanToggle() {
@@ -396,8 +438,8 @@
           u.user_id === openedUser.user_id ? { ...u, is_banned: banned } : u,
         );
         userBanConfirmOpen = false;
-        flash(banned ? "Пользователь забанен" : "Пользователь разбанен");
-      } else flash(res?.error || "Ошибка");
+        flash(banned ? at("user_banned", {}, "Пользователь забанен") : at("user_unbanned", {}, "Пользователь разбанен"));
+      } else flash(res?.error || at("error", {}, "Ошибка"));
     } finally {
       userActionBusy = false;
     }
@@ -412,9 +454,30 @@
         body: JSON.stringify({ text: userMessageDraft }),
       });
       if (res?.ok) {
-        flash("Сообщение отправлено");
+        flash(at("message_sent", {}, "Сообщение отправлено"));
         userMessageDraft = "";
-      } else flash(res?.error || "Не удалось отправить");
+        userMessageConfirmOpen = false;
+      } else flash(res?.error || at("message_send_failed", {}, "Не удалось отправить"));
+    } finally {
+      userActionBusy = false;
+    }
+  }
+
+  function requestSendUserMessage() {
+    if (!openedUser || !userMessageDraft.trim()) return;
+    userMessageConfirmOpen = true;
+  }
+
+  async function previewUserMessage() {
+    if (!openedUser || !userMessageDraft.trim()) return;
+    userActionBusy = true;
+    try {
+      const res = await api(`/admin/users/${openedUser.user_id}/message/preview`, {
+        method: "POST",
+        body: JSON.stringify({ text: userMessageDraft }),
+      });
+      if (res?.ok) flash(at("message_preview_sent", {}, "Превью отправлено вам в Telegram"));
+      else flash(res?.error || at("message_preview_failed", {}, "Не удалось отправить превью"));
     } finally {
       userActionBusy = false;
     }
@@ -431,9 +494,9 @@
         body: JSON.stringify({ days }),
       });
       if (res?.ok) {
-        flash(`Подписка продлена на ${days} дн.`);
+        flash(at("subscription_extended", { days }, `Подписка продлена на ${days} дн.`));
         await openUser(openedUser, { skipPush: true });
-      } else flash(res?.error || "Ошибка");
+      } else flash(res?.error || at("error", {}, "Ошибка"));
     } finally {
       userActionBusy = false;
     }
@@ -444,8 +507,8 @@
     userActionBusy = true;
     try {
       const res = await api(`/admin/users/${openedUser.user_id}/reset-trial`, { method: "POST" });
-      if (res?.ok) flash("Триал сброшен");
-      else flash(res?.error || "Ошибка");
+      if (res?.ok) flash(at("trial_reset", {}, "Триал сброшен"));
+      else flash(res?.error || at("error", {}, "Ошибка"));
     } finally {
       userActionBusy = false;
     }
@@ -457,10 +520,10 @@
     try {
       const res = await api(`/admin/users/${openedUser.user_id}`, { method: "DELETE" });
       if (res?.ok) {
-        flash("Пользователь удалён");
+        flash(at("user_deleted", {}, "Пользователь удалён"));
         users = users.filter((u) => u.user_id !== openedUser.user_id);
         closeUser();
-      } else flash(res?.error || "Ошибка");
+      } else flash(res?.error || at("error", {}, "Ошибка"));
     } finally {
       userActionBusy = false;
     }
@@ -1110,6 +1173,33 @@
     return `${num.toFixed(2)} ${sym}`.trim();
   }
 
+  function fmtTrafficBytes(value) {
+    const bytes = Number(value || 0);
+    if (!bytes || bytes <= 0) return "0 GB";
+    const gb = bytes / 1073741824;
+    const formatted = gb >= 10 ? gb.toFixed(1) : gb.toFixed(2);
+    return `${formatted.replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1")} GB`;
+  }
+
+  function trafficPercentValue(used, limit) {
+    const usedBytes = Number(used || 0);
+    const limitBytes = Number(limit || 0);
+    if (!limitBytes || limitBytes <= 0) return 0;
+    return Math.max(0, Math.min(100, Math.round((usedBytes / limitBytes) * 100)));
+  }
+
+  function trafficLeftLabel(used, limit) {
+    const limitBytes = Number(limit || 0);
+    if (!limitBytes || limitBytes <= 0) return "Без лимита";
+    return fmtTrafficBytes(Math.max(0, limitBytes - Number(used || 0)));
+  }
+
+  function trafficOfLabel(used, limit) {
+    const limitBytes = Number(limit || 0);
+    if (!limitBytes || limitBytes <= 0) return `${fmtTrafficBytes(used)} / без лимита`;
+    return `${fmtTrafficBytes(used)} / ${fmtTrafficBytes(limit)}`;
+  }
+
   function tariffName(tariff) {
     return tariff?.names?.ru || tariff?.names?.en || tariff?.key || "—";
   }
@@ -1211,7 +1301,12 @@
       case "active":
         return { label: "Active", variant: "success" };
       case "expired":
-        return { label: "Expired", variant: "warning" };
+        return {
+          label: user?.panel_status_expired_at
+            ? at("expired_badge", { date: fmtDateShort(user.panel_status_expired_at) }, `Expired ${fmtDateShort(user.panel_status_expired_at)}`)
+            : "Expired",
+          variant: "warning",
+        };
       case "limited":
         return { label: "Limited", variant: "warning" };
       case "disabled":
@@ -1231,20 +1326,25 @@
 
   function sectionTitle(id) {
     const map = {
-      general: "Общие",
-      appearance: "Внешний вид",
-      pricing: "Тарифы и цены",
-      payments: "Платёжные системы",
-      trial: "Триал",
-      referral: "Реферальная программа",
-      notifications: "Уведомления",
-      devices: "Устройства",
+      general: at("settings_section_general", {}, "Общие"),
+      appearance: at("settings_section_appearance", {}, "Внешний вид"),
+      pricing: at("settings_section_pricing", {}, "Тарифы и цены"),
+      payments: at("settings_section_payments", {}, "Платёжные системы"),
+      trial: at("settings_section_trial", {}, "Триал"),
+      referral: at("settings_section_referral", {}, "Реферальная программа"),
+      notifications: at("settings_section_notifications", {}, "Уведомления"),
+      devices: at("settings_section_devices", {}, "Устройства"),
     };
     return map[id] || id;
   }
 
+  function optionLabel(options, value) {
+    return options.find((option) => option.value === value)?.label || value;
+  }
+
   $: dirtyCount = Object.keys(settingsDirty).length;
   $: meta = SECTION_META[active] || { title: active, subtitle: "" };
+  $: currentLanguageOption = languageOptions.find((option) => option.value === currentLang) || languageOptions[0];
   $: usersHasMore = users.length === USERS_PAGE_SIZE;
   $: paymentsHasMore = payments.length === PAYMENTS_PAGE_SIZE;
   $: logsHasMore = logs.length === LOGS_PAGE_SIZE;
@@ -1310,15 +1410,16 @@
     </div>
     <div class="admin-setting-control">
       {#if field.type === "bool"}
-        <label class="admin-switch">
-          <input
-            type="checkbox"
+        <div class="admin-setting-switch">
+          <Switch.Root
             checked={Boolean(valueFor(field))}
-            on:change={(e) => markDirty(field.key, e.currentTarget.checked)}
-          />
-          <span class="admin-switch-track" aria-hidden="true"></span>
+            onCheckedChange={(checked) => markDirty(field.key, checked)}
+            class="admin-switch-root"
+          >
+            <Switch.Thumb class="admin-switch-thumb" />
+          </Switch.Root>
           <span>{Boolean(valueFor(field)) ? "Включено" : "Выключено"}</span>
-        </label>
+        </div>
       {:else if field.type === "color"}
         <input
           class="admin-color"
@@ -1381,19 +1482,19 @@
     <button
       type="button"
       class="admin-sidebar-backdrop"
-      aria-label="Закрыть меню"
+      aria-label={at("close_menu", {}, "Закрыть меню")}
       on:click={() => (sidebarOpen = false)}
     ></button>
   {/if}
 
-  <aside class="admin-sidebar" aria-label="Навигация админки">
+  <aside class="admin-sidebar" aria-label={at("sidebar_navigation", {}, "Навигация админки")}>
     <div class="admin-sidebar-brand">
       <BrandMark class="admin-brand-mark" logoUrl={logoUrl} emoji={logoEmoji} />
       <div>
         <strong class="admin-brand-title">{brandTitle}</strong>
-        <small>Админ-панель</small>
+        <small>{at("panel_title", {}, "Админ-панель")}</small>
       </div>
-      <button type="button" class="admin-btn admin-btn-icon admin-btn-ghost" on:click={onClose} aria-label="Выйти">
+      <button type="button" class="admin-btn admin-btn-icon admin-btn-ghost" on:click={onClose} aria-label={at("exit", {}, "Выйти")}>
         <ArrowLeft size={16} />
       </button>
     </div>
@@ -1417,6 +1518,42 @@
     {/each}
 
     <div class="admin-sidebar-footer">
+      {#if languageOptions.length}
+        <div class="admin-language-switch">
+          <Globe2 size={16} />
+          <Select.Root
+            type="single"
+            value={currentLang}
+            items={languageOptions}
+            disabled={languageBusy}
+            onValueChange={onLanguageChange}
+          >
+            <Select.Trigger class="admin-language-trigger" aria-label={t("wa_settings_language", {}, at("language", {}, "Язык"))}>
+              <span>
+                <strong>{t("wa_settings_language", {}, at("language", {}, "Язык"))}</strong>
+                <small>
+                  <span class="emoji-flag" aria-hidden="true">{currentLanguageOption?.flag || "🏳️"}</span>
+                  {currentLanguageOption?.label || currentLang}
+                </small>
+              </span>
+              <ChevronsUpDown size={14} />
+            </Select.Trigger>
+            <Select.Content class="language-select-content" side="top" align="start" sideOffset={8}>
+              <Select.Viewport class="language-select-viewport">
+                {#each languageOptions as option (option.value)}
+                  <Select.Item value={option.value} label={option.label} class="language-select-item">
+                    <span class="language-select-item-main">
+                      <span class="emoji-flag" aria-hidden="true">{option.flag}</span>
+                      <span>{option.label}</span>
+                    </span>
+                    <Check size={15} class="language-select-item-check" />
+                  </Select.Item>
+                {/each}
+              </Select.Viewport>
+            </Select.Content>
+          </Select.Root>
+        </div>
+      {/if}
       <a
         class="admin-version-link"
         href={appRepositoryUrl}
@@ -1437,7 +1574,7 @@
           type="button"
           class="admin-mobile-toggle"
           on:click={() => (sidebarOpen = !sidebarOpen)}
-          aria-label="Меню"
+          aria-label={at("menu", {}, "Меню")}
         >
           <Menu size={18} />
         </button>
@@ -1565,27 +1702,119 @@
       {/if}
 
       {#if active === "users"}
-        <div class="admin-toolbar">
-          <input
-            type="search"
-            class="input"
-            placeholder="ID, @username или email"
-            bind:value={usersQuery}
-            on:keydown={(e) => e.key === "Enter" && ((usersPage = 0), loadUsers())}
-          />
-          <button type="button" class="admin-btn" on:click={() => { usersPage = 0; loadUsers(); }}>Найти</button>
-          <div class="admin-segmented" role="tablist" aria-label="Фильтр пользователей">
-            <button type="button" class:active={usersFilter === "all"} on:click={() => { usersFilter = "all"; usersPage = 0; loadUsers(); }}>Все</button>
-            <button type="button" class:active={usersFilter === "banned"} on:click={() => { usersFilter = "banned"; usersPage = 0; loadUsers(); }}>Забанены</button>
+        <div class="admin-toolbar admin-toolbar-users">
+          <div class="admin-toolbar-search">
+            <input
+              type="search"
+              class="input"
+              placeholder={at("users_search_placeholder", {}, "ID, @username или email")}
+              bind:value={usersQuery}
+              on:keydown={(e) => e.key === "Enter" && ((usersPage = 0), loadUsers())}
+            />
+            <button type="button" class="admin-btn admin-btn-primary" on:click={() => { usersPage = 0; loadUsers(); }}>{at("find", {}, "Найти")}</button>
           </div>
-          <span class="admin-muted" style="margin-left:auto;">Всего: {usersTotal}</span>
+
+          <div class="admin-toolbar-controls">
+            <Label.Root class="admin-toolbar-field">
+              <span class="admin-toolbar-field-label">{at("filter", {}, "Фильтр")}</span>
+              <Select.Root
+                type="single"
+                value={usersFilter}
+                onValueChange={(value) => { usersFilter = value; usersPage = 0; loadUsers(); }}
+              >
+                <Select.Trigger class="admin-select-trigger admin-toolbar-select" aria-label={at("filter", {}, "Фильтр")}>
+                  <span>{optionLabel(USERS_FILTER_OPTIONS, usersFilter)}</span>
+                  <ChevronDown size={14} class="admin-select-icon" />
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content class="admin-select-content" sideOffset={6}>
+                    {#each USERS_FILTER_OPTIONS as opt}
+                      <Select.Item value={opt.value} class="admin-select-item">
+                        <span>{opt.label}</span>
+                        <Check size={14} class="admin-select-item-check" />
+                      </Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
+            </Label.Root>
+
+            <Label.Root class="admin-toolbar-field">
+              <span class="admin-toolbar-field-label">{at("panel_status", {}, "Статус панели")}</span>
+              <Select.Root
+                type="single"
+                value={usersPanelStatus}
+                onValueChange={(value) => { usersPanelStatus = value; usersPage = 0; loadUsers(); }}
+              >
+                <Select.Trigger class="admin-select-trigger admin-toolbar-select" aria-label={at("panel_status", {}, "Статус панели")}>
+                  <span>{optionLabel(USERS_PANEL_STATUS_OPTIONS, usersPanelStatus)}</span>
+                  <ChevronDown size={14} class="admin-select-icon" />
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content class="admin-select-content" sideOffset={6}>
+                    {#each USERS_PANEL_STATUS_OPTIONS as opt}
+                      <Select.Item value={opt.value} class="admin-select-item">
+                        <span>{opt.label}</span>
+                        <Check size={14} class="admin-select-item-check" />
+                      </Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
+            </Label.Root>
+
+            <Label.Root class="admin-toolbar-field">
+              <span class="admin-toolbar-field-label">{at("sort", {}, "Сортировка")}</span>
+              <Select.Root
+                type="single"
+                value={usersSort}
+                onValueChange={(value) => { usersSort = value; usersPage = 0; loadUsers(); }}
+              >
+                <Select.Trigger class="admin-select-trigger admin-toolbar-select" aria-label={at("sort", {}, "Сортировка")}>
+                  <span>{optionLabel(USERS_SORT_OPTIONS, usersSort)}</span>
+                  <ChevronDown size={14} class="admin-select-icon" />
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content class="admin-select-content" sideOffset={6}>
+                    {#each USERS_SORT_OPTIONS as opt}
+                      <Select.Item value={opt.value} class="admin-select-item">
+                        <span>{opt.label}</span>
+                        <Check size={14} class="admin-select-item-check" />
+                      </Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
+            </Label.Root>
+
+            <div class="admin-toolbar-summary">
+              <span class="admin-toolbar-field-label">{at("total", {}, "Всего")}</span>
+              <strong>{usersTotal}</strong>
+            </div>
+          </div>
         </div>
 
         <div class="admin-table-wrap">
           {#if usersLoading}
-            <div class="admin-card-body"><span class="admin-muted">Загрузка…</span></div>
+            <ul class="admin-user-list admin-user-list-skeleton" aria-hidden="true">
+              {#each Array(USERS_PAGE_SIZE) as _, i (i)}
+                <li>
+                  <div class="admin-user-row admin-user-row-skeleton">
+                    <span class="admin-skeleton admin-skeleton-avatar"></span>
+                    <span class="admin-user-main">
+                      <span class="admin-skeleton admin-skeleton-line admin-skeleton-line-strong"></span>
+                      <span class="admin-skeleton admin-skeleton-line admin-skeleton-line-soft"></span>
+                    </span>
+                    <span class="admin-user-side">
+                      <span class="admin-skeleton admin-skeleton-badge"></span>
+                      <span class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"></span>
+                    </span>
+                  </div>
+                </li>
+              {/each}
+            </ul>
           {:else if !users.length}
-            <div class="admin-card-body"><span class="admin-muted">Никого не найдено</span></div>
+            <div class="admin-card-body"><span class="admin-muted">{at("users_empty", {}, "Никого не найдено")}</span></div>
           {:else}
             <ul class="admin-user-list">
               {#each users as user}
@@ -1616,13 +1845,13 @@
         </div>
 
         <div class="admin-pagination">
-          <span class="admin-pagination-meta">Страница {usersPage + 1}</span>
+          <span class="admin-pagination-meta">{at("page", {}, "Страница")} {usersPage + 1}</span>
           <div class="admin-pagination-buttons">
             <button type="button" class="admin-btn admin-btn-sm" disabled={usersPage === 0} on:click={() => { usersPage = Math.max(0, usersPage - 1); loadUsers(); }}>
-              <ChevronLeft size={14} /> Назад
+              <ChevronLeft size={14} /> {at("back", {}, "Назад")}
             </button>
             <button type="button" class="admin-btn admin-btn-sm" disabled={!usersHasMore} on:click={() => { usersPage += 1; loadUsers(); }}>
-              Далее <ChevronRight size={14} />
+              {at("next", {}, "Далее")} <ChevronRight size={14} />
             </button>
           </div>
         </div>
@@ -1631,34 +1860,53 @@
       {#if active === "payments"}
         <div class="admin-table-wrap">
           {#if paymentsLoading}
-            <div class="admin-card-body"><span class="admin-muted">Загрузка…</span></div>
+            <table class="admin-table admin-table-skeleton" aria-hidden="true">
+              <thead>
+                <tr>
+                  <th>ID</th><th>{at("user", {}, "Пользователь")}</th><th>{at("amount", {}, "Сумма")}</th><th>{at("provider", {}, "Провайдер")}</th><th>{at("description", {}, "Описание")}</th><th>{at("status", {}, "Статус")}</th><th>{at("date", {}, "Дата")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each Array(8) as _, i (i)}
+                  <tr>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-short"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-short"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-badge"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-short"></span></td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
           {:else if !payments.length}
-            <div class="admin-card-body"><span class="admin-muted">Нет платежей</span></div>
+            <div class="admin-card-body"><span class="admin-muted">{at("payments_empty", {}, "Нет платежей")}</span></div>
           {:else}
             <table class="admin-table">
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Пользователь</th>
-                  <th>Сумма</th>
-                  <th>Провайдер</th>
-                  <th>Описание</th>
-                  <th>Статус</th>
-                  <th>Дата</th>
+                  <th>{at("user", {}, "Пользователь")}</th>
+                  <th>{at("amount", {}, "Сумма")}</th>
+                  <th>{at("provider", {}, "Провайдер")}</th>
+                  <th>{at("description", {}, "Описание")}</th>
+                  <th>{at("status", {}, "Статус")}</th>
+                  <th>{at("date", {}, "Дата")}</th>
                 </tr>
               </thead>
               <tbody>
                 {#each payments as p}
                   <tr>
                     <td class="admin-cell-id" data-label="ID">#{p.payment_id}</td>
-                    <td data-label="Пользователь">{p.user_label || p.user_id}</td>
-                    <td data-label="Сумма">{fmtMoney(p.amount, p.currency)}</td>
-                    <td data-label="Провайдер">{p.provider}</td>
-                    <td class="admin-cell-wrap" data-label="Описание">{p.description || "—"}</td>
-                    <td data-label="Статус">
+                    <td data-label={at("user", {}, "Пользователь")}>{p.user_label || p.user_id}</td>
+                    <td data-label={at("amount", {}, "Сумма")}>{fmtMoney(p.amount, p.currency)}</td>
+                    <td data-label={at("provider", {}, "Провайдер")}>{p.provider}</td>
+                    <td class="admin-cell-wrap" data-label={at("description", {}, "Описание")}>{p.description || "—"}</td>
+                    <td data-label={at("status", {}, "Статус")}>
                       <span class="admin-badge admin-badge-{paymentStatusVariant(p.status)}">{p.status}</span>
                     </td>
-                    <td data-label="Дата">{fmtDate(p.created_at)}</td>
+                    <td data-label={at("date", {}, "Дата")}>{fmtDate(p.created_at)}</td>
                   </tr>
                 {/each}
               </tbody>
@@ -1667,13 +1915,13 @@
         </div>
 
         <div class="admin-pagination">
-          <span class="admin-pagination-meta">Стр. {paymentsPage + 1} · Всего {paymentsTotal}</span>
+          <span class="admin-pagination-meta">{at("page_short", {}, "Стр.")} {paymentsPage + 1} · {at("total", {}, "Всего")} {paymentsTotal}</span>
           <div class="admin-pagination-buttons">
             <button type="button" class="admin-btn admin-btn-sm" disabled={paymentsPage === 0} on:click={() => { paymentsPage = Math.max(0, paymentsPage - 1); loadPayments(); }}>
-              <ChevronLeft size={14} /> Назад
+              <ChevronLeft size={14} /> {at("back", {}, "Назад")}
             </button>
             <button type="button" class="admin-btn admin-btn-sm" disabled={!paymentsHasMore} on:click={() => { paymentsPage += 1; loadPayments(); }}>
-              Далее <ChevronRight size={14} />
+              {at("next", {}, "Далее")} <ChevronRight size={14} />
             </button>
           </div>
         </div>
@@ -1682,7 +1930,25 @@
       {#if active === "promos"}
         <div class="admin-table-wrap">
           {#if promosLoading}
-            <div class="admin-card-body"><span class="admin-muted">Загрузка…</span></div>
+            <table class="admin-table admin-table-skeleton" aria-hidden="true">
+              <thead>
+                <tr>
+                  <th>Код</th><th>Бонус</th><th>Активаций</th><th>Действует до</th><th>Статус</th><th class="admin-cell-actions">Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each Array(6) as _, i (i)}
+                  <tr>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-short"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-short"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-badge"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line"></span></td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
           {:else if !promos.length}
             <div class="admin-card-body"><span class="admin-muted">Промокодов нет</span></div>
           {:else}
@@ -1735,21 +2001,30 @@
           </header>
           <div class="admin-card-body">
             <div class="admin-form">
-              <label>
+              <Label.Root class="admin-field-label">
                 <span>Аудитория</span>
-                <div class="admin-segmented">
-                  {#each [["all", "Все активные"], ["active", "С подпиской"], ["inactive", "Без подписки"]] as [value, label]}
-                    <button type="button" class:active={broadcastTarget === value} on:click={() => (broadcastTarget = value)}>
-                      {label}
-                    </button>
-                  {/each}
-                </div>
-              </label>
-              <label>
+                <Select.Root type="single" value={broadcastTarget} onValueChange={(value) => (broadcastTarget = value)}>
+                  <Select.Trigger class="admin-select-trigger" aria-label="Аудитория">
+                    <span>{optionLabel(BROADCAST_TARGET_OPTIONS, broadcastTarget)}</span>
+                    <ChevronDown size={14} class="admin-select-icon" />
+                  </Select.Trigger>
+                  <Select.Portal>
+                    <Select.Content class="admin-select-content" sideOffset={6}>
+                      {#each BROADCAST_TARGET_OPTIONS as opt}
+                        <Select.Item value={opt.value} class="admin-select-item">
+                          <span>{opt.label}</span>
+                          <Check size={14} class="admin-select-item-check" />
+                        </Select.Item>
+                      {/each}
+                    </Select.Content>
+                  </Select.Portal>
+                </Select.Root>
+              </Label.Root>
+              <Label.Root class="admin-field-label">
                 <span>Текст сообщения</span>
                 <small>Поддерживается HTML-разметка Telegram</small>
                 <textarea class="admin-textarea" rows="6" bind:value={broadcastText}></textarea>
-              </label>
+              </Label.Root>
               <div style="display:flex; gap:8px; align-items:center;">
                 <button type="button" class="admin-btn admin-btn-primary" on:click={runBroadcast} disabled={broadcastBusy || !broadcastText.trim()}>
                   <Send size={14} /> {broadcastBusy ? "Отправка..." : "Поставить в очередь"}
@@ -1764,43 +2039,65 @@
       {/if}
 
       {#if active === "logs"}
-        <div class="admin-toolbar">
-          <input
-            type="search"
-            class="input"
-            placeholder="Фильтр по ID пользователя"
-            bind:value={logsUserFilter}
-            on:keydown={(e) => e.key === "Enter" && ((logsPage = 0), loadLogs())}
-          />
-          <button type="button" class="admin-btn" on:click={() => { logsPage = 0; loadLogs(); }}>Применить</button>
-          <button type="button" class="admin-btn admin-btn-ghost" on:click={() => { logsUserFilter = ""; logsPage = 0; loadLogs(); }}>Сбросить</button>
-          <span class="admin-muted" style="margin-left:auto;">Всего: {logsTotal}</span>
+        <div class="admin-toolbar admin-toolbar-card">
+          <div class="admin-toolbar-search admin-toolbar-search-actions">
+            <input
+              type="search"
+              class="input"
+              placeholder={at("logs_user_filter_placeholder", {}, "Фильтр по ID пользователя")}
+              bind:value={logsUserFilter}
+              on:keydown={(e) => e.key === "Enter" && ((logsPage = 0), loadLogs())}
+            />
+            <button type="button" class="admin-btn admin-btn-primary" on:click={() => { logsPage = 0; loadLogs(); }}>{at("apply", {}, "Применить")}</button>
+            <button type="button" class="admin-btn admin-btn-ghost" on:click={() => { logsUserFilter = ""; logsPage = 0; loadLogs(); }}>{at("reset", {}, "Сбросить")}</button>
+          </div>
+          <div class="admin-toolbar-summary">
+            <span class="admin-toolbar-field-label">{at("total", {}, "Всего")}</span>
+            <strong>{logsTotal}</strong>
+          </div>
         </div>
 
         <div class="admin-table-wrap">
           {#if logsLoading}
-            <div class="admin-card-body"><span class="admin-muted">Загрузка…</span></div>
+            <table class="admin-table admin-table-skeleton" aria-hidden="true">
+              <thead>
+                <tr>
+                  <th>{at("date", {}, "Дата")}</th><th>{at("event", {}, "Событие")}</th><th>User</th><th>Target</th><th>{at("content", {}, "Контент")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each Array(10) as _, i (i)}
+                  <tr>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-short"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-short"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line"></span></td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
           {:else if !logs.length}
-            <div class="admin-card-body"><span class="admin-muted">Записей нет</span></div>
+            <div class="admin-card-body"><span class="admin-muted">{at("logs_empty", {}, "Записей нет")}</span></div>
           {:else}
             <table class="admin-table">
               <thead>
                 <tr>
-                  <th>Дата</th>
-                  <th>Событие</th>
+                  <th>{at("date", {}, "Дата")}</th>
+                  <th>{at("event", {}, "Событие")}</th>
                   <th>User</th>
                   <th>Target</th>
-                  <th>Контент</th>
+                  <th>{at("content", {}, "Контент")}</th>
                 </tr>
               </thead>
               <tbody>
                 {#each logs as entry}
                   <tr>
-                    <td data-label="Дата">{fmtDate(entry.timestamp)}</td>
-                    <td class="admin-cell-mono" data-label="Событие">{entry.event_type}</td>
+                    <td data-label={at("date", {}, "Дата")}>{fmtDate(entry.timestamp)}</td>
+                    <td class="admin-cell-mono" data-label={at("event", {}, "Событие")}>{entry.event_type}</td>
                     <td class="admin-cell-mono" data-label="User">{entry.user_id || "—"}</td>
                     <td class="admin-cell-mono" data-label="Target">{entry.target_user_id || "—"}</td>
-                    <td class="admin-cell-wrap" data-label="Контент">{entry.content || ""}</td>
+                    <td class="admin-cell-wrap" data-label={at("content", {}, "Контент")}>{entry.content || ""}</td>
                   </tr>
                 {/each}
               </tbody>
@@ -1809,13 +2106,13 @@
         </div>
 
         <div class="admin-pagination">
-          <span class="admin-pagination-meta">Стр. {logsPage + 1}</span>
+          <span class="admin-pagination-meta">{at("page_short", {}, "Стр.")} {logsPage + 1}</span>
           <div class="admin-pagination-buttons">
             <button type="button" class="admin-btn admin-btn-sm" disabled={logsPage === 0} on:click={() => { logsPage = Math.max(0, logsPage - 1); loadLogs(); }}>
-              <ChevronLeft size={14} /> Назад
+              <ChevronLeft size={14} /> {at("back", {}, "Назад")}
             </button>
             <button type="button" class="admin-btn admin-btn-sm" disabled={!logsHasMore} on:click={() => { logsPage += 1; loadLogs(); }}>
-              Далее <ChevronRight size={14} />
+              {at("next", {}, "Далее")} <ChevronRight size={14} />
             </button>
           </div>
         </div>
@@ -1824,7 +2121,27 @@
       {#if active === "ads"}
         <div class="admin-table-wrap">
           {#if adsLoading}
-            <div class="admin-card-body"><span class="admin-muted">Загрузка…</span></div>
+            <table class="admin-table admin-table-skeleton" aria-hidden="true">
+              <thead>
+                <tr>
+                  <th>ID</th><th>Источник</th><th>Параметр</th><th>Стоимость</th><th>Регистрации</th><th>Конверсии</th><th>Статус</th><th class="admin-cell-actions">Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each Array(6) as _, i (i)}
+                  <tr>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-short"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-short"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-badge"></span></td>
+                    <td><span class="admin-skeleton admin-skeleton-line"></span></td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
           {:else if !ads.length}
             <div class="admin-card-body"><span class="admin-muted">Кампаний нет</span></div>
           {:else}
@@ -2616,14 +2933,10 @@
               {/if}
             </div>
           {/if}
-
-          <button type="button" class="admin-btn admin-user-link-btn" on:click={copyUserDeepLink}>
-            <Link2 size={14} /> Скопировать ссылку на карточку
-          </button>
         </aside>
 
         <main class="admin-user-main">
-          <Tabs.Root bind:value={userDetailTab} class="admin-tabs-root">
+          <Tabs.Root bind:value={userDetailTab} class="admin-tabs-root admin-user-tabs-root">
             <Tabs.List class="admin-tabs-list">
               <Tabs.Trigger value="subscription" class="admin-tabs-trigger">Подписка</Tabs.Trigger>
               <Tabs.Trigger value="activity" class="admin-tabs-trigger">Активность</Tabs.Trigger>
@@ -2638,6 +2951,36 @@
               <li><span>Авто-продление</span><strong>{pretty(openedUserDetail.active_subscription.auto_renew_enabled)}</strong></li>
               <li><span>Провайдер</span><strong>{openedUserDetail.active_subscription.provider || "—"}</strong></li>
             </ul>
+            <div class="admin-traffic-summary">
+              <div class={`admin-traffic-card${openedUserDetail.active_subscription.is_throttled ? " admin-traffic-card-warning" : ""}`}>
+                <div class="admin-traffic-head">
+                  <span>Основной трафик</span>
+                  <strong>{trafficOfLabel(openedUserDetail.active_subscription.traffic_used_bytes, openedUserDetail.active_subscription.traffic_limit_bytes)}</strong>
+                </div>
+                <div class="admin-traffic-bar" aria-label="Использование основного трафика">
+                  <span style={`width: ${trafficPercentValue(openedUserDetail.active_subscription.traffic_used_bytes, openedUserDetail.active_subscription.traffic_limit_bytes)}%`}></span>
+                </div>
+                <div class="admin-traffic-meta">
+                  <span>Осталось: {trafficLeftLabel(openedUserDetail.active_subscription.traffic_used_bytes, openedUserDetail.active_subscription.traffic_limit_bytes)}</span>
+                  <span>{trafficPercentValue(openedUserDetail.active_subscription.traffic_used_bytes, openedUserDetail.active_subscription.traffic_limit_bytes)}%</span>
+                </div>
+              </div>
+              {#if Number(openedUserDetail.active_subscription.premium_limit_bytes || 0) > 0}
+                <div class={`admin-traffic-card admin-traffic-card-premium${openedUserDetail.active_subscription.premium_is_limited ? " admin-traffic-card-warning" : ""}`}>
+                  <div class="admin-traffic-head">
+                    <span>Premium-сквады</span>
+                    <strong>{trafficOfLabel(openedUserDetail.active_subscription.premium_used_bytes, openedUserDetail.active_subscription.premium_limit_bytes)}</strong>
+                  </div>
+                  <div class="admin-traffic-bar admin-traffic-bar-premium" aria-label="Использование premium-трафика">
+                    <span style={`width: ${trafficPercentValue(openedUserDetail.active_subscription.premium_used_bytes, openedUserDetail.active_subscription.premium_limit_bytes)}%`}></span>
+                  </div>
+                  <div class="admin-traffic-meta">
+                    <span>Осталось: {trafficLeftLabel(openedUserDetail.active_subscription.premium_used_bytes, openedUserDetail.active_subscription.premium_limit_bytes)}</span>
+                    <span>{trafficPercentValue(openedUserDetail.active_subscription.premium_used_bytes, openedUserDetail.active_subscription.premium_limit_bytes)}%</span>
+                  </div>
+                </div>
+              {/if}
+            </div>
           {:else}
             <p class="admin-muted">Активной подписки нет</p>
           {/if}
@@ -2682,33 +3025,35 @@
           {/if}
         </Tabs.Content>
 
-        <Tabs.Content value="actions" class="admin-tabs-content">
-          <section class="admin-action-section">
-            <header class="admin-action-section-head">
-              <strong>Безопасные действия</strong>
-              <small>Можно выполнять без подтверждения</small>
-            </header>
-            <div class="admin-action-grid">
-              <button type="button" class="admin-btn" on:click={resetTrialUser} disabled={userActionBusy}>
-                <RefreshCw size={14} /> Сбросить триал
-              </button>
-              <div class="admin-input-row">
+        <Tabs.Content value="actions" class="admin-tabs-content admin-actions-tab">
+          <div class="admin-user-quick-actions">
+            <button type="button" class="admin-btn admin-reset-trial-btn" on:click={resetTrialUser} disabled={userActionBusy}>
+              <RefreshCw size={14} /> Сбросить триал
+            </button>
+            <Label.Root class="admin-field-label admin-extend-field">
+              <span>Продлить подписку</span>
+              <div class="admin-extend-control">
                 <input class="input" type="number" min="1" bind:value={userExtendDays} aria-label="Дней" />
                 <button type="button" class="admin-btn" on:click={extendUser} disabled={userActionBusy}>
                   <Plus size={14} /> Продлить
                 </button>
               </div>
-            </div>
-          </section>
+            </Label.Root>
+          </div>
 
           <Label.Root class="admin-field-label">
             <span>Сообщение в Telegram</span>
             <small>Поддерживается HTML-разметка Telegram</small>
             <textarea class="admin-textarea" rows="3" placeholder="Текст сообщения" bind:value={userMessageDraft}></textarea>
           </Label.Root>
-          <button type="button" class="admin-btn admin-btn-primary" on:click={sendUserMessage} disabled={userActionBusy || !userMessageDraft.trim()}>
-            <Send size={14} /> Отправить сообщение
-          </button>
+          <div class="admin-message-actions">
+            <button type="button" class="admin-btn" on:click={previewUserMessage} disabled={userActionBusy || !userMessageDraft.trim()}>
+              <Eye size={14} /> Превью в Telegram
+            </button>
+            <button type="button" class="admin-btn admin-btn-primary" on:click={requestSendUserMessage} disabled={userActionBusy || !userMessageDraft.trim()}>
+              <Send size={14} /> Отправить сообщение
+            </button>
+          </div>
 
           <section class="admin-danger-zone">
             <header class="admin-danger-zone-head">
@@ -2736,6 +3081,23 @@
       </div>
     {/if}
   {/if}
+</Dialog>
+
+<Dialog
+  open={userMessageConfirmOpen}
+  title="Отправить сообщение пользователю?"
+  description={openedUser ? `Получатель: ${userDisplayName(openedUser)}` : ""}
+  closeLabel="Закрыть"
+  onclose={() => (userMessageConfirmOpen = false)}
+  class="admin-dialog"
+>
+  <div class="admin-confirm-message-preview">{userMessageDraft}</div>
+  <div class="admin-dialog-actions">
+    <button type="button" class="admin-btn" on:click={() => (userMessageConfirmOpen = false)}>Отмена</button>
+    <button type="button" class="admin-btn admin-btn-primary" on:click={sendUserMessage} disabled={userActionBusy || !userMessageDraft.trim()}>
+      <Send size={14} /> Подтвердить отправку
+    </button>
+  </div>
 </Dialog>
 
 <Dialog
@@ -2772,24 +3134,24 @@
 
 <Dialog open={promoCreateOpen} title="Новый промокод" closeLabel="Закрыть" onclose={() => (promoCreateOpen = false)} class="admin-dialog">
   <div class="admin-form">
-    <label>
+    <Label.Root class="admin-field-label">
       <span>Код</span>
       <input class="input" type="text" placeholder="WELCOME10" bind:value={promoDraft.code} />
-    </label>
+    </Label.Root>
     <div class="admin-form-row">
-      <label>
+      <Label.Root class="admin-field-label">
         <span>Бонус (дней)</span>
         <input class="input" type="number" min="1" bind:value={promoDraft.bonus_days} />
-      </label>
-      <label>
+      </Label.Root>
+      <Label.Root class="admin-field-label">
         <span>Макс. активаций</span>
         <input class="input" type="number" min="1" bind:value={promoDraft.max_activations} />
-      </label>
-      <label>
+      </Label.Root>
+      <Label.Root class="admin-field-label">
         <span>Срок действия</span>
         <small>0 — бессрочно</small>
         <input class="input" type="number" min="0" bind:value={promoDraft.valid_days} />
-      </label>
+      </Label.Root>
     </div>
     <button type="button" class="admin-btn admin-btn-primary" on:click={createPromo} disabled={!promoDraft.code.trim()}>
       <Check size={14} /> Создать
@@ -2799,19 +3161,19 @@
 
 <Dialog open={adCreateOpen} title="Новая кампания" closeLabel="Закрыть" onclose={() => (adCreateOpen = false)} class="admin-dialog">
   <div class="admin-form">
-    <label>
+    <Label.Root class="admin-field-label">
       <span>Источник</span>
       <input class="input" type="text" placeholder="telegram_ads" bind:value={adDraft.source} />
-    </label>
-    <label>
+    </Label.Root>
+    <Label.Root class="admin-field-label">
       <span>start-параметр</span>
       <small>Передаётся в /start, должен быть уникален</small>
       <input class="input" type="text" placeholder="ads_summer25" bind:value={adDraft.start_param} />
-    </label>
-    <label>
+    </Label.Root>
+    <Label.Root class="admin-field-label">
       <span>Стоимость, RUB</span>
       <input class="input" type="number" step="0.01" min="0" bind:value={adDraft.cost} />
-    </label>
+    </Label.Root>
     <button type="button" class="admin-btn admin-btn-primary" on:click={createAd} disabled={!adDraft.source.trim() || !adDraft.start_param.trim()}>
       <Check size={14} /> Создать
     </button>

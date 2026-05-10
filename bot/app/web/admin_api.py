@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 from aiogram import Bot
 from aiohttp import web
 from pydantic import ValidationError
-from sqlalchemy import or_, select
+from sqlalchemy import func as sa_func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -163,6 +163,11 @@ def _serialize_user(user: User) -> Dict[str, Any]:
 
 
 def _serialize_subscription(sub: Subscription) -> Dict[str, Any]:
+    premium_limit_bytes = (
+        int(sub.premium_baseline_bytes or 0)
+        + int(sub.premium_topup_balance_bytes or 0)
+        + int(getattr(sub, "premium_topup_used_bytes", 0) or 0)
+    )
     return {
         "subscription_id": int(sub.subscription_id),
         "panel_user_uuid": sub.panel_user_uuid,
@@ -174,9 +179,18 @@ def _serialize_subscription(sub: Subscription) -> Dict[str, Any]:
         "status_from_panel": sub.status_from_panel,
         "traffic_limit_bytes": sub.traffic_limit_bytes,
         "traffic_used_bytes": sub.traffic_used_bytes,
+        "tier_baseline_bytes": sub.tier_baseline_bytes,
+        "topup_balance_bytes": sub.topup_balance_bytes,
+        "premium_used_bytes": sub.premium_used_bytes,
+        "premium_limit_bytes": premium_limit_bytes,
+        "premium_baseline_bytes": sub.premium_baseline_bytes,
+        "premium_topup_balance_bytes": sub.premium_topup_balance_bytes,
+        "premium_topup_used_bytes": getattr(sub, "premium_topup_used_bytes", 0),
+        "premium_is_limited": bool(sub.premium_is_limited),
         "tariff_key": sub.tariff_key,
         "auto_renew_enabled": bool(sub.auto_renew_enabled),
         "provider": sub.provider,
+        "is_throttled": bool(sub.is_throttled),
     }
 
 
@@ -335,20 +349,20 @@ async def admin_users_list_route(request: web.Request) -> web.Response:
     page = max(0, int(request.query.get("page", 0) or 0))
     page_size = min(100, max(1, int(request.query.get("page_size", 25) or 25)))
     query = (request.query.get("q") or "").strip()
-    only_banned = (request.query.get("filter") or "").lower() == "banned"
+    filter_value = (request.query.get("filter") or "all").lower()
+    panel_status = (request.query.get("panel_status") or "all").lower()
+    sort_value = (request.query.get("sort") or "registered_desc").lower()
 
     async with async_session_factory() as session:
-        if query:
-            users = await _search_users(session, query, page=page, page_size=page_size)
-            total = len(users)  # cheap upper bound; UI shows hasMore via len==page_size
-        elif only_banned:
-            banned = await user_dal.get_banned_users(session)
-            total = len(banned)
-            start = page * page_size
-            users = banned[start : start + page_size]
-        else:
-            users = await user_dal.get_all_users_paginated(session, page=page, page_size=page_size)
-            total = await user_dal.count_all_users(session)
+        users, total = await _filter_and_sort_users(
+            session,
+            query=query,
+            filter_value=filter_value,
+            panel_status=panel_status,
+            sort_value=sort_value,
+            page=page,
+            page_size=page_size,
+        )
 
         statuses = await _bulk_user_statuses(session, [u.user_id for u in users])
         cached_avatar_ids = await _bulk_user_avatar_keys(session, [u.user_id for u in users])
@@ -356,7 +370,10 @@ async def admin_users_list_route(request: web.Request) -> web.Response:
     serialized = []
     for user in users:
         payload = _serialize_user(user)
-        payload["panel_status"] = statuses.get(user.user_id)
+        status_payload = statuses.get(user.user_id) or {"status": "bot_only", "end_date": None}
+        payload["panel_status"] = status_payload.get("status")
+        if status_payload.get("status") == "expired" and status_payload.get("end_date"):
+            payload["panel_status_expired_at"] = status_payload["end_date"]
         payload["avatar_url"] = (
             f"/api/admin/users/{user.user_id}/avatar?v={cached_avatar_ids[user.user_id]}"
             if user.user_id in cached_avatar_ids
@@ -376,7 +393,7 @@ async def admin_users_list_route(request: web.Request) -> web.Response:
 
 async def _bulk_user_statuses(
     session: AsyncSession, user_ids: List[int]
-) -> Dict[int, Optional[str]]:
+) -> Dict[int, Dict[str, Optional[str]]]:
     """Return active subscription status for a batch of users.
 
     Returns the panel status (active/expired/limited/disabled) when an active
@@ -392,18 +409,21 @@ async def _bulk_user_statuses(
         .order_by(Subscription.is_active.desc(), Subscription.end_date.desc().nullslast())
     )
     rows = (await session.execute(stmt)).all()
-    out: Dict[int, str] = {}
-    for uid, panel_status, is_active, _end in rows:
+    out: Dict[int, Dict[str, Optional[str]]] = {}
+    for uid, panel_status, is_active, end_date in rows:
         if uid in out:
             continue
         if is_active:
             status = (panel_status or "active").lower()
         else:
             status = (panel_status or "expired").lower()
-        out[uid] = status
+        out[uid] = {
+            "status": status,
+            "end_date": end_date.isoformat() if end_date else None,
+        }
     for uid in user_ids:
         if uid not in out:
-            out[uid] = "bot_only"
+            out[uid] = {"status": "bot_only", "end_date": None}
     return out
 
 
@@ -466,59 +486,118 @@ async def admin_user_avatar_route(request: web.Request) -> web.Response:
     return response
 
 
-async def _search_users(
-    session: AsyncSession, query: str, *, page: int, page_size: int
-) -> List[User]:
-    """Best-effort search that tries telegram id, username, email."""
+async def _filter_and_sort_users(
+    session: AsyncSession,
+    *,
+    query: str = "",
+    filter_value: str,
+    panel_status: str = "all",
+    sort_value: str,
+    page: int,
+    page_size: int,
+) -> tuple[List[User], int]:
+    """Return paginated users with optional search, filter and sort applied."""
 
-    candidates: List[User] = []
-    seen: set = set()
+    stmt = select(User)
+    count_stmt = select(sa_func.count(User.user_id))
 
-    if query.isdigit():
-        user = await user_dal.get_user_by_id(session, int(query))
-        if user:
-            candidates.append(user)
-            seen.add(user.user_id)
-        user = await user_dal.get_user_by_telegram_id(session, int(query))
-        if user and user.user_id not in seen:
-            candidates.append(user)
-            seen.add(user.user_id)
+    search_cond = _user_search_condition(query)
+    if search_cond is not None:
+        stmt = stmt.where(search_cond)
+        count_stmt = count_stmt.where(search_cond)
 
-    if "@" in query and not query.startswith("@"):
-        user = await user_dal.get_user_by_email(session, query)
-        if user and user.user_id not in seen:
-            candidates.append(user)
-            seen.add(user.user_id)
+    f = (filter_value or "all").lower()
+    if f == "banned":
+        cond = User.is_banned.is_(True)
+    elif f == "active":
+        cond = User.is_banned.is_(False)
+    elif f == "tg_linked":
+        cond = User.telegram_id.is_not(None)
+    elif f == "no_tg":
+        cond = User.telegram_id.is_(None)
+    elif f == "email_linked":
+        cond = User.email.is_not(None)
+    elif f == "no_email":
+        cond = User.email.is_(None)
+    elif f == "panel_linked":
+        cond = User.panel_user_uuid.is_not(None)
+    else:
+        cond = None
 
-    raw = query.lstrip("@")
-    user = await user_dal.get_user_by_username(session, raw)
-    if user and user.user_id not in seen:
-        candidates.append(user)
-        seen.add(user.user_id)
+    if cond is not None:
+        stmt = stmt.where(cond)
+        count_stmt = count_stmt.where(cond)
 
-    if not candidates:
-        like = f"%{raw}%"
-        stmt = (
-            select(User)
-            .where(
-                or_(
-                    User.username.ilike(like),
-                    User.first_name.ilike(like),
-                    User.last_name.ilike(like),
-                    User.email.ilike(like),
-                )
-            )
-            .order_by(User.registration_date.desc())
-            .offset(page * page_size)
-            .limit(page_size)
-        )
-        rows = (await session.execute(stmt)).scalars().all()
-        for row in rows:
-            if row.user_id not in seen:
-                candidates.append(row)
-                seen.add(row.user_id)
+    panel_cond = _user_panel_status_condition(panel_status)
+    if panel_cond is not None:
+        stmt = stmt.where(panel_cond)
+        count_stmt = count_stmt.where(panel_cond)
 
-    return candidates
+    sort_map = {
+        "registered_desc": User.registration_date.desc().nullslast(),
+        "registered_asc": User.registration_date.asc().nullslast(),
+        "name_asc": (
+            sa_func.coalesce(User.first_name, User.username, User.email).asc(),
+            User.user_id.asc(),
+        ),
+        "name_desc": (
+            sa_func.coalesce(User.first_name, User.username, User.email).desc(),
+            User.user_id.desc(),
+        ),
+        "id_asc": User.user_id.asc(),
+        "id_desc": User.user_id.desc(),
+    }
+    order = sort_map.get(sort_value, sort_map["registered_desc"])
+    if isinstance(order, tuple):
+        stmt = stmt.order_by(*order)
+    else:
+        stmt = stmt.order_by(order)
+
+    stmt = stmt.offset(max(page, 0) * max(page_size, 1)).limit(max(page_size, 1))
+
+    users = (await session.execute(stmt)).scalars().all()
+    total = (await session.execute(count_stmt)).scalar_one()
+    return users, int(total)
+
+
+def _user_panel_status_condition(panel_status: str):
+    status = (panel_status or "all").lower()
+    if status not in {"active", "expired", "limited"}:
+        return None
+
+    normalized_status = sa_func.lower(sa_func.coalesce(Subscription.status_from_panel, ""))
+    blank_status = or_(Subscription.status_from_panel.is_(None), Subscription.status_from_panel == "")
+    if status == "active":
+        status_cond = or_(normalized_status == "active", blank_status & Subscription.is_active.is_(True))
+    elif status == "expired":
+        status_cond = or_(normalized_status == "expired", blank_status & Subscription.is_active.is_(False))
+    else:
+        status_cond = normalized_status == "limited"
+
+    return (
+        select(Subscription.subscription_id)
+        .where(Subscription.user_id == User.user_id, status_cond)
+        .exists()
+    )
+
+
+def _user_search_condition(query: str):
+    raw = (query or "").strip().lstrip("@")
+    if not raw:
+        return None
+
+    like = f"%{raw}%"
+    conditions = [
+        User.username.ilike(like),
+        User.first_name.ilike(like),
+        User.last_name.ilike(like),
+        User.email.ilike(like),
+    ]
+    if raw.isdigit():
+        numeric = int(raw)
+        conditions.extend([User.user_id == numeric, User.telegram_id == numeric])
+
+    return or_(*conditions)
 
 
 async def admin_user_detail_route(request: web.Request) -> web.Response:
@@ -689,6 +768,49 @@ async def admin_user_message_route(request: web.Request) -> web.Response:
             {
                 "user_id": actor_id,
                 "event_type": "admin_direct_message_webapp",
+                "content": text[:4000],
+                "is_admin_event": True,
+                "target_user_id": target_id,
+            },
+        )
+
+    return _ok({})
+
+
+async def admin_user_message_preview_route(request: web.Request) -> web.Response:
+    actor_id = _require_admin_user_id(request)
+    admin_telegram_id = request.get("admin_telegram_id")
+    target_id = int(request.match_info["user_id"])
+    payload = await _read_json(request)
+    text = str(payload.get("text") or "").strip()
+    if not text:
+        return _error(400, "empty_text")
+    if not admin_telegram_id:
+        return _error(403, "admin_telegram_unavailable")
+
+    queue_manager = get_queue_manager()
+    if not queue_manager:
+        return _error(503, "queue_unavailable")
+
+    try:
+        await send_message_via_queue(
+            queue_manager,
+            int(admin_telegram_id),
+            MessageContent(content_type="text", text=text),
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
+    except Exception as exc:
+        logger.warning("Admin direct message preview failed: %s", exc)
+        return _error(502, "preview_failed", str(exc))
+
+    async_session_factory: sessionmaker = request.app["async_session_factory"]
+    async with async_session_factory() as session:
+        await message_log_dal.create_message_log(
+            session,
+            {
+                "user_id": actor_id,
+                "event_type": "admin_direct_message_preview_webapp",
                 "content": text[:4000],
                 "is_admin_event": True,
                 "target_user_id": target_id,
@@ -1347,6 +1469,7 @@ def setup_admin_routes(app: web.Application) -> None:
     router.add_get("/api/admin/users/{user_id:-?\\d+}/avatar", admin_user_avatar_route)
     router.add_post("/api/admin/users/{user_id:-?\\d+}/ban", admin_user_ban_route)
     router.add_post("/api/admin/users/{user_id:-?\\d+}/message", admin_user_message_route)
+    router.add_post("/api/admin/users/{user_id:-?\\d+}/message/preview", admin_user_message_preview_route)
     router.add_post("/api/admin/users/{user_id:-?\\d+}/reset-trial", admin_user_reset_trial_route)
     router.add_post("/api/admin/users/{user_id:-?\\d+}/extend", admin_user_extend_route)
     router.add_delete("/api/admin/users/{user_id:-?\\d+}", admin_user_delete_route)

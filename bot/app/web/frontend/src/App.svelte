@@ -2963,6 +2963,11 @@
         logoEmoji={brandEmoji}
         appVersion={CFG.appVersion}
         appRepositoryUrl={CFG.appRepositoryUrl}
+        currentLang={currentLang}
+        languageOptions={languageOptions}
+        languageBusy={languageBusy}
+        onLanguageChange={updateAccountLanguage}
+        t={t}
       />
     {:else}
       <div class="phone-screen" class:home-screen={screen === "home"}>
