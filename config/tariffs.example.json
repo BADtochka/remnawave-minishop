@@ -5,6 +5,7 @@
       "key": "standard",
       "names": { "ru": "Стандарт", "en": "Standard" },
       "descriptions": { "ru": "Базовый набор серверов", "en": "Base server pool" },
+      "premium_names": { "ru": "Premium-серверы", "en": "Premium servers" },
       "squad_uuids": ["uuid-1", "uuid-2"],
       "premium_squad_uuids": ["premium-squad-uuid"],
       "premium_monthly_gb": 50,

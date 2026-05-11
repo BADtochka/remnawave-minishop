@@ -256,6 +256,7 @@
   let deviceTopupModalOpen = query.get("device_topup") === "1";
   let changeModalOpen = query.get("change") === "1";
   let topupOptions = null;
+  let topupOptionsRequestId = 0;
   let deviceTopupOptions = null;
   let changeOptions = null;
   let selectedTopupPlan = null;
@@ -1817,20 +1818,23 @@
   }
 
   async function loadTopupOptions(kind = topupKind) {
-    if (topupOptions?.topup_kind === kind || tariffActionBusy) return;
+    if (topupOptions?.topup_kind === kind) return;
+    const requestId = ++topupOptionsRequestId;
     tariffActionBusy = true;
     try {
       topupOptions = null;
       selectedTopupPlan = null;
       const response = await api(`/tariffs/topup-options?kind=${encodeURIComponent(kind)}`);
+      if (requestId !== topupOptionsRequestId || kind !== topupKind) return;
       if (!response?.ok) throw response;
       topupOptions = response;
       selectedTopupPlan = response.plans?.[0] || null;
     } catch (error) {
+      if (requestId !== topupOptionsRequestId || kind !== topupKind) return;
       showToast(error?.message || t("wa_tariff_options_failed"));
       topupModalOpen = false;
     } finally {
-      tariffActionBusy = false;
+      if (requestId === topupOptionsRequestId) tariffActionBusy = false;
     }
   }
 
@@ -2272,6 +2276,10 @@
 
   function openTopupModal(kind = "regular") {
     if (kind === "premium" ? !canOpenPremiumTopupModal : !canOpenRegularTopupModal) return;
+    if (topupKind !== kind) {
+      topupOptions = null;
+      selectedTopupPlan = null;
+    }
     topupKind = kind;
     topupModalOpen = true;
     loadTopupOptions(kind);
@@ -2617,13 +2625,19 @@
 
   function topupModalDescription() {
     if (!topupOptions) return "";
-    if (topupKind === "premium") return topupOptions?.tariff_name ? t("wa_topup_for_tariff", { tariff: topupOptions.tariff_name }) : "";
+    if (isPremiumTopupContext()) return topupOptions?.tariff_name ? t("wa_topup_for_tariff", { tariff: topupOptions.tariff_name }) : "";
     if (singleTariffMode) return "";
     return topupOptions?.tariff_name ? t("wa_topup_for_tariff", { tariff: topupOptions.tariff_name }) : "";
   }
 
+  function isPremiumTopupContext() {
+    if (selectedTopupPlan?.sale_mode === "premium_topup") return true;
+    if (topupOptions?.topup_kind) return topupOptions.topup_kind === "premium";
+    return topupKind === "premium";
+  }
+
   function topupModalTitle() {
-    if (topupKind === "premium") return premiumTitle(subscription);
+    if (isPremiumTopupContext()) return premiumTitle(topupOptions || subscription);
     return t("wa_topup_traffic");
   }
 
