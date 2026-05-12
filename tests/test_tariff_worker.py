@@ -148,7 +148,7 @@ class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
                 return_value={
                     "topUsers": [
                         {
-                            "user": {"uuid": "panel-uuid"},
+                            "username": "tg_123",
                             "total": 2 * (1024**3),
                         }
                     ]
@@ -176,7 +176,13 @@ class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
             tariff = settings.tariffs_config.require("standard")
 
             with patch("bot.services.tariff_worker.tariff_dal.get_warning", new=AsyncMock(return_value=True)):
-                await worker._sync_premium_squad_limit(AsyncMock(), sub, tariff, datetime.now(timezone.utc))
+                await worker._sync_premium_squad_limit(
+                    AsyncMock(),
+                    sub,
+                    tariff,
+                    datetime.now(timezone.utc),
+                    panel_username="tg_123",
+                )
 
             self.assertTrue(sub.premium_is_limited)
             panel_service.update_user_details_on_panel.assert_awaited_once()
@@ -205,7 +211,7 @@ class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
                 return_value={
                     "topUsers": [
                         {
-                            "user": {"uuid": "panel-uuid"},
+                            "username": "tg_123",
                             "total": int(1.5 * (1024**3)),
                         }
                     ]
@@ -233,7 +239,9 @@ class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
             )
             tariff = settings.tariffs_config.require("standard")
 
-            await worker._sync_premium_squad_limit(AsyncMock(), sub, tariff, now)
+            await worker._sync_premium_squad_limit(
+                AsyncMock(), sub, tariff, now, panel_username="tg_123"
+            )
 
             self.assertEqual(sub.premium_topup_balance_bytes, int(1.5 * (1024**3)))
             self.assertEqual(sub.premium_topup_used_bytes, int(0.5 * (1024**3)))
@@ -243,14 +251,16 @@ class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
                 return_value={
                     "topUsers": [
                         {
-                            "user": {"uuid": "panel-uuid"},
+                            "username": "tg_123",
                             "total": int(0.1 * (1024**3)),
                         }
                     ]
                 }
             )
             next_month = datetime(2026, 6, 2, tzinfo=timezone.utc)
-            await worker._sync_premium_squad_limit(AsyncMock(), sub, tariff, next_month)
+            await worker._sync_premium_squad_limit(
+                AsyncMock(), sub, tariff, next_month, panel_username="tg_123"
+            )
 
             self.assertEqual(sub.premium_topup_balance_bytes, int(1.5 * (1024**3)))
             self.assertEqual(sub.premium_topup_used_bytes, 0)

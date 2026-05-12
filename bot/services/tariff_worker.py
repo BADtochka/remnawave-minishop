@@ -78,6 +78,7 @@ class TariffTrafficWorker:
             panel_data = await self.panel_service.get_user_by_uuid(sub.panel_user_uuid, log_response=False) or {}
             used, limit, panel_strategy = self.subscription_service._extract_panel_traffic_details(panel_data)
             panel_status = str(panel_data.get("status") or "").upper()
+            panel_username = panel_data.get("username") if isinstance(panel_data, dict) else None
             if used is not None and used != sub.traffic_used_bytes:
                 sub.traffic_used_bytes = used
             if limit is not None and limit != sub.traffic_limit_bytes:
@@ -96,7 +97,7 @@ class TariffTrafficWorker:
                 warning_period_start=warning_period_start if tariff.billing_model == "period" else None,
             )
 
-            await self._sync_premium_squad_limit(session, sub, tariff, now)
+            await self._sync_premium_squad_limit(session, sub, tariff, now, panel_username=panel_username)
 
     async def _ensure_period_reset_strategy(
         self,
@@ -190,6 +191,8 @@ class TariffTrafficWorker:
         sub: Subscription,
         tariff,
         now: datetime,
+        *,
+        panel_username: Optional[str] = None,
     ) -> None:
         if not getattr(tariff, "premium_squad_uuids", None):
             if any(
@@ -222,7 +225,13 @@ class TariffTrafficWorker:
 
         start_date = now.date().replace(day=1).isoformat()
         end_date = now.date().isoformat()
-        premium_used = await self._premium_usage_for_user(sub.panel_user_uuid, node_uuids, start_date, end_date)
+        premium_used = await self._premium_usage_for_user(
+            sub.panel_user_uuid,
+            node_uuids,
+            start_date,
+            end_date,
+            panel_username=panel_username,
+        )
         if premium_used is None:
             return
 
@@ -379,9 +388,12 @@ class TariffTrafficWorker:
         node_uuids: list[str],
         start_date: str,
         end_date: str,
+        *,
+        panel_username: Optional[str] = None,
     ) -> Optional[int]:
         total = 0
         found = False
+        username = (panel_username or "").strip() or None
         for node_uuid in node_uuids:
             stats = await self.panel_service.get_node_users_bandwidth_stats(
                 node_uuid,
@@ -403,7 +415,21 @@ class TariffTrafficWorker:
                     or entry.get("uuid")
                     or entry.get("user_uuid")
                 )
-                if entry_uuid != user_uuid:
+                entry_username = (
+                    user_obj.get("username")
+                    or entry.get("username")
+                    or entry.get("userUsername")
+                )
+                # Remnawave's /bandwidth-stats/nodes/{uuid}/users response
+                # currently exposes only {color, username, total}; match by
+                # username first, fall back to UUID if a future version
+                # adds it back.
+                matched = False
+                if entry_uuid and entry_uuid == user_uuid:
+                    matched = True
+                elif username and entry_username and entry_username == username:
+                    matched = True
+                if not matched:
                     continue
                 value = entry.get("total")
                 if value is None:
