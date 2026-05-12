@@ -544,6 +544,87 @@ def _migration_0016_add_message_logs_admin_fields(connection: Connection) -> Non
     )
 
 
+def _migration_0018_add_premium_admin_overrides(connection: Connection) -> None:
+    """Per-subscription overrides letting admins gift extra premium traffic or unlimited access."""
+    inspector = inspect(connection)
+    sub_columns: Set[str] = {col["name"] for col in inspector.get_columns("subscriptions")}
+    statements: List[str] = []
+    if "premium_unlimited_override" not in sub_columns:
+        statements.append(
+            "ALTER TABLE subscriptions ADD COLUMN premium_unlimited_override BOOLEAN NOT NULL DEFAULT FALSE"
+        )
+    if "premium_bonus_bytes" not in sub_columns:
+        statements.append(
+            "ALTER TABLE subscriptions ADD COLUMN premium_bonus_bytes BIGINT NOT NULL DEFAULT 0"
+        )
+    for stmt in statements:
+        connection.execute(text(stmt))
+    connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_subscriptions_premium_unlimited_override "
+            "ON subscriptions (premium_unlimited_override)"
+        )
+    )
+
+
+def _migration_0021_add_regular_unlimited_override(connection: Connection) -> None:
+    inspector = inspect(connection)
+    sub_columns: Set[str] = {col["name"] for col in inspector.get_columns("subscriptions")}
+    if "regular_unlimited_override" not in sub_columns:
+        connection.execute(
+            text(
+                "ALTER TABLE subscriptions ADD COLUMN regular_unlimited_override BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+        )
+    connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_subscriptions_regular_unlimited_override "
+            "ON subscriptions (regular_unlimited_override)"
+        )
+    )
+
+
+def _migration_0020_add_regular_bonus_bytes(connection: Connection) -> None:
+    """Admin-granted extra bytes on main (non-premium) traffic limit, like premium_bonus_bytes."""
+    inspector = inspect(connection)
+    sub_columns: Set[str] = {col["name"] for col in inspector.get_columns("subscriptions")}
+    if "regular_bonus_bytes" not in sub_columns:
+        connection.execute(
+            text(
+                "ALTER TABLE subscriptions ADD COLUMN regular_bonus_bytes BIGINT NOT NULL DEFAULT 0"
+            )
+        )
+
+
+def _migration_0019_clear_subscription_months_for_non_subscription_payments(connection: Connection) -> None:
+    """Null out subscription_duration_months for legacy non-subscription payments.
+
+    Older builds stored the raw `months` callback value into
+    `subscription_duration_months` for every sale_mode, including traffic
+    top-ups and HWID device packs. This polluted CSV exports and made admin
+    log messages render top-ups as "N мес.". The new code only sets the
+    column for subscription sales; this migration aligns historical rows.
+    """
+    inspector = inspect(connection)
+    table_names = set(inspector.get_table_names())
+    if "payments" not in table_names:
+        return
+    pay_columns: Set[str] = {col["name"] for col in inspector.get_columns("payments")}
+    if "subscription_duration_months" not in pay_columns or "sale_mode" not in pay_columns:
+        return
+    connection.execute(
+        text(
+            """
+            UPDATE payments
+            SET subscription_duration_months = NULL
+            WHERE subscription_duration_months IS NOT NULL
+              AND sale_mode IS NOT NULL
+              AND split_part(split_part(sale_mode, '@', 1), '|', 1) <> 'subscription'
+            """
+        )
+    )
+
+
 def _migration_0017_reconcile_legacy_admin_api_schema(connection: Connection) -> None:
     """Backfill columns required by admin user detail API on legacy databases.
 
@@ -704,6 +785,26 @@ MIGRATIONS: List[Migration] = [
         id="0017_reconcile_legacy_admin_api_schema",
         description="Reconcile legacy DB schema for admin user detail endpoint compatibility",
         upgrade=_migration_0017_reconcile_legacy_admin_api_schema,
+    ),
+    Migration(
+        id="0018_add_premium_admin_overrides",
+        description="Per-subscription admin overrides for premium traffic (unlimited toggle + bonus bytes)",
+        upgrade=_migration_0018_add_premium_admin_overrides,
+    ),
+    Migration(
+        id="0019_clear_subscription_months_for_non_subscription_payments",
+        description="Backfill: null out subscription_duration_months for legacy traffic/topup/hwid payments",
+        upgrade=_migration_0019_clear_subscription_months_for_non_subscription_payments,
+    ),
+    Migration(
+        id="0020_add_regular_bonus_bytes",
+        description="Per-subscription admin bonus bytes on regular (main) traffic limit",
+        upgrade=_migration_0020_add_regular_bonus_bytes,
+    ),
+    Migration(
+        id="0021_add_regular_unlimited_override",
+        description="Admin toggle for effectively unlimited main traffic limit",
+        upgrade=_migration_0021_add_regular_unlimited_override,
     ),
 ]
 

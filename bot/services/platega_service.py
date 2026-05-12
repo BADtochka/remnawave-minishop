@@ -318,10 +318,12 @@ class PlategaService:
                         user_id=payment.user_id,
                         amount=float(payment.amount),
                         currency=currency,
-                        months=int(payment_months) if sale_mode != "traffic" else 0,
-                        traffic_gb=payment_months if sale_mode == "traffic" else None,
+                        months=int(payment_months) if sale_base == "subscription" else 0,
+                        traffic_gb=float(payment_months) if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
                         payment_provider="platega",
                         username=db_user.username if db_user else None,
+                        traffic_is_premium=sale_base == "premium_topup",
+                        tariff_key=getattr(payment, "tariff_key", None),
                     )
                 except Exception:
                     logging.exception("Platega webhook: failed to notify admins.")

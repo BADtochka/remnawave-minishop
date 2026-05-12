@@ -347,7 +347,7 @@ def render_payment_success(
     lang = _normalize_lang(language_code, settings)
     accent = _safe_color(settings.WEBAPP_PRIMARY_COLOR)
     brand = _brand_title(settings)
-    is_traffic = sale_mode == "traffic"
+    is_traffic = (sale_mode or "").split("@", 1)[0].split("|", 1)[0] in {"traffic", "traffic_package", "topup", "premium_topup"}
     amount_text = _format_amount(amount, currency)
     safe_dashboard_url = (dashboard_url or "").strip()
     end_date = end_date_text or "—"

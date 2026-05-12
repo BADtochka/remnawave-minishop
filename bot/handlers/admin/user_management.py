@@ -192,6 +192,16 @@ def get_user_card_keyboard(user_id: int, i18n_instance, lang: str,
         callback_data=f"user_action:refresh:{user_id}"
     )
 
+    # Row 3b: Premium override + traffic grant
+    builder.button(
+        text=_(key="admin_user_premium_override_button"),
+        callback_data=f"user_action:premium_override:{user_id}"
+    )
+    builder.button(
+        text=_(key="admin_user_traffic_grant_button"),
+        callback_data=f"user_action:traffic_grant:{user_id}"
+    )
+
     # Row 4: Quick links — only for users with a real Telegram profile
     # (synthetic email-only users have a negative user_id with no tg profile).
     has_self_link = user_id > 0
@@ -225,9 +235,9 @@ def get_user_card_keyboard(user_id: int, i18n_instance, lang: str,
 
     quick_links_count = (1 if has_self_link else 0) + (1 if has_referrer_link else 0)
     if quick_links_count == 0:
-        builder.adjust(2, 2, 2, 1, 2)
+        builder.adjust(2, 2, 2, 2, 1, 2)
     else:
-        builder.adjust(2, 2, 2, quick_links_count, 1, 2)
+        builder.adjust(2, 2, 2, 2, quick_links_count, 1, 2)
     return builder
 
 
@@ -343,6 +353,18 @@ async def format_user_card(user: User, session: AsyncSession,
                     limit_display = _("traffic_unlimited")
 
                 card_parts.append(f"{_('admin_user_traffic_label')} {hcode(f'{used_display} / {limit_display}')}")
+
+            premium_unlimited = bool(subscription_details.get("premium_unlimited_override"))
+            premium_bonus_bytes = int(subscription_details.get("premium_bonus_bytes") or 0)
+            if premium_unlimited:
+                card_parts.append(
+                    f"{_('admin_user_premium_override_label')} {hcode(_('admin_user_premium_override_unlimited'))}"
+                )
+            elif premium_bonus_bytes > 0:
+                bonus_gb = premium_bonus_bytes / (1024 ** 3)
+                card_parts.append(
+                    f"{_('admin_user_premium_override_label')} {hcode(_('admin_user_premium_override_bonus_value', gb=f'{bonus_gb:.2f}'))}"
+                )
         else:
             card_parts.append(f"{_('admin_user_subscription_label')} {hcode(_('admin_user_subscription_none'))}")
     except Exception as e:
@@ -541,8 +563,235 @@ async def user_action_handler(callback: types.CallbackQuery, state: FSMContext,
         await handle_delete_user_prompt(
             callback, state, user, settings, i18n, current_lang, session
         )
+    elif action == "premium_override":
+        await handle_premium_override_menu(
+            callback, state, user, subscription_service, session, i18n, current_lang
+        )
+    elif action == "premium_override_set_unlimited":
+        await handle_premium_override_apply(
+            callback, user, subscription_service, session, i18n, current_lang,
+            unlimited=True, bonus_bytes=0,
+        )
+    elif action == "premium_override_clear":
+        await handle_premium_override_apply(
+            callback, user, subscription_service, session, i18n, current_lang,
+            unlimited=False, bonus_bytes=0,
+        )
+    elif action == "premium_override_set_bonus":
+        await handle_premium_override_bonus_prompt(
+            callback, state, user, i18n, current_lang
+        )
+    elif action == "traffic_grant":
+        await handle_traffic_grant_menu(callback, user, i18n, current_lang)
+    elif action == "traffic_grant_regular":
+        await handle_traffic_grant_prompt(callback, state, user, "regular", i18n, current_lang)
+    elif action == "traffic_grant_premium":
+        await handle_traffic_grant_prompt(callback, state, user, "premium", i18n, current_lang)
     else:
         await callback.answer(_("admin_unknown_action"), show_alert=True)
+
+
+async def handle_premium_override_menu(
+    callback: types.CallbackQuery,
+    state: FSMContext,
+    user: User,
+    subscription_service: SubscriptionService,
+    session: AsyncSession,
+    i18n_instance,
+    lang: str,
+) -> None:
+    """Show premium override sub-menu with current state and quick toggles."""
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+
+    active_sub = await subscription_dal.get_active_subscription_by_user_id(session, user.user_id)
+    if not active_sub:
+        await callback.answer(_("admin_premium_override_no_subscription"), show_alert=True)
+        return
+
+    unlimited = bool(getattr(active_sub, "premium_unlimited_override", False))
+    bonus_bytes = int(getattr(active_sub, "premium_bonus_bytes", 0) or 0)
+    bonus_gb = bonus_bytes / (1024 ** 3) if bonus_bytes else 0
+
+    if unlimited:
+        current_text = _("admin_premium_override_state_unlimited")
+    elif bonus_bytes > 0:
+        current_text = _("admin_premium_override_state_bonus", gb=f"{bonus_gb:.2f}")
+    else:
+        current_text = _("admin_premium_override_state_none")
+
+    text = "\n".join(
+        [
+            f"<b>{_('admin_premium_override_title')}</b>",
+            "",
+            _("admin_premium_override_hint"),
+            "",
+            _("admin_premium_override_current", current=current_text),
+        ]
+    )
+
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=_("admin_premium_override_btn_unlimited"),
+        callback_data=f"user_action:premium_override_set_unlimited:{user.user_id}",
+    )
+    builder.button(
+        text=_("admin_premium_override_btn_bonus"),
+        callback_data=f"user_action:premium_override_set_bonus:{user.user_id}",
+    )
+    builder.button(
+        text=_("admin_premium_override_btn_clear"),
+        callback_data=f"user_action:premium_override_clear:{user.user_id}",
+    )
+    builder.button(
+        text=_("admin_user_back_to_card_button"),
+        callback_data=f"user_action:refresh:{user.user_id}",
+    )
+    builder.adjust(1, 1, 1, 1)
+
+    try:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    except Exception:
+        await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await state.update_data(target_user_id=user.user_id)
+    await callback.answer()
+
+
+async def handle_premium_override_apply(
+    callback: types.CallbackQuery,
+    user: User,
+    subscription_service: SubscriptionService,
+    session: AsyncSession,
+    i18n_instance,
+    lang: str,
+    *,
+    unlimited: bool,
+    bonus_bytes: int,
+) -> None:
+    """Persist a premium override (unlimited or explicit bonus) on the active subscription."""
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+
+    try:
+        active_sub = await subscription_dal.get_active_subscription_by_user_id(session, user.user_id)
+        if not active_sub:
+            await callback.answer(_("admin_premium_override_no_subscription"), show_alert=True)
+            return
+
+        active_sub.premium_unlimited_override = bool(unlimited)
+        active_sub.premium_bonus_bytes = max(0, int(bonus_bytes or 0))
+        if unlimited:
+            active_sub.premium_is_limited = False
+
+        await message_log_dal.create_message_log_no_commit(
+            session,
+            {
+                "user_id": callback.from_user.id if callback.from_user else user.user_id,
+                "event_type": "admin:premium_override",
+                "content": (
+                    f"unlimited={bool(unlimited)} bonus_bytes={int(bonus_bytes or 0)}"
+                ),
+                "is_admin_event": True,
+                "target_user_id": user.user_id,
+                "timestamp": datetime.now(timezone.utc),
+            },
+        )
+        await session.commit()
+
+        await callback.answer(_("admin_premium_override_saved"), show_alert=False)
+        await handle_refresh_user_card(callback, user, subscription_service, session, i18n_instance, lang)
+    except Exception as exc:
+        logging.error(
+            "Failed to apply premium override for user %s: %s", user.user_id, exc, exc_info=True
+        )
+        await session.rollback()
+        await callback.answer(_("admin_premium_override_save_error"), show_alert=True)
+
+
+async def handle_premium_override_bonus_prompt(
+    callback: types.CallbackQuery,
+    state: FSMContext,
+    user: User,
+    i18n_instance,
+    lang: str,
+) -> None:
+    """Ask admin for the bonus GB to grant."""
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+    await state.update_data(target_user_id=user.user_id)
+    await state.set_state(AdminStates.waiting_for_premium_override_bonus_gb)
+    prompt = _("admin_premium_override_bonus_prompt", user_id=user.user_id)
+    try:
+        await callback.message.edit_text(prompt)
+    except Exception:
+        await callback.message.answer(prompt)
+    await callback.answer()
+
+
+async def handle_traffic_grant_menu(
+    callback: types.CallbackQuery,
+    user: User,
+    i18n_instance,
+    lang: str,
+) -> None:
+    """Show traffic-grant menu (regular vs premium)."""
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+
+    text = "\n".join(
+        [
+            f"<b>{_('admin_traffic_grant_title')}</b>",
+            "",
+            _("admin_traffic_grant_hint"),
+        ]
+    )
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=_("admin_traffic_grant_btn_regular"),
+        callback_data=f"user_action:traffic_grant_regular:{user.user_id}",
+    )
+    builder.button(
+        text=_("admin_traffic_grant_btn_premium"),
+        callback_data=f"user_action:traffic_grant_premium:{user.user_id}",
+    )
+    builder.button(
+        text=_("admin_user_back_to_card_button"),
+        callback_data=f"user_action:refresh:{user.user_id}",
+    )
+    builder.adjust(1, 1, 1)
+
+    try:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    except Exception:
+        await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await callback.answer()
+
+
+async def handle_traffic_grant_prompt(
+    callback: types.CallbackQuery,
+    state: FSMContext,
+    user: User,
+    kind: str,
+    i18n_instance,
+    lang: str,
+) -> None:
+    """Ask the admin for the amount of GB to grant (regular or premium)."""
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+    kind_normalized = "premium" if kind == "premium" else "regular"
+    await state.update_data(target_user_id=user.user_id, traffic_grant_kind=kind_normalized)
+    await state.set_state(AdminStates.waiting_for_traffic_grant_gb)
+    prompt_key = (
+        "admin_traffic_grant_prompt_premium"
+        if kind_normalized == "premium"
+        else "admin_traffic_grant_prompt_regular"
+    )
+    prompt = _(prompt_key, user_id=user.user_id)
+    try:
+        await callback.message.edit_text(prompt)
+    except Exception:
+        await callback.message.answer(prompt)
+    await callback.answer()
+
+
+# `process_traffic_grant_gb_handler` is declared near the other FSM-bound
+# handlers at the bottom of the module, so the router decorator can attach to
+# the same `router` instance the premium override flow uses.
 
 
 async def handle_reset_trial(callback: types.CallbackQuery, user: User,
@@ -1372,6 +1621,203 @@ async def process_unban_user_handler(message: types.Message, state: FSMContext,
     await state.clear()
 
 
+@router.message(AdminStates.waiting_for_premium_override_bonus_gb, F.text)
+async def process_premium_override_bonus_handler(
+    message: types.Message,
+    state: FSMContext,
+    settings: Settings,
+    i18n_data: dict,
+    subscription_service: SubscriptionService,
+    session: AsyncSession,
+):
+    """Read bonus GB and apply premium override (non-unlimited path)."""
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
+    if not i18n:
+        await message.reply("Language service error.")
+        return
+    _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs)
+
+    data = await state.get_data()
+    target_user_id = data.get("target_user_id")
+    if not target_user_id:
+        await message.answer(_("admin_premium_override_state_missing"))
+        await state.clear()
+        return
+
+    raw = (message.text or "").strip().replace(",", ".")
+    try:
+        gb = float(raw)
+        if gb < 0 or gb > 1_000_000:
+            raise ValueError("out_of_range")
+    except (TypeError, ValueError):
+        await message.answer(_("admin_premium_override_invalid_gb"))
+        return
+
+    bonus_bytes = int(round(gb * (1024 ** 3)))
+    target_user = await user_dal.get_user_by_id(session, target_user_id)
+    if not target_user:
+        await message.answer(_("admin_user_not_found_action"))
+        await state.clear()
+        return
+
+    try:
+        active_sub = await subscription_dal.get_active_subscription_by_user_id(
+            session, target_user_id
+        )
+        if not active_sub:
+            await message.answer(_("admin_premium_override_no_subscription"))
+            await state.clear()
+            return
+
+        active_sub.premium_unlimited_override = False
+        active_sub.premium_bonus_bytes = max(0, bonus_bytes)
+
+        await message_log_dal.create_message_log_no_commit(
+            session,
+            {
+                "user_id": message.from_user.id if message.from_user else target_user_id,
+                "event_type": "admin:premium_override",
+                "content": f"unlimited=False bonus_bytes={int(bonus_bytes)}",
+                "is_admin_event": True,
+                "target_user_id": target_user_id,
+                "timestamp": datetime.now(timezone.utc),
+            },
+        )
+        await session.commit()
+
+        await message.answer(
+            _("admin_premium_override_bonus_set", gb=f"{gb:.2f}", user_id=target_user_id)
+        )
+
+        referral_service = ReferralService(settings, subscription_service, message.bot, i18n)
+        bot_username = await _resolve_bot_username(message.bot)
+        user_card_text = await format_user_card(
+            target_user, session, subscription_service, i18n, current_lang, referral_service,
+            settings=settings, bot_username=bot_username,
+        )
+        keyboard = get_user_card_keyboard(
+            target_user.user_id, i18n, current_lang, target_user.referred_by_id
+        )
+        await _send_with_profile_link_fallback(
+            message.answer,
+            text=user_card_text,
+            markup=keyboard.as_markup(),
+            user_id=target_user.user_id,
+            parse_mode="HTML",
+        )
+    except Exception as exc:
+        logging.error(
+            "Error setting premium override bonus for user %s: %s", target_user_id, exc, exc_info=True
+        )
+        await session.rollback()
+        await message.answer(_("admin_premium_override_save_error"))
+    finally:
+        await state.clear()
+
+
+@router.message(AdminStates.waiting_for_traffic_grant_gb, F.text)
+async def process_traffic_grant_gb_handler(
+    message: types.Message,
+    state: FSMContext,
+    settings: Settings,
+    i18n_data: dict,
+    subscription_service: SubscriptionService,
+    session: AsyncSession,
+):
+    """Read GB amount and apply admin grant of regular or premium traffic."""
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
+    if not i18n:
+        await message.reply("Language service error.")
+        return
+    _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs)
+
+    data = await state.get_data()
+    target_user_id = data.get("target_user_id")
+    kind = (data.get("traffic_grant_kind") or "regular").lower()
+    if not target_user_id:
+        await message.answer(_("admin_traffic_grant_no_user"))
+        await state.clear()
+        return
+
+    raw = (message.text or "").strip().replace(",", ".")
+    try:
+        gb_value = float(raw)
+        if gb_value <= 0 or gb_value > 1_000_000:
+            raise ValueError("out_of_range")
+    except (TypeError, ValueError):
+        await message.answer(_("admin_traffic_grant_invalid_gb"))
+        return
+
+    target_user = await user_dal.get_user_by_id(session, target_user_id)
+    if not target_user:
+        await message.answer(_("admin_user_not_found_action"))
+        await state.clear()
+        return
+
+    try:
+        if kind == "premium":
+            result = await subscription_service.admin_grant_premium_topup(
+                session, target_user_id, gb_value
+            )
+        else:
+            result = await subscription_service.admin_grant_topup(
+                session, target_user_id, gb_value
+            )
+        if not result:
+            await session.rollback()
+            await message.answer(_("admin_traffic_grant_failed"))
+            await state.clear()
+            return
+        await message_log_dal.create_message_log_no_commit(
+            session,
+            {
+                "user_id": message.from_user.id if message.from_user else target_user_id,
+                "event_type": "admin:traffic_grant",
+                "content": f"kind={kind} gb={gb_value:g}",
+                "is_admin_event": True,
+                "target_user_id": target_user_id,
+                "timestamp": datetime.now(timezone.utc),
+            },
+        )
+        await session.commit()
+
+        gb_text = f"{gb_value:g}"
+        success_key = (
+            "admin_traffic_grant_premium_done"
+            if kind == "premium"
+            else "admin_traffic_grant_regular_done"
+        )
+        await message.answer(_(success_key, gb=gb_text, user_id=target_user_id))
+
+        referral_service = ReferralService(settings, subscription_service, message.bot, i18n)
+        bot_username = await _resolve_bot_username(message.bot)
+        user_card_text = await format_user_card(
+            target_user, session, subscription_service, i18n, current_lang, referral_service,
+            settings=settings, bot_username=bot_username,
+        )
+        keyboard = get_user_card_keyboard(
+            target_user.user_id, i18n, current_lang, target_user.referred_by_id
+        )
+        await _send_with_profile_link_fallback(
+            message.answer,
+            text=user_card_text,
+            markup=keyboard.as_markup(),
+            user_id=target_user.user_id,
+            parse_mode="HTML",
+        )
+    except Exception as exc:
+        logging.error(
+            "Error granting traffic for user %s (kind=%s, gb=%s): %s",
+            target_user_id, kind, gb_value, exc, exc_info=True,
+        )
+        await session.rollback()
+        await message.answer(_("admin_traffic_grant_failed"))
+    finally:
+        await state.clear()
+
+
 @router.callback_query(F.data.startswith("admin_user_card_from_list:"))
 async def user_card_from_list_handler(callback: types.CallbackQuery,
                                      state: FSMContext, i18n_data: dict,
@@ -1413,7 +1859,7 @@ async def user_card_from_list_handler(callback: types.CallbackQuery,
         callback_data=f"admin_action:users_list:{page}"
     )
     quick_links_width = 2 if user.referred_by_id else 1
-    keyboard.adjust(2, 2, 2, quick_links_width, 1, 2, 1)
+    keyboard.adjust(2, 2, 2, 2, quick_links_width, 1, 2, 1)
     
     # Format user card
     try:

@@ -267,6 +267,17 @@
   flex: 0 0 auto;
 }
 
+.admin-extend-control .admin-btn.admin-btn-primary {
+  background: var(--accent);
+  color: #02110a;
+  border-color: color-mix(in srgb, var(--accent) 70%, #000);
+  font-weight: 600;
+}
+
+.admin-extend-control .admin-btn.admin-btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 90%, #fff);
+}
+
 .admin-input-row .input,
 .admin-input-row .admin-btn {
   height: 36px;

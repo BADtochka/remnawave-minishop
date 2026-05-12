@@ -14,7 +14,7 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from aiogram import Bot
 from aiohttp import web
@@ -163,10 +163,15 @@ def _serialize_user(user: User) -> Dict[str, Any]:
 
 
 def _serialize_subscription(sub: Subscription) -> Dict[str, Any]:
+    premium_bonus_bytes = int(getattr(sub, "premium_bonus_bytes", 0) or 0)
+    regular_bonus_bytes = int(getattr(sub, "regular_bonus_bytes", 0) or 0)
+    regular_unlimited_override = bool(getattr(sub, "regular_unlimited_override", False))
+    premium_unlimited_override = bool(getattr(sub, "premium_unlimited_override", False))
     premium_limit_bytes = (
         int(sub.premium_baseline_bytes or 0)
         + int(sub.premium_topup_balance_bytes or 0)
         + int(getattr(sub, "premium_topup_used_bytes", 0) or 0)
+        + premium_bonus_bytes
     )
     return {
         "subscription_id": int(sub.subscription_id),
@@ -186,6 +191,10 @@ def _serialize_subscription(sub: Subscription) -> Dict[str, Any]:
         "premium_baseline_bytes": sub.premium_baseline_bytes,
         "premium_topup_balance_bytes": sub.premium_topup_balance_bytes,
         "premium_topup_used_bytes": getattr(sub, "premium_topup_used_bytes", 0),
+        "premium_bonus_bytes": premium_bonus_bytes,
+        "regular_bonus_bytes": regular_bonus_bytes,
+        "regular_unlimited_override": regular_unlimited_override,
+        "premium_unlimited_override": premium_unlimited_override,
         "premium_is_limited": bool(sub.premium_is_limited),
         "tariff_key": sub.tariff_key,
         "auto_renew_enabled": bool(sub.auto_renew_enabled),
@@ -194,17 +203,47 @@ def _serialize_subscription(sub: Subscription) -> Dict[str, Any]:
     }
 
 
+def _payment_traffic_gb_split(payment: Payment) -> Tuple[Optional[float], Optional[float]]:
+    """For traffic purchases: ``(regular_gb, premium_gb)``. Other payments → (None, None)."""
+    if payment.purchased_gb is None:
+        return None, None
+    try:
+        gb = float(payment.purchased_gb)
+    except (TypeError, ValueError):
+        return None, None
+    sm = (payment.sale_mode or "").strip()
+    if not sm:
+        return None, None
+    base = sm.split("@", 1)[0].split("|", 1)[0].lower()
+    if base == "premium_topup":
+        return None, gb
+    if base in {"traffic", "traffic_package", "topup"}:
+        return gb, None
+    return None, None
+
+
 def _serialize_payment(payment: Payment) -> Dict[str, Any]:
     # Avoid lazy-loading `payment.user` outside an active SQLAlchemy session.
     # Some admin routes serialize payments after the session scope is closed.
     user_label = str(payment.user_id)
+    telegram_id = None
     loaded_user = payment.__dict__.get("user")
     if loaded_user is not None:
         user_label = loaded_user.username or loaded_user.first_name or str(payment.user_id)
+        tid = getattr(loaded_user, "telegram_id", None)
+        if tid is not None:
+            try:
+                telegram_id = int(tid)
+            except (TypeError, ValueError):
+                telegram_id = None
+    reg_gb, prem_gb = _payment_traffic_gb_split(payment)
     return {
         "payment_id": int(payment.payment_id),
         "user_id": int(payment.user_id),
         "user_label": user_label,
+        "telegram_id": telegram_id,
+        "traffic_regular_gb": reg_gb,
+        "traffic_premium_gb": prem_gb,
         "provider": payment.provider,
         "provider_payment_id": payment.provider_payment_id,
         "amount": float(payment.amount),
@@ -992,6 +1031,204 @@ async def admin_user_reset_trial_route(request: web.Request) -> web.Response:
     return _ok({})
 
 
+async def admin_user_premium_override_route(request: web.Request) -> web.Response:
+    """Premium-squad traffic overrides only (unlimited toggle + bonus GB)."""
+    actor_id = _require_admin_user_id(request)
+    target_id = int(request.match_info["user_id"])
+    payload = await _read_json(request)
+
+    unlimited = bool(payload.get("unlimited"))
+    bonus_bytes_raw = payload.get("bonus_bytes")
+    bonus_gb_raw = payload.get("bonus_gb")
+    if bonus_bytes_raw is None and bonus_gb_raw is None:
+        bonus_bytes = 0
+    elif bonus_bytes_raw is not None:
+        try:
+            bonus_bytes = int(bonus_bytes_raw)
+        except (TypeError, ValueError):
+            return _error(400, "invalid_bonus", "bonus_bytes must be an integer")
+    else:
+        try:
+            bonus_bytes = int(round(float(bonus_gb_raw) * (1024 ** 3)))
+        except (TypeError, ValueError):
+            return _error(400, "invalid_bonus", "bonus_gb must be a number")
+
+    if bonus_bytes < 0:
+        return _error(400, "invalid_bonus", "bonus must be non-negative")
+
+    async_session_factory: sessionmaker = request.app["async_session_factory"]
+    async with async_session_factory() as session:
+        active = await subscription_dal.get_active_subscription_by_user_id(session, target_id)
+        if not active:
+            return _error(404, "no_active_subscription")
+
+        active.premium_unlimited_override = bool(unlimited)
+        active.premium_bonus_bytes = int(bonus_bytes)
+        if active.premium_unlimited_override:
+            active.premium_is_limited = False
+
+        await message_log_dal.create_message_log(
+            session,
+            {
+                "user_id": actor_id,
+                "event_type": "admin_premium_override_webapp",
+                "content": (
+                    f"unlimited={bool(unlimited)} bonus_bytes={int(bonus_bytes)}"
+                ),
+                "is_admin_event": True,
+                "target_user_id": target_id,
+            },
+        )
+        await session.commit()
+        await session.refresh(active)
+
+    return _ok({"subscription": _serialize_subscription(active)})
+
+
+async def admin_user_regular_traffic_override_route(request: web.Request) -> web.Response:
+    """Main (regular) traffic: unlimited-style ceiling + admin bonus GB."""
+    actor_id = _require_admin_user_id(request)
+    target_id = int(request.match_info["user_id"])
+    payload = await _read_json(request)
+
+    unlimited = bool(payload.get("unlimited"))
+    regular_bonus_bytes_raw = payload.get("regular_bonus_bytes")
+    regular_bonus_gb_raw = payload.get("regular_bonus_gb")
+    if regular_bonus_bytes_raw is None and regular_bonus_gb_raw is None:
+        regular_bonus_bytes = 0
+    elif regular_bonus_bytes_raw is not None:
+        try:
+            regular_bonus_bytes = int(regular_bonus_bytes_raw)
+        except (TypeError, ValueError):
+            return _error(400, "invalid_regular_bonus", "regular_bonus_bytes must be an integer")
+    else:
+        try:
+            regular_bonus_bytes = int(round(float(regular_bonus_gb_raw) * (1024 ** 3)))
+        except (TypeError, ValueError):
+            return _error(400, "invalid_regular_bonus", "regular_bonus_gb must be a number")
+
+    if regular_bonus_bytes < 0:
+        return _error(400, "invalid_regular_bonus", "regular bonus must be non-negative")
+
+    subscription_service = request.app.get("subscription_service")
+
+    async_session_factory: sessionmaker = request.app["async_session_factory"]
+    async with async_session_factory() as session:
+        active = await subscription_dal.get_active_subscription_by_user_id(session, target_id)
+        if not active:
+            return _error(404, "no_active_subscription")
+
+        active.regular_unlimited_override = bool(unlimited)
+        active.regular_bonus_bytes = int(regular_bonus_bytes)
+
+        if subscription_service is not None:
+            await subscription_service.sync_main_traffic_limit_to_panel(session, target_id)
+
+        await message_log_dal.create_message_log(
+            session,
+            {
+                "user_id": actor_id,
+                "event_type": "admin_regular_traffic_override_webapp",
+                "content": (
+                    f"unlimited={bool(unlimited)} regular_bonus_bytes={int(regular_bonus_bytes)}"
+                ),
+                "is_admin_event": True,
+                "target_user_id": target_id,
+            },
+        )
+        await session.commit()
+        await session.refresh(active)
+
+    return _ok({"subscription": _serialize_subscription(active)})
+
+
+async def admin_user_traffic_grant_route(request: web.Request) -> web.Response:
+    """Credit regular or premium traffic to a user without a payment.
+
+    Body: ``{"kind": "regular" | "premium", "gb": float}`` (alternatively
+    ``"bytes": int``). Mirrors the same effect as a user-purchased top-up:
+    the chosen balance grows, panel limit/squads are refreshed, and an entry
+    is added to ``traffic_topups`` with ``kind="admin_topup"`` or
+    ``kind="admin_premium_topup"`` and ``payment_id=NULL``.
+    """
+    actor_id = _require_admin_user_id(request)
+    target_id = int(request.match_info["user_id"])
+    payload = await _read_json(request)
+
+    kind = str(payload.get("kind") or "regular").strip().lower()
+    if kind not in {"regular", "premium"}:
+        return _error(400, "invalid_kind", "kind must be 'regular' or 'premium'")
+
+    bytes_raw = payload.get("bytes")
+    gb_raw = payload.get("gb")
+    if bytes_raw is None and gb_raw is None:
+        return _error(400, "missing_amount", "either 'gb' or 'bytes' is required")
+    try:
+        if bytes_raw is not None:
+            grant_bytes = int(bytes_raw)
+            gb_value = grant_bytes / (1024 ** 3)
+        else:
+            gb_value = float(gb_raw)
+            grant_bytes = int(round(gb_value * (1024 ** 3)))
+    except (TypeError, ValueError):
+        return _error(400, "invalid_amount", "amount must be a positive number")
+    if gb_value <= 0 or grant_bytes <= 0:
+        return _error(400, "invalid_amount", "amount must be positive")
+
+    subscription_service = request.app.get("subscription_service")
+    if subscription_service is None:
+        return _error(503, "subscription_service_unavailable")
+
+    async_session_factory: sessionmaker = request.app["async_session_factory"]
+    async with async_session_factory() as session:
+        active = await subscription_dal.get_active_subscription_by_user_id(session, target_id)
+        if not active:
+            return _error(404, "no_active_subscription")
+
+        if kind == "regular":
+            result = await subscription_service.admin_grant_topup(
+                session, target_id, gb_value
+            )
+        else:
+            result = await subscription_service.admin_grant_premium_topup(
+                session, target_id, gb_value
+            )
+        if not result:
+            await session.rollback()
+            return _error(
+                422,
+                "grant_failed",
+                "Unable to credit traffic (missing tariff/squads or panel error)",
+            )
+
+        await message_log_dal.create_message_log(
+            session,
+            {
+                "user_id": actor_id,
+                "event_type": "admin_traffic_grant_webapp",
+                "content": f"kind={kind} bytes={grant_bytes}",
+                "is_admin_event": True,
+                "target_user_id": target_id,
+            },
+        )
+        await session.commit()
+
+        refreshed = await subscription_dal.get_active_subscription_by_user_id(
+            session, target_id
+        )
+
+    return _ok(
+        {
+            "subscription": _serialize_subscription(refreshed) if refreshed else None,
+            "grant": {
+                "kind": kind,
+                "granted_bytes": grant_bytes,
+                "granted_gb": gb_value,
+            },
+        }
+    )
+
+
 async def admin_user_extend_route(request: web.Request) -> web.Response:
     actor_id = _require_admin_user_id(request)
     target_id = int(request.match_info["user_id"])
@@ -1003,14 +1240,22 @@ async def admin_user_extend_route(request: web.Request) -> web.Response:
     if days <= 0:
         return _error(400, "invalid_days")
 
+    subscription_service = request.app.get("subscription_service")
+    if subscription_service is None:
+        return _error(503, "subscription_service_unavailable")
+
     async_session_factory: sessionmaker = request.app["async_session_factory"]
     async with async_session_factory() as session:
-        active = await subscription_dal.get_active_subscription_by_user_id(session, target_id)
-        if not active:
-            return _error(404, "no_active_subscription")
+        new_end = await subscription_service.extend_active_subscription_days(
+            session,
+            target_id,
+            days,
+            "admin_extend_subscription_webapp",
+        )
+        if not new_end:
+            await session.rollback()
+            return _error(500, "extend_failed")
 
-        new_end = (active.end_date or datetime.now(timezone.utc)) + timedelta(days=days)
-        active.end_date = new_end
         await message_log_dal.create_message_log(
             session,
             {
@@ -1022,8 +1267,18 @@ async def admin_user_extend_route(request: web.Request) -> web.Response:
             },
         )
         await session.commit()
-        await session.refresh(active)
-    return _ok({"subscription": _serialize_subscription(active)})
+
+        refreshed = await subscription_dal.get_active_subscription_by_user_id(
+            session, target_id
+        )
+
+    return _ok(
+        {
+            "subscription": _serialize_subscription(refreshed)
+            if refreshed
+            else None,
+        }
+    )
 
 
 # ─── Payments ──────────────────────────────────────────────────────
@@ -1589,6 +1844,18 @@ def setup_admin_routes(app: web.Application) -> None:
     router.add_post("/api/admin/users/{user_id:-?\\d+}/message/preview", admin_user_message_preview_route)
     router.add_post("/api/admin/users/{user_id:-?\\d+}/reset-trial", admin_user_reset_trial_route)
     router.add_post("/api/admin/users/{user_id:-?\\d+}/extend", admin_user_extend_route)
+    router.add_post(
+        "/api/admin/users/{user_id:-?\\d+}/premium-override",
+        admin_user_premium_override_route,
+    )
+    router.add_post(
+        "/api/admin/users/{user_id:-?\\d+}/regular-traffic-override",
+        admin_user_regular_traffic_override_route,
+    )
+    router.add_post(
+        "/api/admin/users/{user_id:-?\\d+}/traffic-grant",
+        admin_user_traffic_grant_route,
+    )
     router.add_delete("/api/admin/users/{user_id:-?\\d+}", admin_user_delete_route)
 
     router.add_get("/api/admin/payments", admin_payments_list_route)

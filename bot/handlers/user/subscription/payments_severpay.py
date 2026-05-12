@@ -74,7 +74,7 @@ async def pay_severpay_callback_handler(
         "currency": currency_code,
         "status": "pending_severpay",
         "description": payment_description,
-        "subscription_duration_months": int(months),
+        "subscription_duration_months": int(months) if sale_base == "subscription" else None,
         "provider": "severpay",
         "sale_mode": sale_mode,
         "tariff_key": sale_mode.split("@", 1)[1] if "@" in sale_mode else None,
@@ -138,7 +138,7 @@ async def pay_severpay_callback_handler(
             try:
                 await callback.message.edit_text(
                     get_text(
-                        key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                        key="payment_link_message_traffic" if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else "payment_link_message",
                         months=int(months),
                         traffic_gb=human_value,
                     ),
@@ -156,7 +156,7 @@ async def pay_severpay_callback_handler(
                 try:
                     await callback.message.answer(
                         get_text(
-                            key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                            key="payment_link_message_traffic" if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else "payment_link_message",
                             months=int(months),
                             traffic_gb=human_value,
                         ),

@@ -454,6 +454,16 @@
     });
   }
 
+  function stripTopupQueryFromUrl() {
+    if (typeof window === "undefined") return;
+    const u = new URL(window.location.href);
+    if (!u.searchParams.has("topup")) return;
+    u.searchParams.delete("topup");
+    const search = u.searchParams.toString();
+    const qs = search ? `?${search}` : "";
+    window.history.replaceState(null, "", `${u.pathname}${qs}${u.hash}`);
+  }
+
   async function loadData() {
     const payload = await api("/me");
     if (!payload.ok) throw new Error(payload.error || "load_failed");
@@ -482,6 +492,35 @@
     if (topupModalOpen) await billingStore.loadTopupOptions(topupKind);
     if (deviceTopupModalOpen) await billingStore.loadDeviceTopupOptions();
     if (changeModalOpen) await billingStore.loadTariffChangeOptions();
+
+    const topupDeep = new URLSearchParams(window.location.search).get("topup");
+    if (topupDeep === "regular" || topupDeep === "premium") {
+      const plansList = payload.plans?.length ? payload.plans : [];
+      const tariffCatalogLocal = buildTariffCatalog(plansList);
+      const sub = payload.subscription || {};
+      const tariffModeLocal = plansList.some((plan) => plan?.tariff_key);
+      const hasTariffSub = Boolean(
+        tariffModeLocal &&
+          sub?.active &&
+          sub?.tariff_key &&
+          tariffCatalogLocal.some((t) => t.key === sub.tariff_key),
+      );
+      const canRegular =
+        hasTariffSub &&
+        (sub?.can_topup_regular_traffic ?? sub?.can_topup_traffic) &&
+        Number(sub?.traffic_limit_bytes || 0) > 0;
+      const canPremium =
+        hasTariffSub &&
+        (sub?.can_topup_premium_traffic ?? sub?.can_topup_traffic) &&
+        Number(sub?.premium_limit_bytes || 0) > 0;
+      if (topupDeep === "regular" && canRegular) {
+        billingStore.openTopupModal("regular", payload.payment_methods?.[0]?.id || "");
+        stripTopupQueryFromUrl();
+      } else if (topupDeep === "premium" && canPremium) {
+        billingStore.openTopupModal("premium", payload.payment_methods?.[0]?.id || "");
+        stripTopupQueryFromUrl();
+      }
+    }
   }
 
   function showLogin() {

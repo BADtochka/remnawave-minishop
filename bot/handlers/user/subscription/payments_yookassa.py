@@ -93,7 +93,7 @@ async def _initiate_yk_payment(
         "currency": currency_code_for_yk,
         "status": "pending_yookassa",
         "description": payment_description,
-        "subscription_duration_months": int(months),
+        "subscription_duration_months": int(months) if sale_base == "subscription" else None,
         "sale_mode": sale_base,
         "tariff_key": sale_mode.split("@", 1)[1] if "@" in sale_mode else None,
         "purchased_gb": float(months) if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
@@ -223,7 +223,7 @@ async def _initiate_yk_payment(
         try:
             await callback.message.edit_text(
                 get_text(
-                    key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                    key="payment_link_message_traffic" if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else "payment_link_message",
                     months=int(months),
                     traffic_gb=_format_value(months),
                 ),
@@ -243,7 +243,7 @@ async def _initiate_yk_payment(
             try:
                 await callback.message.answer(
                     get_text(
-                        key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                        key="payment_link_message_traffic" if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else "payment_link_message",
                         months=int(months),
                         traffic_gb=_format_value(months),
                     ),

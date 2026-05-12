@@ -315,6 +315,7 @@ class FreeKassaService:
             final_end = activation.get("end_date") if activation else None
             months = payment.purchased_gb or payment.subscription_duration_months or 1
             sale_mode = payment.sale_mode or ("traffic" if self.settings.traffic_sale_mode else "subscription")
+            sale_base = sale_mode.split("@", 1)[0].split("|", 1)[0]
 
             applied_days = 0
             if referral_bonus and referral_bonus.get("referee_new_end_date"):
@@ -395,10 +396,12 @@ class FreeKassaService:
                     user_id=payment.user_id,
                     amount=float(payment.amount),
                     currency=self.default_currency,
-                    months=int(months) if sale_mode != "traffic" else 0,
-                    traffic_gb=months if sale_mode == "traffic" else None,
+                    months=int(months) if sale_base == "subscription" else 0,
+                    traffic_gb=float(months) if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
                     payment_provider="freekassa",
                     username=db_user.username if db_user else None,
+                    traffic_is_premium=sale_base == "premium_topup",
+                    tariff_key=getattr(payment, "tariff_key", None),
                 )
             except Exception:
                 logging.exception("FreeKassa notification: failed to notify admins.")

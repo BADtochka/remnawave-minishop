@@ -219,6 +219,19 @@
     window.open("/api/admin/payments/export.csv", "_blank", "noopener");
   }
 
+  function openPaymentUserCard(userId) {
+    const uid = Number(userId);
+    if (!Number.isFinite(uid) || uid <= 0) return;
+    const next = normalizeSection("users");
+    sidebarOpen = false;
+    if (active !== next) {
+      active = next;
+      usersStore.closeUser();
+      onSectionChange(next);
+    }
+    usersStore.openUser(uid);
+  }
+
   function resolvedAvatarUrl(user) {
     return userAvatarUrl(user) || (!user?.telegram_id && user?.email ? gravatarCache.gravatarUrl(user.email) : "");
   }
@@ -470,7 +483,7 @@
       {/if}
 
       {#if active === "payments"}
-        <PaymentsSection {at} {fmtDate} {fmtMoney} {paymentStatusVariant} />
+        <PaymentsSection {at} {fmtDate} {fmtMoney} {paymentStatusVariant} onOpenUserCard={openPaymentUserCard} />
       {/if}
 
       {#if active === "promos"}

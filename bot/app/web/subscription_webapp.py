@@ -2113,10 +2113,13 @@ async def tariff_topup_options_route(request: web.Request) -> web.Response:
             sale_mode="premium_topup",
             title_prefix=f"{tariff.premium_name(lang)} ",
         ) if topup_kind in {"all", "premium"} and tariff.premium_squad_uuids else []
+        premium_bonus_bytes = int(getattr(sub, "premium_bonus_bytes", 0) or 0)
+        premium_unlimited_override = bool(getattr(sub, "premium_unlimited_override", False))
         premium_limit_bytes = (
             int(sub.premium_baseline_bytes or 0)
             + int(sub.premium_topup_balance_bytes or 0)
             + int(getattr(sub, "premium_topup_used_bytes", 0) or 0)
+            + premium_bonus_bytes
         )
         premium_access = await request.app["subscription_service"].premium_access_for_tariff(tariff)
         return web.json_response(
@@ -2127,7 +2130,7 @@ async def tariff_topup_options_route(request: web.Request) -> web.Response:
                 "topup_kind": topup_kind,
                 "premium_title": tariff.premium_name(lang),
                 "traffic_percent": _traffic_percent(sub.traffic_used_bytes, sub.traffic_limit_bytes),
-                "premium_traffic_percent": _traffic_percent(
+                "premium_traffic_percent": 0 if premium_unlimited_override else _traffic_percent(
                     sub.premium_used_bytes,
                     premium_limit_bytes,
                 ),
@@ -2136,6 +2139,8 @@ async def tariff_topup_options_route(request: web.Request) -> web.Response:
                 "premium_baseline_bytes": int(sub.premium_baseline_bytes or 0),
                 "premium_topup_balance_bytes": int(sub.premium_topup_balance_bytes or 0),
                 "premium_topup_used_bytes": int(getattr(sub, "premium_topup_used_bytes", 0) or 0),
+                "premium_bonus_bytes": premium_bonus_bytes,
+                "premium_unlimited_override": premium_unlimited_override,
                 "premium_is_limited": bool(sub.premium_is_limited),
                 "premium_squad_labels": premium_access.get("squad_labels") or [],
                 "premium_node_labels": premium_access.get("node_labels") or [],
@@ -3278,6 +3283,10 @@ def _serialize_subscription(
         "premium_baseline_bytes": _coerce_int_or_none(active.get("premium_baseline_bytes")),
         "premium_topup_balance_bytes": _coerce_int_or_none(active.get("premium_topup_balance_bytes")),
         "premium_topup_used_bytes": _coerce_int_or_none(active.get("premium_topup_used_bytes")),
+        "premium_bonus_bytes": _coerce_int_or_none(active.get("premium_bonus_bytes")) or 0,
+        "regular_bonus_bytes": _coerce_int_or_none(active.get("regular_bonus_bytes")) or 0,
+        "regular_unlimited_override": bool(active.get("regular_unlimited_override")),
+        "premium_unlimited_override": bool(active.get("premium_unlimited_override")),
         "premium_is_limited": bool(active.get("premium_is_limited")),
         "premium_squad_labels": list(active.get("premium_squad_labels") or []),
         "premium_node_labels": list(active.get("premium_node_labels") or []),

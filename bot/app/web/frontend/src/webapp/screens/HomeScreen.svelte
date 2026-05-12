@@ -100,7 +100,34 @@
           <span class="traffic-percent">{trafficPercent(subscription)}%</span>
         </div>
       </Card>
-      {#if Number(subscription?.premium_limit_bytes || 0) > 0}
+      {#if subscription?.premium_unlimited_override}
+        <Card class="premium-traffic-card">
+          <div class="traffic-top">
+            <span>{premiumTitle(subscription)}</span>
+            <strong>∞</strong>
+          </div>
+          <div class="traffic-meta premium-traffic-meta">
+            {#if premiumServerLabels(subscription).length}
+              <details class="premium-server-dropdown">
+                <summary>
+                  <span>{t("wa_premium_unlimited", {}, "Безлимит на premium-сервера")}</span>
+                  <ChevronsUpDown size={13} />
+                </summary>
+                <div class="premium-server-list premium-server-list-dropdown">
+                  <small>{t("wa_premium_servers_limited", {}, "Отдельный лимит действует на")}</small>
+                  <div>
+                    {#each premiumServerLabels(subscription).slice(0, 8) as label}
+                      <span>{label}</span>
+                    {/each}
+                  </div>
+                </div>
+              </details>
+            {:else}
+              <span>{t("wa_premium_unlimited", {}, "Безлимит на premium-сервера")}</span>
+            {/if}
+          </div>
+        </Card>
+      {:else if Number(subscription?.premium_limit_bytes || 0) > 0}
         <Card class={`${canOpenPremiumTopupModal ? "traffic-card-clickable " : ""}premium-traffic-card${subscription?.premium_is_limited ? " premium-traffic-card-limited" : ""}`}>
           {#if canOpenPremiumTopupModal}
             <button class="card-click-target" type="button" onclick={openPremiumTopupModal} aria-label={premiumTitle(subscription)}></button>

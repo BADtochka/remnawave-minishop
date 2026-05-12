@@ -1,7 +1,7 @@
 <script>
   import { Label, Select, Separator, Tabs } from "$components/ui/primitives.js";
   import Dialog from "$components/ui/dialog.svelte";
-  import { AdminBadge, AdminButton, AdminTrafficCard } from "$components/patterns/admin/index.js";
+  import { AdminBadge, AdminButton, AdminSectionHeader, AdminSelect, AdminTrafficCard } from "$components/patterns/admin/index.js";
   import {
     CalendarDays, Copy, CreditCard, ExternalLink, Eye, Info, Key,
     Mail, Map, MessageSquare, MousePointerClick, QrCode, RefreshCw, Send,
@@ -41,6 +41,8 @@
     userBanConfirmOpen,
     userMessageConfirmOpen,
     userDetailTab,
+    premiumUnlimitedDraft,
+    premiumBonusGbDraft,
   } = $usersStore);
 
 </script>
@@ -177,7 +179,17 @@
                 warning={openedUserDetail.active_subscription.is_throttled}
                 label={at("aria_label_main_traffic", {}, "Использование основного трафика")}
               />
-              {#if Number(openedUserDetail.active_subscription.premium_limit_bytes || 0) > 0}
+              {#if openedUserDetail.active_subscription.premium_unlimited_override}
+                <AdminTrafficCard
+                  premium
+                  title={at("user_label_premium_squads", {}, "Premium-сквады")}
+                  value={at("user_premium_unlimited_value", { used: trafficLeftLabel(0, openedUserDetail.active_subscription.premium_used_bytes) }, "∞ (использовано " + trafficLeftLabel(0, openedUserDetail.active_subscription.premium_used_bytes) + ")")}
+                  left={at("user_premium_unlimited_hint", {}, "Безлимит (админ-оверрайд)")}
+                  percent={0}
+                  warning={false}
+                  label={at("aria_label_premium_traffic", {}, "Использование premium-трафика")}
+                />
+              {:else if Number(openedUserDetail.active_subscription.premium_limit_bytes || 0) > 0}
                 <AdminTrafficCard
                   premium
                   title={at("user_label_premium_squads", {}, "Premium-сквады")}
@@ -248,6 +260,149 @@
               </div>
             </Label.Root>
           </div>
+
+          {#if openedUserDetail?.active_subscription}
+            <section class="admin-user-action-sheet admin-user-action-sheet--premium-override">
+              <AdminSectionHeader
+                title={at("user_premium_override_card_title", {}, "Премиум-трафик")}
+                description={at("user_premium_override_card_hint", {}, "Безлимит и дополнительный объём для премиум-сквадов поверх тарифа.")}
+              />
+              <div class="admin-user-action-sheet-body admin-user-override-stack">
+                <Label.Root class="admin-field-label admin-extend-field">
+                  <span>{at("user_premium_override_bonus", {}, "Доп. премиум-трафик, GB")}</span>
+                  <small>{at("user_premium_override_bonus_hint", {}, "")}</small>
+                  <input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    disabled={premiumUnlimitedDraft}
+                    aria-label={at("user_premium_override_bonus", {}, "Доп. премиум-трафик, GB")}
+                    bind:value={$usersStore.premiumBonusGbDraft}
+                  />
+                </Label.Root>
+              </div>
+              <div class="admin-user-action-sheet-footer admin-override-card-footer">
+                <div class="admin-override-card-toolbar">
+                  <label class="admin-override-unlimited-label">
+                    <input type="checkbox" bind:checked={$usersStore.premiumUnlimitedDraft} aria-label={at("user_override_unlimited_short", {}, "Безлимит")} />
+                    <span>{at("user_override_unlimited_short", {}, "Безлимит")}</span>
+                  </label>
+                  <AdminButton variant="primary" onclick={usersStore.savePremiumTrafficOverride} disabled={userActionBusy}>
+                    {at("user_premium_override_save", {}, "Сохранить")}
+                  </AdminButton>
+                </div>
+                <div class="admin-override-status-lines">
+                  {#if openedUserDetail.active_subscription.premium_unlimited_override}
+                    <span class="admin-meta-truncate">
+                      {at("user_premium_override_status_unlimited", {}, "Сейчас: безлимит")}
+                    </span>
+                  {:else if Number(openedUserDetail.active_subscription.premium_bonus_bytes || 0) > 0}
+                    <span class="admin-meta-truncate">
+                      {at(
+                        "user_premium_override_status_bonus",
+                        { gb: +(Number(openedUserDetail.active_subscription.premium_bonus_bytes) / (1024 ** 3)).toFixed(2) },
+                        `Премиум сейчас: +${+(Number(openedUserDetail.active_subscription.premium_bonus_bytes) / (1024 ** 3)).toFixed(2)} GB`,
+                      )}
+                    </span>
+                  {:else}
+                    <span class="admin-muted">{at("user_premium_override_status_none", {}, "Премиум-оверрайд не задан")}</span>
+                  {/if}
+                </div>
+              </div>
+            </section>
+
+            <section class="admin-user-action-sheet admin-user-action-sheet--regular-override">
+              <AdminSectionHeader
+                title={at("user_regular_override_card_title", {}, "Основной трафик")}
+                description={at("user_regular_override_card_hint", {}, "Безлимит и постоянный бонус к лимиту основного трафика.")}
+              />
+              <div class="admin-user-action-sheet-body admin-user-override-stack">
+                <Label.Root class="admin-field-label admin-extend-field">
+                  <span>{at("user_regular_override_bonus", {}, "Доп. основной трафик, GB")}</span>
+                  <small>{at("user_regular_override_bonus_hint", {}, "")}</small>
+                  <input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    disabled={$usersStore.regularUnlimitedDraft}
+                    aria-label={at("user_regular_override_bonus", {}, "Доп. основной трафик, GB")}
+                    bind:value={$usersStore.regularBonusGbDraft}
+                  />
+                </Label.Root>
+              </div>
+              <div class="admin-user-action-sheet-footer admin-override-card-footer">
+                <div class="admin-override-card-toolbar">
+                  <label class="admin-override-unlimited-label">
+                    <input type="checkbox" bind:checked={$usersStore.regularUnlimitedDraft} aria-label={at("user_override_unlimited_short", {}, "Безлимит")} />
+                    <span>{at("user_override_unlimited_short", {}, "Безлимит")}</span>
+                  </label>
+                  <AdminButton variant="primary" onclick={usersStore.saveRegularTrafficOverride} disabled={userActionBusy}>
+                    {at("user_regular_override_save", {}, "Сохранить")}
+                  </AdminButton>
+                </div>
+                <div class="admin-override-status-lines">
+                  {#if openedUserDetail.active_subscription.regular_unlimited_override}
+                    <span class="admin-meta-truncate">
+                      {at("user_regular_override_status_unlimited", {}, "Сейчас: безлимит")}
+                    </span>
+                  {:else if Number(openedUserDetail.active_subscription.regular_bonus_bytes || 0) > 0}
+                    <span class="admin-meta-truncate">
+                      {at(
+                        "user_regular_override_status_bonus",
+                        { gb: +(Number(openedUserDetail.active_subscription.regular_bonus_bytes) / (1024 ** 3)).toFixed(2) },
+                        `Основной сейчас: +${+(Number(openedUserDetail.active_subscription.regular_bonus_bytes) / (1024 ** 3)).toFixed(2)} GB`,
+                      )}
+                    </span>
+                  {:else}
+                    <span class="admin-muted">{at("user_regular_override_status_none", {}, "Бонус основного трафика не задан")}</span>
+                  {/if}
+                </div>
+              </div>
+            </section>
+
+            <section class="admin-user-action-sheet admin-user-action-sheet--traffic-grant">
+              <AdminSectionHeader
+                title={at("user_traffic_grant_title", {}, "Выдать трафик")}
+                description={at("user_traffic_grant_hint", {}, "Зачисление ГБ на баланс пользователя — как при докупке, но без оплаты. Лимит и сквады в панели обновятся сразу.")}
+              />
+              <div class="admin-user-action-sheet-body admin-user-grant-stack">
+                <Label.Root class="admin-field-label admin-extend-field">
+                  <span>{at("user_traffic_grant_kind", {}, "Тип трафика")}</span>
+                  <AdminSelect
+                    class="admin-grant-kind-select"
+                    value={$usersStore.grantTrafficKindDraft}
+                    items={[
+                      { value: "regular", label: at("user_traffic_grant_kind_regular", {}, "Обычный") },
+                      { value: "premium", label: at("user_traffic_grant_kind_premium", {}, "Премиум") },
+                    ]}
+                    onValueChange={(v) => usersStore.updateState({ grantTrafficKindDraft: v })}
+                    ariaLabel={at("user_traffic_grant_kind", {}, "Тип трафика")}
+                  />
+                </Label.Root>
+                <Label.Root class="admin-field-label admin-extend-field">
+                  <span>{at("user_traffic_grant_gb", {}, "ГБ к выдаче")}</span>
+                  <div class="admin-extend-control">
+                    <input
+                      class="input"
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="0"
+                      aria-label={at("user_traffic_grant_gb", {}, "ГБ к выдаче")}
+                      bind:value={$usersStore.grantTrafficGbDraft}
+                    />
+                    <AdminButton variant="primary" onclick={usersStore.grantTraffic} disabled={userActionBusy}>
+                      <Plus size={14} /> {at("user_traffic_grant_submit", {}, "Выдать")}
+                    </AdminButton>
+                  </div>
+                </Label.Root>
+              </div>
+            </section>
+          {/if}
 
           <Label.Root class="admin-field-label">
             <span>{at("user_label_telegram_msg", {}, "Сообщение в Telegram")}</span>
@@ -339,3 +494,106 @@
     </AdminButton>
   </div>
 </Dialog>
+
+<style>
+  .admin-user-action-sheet {
+    border: 1px solid var(--admin-border-muted, rgba(255, 255, 255, 0.08));
+    border-radius: 12px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    background: var(--admin-surface-1, rgba(255, 255, 255, 0.02));
+  }
+  .admin-user-action-sheet :global(.admin-dashboard-section-head) {
+    padding: 12px 14px 10px;
+    margin: 0;
+    border-bottom: 1px solid var(--admin-border-muted, rgba(255, 255, 255, 0.06));
+  }
+  .admin-user-action-sheet-body {
+    padding: 12px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .admin-user-override-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .admin-user-grant-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .admin-user-action-sheet-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 4px 14px 12px;
+  }
+  .admin-override-card-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .admin-override-card-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 14px;
+    width: 100%;
+  }
+  .admin-override-card-toolbar :global(.admin-btn) {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .admin-override-unlimited-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--admin-text, inherit);
+    cursor: pointer;
+    user-select: none;
+    min-height: 36px;
+  }
+  .admin-override-unlimited-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+  @media (max-width: 520px) {
+    .admin-override-card-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .admin-override-card-toolbar :global(.admin-btn) {
+      width: 100%;
+    }
+  }
+  .admin-override-status-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  :global(.admin-user-dialog .admin-actions-tab) {
+    padding-bottom: 14px;
+  }
+  .admin-user-action-sheet--regular-override {
+    margin-top: 10px;
+  }
+  .admin-user-action-sheet--traffic-grant {
+    margin-top: 10px;
+  }
+  .admin-user-action-sheet :global(.admin-grant-kind-select) {
+    width: 100%;
+    max-width: 100%;
+  }
+</style>

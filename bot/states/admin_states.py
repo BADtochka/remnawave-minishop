@@ -29,6 +29,8 @@ class AdminStates(StatesGroup):
     waiting_for_subscription_days_to_add = State()
     waiting_for_direct_message_to_user = State()
     waiting_for_user_delete_confirmation = State()
+    waiting_for_premium_override_bonus_gb = State()
+    waiting_for_traffic_grant_gb = State()
 
     # Ads campaigns
     waiting_for_ad_source = State()

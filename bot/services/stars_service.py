@@ -35,7 +35,7 @@ class StarsService:
             "currency": "XTR",
             "status": "pending_stars",
             "description": description,
-            "subscription_duration_months": int(months),
+            "subscription_duration_months": int(months) if sale_base == "subscription" else None,
             "provider": "telegram_stars",
             "sale_mode": sale_mode,
             "tariff_key": sale_mode.split("@", 1)[1] if "@" in sale_mode else None,
@@ -201,7 +201,9 @@ class StarsService:
                 months=int(months) if sale_base == "subscription" else 0,
                 payment_provider="stars",
                 username=user.username if user else None,
-                traffic_gb=months if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
+                traffic_gb=float(months) if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
+                traffic_is_premium=sale_base == "premium_topup",
+                tariff_key=getattr(payment_record, "tariff_key", None),
             )
         except Exception as e:
             logging.error(f"Failed to send stars payment notification: {e}")

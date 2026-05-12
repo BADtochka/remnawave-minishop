@@ -87,7 +87,7 @@ class CryptoPayService:
                     "currency": self.settings.CRYPTOPAY_ASSET,
                     "status": "pending_cryptopay",
                     "description": description,
-                    "subscription_duration_months": int(months),
+                    "subscription_duration_months": int(months) if sale_base == "subscription" else None,
                     "provider": "cryptopay",
                     "sale_mode": sale_mode,
                     "tariff_key": sale_mode.split("@", 1)[1] if "@" in sale_mode else None,
@@ -264,6 +264,10 @@ class CryptoPayService:
 
             # Send notification about payment
             try:
+                payment_row = await payment_dal.get_payment_by_db_id(session, payment_db_id)
+            except Exception:
+                payment_row = None
+            try:
                 notification_service = NotificationService(bot, settings, i18n)
                 user = await user_dal.get_user_by_id(session, user_id)
                 await notification_service.notify_payment_received(
@@ -273,7 +277,9 @@ class CryptoPayService:
                     months=int(months) if sale_base == "subscription" else 0,
                     traffic_gb=traffic_gb if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
                     payment_provider="crypto_pay",
-                    username=user.username if user else None
+                    username=user.username if user else None,
+                    traffic_is_premium=sale_base == "premium_topup",
+                    tariff_key=getattr(payment_row, "tariff_key", None) if payment_row else None,
                 )
             except Exception:
                 logging.exception("Failed to send crypto_pay payment notification.")

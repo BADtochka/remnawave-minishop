@@ -324,10 +324,31 @@ class NotificationService:
         profile_keyboard = self._build_profile_keyboard(_, telegram_id)
         await self._send_to_log_channel(message, reply_markup=profile_keyboard)
 
+    def _format_traffic_gb_admin(self, traffic_gb: float) -> str:
+        value = float(traffic_gb)
+        if value.is_integer():
+            return str(int(value))
+        return f"{value:g}"
+
+    def _tariff_display_for_log(self, tariff_key: Optional[str]) -> str:
+        if not tariff_key:
+            return ""
+        cfg = getattr(self.settings, "tariffs_config", None)
+        if not cfg:
+            return str(tariff_key)
+        try:
+            tariff = cfg.require(str(tariff_key))
+            return str(tariff.name(self.settings.DEFAULT_LANGUAGE))
+        except Exception:
+            return str(tariff_key)
+
     async def notify_payment_received(self, user_id: int, amount: float, currency: str,
                                     months: int, payment_provider: str, 
                                     username: Optional[str] = None,
-                                    traffic_gb: Optional[float] = None):
+                                    traffic_gb: Optional[float] = None,
+                                    *,
+                                    traffic_is_premium: bool = False,
+                                    tariff_key: Optional[str] = None):
         """Send notification about successful payment"""
         if not self.settings.LOG_PAYMENTS:
             return
@@ -350,14 +371,25 @@ class NotificationService:
         }.get(payment_provider.lower(), "💰")
 
         if traffic_gb is not None:
-            traffic_label = str(int(traffic_gb)) if float(traffic_gb).is_integer() else f"{traffic_gb:g}"
+            traffic_label = self._format_traffic_gb_admin(float(traffic_gb))
+            traffic_kind = _(
+                "log_payment_traffic_kind_premium" if traffic_is_premium else "log_payment_traffic_kind_regular",
+            )
+            traffic_summary = _("log_payment_traffic_purchase_line", gb=traffic_label, kind=traffic_kind)
+            tariff_name = self._tariff_display_for_log(tariff_key)
+            tariff_line = (
+                _("log_payment_tariff_line", name=hd.quote(tariff_name))
+                if tariff_name
+                else ""
+            )
             message = _(
                 "log_payment_received_traffic",
                 provider_emoji=provider_emoji,
                 user_display=user_display,
                 amount=amount,
                 currency=currency,
-                traffic_gb=traffic_label,
+                traffic_summary=traffic_summary,
+                tariff_line=tariff_line,
                 payment_provider=payment_provider,
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             )

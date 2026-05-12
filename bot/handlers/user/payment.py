@@ -266,7 +266,7 @@ async def process_successful_payment(session: AsyncSession, bot: Bot,
             "applied_promo_bonus_days", 0)
 
         referral_bonus_info = None
-        if sale_mode != "traffic":
+        if sale_mode_base == "subscription":
             referral_bonus_info = await referral_service.apply_referral_bonuses_for_payment(
                 session,
                 user_id,
@@ -292,7 +292,7 @@ async def process_successful_payment(session: AsyncSession, bot: Bot,
         if should_send_lknpd_receipt:
             receipt_item_name = payment_info_from_webhook.get("description")
             if not receipt_item_name:
-                if sale_mode == "traffic":
+                if sale_mode_base in {"traffic", "traffic_package", "topup", "premium_topup"}:
                     receipt_item_name = settings.LKNPD_RECEIPT_NAME_TRAFFIC.format(gb=traffic_label)
                 else:
                     receipt_item_name = settings.LKNPD_RECEIPT_NAME_SUBSCRIPTION.format(months=int(subscription_months))
@@ -313,14 +313,14 @@ async def process_successful_payment(session: AsyncSession, bot: Bot,
         )
         config_link_text = config_link_display or _("config_link_not_available")
         # For auto-renew charges, avoid re-sending config link; send concise message
-        if sale_mode != "traffic" and is_auto_renew and final_end_date_for_user:
+        if sale_mode_base == "subscription" and is_auto_renew and final_end_date_for_user:
             details_message = _(
                 "yookassa_auto_renewal",
                 months=int(subscription_months),
                 end_date=final_end_date_for_user.strftime('%Y-%m-%d'),
             )
             details_markup = None
-        elif sale_mode == "traffic":
+        elif sale_mode_base in {"traffic", "traffic_package", "topup", "premium_topup"}:
             details_message = _(
                 "payment_successful_traffic_full",
                 traffic_gb=traffic_label,
@@ -403,14 +403,23 @@ async def process_successful_payment(session: AsyncSession, bot: Bot,
         try:
             notification_service = NotificationService(bot, settings, i18n)
             user = await user_dal.get_user_by_id(session, user_id)
+            tariff_for_log = None
+            if payment_before_update and getattr(payment_before_update, "tariff_key", None):
+                tariff_for_log = payment_before_update.tariff_key
+            elif updated_payment_record and getattr(updated_payment_record, "tariff_key", None):
+                tariff_for_log = updated_payment_record.tariff_key
+            elif payment_record and getattr(payment_record, "tariff_key", None):
+                tariff_for_log = payment_record.tariff_key
             await notification_service.notify_payment_received(
                 user_id=user_id,
                 amount=payment_value,
                 currency=settings.DEFAULT_CURRENCY_SYMBOL,
-                months=int(subscription_months) if sale_mode != "traffic" else 0,
+                months=int(subscription_months) if sale_mode_base == "subscription" else 0,
                 payment_provider="yookassa",  # This is specifically for YooKassa webhook
                 username=user.username if user else None,
-                traffic_gb=traffic_amount_gb if sale_mode == "traffic" else None,
+                traffic_gb=traffic_amount_gb if sale_mode_base in {"traffic", "traffic_package", "topup", "premium_topup"} else None,
+                traffic_is_premium=sale_mode_base == "premium_topup",
+                tariff_key=tariff_for_log,
             )
         except Exception as e:
             logging.error(f"Failed to send payment notification: {e}")

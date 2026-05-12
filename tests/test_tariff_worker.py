@@ -265,3 +265,121 @@ class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(sub.premium_topup_balance_bytes, int(1.5 * (1024**3)))
             self.assertEqual(sub.premium_topup_used_bytes, 0)
             self.assertEqual(sub.premium_period_start_at, datetime(2026, 6, 1, tzinfo=timezone.utc))
+
+    async def test_premium_unlimited_override_never_throttles(self):
+        payload = _tariffs_config_payload()
+        payload["tariffs"][0]["premium_squad_uuids"] = ["premium-squad"]
+        payload["tariffs"][0]["premium_monthly_gb"] = 1
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "tariffs.json"
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            settings = Settings(
+                _env_file=None,
+                BOT_TOKEN="token",
+                POSTGRES_USER="app_user",
+                POSTGRES_PASSWORD="app_password",
+                TARIFFS_CONFIG_PATH=str(config_path),
+                TARIFF_TRAFFIC_WARNING_LEVELS="101",
+            )
+            panel_service = AsyncMock(spec=PanelApiService)
+            panel_service.get_internal_squad_accessible_nodes = AsyncMock(
+                return_value=[{"uuid": "node-1"}]
+            )
+            panel_service.get_node_users_bandwidth_stats = AsyncMock(
+                return_value={
+                    "topUsers": [
+                        {"username": "tg_42", "total": 50 * (1024**3)},
+                    ]
+                }
+            )
+            panel_service.update_user_details_on_panel = AsyncMock(return_value={"response": {}})
+            subscription_service = SubscriptionService(settings, panel_service)
+            worker = TariffTrafficWorker(
+                settings=settings,
+                session_factory=SimpleNamespace(),
+                panel_service=panel_service,
+                subscription_service=subscription_service,
+            )
+            sub = SimpleNamespace(
+                subscription_id=1,
+                user_id=42,
+                panel_user_uuid="panel-uuid",
+                premium_baseline_bytes=1 * (1024**3),
+                premium_topup_balance_bytes=0,
+                premium_topup_used_bytes=0,
+                premium_used_bytes=0,
+                premium_is_limited=False,
+                premium_period_start_at=None,
+                premium_unlimited_override=True,
+                premium_bonus_bytes=0,
+            )
+            tariff = settings.tariffs_config.require("standard")
+
+            await worker._sync_premium_squad_limit(
+                AsyncMock(), sub, tariff, datetime.now(timezone.utc), panel_username="tg_42"
+            )
+
+            self.assertFalse(sub.premium_is_limited)
+            self.assertEqual(int(sub.premium_used_bytes), 50 * (1024**3))
+            payload_sent = panel_service.update_user_details_on_panel.await_args.args[1]
+            self.assertIn("premium-squad", payload_sent["activeInternalSquads"])
+
+    async def test_premium_bonus_extends_limit(self):
+        payload = _tariffs_config_payload()
+        payload["tariffs"][0]["premium_squad_uuids"] = ["premium-squad"]
+        payload["tariffs"][0]["premium_monthly_gb"] = 1
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "tariffs.json"
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            settings = Settings(
+                _env_file=None,
+                BOT_TOKEN="token",
+                POSTGRES_USER="app_user",
+                POSTGRES_PASSWORD="app_password",
+                TARIFFS_CONFIG_PATH=str(config_path),
+                TARIFF_TRAFFIC_WARNING_LEVELS="101",
+            )
+            panel_service = AsyncMock(spec=PanelApiService)
+            panel_service.get_internal_squad_accessible_nodes = AsyncMock(
+                return_value=[{"uuid": "node-1"}]
+            )
+            # Used 4 GB > tariff baseline 1 GB, but admin granted +10 GB bonus.
+            panel_service.get_node_users_bandwidth_stats = AsyncMock(
+                return_value={
+                    "topUsers": [
+                        {"username": "tg_77", "total": 4 * (1024**3)},
+                    ]
+                }
+            )
+            panel_service.update_user_details_on_panel = AsyncMock(return_value={"response": {}})
+            subscription_service = SubscriptionService(settings, panel_service)
+            worker = TariffTrafficWorker(
+                settings=settings,
+                session_factory=SimpleNamespace(),
+                panel_service=panel_service,
+                subscription_service=subscription_service,
+            )
+            sub = SimpleNamespace(
+                subscription_id=1,
+                user_id=77,
+                panel_user_uuid="panel-uuid",
+                premium_baseline_bytes=1 * (1024**3),
+                premium_topup_balance_bytes=0,
+                premium_topup_used_bytes=0,
+                premium_used_bytes=0,
+                premium_is_limited=False,
+                premium_period_start_at=None,
+                premium_unlimited_override=False,
+                premium_bonus_bytes=10 * (1024**3),
+            )
+            tariff = settings.tariffs_config.require("standard")
+
+            await worker._sync_premium_squad_limit(
+                AsyncMock(), sub, tariff, datetime.now(timezone.utc), panel_username="tg_77"
+            )
+
+            # 4 GB used vs 1 GB baseline + 10 GB bonus = 11 GB limit → not limited.
+            self.assertFalse(sub.premium_is_limited)
+            self.assertEqual(int(sub.premium_used_bytes), 4 * (1024**3))

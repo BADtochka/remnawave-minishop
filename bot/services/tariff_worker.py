@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from aiogram import Bot
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from aiogram.utils.text_decorations import html_decoration as hd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -14,10 +15,13 @@ from bot.services.panel_api_service import PanelApiService
 from bot.services.subscription_service import SubscriptionService
 from bot.utils.date_utils import month_start
 from config.settings import Settings
-from db.dal import subscription_dal, tariff_dal
+from bot.utils.mini_app_url import subscription_mini_app_topup_url
+from db.dal import subscription_dal, tariff_dal, user_dal
 from db.models import Subscription
 
 PREMIUM_WARNING_LEVEL_OFFSET = 1000
+# Single warning per premium billing period when usage reached or exceeded the quota.
+PREMIUM_WARNING_DEPLETED_LEVEL = PREMIUM_WARNING_LEVEL_OFFSET + 100
 
 
 class TariffTrafficWorker:
@@ -38,6 +42,47 @@ class TariffTrafficWorker:
         self.i18n = i18n
         self._stopped = asyncio.Event()
         self._premium_nodes_cache = {}
+
+    async def _user_lang(self, session: AsyncSession, user_id: int) -> str:
+        try:
+            row = await user_dal.get_user_by_id(session, user_id)
+            if row and getattr(row, "language_code", None):
+                code = str(row.language_code or "").strip()
+                if code:
+                    return code
+        except Exception:
+            logging.exception("TariffTrafficWorker: failed to load user language for %s", user_id)
+        return self.settings.DEFAULT_LANGUAGE
+
+    def _usage_placeholders(self, used_bytes: int, limit_bytes: int) -> dict:
+        """Formatted traffic stats for warning messages (HTML-safe quoted)."""
+        used_b = max(0, int(used_bytes or 0))
+        lim_b = max(0, int(limit_bytes or 0))
+        remaining_b = max(0, lim_b - used_b)
+        return {
+            "used": hd.quote(self._fmt_bytes(used_b)),
+            "remaining": hd.quote(self._fmt_bytes(remaining_b)),
+            "limit_total": hd.quote(self._fmt_bytes(lim_b)),
+        }
+
+    def _traffic_topup_markup(self, user_lang: str, kind: str) -> Optional[InlineKeyboardMarkup]:
+        if not self.bot:
+            return None
+        _ = lambda k, **kw: self.i18n.gettext(user_lang, k, **kw) if self.i18n else (lambda key, **_: key)
+        normalized = "premium" if str(kind or "").lower() == "premium" else "regular"
+        url = subscription_mini_app_topup_url(self.settings, normalized)
+        if normalized == "premium":
+            label_key = "traffic_warn_btn_topup_webapp_premium"
+            fallback_key = "traffic_warn_btn_topup_premium"
+        else:
+            label_key = "traffic_warn_btn_topup_webapp_regular"
+            fallback_key = "traffic_warn_btn_topup_regular"
+        # Mini App inside Telegram when SUBSCRIPTION_MINI_APP_URL is configured.
+        if url:
+            button = InlineKeyboardButton(text=_(label_key), web_app=WebAppInfo(url=url))
+        else:
+            button = InlineKeyboardButton(text=_(fallback_key), callback_data="tariff_topup:list")
+        return InlineKeyboardMarkup(inline_keyboard=[[button]])
 
     async def run(self) -> None:
         if not self.settings.tariffs_config:
@@ -108,7 +153,22 @@ class TariffTrafficWorker:
     ) -> None:
         if str(panel_strategy or "").upper() == "MONTH":
             return
-        traffic_limit_bytes = int(limit or sub.traffic_limit_bytes or (tariff.monthly_bytes + int(sub.topup_balance_bytes or 0)))
+        rb = int(getattr(sub, "regular_bonus_bytes", 0) or 0)
+        if bool(getattr(sub, "regular_unlimited_override", False)):
+            baseline = int(sub.tier_baseline_bytes or (tariff.monthly_bytes if tariff else 0) or 0)
+            traffic_limit_bytes = self.subscription_service._compute_main_traffic_limit_bytes(
+                tier_baseline_bytes=baseline,
+                topup_balance_bytes=int(sub.topup_balance_bytes or 0),
+                regular_bonus_bytes=rb,
+                regular_unlimited_override=True,
+                traffic_used_bytes=int(sub.traffic_used_bytes or 0),
+            )
+        else:
+            traffic_limit_bytes = int(
+                limit
+                or sub.traffic_limit_bytes
+                or (tariff.monthly_bytes + int(sub.topup_balance_bytes or 0) + rb)
+            )
         payload = self.subscription_service._build_panel_update_payload(
             panel_user_uuid=sub.panel_user_uuid,
             expire_at=sub.end_date,
@@ -131,6 +191,8 @@ class TariffTrafficWorker:
         *,
         warning_period_start: Optional[datetime] = None,
     ) -> None:
+        if bool(getattr(sub, "regular_unlimited_override", False)):
+            return
         used_val = int(used or sub.traffic_used_bytes or 0)
         limit_val = int(limit or sub.traffic_limit_bytes or 0)
         if limit_val <= 0:
@@ -159,22 +221,35 @@ class TariffTrafficWorker:
             )
             if self.bot:
                 try:
-                    left_pct = max(0, 100 - level)
-                    if level < 100:
-                        text = f"Трафик тарифа {tariff.name(self.settings.DEFAULT_LANGUAGE)} почти закончился. Осталось около {left_pct}%."
-                    else:
-                        text = "Трафик закончился. Доступ временно ограничен до сброса или докупки пакета."
-                    markup = InlineKeyboardMarkup(
-                        inline_keyboard=[
-                            [
-                                InlineKeyboardButton(
-                                    text="Докупить трафик",
-                                    callback_data="tariff_topup:list",
-                                )
-                            ]
-                        ]
+                    user_lang = await self._user_lang(session, sub.user_id)
+                    _ = (
+                        (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
+                        if self.i18n
+                        else (lambda k, **kw: k)
                     )
-                    await self.bot.send_message(sub.user_id, text, reply_markup=markup)
+                    left_pct = max(0, 100 - level)
+                    tariff_name = hd.quote(str(tariff.name(user_lang)))
+                    usage = self._usage_placeholders(used_val, limit_val)
+                    if level < 100:
+                        text = _(
+                            "traffic_warning_regular_almost",
+                            tariff_name=tariff_name,
+                            left_pct=left_pct,
+                            **usage,
+                        )
+                    else:
+                        text = _(
+                            "traffic_warning_regular_depleted",
+                            tariff_name=tariff_name,
+                            **usage,
+                        )
+                    markup = self._traffic_topup_markup(user_lang, "regular")
+                    await self.bot.send_message(
+                        sub.user_id,
+                        text,
+                        reply_markup=markup,
+                        parse_mode="HTML",
+                    )
                 except Exception:
                     logging.exception("Failed to send traffic warning to user %s", sub.user_id)
         if ratio >= 1.0 and not sub.is_throttled:
@@ -214,8 +289,11 @@ class TariffTrafficWorker:
         premium_baseline = int(tariff.premium_monthly_bytes or 0)
         premium_topup_balance = int(sub.premium_topup_balance_bytes or 0)
         premium_topup_used = int(getattr(sub, "premium_topup_used_bytes", 0) or 0) if same_period else 0
-        premium_limit = premium_baseline + premium_topup_balance + premium_topup_used
-        if premium_limit <= 0:
+        # Admin-side overrides for free gifted premium traffic.
+        premium_unlimited_override = bool(getattr(sub, "premium_unlimited_override", False))
+        premium_bonus = max(0, int(getattr(sub, "premium_bonus_bytes", 0) or 0))
+        premium_limit = premium_baseline + premium_topup_balance + premium_topup_used + premium_bonus
+        if premium_limit <= 0 and not premium_unlimited_override:
             return
 
         node_uuids = await self._premium_node_uuids_for_tariff(tariff)
@@ -235,15 +313,22 @@ class TariffTrafficWorker:
         if premium_used is None:
             return
 
-        overflow = max(0, int(premium_used) - premium_baseline)
+        # Consume paid top-up balance only for overflow beyond baseline+bonus.
+        # Admin-granted bonus is "spent" against usage first along with baseline,
+        # so the user's paid top-up survives longer.
+        free_quota = premium_baseline + premium_bonus
+        overflow = max(0, int(premium_used) - free_quota)
         delta_overflow = max(0, overflow - premium_topup_used)
         consume_from_topup = min(premium_topup_balance, delta_overflow)
         if consume_from_topup > 0:
             premium_topup_balance -= consume_from_topup
             premium_topup_used += consume_from_topup
-            premium_limit = premium_baseline + premium_topup_balance + premium_topup_used
+            premium_limit = premium_baseline + premium_topup_balance + premium_topup_used + premium_bonus
 
-        should_limit = premium_used >= premium_limit
+        if premium_unlimited_override:
+            should_limit = False
+        else:
+            should_limit = premium_used >= premium_limit
         changed = (
             int(sub.premium_baseline_bytes or 0) != premium_baseline
             or int(sub.premium_topup_balance_bytes or 0) != premium_topup_balance
@@ -258,14 +343,15 @@ class TariffTrafficWorker:
         sub.premium_used_bytes = int(premium_used)
         sub.premium_is_limited = bool(should_limit)
         sub.premium_period_start_at = premium_period_start
-        await self._maybe_warn_premium_squad_limit(
-            session,
-            sub,
-            tariff,
-            premium_used,
-            premium_limit,
-            premium_period_start,
-        )
+        if not premium_unlimited_override:
+            await self._maybe_warn_premium_squad_limit(
+                session,
+                sub,
+                tariff,
+                premium_used,
+                premium_limit,
+                premium_period_start,
+            )
         if not changed:
             return
 
@@ -307,9 +393,67 @@ class TariffTrafficWorker:
     ) -> None:
         if limit <= 0:
             return
-        ratio = int(used or 0) / int(limit)
+        used_val = int(used or 0)
+        limit_val = int(limit)
+        ratio = used_val / limit_val
         levels = list(getattr(self.settings, "tariff_traffic_warning_levels", [85, 90, 95]))
+
+        # Fully exhausted or over quota — one message per period (same idea as regular traffic at 100%).
+        if ratio >= 1.0:
+            depleted_existing = await tariff_dal.get_warning(
+                session,
+                subscription_id=sub.subscription_id,
+                period_start_at=period_start_at,
+                level=PREMIUM_WARNING_DEPLETED_LEVEL,
+            )
+            if depleted_existing:
+                return
+            await tariff_dal.create_warning(
+                session,
+                subscription_id=sub.subscription_id,
+                period_start_at=period_start_at,
+                level=PREMIUM_WARNING_DEPLETED_LEVEL,
+                traffic_limit_bytes=None,
+            )
+            if self.bot:
+                try:
+                    user_lang = await self._user_lang(session, sub.user_id)
+                    _ = (
+                        (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
+                        if self.i18n
+                        else (lambda k, **kw: k)
+                    )
+                    access = await self.subscription_service.premium_access_for_tariff(tariff)
+                    labels = access.get("node_labels") or access.get("squad_labels") or []
+                    if labels:
+                        visible = [hd.quote(str(x)) for x in labels[:8]]
+                        servers = "\n".join(f"• {label}" for label in visible)
+                        if len(labels) > len(visible):
+                            more = len(labels) - len(visible)
+                            servers += "\n" + _("traffic_warning_premium_servers_more", count=more)
+                    else:
+                        servers = _("traffic_warning_premium_generic_servers")
+                    usage = self._usage_placeholders(used_val, limit_val)
+                    text = _(
+                        "traffic_warning_premium_depleted",
+                        tariff_name=hd.quote(str(tariff.name(user_lang))),
+                        servers=servers,
+                        **usage,
+                    )
+                    markup = self._traffic_topup_markup(user_lang, "premium")
+                    await self.bot.send_message(
+                        sub.user_id,
+                        text,
+                        reply_markup=markup,
+                        parse_mode="HTML",
+                    )
+                except Exception:
+                    logging.exception("Failed to send premium traffic depleted warning to user %s", sub.user_id)
+            return
+
         for level in levels:
+            if level >= 100:
+                continue
             if ratio < level / 100:
                 continue
             storage_level = PREMIUM_WARNING_LEVEL_OFFSET + int(level)
@@ -331,34 +475,38 @@ class TariffTrafficWorker:
             if not self.bot:
                 continue
             try:
+                user_lang = await self._user_lang(session, sub.user_id)
+                _ = (
+                    (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
+                    if self.i18n
+                    else (lambda k, **kw: k)
+                )
                 access = await self.subscription_service.premium_access_for_tariff(tariff)
                 labels = access.get("node_labels") or access.get("squad_labels") or []
                 if labels:
-                    visible = labels[:8]
+                    visible = [hd.quote(str(x)) for x in labels[:8]]
                     servers = "\n".join(f"• {label}" for label in visible)
                     if len(labels) > len(visible):
-                        servers += f"\n• ... еще {len(labels) - len(visible)}"
+                        more = len(labels) - len(visible)
+                        servers += "\n" + _("traffic_warning_premium_servers_more", count=more)
                 else:
-                    servers = "• premium-серверы тарифа"
-                text = (
-                    "⚠️ Отдельный лимит premium-серверов почти закончился.\n\n"
-                    f"Тариф: {tariff.name(self.settings.DEFAULT_LANGUAGE)}\n"
-                    f"Использовано: {self._fmt_bytes(used)} из {self._fmt_bytes(limit)} ({level}%).\n\n"
-                    "Этот лимит действует на:\n"
-                    f"{servers}\n\n"
-                    "Можно докупить premium-трафик. Докупленный остаток переносится на следующие месяцы, пока не израсходуется."
+                    servers = _("traffic_warning_premium_generic_servers")
+                left_pct = max(0, 100 - int(level))
+                usage = self._usage_placeholders(used_val, limit_val)
+                text = _(
+                    "traffic_warning_premium_almost",
+                    tariff_name=hd.quote(str(tariff.name(user_lang))),
+                    left_pct=left_pct,
+                    servers=servers,
+                    **usage,
                 )
-                markup = InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="Докупить premium-трафик",
-                                callback_data="tariff_topup:list",
-                            )
-                        ]
-                    ]
+                markup = self._traffic_topup_markup(user_lang, "premium")
+                await self.bot.send_message(
+                    sub.user_id,
+                    text,
+                    reply_markup=markup,
+                    parse_mode="HTML",
                 )
-                await self.bot.send_message(sub.user_id, text, reply_markup=markup)
             except Exception:
                 logging.exception("Failed to send premium traffic warning to user %s", sub.user_id)
 
