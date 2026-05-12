@@ -285,6 +285,86 @@ def _write_tariffs_config_file(path: Path, config: TariffsConfig) -> None:
         path.write_text(payload, encoding="utf-8")
 
 
+def _panel_node_uuid_key(node: Dict[str, Any]) -> str:
+    uid = node.get("nodeUuid") or node.get("node_uuid") or node.get("uuid") or node.get("id")
+    return str(uid).strip().lower() if uid else ""
+
+
+def _panel_node_users_online(node: Dict[str, Any]) -> Optional[int]:
+    uo = node.get("usersOnline")
+    if uo is None:
+        uo = node.get("users_online")
+    if uo is None:
+        uo = node.get("onlineUsers") or node.get("online_users")
+    if uo is None:
+        mg = node.get("metricGroups")
+        if isinstance(mg, dict):
+            uo = mg.get("onlineUsers") or mg.get("online_users")
+    if uo is None:
+        return None
+    try:
+        return int(uo)
+    except (TypeError, ValueError):
+        return None
+
+
+def _panel_nodes_online_by_uuid(nodes_payload: Any) -> Dict[str, int]:
+    """Build node_uuid(lower) -> usersOnline from GET /system/stats/nodes payload."""
+    out: Dict[str, int] = {}
+    raw_list: Optional[List[Any]] = None
+    if isinstance(nodes_payload, list):
+        raw_list = nodes_payload
+    elif isinstance(nodes_payload, dict):
+        raw_list = nodes_payload.get("nodes")
+        if raw_list is None:
+            raw_list = nodes_payload.get("items") or nodes_payload.get("data")
+    if not isinstance(raw_list, list):
+        return out
+    for n in raw_list:
+        if not isinstance(n, dict):
+            continue
+        key = _panel_node_uuid_key(n)
+        if not key:
+            continue
+        online = _panel_node_users_online(n)
+        if online is not None:
+            out[key] = online
+    return out
+
+
+def _enrich_bandwidth_nodes_with_online(
+    bw: Any,
+    online_by_uuid: Dict[str, int],
+    online_by_name: Optional[Dict[str, int]] = None,
+) -> None:
+    """Attach usersOnline to topNodes/series (UUID and optional node name)."""
+    if not isinstance(bw, dict):
+        return
+    if not online_by_uuid and not online_by_name:
+        return
+    for key in ("topNodes", "series"):
+        arr = bw.get(key)
+        if not isinstance(arr, list):
+            continue
+        for item in arr:
+            if not isinstance(item, dict):
+                continue
+            if item.get("usersOnline") is not None:
+                continue
+            uid = item.get("uuid") or item.get("nodeUuid") or item.get("node_uuid")
+            if uid and online_by_uuid:
+                hit = online_by_uuid.get(str(uid).strip().lower())
+                if hit is not None:
+                    item["usersOnline"] = hit
+                    continue
+            if online_by_name:
+                nm = item.get("name")
+                if nm and isinstance(nm, str):
+                    hitn = online_by_name.get(nm.strip().lower())
+                    if hitn is not None:
+                        item["usersOnline"] = hitn
+
+
 # ─── Routes ────────────────────────────────────────────────────────
 
 
@@ -323,7 +403,41 @@ async def admin_stats_route(request: web.Request) -> web.Response:
         try:
             system = await panel_service.get_system_stats()
             bandwidth = await panel_service.get_bandwidth_stats()
-            payload["panel"] = {"system": system or {}, "bandwidth": bandwidth or {}}
+            panel_body: Dict[str, Any] = {
+                "system": system or {},
+                "bandwidth": bandwidth or {},
+            }
+            try:
+                nodes = await panel_service.get_nodes_statistics()
+                panel_body["nodes"] = nodes or {}
+            except Exception as exc_nodes:  # pragma: no cover - optional endpoint
+                logger.debug("Panel nodes stats unavailable: %s", exc_nodes)
+                panel_body["nodes"] = {}
+            try:
+                today = datetime.now(timezone.utc).date()
+                start_d = today - timedelta(days=7)
+                nodes_bw = await panel_service.get_nodes_bandwidth_usage(
+                    start=start_d.isoformat(),
+                    end=today.isoformat(),
+                    top_nodes_limit=64,
+                )
+                panel_body["nodes_bandwidth"] = nodes_bw or {}
+            except Exception as exc_nb:  # pragma: no cover - optional endpoint
+                logger.debug("Panel nodes bandwidth range unavailable: %s", exc_nb)
+                panel_body["nodes_bandwidth"] = {}
+            try:
+                online_map = _panel_nodes_online_by_uuid(panel_body.get("nodes"))
+                lookups = await panel_service.get_nodes_online_lookups()
+                for k, v in lookups.get("byUuid", {}).items():
+                    online_map[k] = v
+                _enrich_bandwidth_nodes_with_online(
+                    panel_body.get("nodes_bandwidth"),
+                    online_map,
+                    lookups.get("byName") or {},
+                )
+            except Exception as exc_merge:  # pragma: no cover
+                logger.debug("Panel nodes online merge skipped: %s", exc_merge)
+            payload["panel"] = panel_body
         except Exception as exc:
             logger.debug("Panel stats unavailable: %s", exc)
             payload["panel"] = {"error": "unavailable"}

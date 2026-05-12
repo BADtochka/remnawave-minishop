@@ -268,6 +268,9 @@
   function setAdminLanguageMenuOpen(open) {
     adminLanguageMenuOpen = Boolean(open);
     clearAdminLanguageClickGuard();
+    // Desktop doesn't need the click-guard overlay and it can block
+    // option clicks in portaled select content.
+    if (!isCompact) return;
     if (adminLanguageMenuOpen) {
       adminLanguageClickGuard = true;
       adminLanguageClickGuardArmTimer = window.setTimeout(() => {
@@ -319,7 +322,7 @@
   {#if sidebarOpen}
     <button type="button" class="admin-sidebar-backdrop" aria-label={at("close_menu", {}, "Закрыть меню")} on:click={() => (sidebarOpen = false)}></button>
   {/if}
-  {#if adminLanguageMenuOpen || adminLanguageClickGuard}
+  {#if isCompact && (adminLanguageMenuOpen || adminLanguageClickGuard)}
     <button
       class="language-select-guard"
       class:language-select-guard--armed={adminLanguageClickGuardArmed}

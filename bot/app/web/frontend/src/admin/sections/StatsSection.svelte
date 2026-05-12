@@ -1,7 +1,8 @@
 <script>
-  import { Activity, Radio, Server, TrendingDown, TrendingUp } from "$components/ui/icons.js";
+  import { Activity, Radio, Server, TrendingDown, TrendingUp, Zap } from "$components/ui/icons.js";
   import { getContext, onMount } from "svelte";
 
+  import { fmtTrafficBytes } from "../../lib/admin/format.js";
   import Badge from "$components/ui/badge.svelte";
   import * as Card from "$components/ui/card/index.js";
   import {
@@ -38,6 +39,10 @@
     panelPayload && !panelPayload.error ? parsePanelSystem(panelPayload) : null;
   $: panelBw =
     panelPayload && !panelPayload.error ? parsePanelBandwidth(panelPayload) : null;
+  $: panelNodeTraffic =
+    panelPayload && !panelPayload.error ? parsePanelNodeTraffic(panelPayload) : null;
+
+  const PANEL_NODE_TILE_LIMIT = 10;
 
   $: dailySeries = Array.isArray(fin.daily_series) ? fin.daily_series : [];
   $: revenueKpis = computeRevenueKpis(fin, dailySeries);
@@ -62,6 +67,13 @@
     const memUsed = Number(mem.used) || 0;
     const memPct = memTotal > 0 ? (memUsed / memTotal) * 100 : null;
     const nodes = system.nodes || {};
+    const cpuRaw =
+      system.cpu?.usage ??
+      system.cpu?.usedPercent ??
+      system.cpu?.percent ??
+      system.cpuUsage ??
+      system.cpuLoad;
+    const cpuPct = Number(cpuRaw);
     return {
       onlineNow: onlineStats.onlineNow ?? 0,
       active: statusCounts.ACTIVE ?? 0,
@@ -71,6 +83,7 @@
       totalPanelUsers: u.totalUsers ?? 0,
       nodesOnline: nodes.totalOnline != null ? nodes.totalOnline : null,
       memPct,
+      cpuPct: Number.isFinite(cpuPct) ? cpuPct : null,
     };
   }
 
@@ -82,6 +95,302 @@
       bw.bandwidthLast30Days?.current ?? bw.bandwidthLastThirtyDays?.current;
     if (week == null && month == null) return null;
     return { week, month };
+  }
+
+  function panelRowBytes(row) {
+    if (!row || typeof row !== "object") return 0;
+    const total = Number(row.total);
+    if (Number.isFinite(total) && total > 0) return total;
+    const up = Number(
+      row.uploadBytes ?? row.uplinkBytes ?? row.uplink ?? row.up ?? row.upload,
+    );
+    const down = Number(
+      row.downloadBytes ?? row.downlinkBytes ?? row.downlink ?? row.down ?? row.download,
+    );
+    const sum = (Number.isFinite(up) ? up : 0) + (Number.isFinite(down) ? down : 0);
+    return sum > 0 ? sum : 0;
+  }
+
+  /** Remnawave node metrics: inboundsStats / outboundsStats use uplink+downlink per tag. */
+  function sumDirectionPair(item) {
+    if (!item || typeof item !== "object") return 0;
+    const combined = Number(item.total ?? item.bytes ?? item.value);
+    if (Number.isFinite(combined) && combined > 0) return combined;
+    const up = Number(
+      item.uplink ?? item.upload ?? item.uploadBytes ?? item.up ?? item.tx ?? item.sent,
+    );
+    const down = Number(
+      item.downlink ?? item.download ?? item.downloadBytes ?? item.down ?? item.rx ?? item.received,
+    );
+    return (Number.isFinite(up) ? up : 0) + (Number.isFinite(down) ? down : 0);
+  }
+
+  function sumTaggedStatsList(arr) {
+    if (!Array.isArray(arr)) return 0;
+    return arr.reduce((acc, item) => acc + sumDirectionPair(item), 0);
+  }
+
+  /** Traffic bytes for one node record from GET /system/stats/nodes (current panel shape). */
+  function trafficBytesFromNodeRecord(node) {
+    if (!node || typeof node !== "object") return 0;
+    let b =
+      sumTaggedStatsList(node.inboundsStats) +
+      sumTaggedStatsList(node.outboundsStats) +
+      sumTaggedStatsList(node.inbounds_stats) +
+      sumTaggedStatsList(node.outbounds_stats);
+    if (b <= 0) b = panelRowBytes(node);
+    const life = Number(
+      node.totalBytesLifetime ?? node.totalBytes ?? node.bytesLifetime ?? node.totalTrafficBytes,
+    );
+    if (b <= 0 && Number.isFinite(life) && life > 0) b = life;
+    return b;
+  }
+
+  function isNodeMetricsShape(row) {
+    if (!row || typeof row !== "object") return false;
+    return (
+      Array.isArray(row.inboundsStats) ||
+      Array.isArray(row.outboundsStats) ||
+      Array.isArray(row.inbounds_stats) ||
+      Array.isArray(row.outbounds_stats)
+    );
+  }
+
+  function panelRowLabel(row) {
+    if (!row || typeof row !== "object") return "—";
+    for (const k of ["nodeName", "node_name", "name", "nodeRemark", "remark", "label", "title"]) {
+      const v = row[k];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    const u = row.nodeUuid ?? row.node_uuid ?? row.uuid;
+    if (u) return `${String(u).slice(0, 8)}…`;
+    return "—";
+  }
+
+  function nodeRecordUuid(row) {
+    if (!row || typeof row !== "object") return "";
+    const u = row.nodeUuid ?? row.node_uuid ?? row.uuid ?? row.id;
+    return u != null ? String(u) : "";
+  }
+
+  function nodeRecordDisplayName(row) {
+    if (!row || typeof row !== "object") return "";
+    for (const k of ["nodeName", "node_name", "name", "label", "title", "hostname"]) {
+      const v = row[k];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return "";
+  }
+
+  function nodeRecordUsersOnline(row) {
+    if (!row || typeof row !== "object") return null;
+    const raw =
+      row.usersOnline ??
+      row.users_online ??
+      row.onlineUsers ??
+      row.online_users ??
+      row.onlineUserCount ??
+      row.online_user_count ??
+      row.connectedUsers ??
+      row.connected_users ??
+      row.onlineNow;
+    const n = Number(raw);
+    if (Number.isFinite(n)) return n;
+    const mg = row.metricGroups;
+    if (mg && typeof mg === "object") {
+      const v = Number(mg.onlineUsers ?? mg.online_users);
+      if (Number.isFinite(v)) return v;
+    }
+    return null;
+  }
+
+  /** Node list shapes from GET /system/stats/nodes (varies by panel version). */
+  function extractPanelNodesList(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw !== "object") return [];
+    if (Array.isArray(raw.nodes)) return raw.nodes;
+    if (Array.isArray(raw.items)) return raw.items;
+    if (Array.isArray(raw.data)) return raw.data;
+    if (Array.isArray(raw.response)) return raw.response;
+    return [];
+  }
+
+  /** UUID + display name -> online count from panel node metrics. */
+  function buildNodeOnlineLookup(panel) {
+    const byUuid = new Map();
+    const byName = new Map();
+    const list = extractPanelNodesList(panel?.nodes);
+    for (const node of list) {
+      if (!node || typeof node !== "object") continue;
+      const online = nodeRecordUsersOnline(node);
+      if (online == null) continue;
+      const id = nodeRecordUuid(node);
+      if (id) byUuid.set(id.toLowerCase(), online);
+      const nm = nodeRecordDisplayName(node);
+      if (nm) byName.set(nm.toLowerCase(), online);
+    }
+    return { byUuid, byName };
+  }
+
+  function formatTrafficCell(bytes, row, stringHint) {
+    if (bytes > 0) return fmtTrafficBytes(bytes);
+    const cur = row?.current;
+    if (typeof cur === "string" && cur.trim()) return cur.trim();
+    if (typeof stringHint === "string" && stringHint.trim()) return stringHint.trim();
+    if (isNodeMetricsShape(row) && !bytes) return fmtTrafficBytes(0);
+    return "—";
+  }
+
+  function buildNodeMetricsRows(nodes) {
+    return nodes
+      .filter((n) => n && typeof n === "object")
+      .map((node) => {
+        const bytes = trafficBytesFromNodeRecord(node);
+        const uid = nodeRecordUuid(node);
+        return {
+          label: panelRowLabel(node),
+          value: formatTrafficCell(bytes, node, ""),
+          sort: bytes,
+          uuid: uid || null,
+          online: nodeRecordUsersOnline(node),
+        };
+      })
+      .sort((a, b) => b.sort - a.sort);
+  }
+
+  /** Aggregate legacy arrays (daily rows per node, etc.). */
+  function aggregatePanelNodeRows(rows) {
+    if (!Array.isArray(rows) || !rows.length) return [];
+    const map = new Map();
+    for (const row of rows) {
+      if (!row || typeof row !== "object") continue;
+      const key = String(
+        row.nodeUuid ?? row.node_uuid ?? row.uuid ?? row.nodeName ?? row.name ?? panelRowLabel(row),
+      );
+      const prev = map.get(key) || { label: panelRowLabel(row), bytes: 0, stringHint: "" };
+      const add = isNodeMetricsShape(row) ? trafficBytesFromNodeRecord(row) : panelRowBytes(row);
+      prev.bytes += add;
+      const cur = row.current;
+      if (typeof cur === "string" && cur.trim()) prev.stringHint = cur.trim();
+      prev.label = panelRowLabel(row) || prev.label;
+      map.set(key, prev);
+    }
+    return [...map.values()]
+      .map((x) => ({
+        label: x.label,
+        value:
+          x.bytes > 0
+            ? fmtTrafficBytes(x.bytes)
+            : x.stringHint && String(x.stringHint).trim()
+              ? String(x.stringHint).trim()
+              : "—",
+        sort: x.bytes,
+        uuid: null,
+        online: null,
+      }))
+      .sort((a, b) => b.sort - a.sort);
+  }
+
+  function bandwidthRowUuid(n) {
+    if (!n || typeof n !== "object") return "";
+    const u = n.uuid ?? n.nodeUuid ?? n.node_uuid ?? n.id;
+    return u != null ? String(u) : "";
+  }
+
+  function attachNodeOnlineToRows(rows, lookup) {
+    if (!Array.isArray(rows) || !lookup) return rows;
+    const { byUuid, byName } = lookup;
+    if (!byUuid.size && !byName.size) return rows;
+    return rows.map((r) => {
+      let o = r.online;
+      if (o == null && r.uuid) {
+        const hit = byUuid.get(String(r.uuid).toLowerCase());
+        if (hit != null) o = hit;
+      }
+      if (o == null && r.label && typeof r.label === "string") {
+        const hit = byName.get(r.label.trim().toLowerCase());
+        if (hit != null) o = hit;
+      }
+      if (o != null) return { ...r, online: o };
+      return r;
+    });
+  }
+
+  /** Panel analytics: GET /bandwidth-stats/nodes — totals per node for the selected range (bytes). */
+  function parseNodesBandwidthTop(panel) {
+    const nb = panel?.nodes_bandwidth;
+    if (!nb || typeof nb !== "object") return null;
+    const top = nb.topNodes;
+    if (Array.isArray(top) && top.length) {
+      const rows = top.map((n) => {
+        const total = Number(n?.total ?? n?.bytes ?? 0);
+        const uuid = bandwidthRowUuid(n);
+        const label =
+          (typeof n?.name === "string" && n.name.trim()) ||
+          (typeof n?.nodeName === "string" && n.nodeName.trim()) ||
+          (uuid ? `${uuid.slice(0, 8)}…` : "—");
+        const directOn = Number(n?.usersOnline ?? n?.users_online ?? n?.onlineUsers);
+        const onlineInit = Number.isFinite(directOn) ? directOn : null;
+        return {
+          label,
+          value: total > 0 ? fmtTrafficBytes(total) : fmtTrafficBytes(0),
+          sort: total,
+          uuid: uuid || null,
+          online: onlineInit,
+        };
+      });
+      return { seven: rows.sort((a, b) => b.sort - a.sort) };
+    }
+    const series = nb.series;
+    if (Array.isArray(series) && series.length) {
+      const rows = series.map((s) => {
+        const total = Number(s?.total ?? 0);
+        const uuid = bandwidthRowUuid(s);
+        const label =
+          (typeof s?.name === "string" && s.name.trim()) ||
+          (typeof s?.nodeName === "string" && s.nodeName.trim()) ||
+          (uuid ? `${uuid.slice(0, 8)}…` : "—");
+        const directOn = Number(s?.usersOnline ?? s?.users_online ?? s?.onlineUsers);
+        const onlineInit = Number.isFinite(directOn) ? directOn : null;
+        return {
+          label,
+          value: total > 0 ? fmtTrafficBytes(total) : fmtTrafficBytes(0),
+          sort: total,
+          uuid: uuid || null,
+          online: onlineInit,
+        };
+      });
+      return { seven: rows.sort((a, b) => b.sort - a.sort) };
+    }
+    return null;
+  }
+
+  function parsePanelNodeTraffic(panel) {
+    const onlineLookup = buildNodeOnlineLookup(panel);
+    const fromBw = parseNodesBandwidthTop(panel);
+    if (fromBw?.seven?.length) return { seven: attachNodeOnlineToRows(fromBw.seven, onlineLookup) };
+
+    const raw = panel?.nodes;
+    if (raw == null) return { seven: [] };
+
+    if (Array.isArray(raw)) {
+      if (raw.length && isNodeMetricsShape(raw[0])) {
+        return { seven: attachNodeOnlineToRows(buildNodeMetricsRows(raw), onlineLookup) };
+      }
+      return { seven: attachNodeOnlineToRows(aggregatePanelNodeRows(raw), onlineLookup) };
+    }
+
+    if (typeof raw === "object") {
+      if (Array.isArray(raw.nodes) && raw.nodes.length) {
+        return { seven: attachNodeOnlineToRows(buildNodeMetricsRows(raw.nodes), onlineLookup) };
+      }
+      if (Array.isArray(raw.lastSevenDays) && raw.lastSevenDays.length) {
+        return { seven: attachNodeOnlineToRows(aggregatePanelNodeRows(raw.lastSevenDays), onlineLookup) };
+      }
+    }
+
+    return { seven: [] };
   }
 
   function computeRevenueKpis(financial, series) {
@@ -353,61 +662,106 @@
       <p class="admin-muted" style="margin:0;">{at("stats_panel_unavailable_detail", {}, "")}</p>
     {:else if panelMetrics}
       <Card.Root>
-        <Card.Content>
-          <div class="admin-dashboard-panel-metrics">
-            <div class="admin-dashboard-panel-metric">
-              <span><Radio size={12} /> {at("stats_panel_online", {}, "")}</span>
-              <strong>{panelMetrics.onlineNow}</strong>
-            </div>
-            <div class="admin-dashboard-panel-metric">
-              <span>{at("stats_panel_active", {}, "")}</span>
-              <strong>{panelMetrics.active}</strong>
-            </div>
-            <div class="admin-dashboard-panel-metric">
-              <span>{at("stats_panel_expired", {}, "")}</span>
-              <strong>{panelMetrics.expired}</strong>
-            </div>
-            <div class="admin-dashboard-panel-metric">
-              <span>{at("stats_panel_disabled", {}, "")}</span>
-              <strong>{panelMetrics.disabled}</strong>
-            </div>
-            <div class="admin-dashboard-panel-metric">
-              <span>{at("stats_panel_limited", {}, "")}</span>
-              <strong>{panelMetrics.limited}</strong>
-            </div>
-            <div class="admin-dashboard-panel-metric">
-              <span><Activity size={12} /> {at("stats_panel_total_users", {}, "")}</span>
-              <strong>{panelMetrics.totalPanelUsers}</strong>
-            </div>
-            {#if panelMetrics.nodesOnline != null}
-              <div class="admin-dashboard-panel-metric">
-                <span><Server size={12} /> {at("stats_panel_nodes_online", {}, "")}</span>
-                <strong>{panelMetrics.nodesOnline}</strong>
+        <Card.Content class="admin-cn-card-content admin-panel-dash-card">
+          <div class="admin-panel-dash">
+            <div class="admin-panel-dash-tiles" role="group" aria-label={at("stats_section_panel", {}, "")}>
+              <div class="admin-panel-dash-tile">
+                <div class="admin-panel-dash-tile-label">
+                  <span class="admin-panel-dash-ico" aria-hidden="true"><Radio size={12} /></span>
+                  {at("stats_panel_online", {}, "")}
+                </div>
+                <div class="admin-panel-dash-tile-value">{panelMetrics.onlineNow}</div>
               </div>
-            {/if}
-            {#if panelMetrics.memPct != null}
-              <div class="admin-dashboard-panel-metric">
-                <span>{at("stats_panel_memory", {}, "")}</span>
-                <strong>{panelMetrics.memPct.toFixed(1)}%</strong>
+              <div class="admin-panel-dash-tile">
+                <div class="admin-panel-dash-tile-label">{at("stats_panel_active", {}, "")}</div>
+                <div class="admin-panel-dash-tile-value">{panelMetrics.active}</div>
               </div>
+              <div class="admin-panel-dash-tile">
+                <div class="admin-panel-dash-tile-label">
+                  <span class="admin-panel-dash-ico" aria-hidden="true"><Activity size={12} /></span>
+                  {at("stats_panel_total_users", {}, "")}
+                </div>
+                <div class="admin-panel-dash-tile-value">{panelMetrics.totalPanelUsers}</div>
+              </div>
+              <div class="admin-panel-dash-tile">
+                <div class="admin-panel-dash-tile-label">{at("stats_panel_expired", {}, "")}</div>
+                <div class="admin-panel-dash-tile-value">{panelMetrics.expired}</div>
+              </div>
+              <div class="admin-panel-dash-tile">
+                <div class="admin-panel-dash-tile-label">{at("stats_panel_disabled", {}, "")}</div>
+                <div class="admin-panel-dash-tile-value">{panelMetrics.disabled}</div>
+              </div>
+              <div class="admin-panel-dash-tile">
+                <div class="admin-panel-dash-tile-label">{at("stats_panel_limited", {}, "")}</div>
+                <div class="admin-panel-dash-tile-value">{panelMetrics.limited}</div>
+              </div>
+              {#if panelMetrics.nodesOnline != null}
+                <div class="admin-panel-dash-tile">
+                  <div class="admin-panel-dash-tile-label">
+                    <span class="admin-panel-dash-ico" aria-hidden="true"><Server size={12} /></span>
+                    {at("stats_panel_nodes_online", {}, "")}
+                  </div>
+                  <div class="admin-panel-dash-tile-value">{panelMetrics.nodesOnline}</div>
+                </div>
+              {/if}
+              {#if panelMetrics.memPct != null}
+                <div class="admin-panel-dash-tile">
+                  <div class="admin-panel-dash-tile-label">{at("stats_panel_memory", {}, "")}</div>
+                  <div class="admin-panel-dash-tile-value">{panelMetrics.memPct.toFixed(1)}%</div>
+                </div>
+              {/if}
+              {#if panelMetrics.cpuPct != null}
+                <div class="admin-panel-dash-tile">
+                  <div class="admin-panel-dash-tile-label">
+                    <span class="admin-panel-dash-ico" aria-hidden="true"><Zap size={12} /></span>
+                    {at("stats_panel_cpu", {}, "")}
+                  </div>
+                  <div class="admin-panel-dash-tile-value">{panelMetrics.cpuPct.toFixed(1)}%</div>
+                </div>
+              {/if}
+              {#if panelBw?.week != null}
+                <div class="admin-panel-dash-tile admin-panel-dash-tile--wide">
+                  <div class="admin-panel-dash-tile-label">{at("stats_panel_bw_week", {}, "")}</div>
+                  <div class="admin-panel-dash-tile-value admin-panel-dash-tile-value--sm">{panelBw.week}</div>
+                </div>
+              {/if}
+              {#if panelBw?.month != null}
+                <div class="admin-panel-dash-tile admin-panel-dash-tile--wide">
+                  <div class="admin-panel-dash-tile-label">{at("stats_panel_bw_month", {}, "")}</div>
+                  <div class="admin-panel-dash-tile-value admin-panel-dash-tile-value--sm">{panelBw.month}</div>
+                </div>
+              {/if}
+            </div>
+
+            {#if panelNodeTraffic?.seven?.length}
+              <div class="admin-panel-dash-nodes">
+                <div class="admin-panel-dash-nodes-head">
+                  <h3 class="admin-panel-dash-nodes-title">{at("stats_panel_inner_nodes", {}, "")}</h3>
+                  <p class="admin-panel-dash-nodes-hint">{at("stats_panel_inner_nodes_hint", {}, "")}</p>
+                </div>
+                <div class="admin-panel-dash-nodes-grid">
+                  {#each panelNodeTraffic.seven.slice(0, PANEL_NODE_TILE_LIMIT) as node}
+                    <div class="admin-panel-dash-node">
+                      <div class="admin-panel-dash-node-name">{node.label}</div>
+                      <div class="admin-panel-dash-node-value">{node.value}</div>
+                      {#if node.online != null}
+                        <div class="admin-panel-dash-node-meta">
+                          {at("stats_panel_node_users_online", { count: node.online }, "")}
+                        </div>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+                {#if panelNodeTraffic.seven.length > PANEL_NODE_TILE_LIMIT}
+                  <p class="admin-panel-dash-nodes-more">
+                    {at("stats_panel_nodes_overflow", { count: panelNodeTraffic.seven.length - PANEL_NODE_TILE_LIMIT }, "")}
+                  </p>
+                {/if}
+              </div>
+            {:else if panelPayload?.nodes && typeof panelPayload.nodes === "object" && Object.keys(panelPayload.nodes).length > 0}
+              <p class="admin-panel-dash-nodes-empty">{at("stats_panel_nodes_empty", {}, "")}</p>
             {/if}
           </div>
-          {#if panelBw && (panelBw.week != null || panelBw.month != null)}
-            <dl class="admin-dashboard-panel-bandwidth">
-              {#if panelBw.week != null}
-                <div>
-                  <dt>{at("stats_panel_bw_week", {}, "")}</dt>
-                  <dd>{panelBw.week}</dd>
-                </div>
-              {/if}
-              {#if panelBw.month != null}
-                <div>
-                  <dt>{at("stats_panel_bw_month", {}, "")}</dt>
-                  <dd>{panelBw.month}</dd>
-                </div>
-              {/if}
-            </dl>
-          {/if}
         </Card.Content>
       </Card.Root>
     {/if}
