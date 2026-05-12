@@ -1121,8 +1121,11 @@ class SubscriptionService:
         previous_topup_used = int(sub.premium_topup_used_bytes or 0) if same_period else 0
         premium_used = int(sub.premium_used_bytes or 0) if same_period else 0
         premium_baseline = int(tariff.premium_monthly_bytes or sub.premium_baseline_bytes or 0)
+        premium_bonus = max(0, int(getattr(sub, "premium_bonus_bytes", 0) or 0))
         premium_topup_balance = int(sub.premium_topup_balance_bytes or 0) + purchase_bytes
-        overflow_to_cover = max(0, premium_used - premium_baseline - previous_topup_used)
+        overflow_to_cover = max(
+            0, premium_used - premium_baseline - previous_topup_used - premium_bonus
+        )
         consume_now = min(premium_topup_balance, overflow_to_cover)
         premium_topup_balance -= consume_now
         premium_topup_used = previous_topup_used + consume_now
@@ -1130,8 +1133,12 @@ class SubscriptionService:
             premium_baseline,
             premium_topup_balance,
             premium_topup_used,
+            premium_bonus,
         )
-        premium_is_limited = premium_limit > 0 and premium_used >= premium_limit
+        premium_unlimited = bool(getattr(sub, "premium_unlimited_override", False))
+        premium_is_limited = (
+            not premium_unlimited and premium_limit > 0 and premium_used >= premium_limit
+        )
 
         updated_sub = await subscription_dal.update_subscription(
             session,
@@ -1172,6 +1179,63 @@ class SubscriptionService:
             "premium_is_limited": premium_is_limited,
             "tariff_key": tariff.key,
         }
+
+    async def sync_premium_squad_access_to_panel(
+        self,
+        session: AsyncSession,
+        user_id: int,
+    ) -> None:
+        """Recompute premium quota flags from DB and push internal squads to Remnawave.
+
+        Used when admin overrides change without going through the traffic worker
+        (Telegram/Web admin premium bonus / unlimited).
+        """
+        db_user = await user_dal.get_user_by_id(session, user_id)
+        if not db_user or not db_user.panel_user_uuid:
+            return
+        sub = await subscription_dal.get_active_subscription_by_user_id(
+            session, user_id, db_user.panel_user_uuid
+        )
+        if not sub:
+            return
+        tariff = self._resolve_tariff(sub.tariff_key) if sub.tariff_key else None
+        if not tariff or not getattr(tariff, "premium_squad_uuids", None):
+            return
+
+        premium_baseline = int(tariff.premium_monthly_bytes or sub.premium_baseline_bytes or 0)
+        premium_bonus = max(0, int(getattr(sub, "premium_bonus_bytes", 0) or 0))
+        premium_topup_balance = int(sub.premium_topup_balance_bytes or 0)
+        premium_topup_used = int(getattr(sub, "premium_topup_used_bytes", 0) or 0)
+        premium_used = int(sub.premium_used_bytes or 0)
+        premium_limit = self._premium_effective_limit_bytes(
+            premium_baseline,
+            premium_topup_balance,
+            premium_topup_used,
+            premium_bonus,
+        )
+        premium_unlimited = bool(getattr(sub, "premium_unlimited_override", False))
+        premium_is_limited = (
+            not premium_unlimited and premium_limit > 0 and premium_used >= premium_limit
+        )
+
+        if bool(getattr(sub, "premium_is_limited", False)) != premium_is_limited:
+            await subscription_dal.update_subscription(
+                session,
+                sub.subscription_id,
+                {"premium_is_limited": premium_is_limited},
+            )
+
+        squads = self._panel_squads_for_tariff(tariff, include_premium=not premium_is_limited)
+        try:
+            await self.panel_service.update_user_details_on_panel(
+                db_user.panel_user_uuid,
+                {"uuid": db_user.panel_user_uuid, "activeInternalSquads": squads},
+                log_response=False,
+            )
+        except Exception:
+            logging.exception(
+                "sync_premium_squad_access_to_panel: failed to push squads for user %s", user_id
+            )
 
     async def admin_grant_topup(
         self,

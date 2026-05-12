@@ -234,6 +234,58 @@ class AdminGrantTopupTests(unittest.IsolatedAsyncioTestCase):
             ):
                 self.assertIsNone(await service.admin_grant_premium_topup(AsyncMock(), 11, 10.0))
 
+    async def test_sync_premium_squad_access_updates_limited_flag_and_panel(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = _make_settings(_tariffs_config_payload(premium=True), tmpdir)
+            panel_service = AsyncMock(spec=PanelApiService)
+            panel_service.update_user_details_on_panel = AsyncMock(return_value={"response": {}})
+            service = SubscriptionService(settings, panel_service)
+
+            db_user = SimpleNamespace(
+                user_id=88,
+                panel_user_uuid="panel-uuid",
+            )
+            sub = SimpleNamespace(
+                subscription_id=3,
+                user_id=88,
+                panel_user_uuid="panel-uuid",
+                tariff_key="standard",
+                premium_baseline_bytes=25 * (1024**3),
+                premium_topup_balance_bytes=0,
+                premium_topup_used_bytes=0,
+                premium_used_bytes=30 * (1024**3),
+                premium_is_limited=True,
+                premium_period_start_at=datetime.now(timezone.utc).replace(
+                    day=1, hour=0, minute=0, second=0, microsecond=0
+                ),
+                premium_unlimited_override=False,
+                premium_bonus_bytes=10 * (1024**3),
+            )
+
+            with (
+                patch(
+                    "bot.services.subscription_service.user_dal.get_user_by_id",
+                    new=AsyncMock(return_value=db_user),
+                ),
+                patch(
+                    "bot.services.subscription_service.subscription_dal.get_active_subscription_by_user_id",
+                    new=AsyncMock(return_value=sub),
+                ),
+                patch(
+                    "bot.services.subscription_service.subscription_dal.update_subscription",
+                    new=AsyncMock(return_value=sub),
+                ) as upd,
+            ):
+                await service.sync_premium_squad_access_to_panel(AsyncMock(), 88)
+
+            upd.assert_awaited_once()
+            self.assertFalse(upd.await_args.args[2]["premium_is_limited"])
+            panel_service.update_user_details_on_panel.assert_awaited_once()
+            squads = panel_service.update_user_details_on_panel.await_args.args[1][
+                "activeInternalSquads"
+            ]
+            self.assertIn("premium-squad", squads)
+
 
 if __name__ == "__main__":
     unittest.main()

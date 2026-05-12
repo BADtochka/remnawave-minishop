@@ -1241,6 +1241,7 @@ async def admin_user_premium_override_route(request: web.Request) -> web.Respons
     actor_id = _require_admin_user_id(request)
     target_id = int(request.match_info["user_id"])
     payload = await _read_json(request)
+    subscription_service = request.app.get("subscription_service")
 
     unlimited = bool(payload.get("unlimited"))
     bonus_bytes_raw = payload.get("bonus_bytes")
@@ -1284,6 +1285,11 @@ async def admin_user_premium_override_route(request: web.Request) -> web.Respons
         )
         await session.commit()
         await session.refresh(active)
+
+        if subscription_service is not None:
+            await subscription_service.sync_premium_squad_access_to_panel(session, target_id)
+            await session.commit()
+            await session.refresh(active)
 
     return _ok({"subscription": _serialize_subscription(active)})
 

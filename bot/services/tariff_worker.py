@@ -152,7 +152,12 @@ class TariffTrafficWorker:
             )
 
             await self._sync_premium_squad_limit(
-                session, sub, tariff, now, panel_username=panel_username
+                session,
+                sub,
+                tariff,
+                now,
+                panel_username=panel_username,
+                panel_user_dict=panel_data,
             )
 
     async def _ensure_period_reset_strategy(
@@ -281,6 +286,7 @@ class TariffTrafficWorker:
         now: datetime,
         *,
         panel_username: Optional[str] = None,
+        panel_user_dict: Optional[dict] = None,
     ) -> None:
         if not getattr(tariff, "premium_squad_uuids", None):
             if (
@@ -359,6 +365,17 @@ class TariffTrafficWorker:
             or bool(sub.premium_is_limited) != should_limit
             or getattr(sub, "premium_period_start_at", None) != premium_period_start
         )
+        desired_squads = self.subscription_service._panel_squads_for_tariff(
+            tariff,
+            include_premium=not should_limit,
+        )
+        desired_set = self._internal_squad_uuid_set(desired_squads)
+        if isinstance(panel_user_dict, dict):
+            current_raw = panel_user_dict.get("activeInternalSquads") or panel_user_dict.get(
+                "active_internal_squads"
+            )
+            if desired_set != self._internal_squad_uuid_set(current_raw):
+                changed = True
         sub.premium_baseline_bytes = premium_baseline
         sub.premium_topup_balance_bytes = premium_topup_balance
         sub.premium_topup_used_bytes = premium_topup_used
@@ -377,10 +394,7 @@ class TariffTrafficWorker:
         if not changed:
             return
 
-        squads = self.subscription_service._panel_squads_for_tariff(
-            tariff,
-            include_premium=not should_limit,
-        )
+        squads = desired_squads
         await self.panel_service.update_user_details_on_panel(
             sub.panel_user_uuid,
             {"uuid": sub.panel_user_uuid, "activeInternalSquads": squads},
@@ -394,6 +408,20 @@ class TariffTrafficWorker:
             premium_used,
             premium_limit,
         )
+
+    @staticmethod
+    def _internal_squad_uuid_set(raw) -> set[str]:
+        if not isinstance(raw, list):
+            return set()
+        out: set[str] = set()
+        for item in raw:
+            if isinstance(item, dict):
+                u = item.get("uuid") or item.get("internalSquadUuid") or item.get("squadUuid")
+                if u:
+                    out.add(str(u))
+            elif item:
+                out.add(str(item))
+        return out
 
     @staticmethod
     def _fmt_bytes(value: int) -> str:

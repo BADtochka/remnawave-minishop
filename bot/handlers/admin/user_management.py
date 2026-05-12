@@ -759,6 +759,9 @@ async def handle_premium_override_apply(
         )
         await session.commit()
 
+        await subscription_service.sync_premium_squad_access_to_panel(session, user.user_id)
+        await session.commit()
+
         await callback.answer(_("admin_premium_override_saved"), show_alert=False)
         await handle_refresh_user_card(
             callback, user, subscription_service, session, i18n_instance, lang
@@ -1755,6 +1758,9 @@ async def process_premium_override_bonus_handler(
                 "timestamp": datetime.now(timezone.utc),
             },
         )
+        await session.commit()
+
+        await subscription_service.sync_premium_squad_access_to_panel(session, target_user_id)
         await session.commit()
 
         await message.answer(
