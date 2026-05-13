@@ -2,6 +2,7 @@ import { writable } from "svelte/store";
 
 export function createUsersStore({ api, onToast, at }) {
   const USERS_PAGE_SIZE = 25;
+  const USER_LOGS_PAGE_SIZE = 20;
 
   const state = writable({
     users: [],
@@ -30,6 +31,14 @@ export function createUsersStore({ api, onToast, at }) {
     regularBonusGbDraft: "",
     grantTrafficGbDraft: "",
     grantTrafficKindDraft: "regular",
+
+    userLogs: [],
+    userLogsTotal: 0,
+    userLogsPage: 0,
+    userLogsLoading: false,
+    userLogsLoaded: false,
+    userLogsUserId: null,
+    userLogsPageSize: USER_LOGS_PAGE_SIZE,
   });
 
   let _activeRef = "stats"; // fallback if active isn't tracked
@@ -96,6 +105,12 @@ export function createUsersStore({ api, onToast, at }) {
       userExtendDays: 30,
       userDetailLoading: true,
       userDetailTab: "subscription",
+      userLogs: [],
+      userLogsTotal: 0,
+      userLogsPage: 0,
+      userLogsLoading: false,
+      userLogsLoaded: false,
+      userLogsUserId: userId,
     }));
 
     if (!opts.skipPush) _pushUserPath(userId);
@@ -138,9 +153,59 @@ export function createUsersStore({ api, onToast, at }) {
         userDeleteOpen: false,
         userBanConfirmOpen: false,
         userMessageConfirmOpen: false,
+        userLogs: [],
+        userLogsTotal: 0,
+        userLogsPage: 0,
+        userLogsLoading: false,
+        userLogsLoaded: false,
+        userLogsUserId: null,
       };
     });
     if (wasOpen && !opts.skipPush) _pushUserPath(null);
+  }
+
+  async function loadUserLogs(page) {
+    let s;
+    state.update((st) => {
+      s = st;
+      return st;
+    });
+    if (!s.openedUser) return;
+    const userId = s.openedUser.user_id;
+    const targetPage = Number.isFinite(page) ? Math.max(0, Math.floor(page)) : s.userLogsPage || 0;
+    state.update((st) => ({
+      ...st,
+      userLogsLoading: true,
+      userLogsPage: targetPage,
+      userLogsUserId: userId,
+    }));
+    try {
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        page_size: String(USER_LOGS_PAGE_SIZE),
+        user_id: String(userId),
+      });
+      const data = await api(`/admin/logs?${params.toString()}`);
+      if (data?.ok) {
+        state.update((st) => {
+          if (!st.openedUser || st.openedUser.user_id !== userId) return st;
+          return {
+            ...st,
+            userLogs: data.logs || [],
+            userLogsTotal: Number(data.total || 0),
+            userLogsLoaded: true,
+          };
+        });
+      } else if (data?.error) {
+        onToast(data.error);
+      }
+    } finally {
+      state.update((st) => ({ ...st, userLogsLoading: false }));
+    }
+  }
+
+  function setUserLogsPage(page) {
+    loadUserLogs(page);
   }
 
   function copyToClipboard(text, successMessage = at("link_copied", {}, "Скопировано")) {
@@ -451,5 +516,7 @@ export function createUsersStore({ api, onToast, at }) {
     savePremiumTrafficOverride,
     saveRegularTrafficOverride,
     grantTraffic,
+    loadUserLogs,
+    setUserLogsPage,
   };
 }
