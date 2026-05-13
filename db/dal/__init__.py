@@ -1,12 +1,15 @@
-from . import user_dal
-from . import payment_dal
-from . import subscription_dal
-from . import promo_code_dal
-from . import panel_sync_dal
-from . import message_log_dal
-from . import user_billing_dal
-from . import ad_dal
-from . import security_dal
+from . import (
+    ad_dal,
+    app_settings_dal,
+    message_log_dal,
+    panel_sync_dal,
+    payment_dal,
+    promo_code_dal,
+    security_dal,
+    subscription_dal,
+    user_billing_dal,
+    user_dal,
+)
 
 __all__ = (
     "user_dal",
@@ -18,6 +21,5 @@ __all__ = (
     "user_billing_dal",
     "ad_dal",
     "security_dal",
+    "app_settings_dal",
 )
-
-

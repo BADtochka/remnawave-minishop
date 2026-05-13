@@ -6,7 +6,7 @@ import sys
 from dotenv import load_dotenv
 
 from bot.main_bot import run_bot
-from config.settings import get_settings, Settings
+from config.settings import get_settings
 from db.database_setup import init_db, init_db_connection
 
 
@@ -19,8 +19,7 @@ async def main():
 
     session_factory = init_db_connection(settings)
     if not session_factory:
-        logging.critical(
-            "Failed to initialize DB connection and session factory. Exiting.")
+        logging.critical("Failed to initialize DB connection and session factory. Exiting.")
         return
 
     await init_db(settings, session_factory)
@@ -33,12 +32,12 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=_resolve_log_level(os.getenv("LOG_LEVEL", "INFO")),
         stream=sys.stdout,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Bot stopped manually")
     except Exception as e_global:
-        logging.critical(f"Global unhandled exception in main: {e_global}",
-                         exc_info=True)
+        logging.critical(f"Global unhandled exception in main: {e_global}", exc_info=True)
         sys.exit(1)

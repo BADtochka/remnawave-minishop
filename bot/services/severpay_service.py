@@ -1,24 +1,24 @@
+import hashlib
+import hmac
 import json
 import logging
 import secrets
-import hmac
-import hashlib
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional, Dict, Any, Tuple
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any, Dict, Optional, Tuple
 
-from aiohttp import ClientSession, ClientTimeout, web
 from aiogram import Bot
+from aiohttp import ClientSession, ClientTimeout, web
 from sqlalchemy.orm import sessionmaker
 
-from config.settings import Settings
-from bot.middlewares.i18n import JsonI18n
-from bot.services.subscription_service import SubscriptionService
-from bot.services.referral_service import ReferralService
-from bot.services.notification_service import NotificationService
 from bot.keyboards.inline.user_keyboards import get_connect_and_main_keyboard
-from db.dal import payment_dal, user_dal
-from bot.utils.text_sanitizer import sanitize_display_name, username_for_display
+from bot.middlewares.i18n import JsonI18n
+from bot.services.notification_service import NotificationService
+from bot.services.referral_service import ReferralService
+from bot.services.subscription_service import SubscriptionService
 from bot.utils.config_link import prepare_config_links
+from bot.utils.text_sanitizer import sanitize_display_name, username_for_display
+from config.settings import Settings
+from db.dal import payment_dal, user_dal
 
 
 class SeverPayService:
@@ -40,7 +40,9 @@ class SeverPayService:
         self.subscription_service = subscription_service
         self.referral_service = referral_service
 
-        self.base_url = (settings.SEVERPAY_BASE_URL or "https://severpay.io/api/merchant").rstrip("/")
+        self.base_url = (settings.SEVERPAY_BASE_URL or "https://severpay.io/api/merchant").rstrip(
+            "/"
+        )
         self.mid = settings.SEVERPAY_MID
         self.token = settings.SEVERPAY_TOKEN or ""
         self.return_url = settings.SEVERPAY_RETURN_URL or f"https://t.me/{default_return_url}"
@@ -51,7 +53,9 @@ class SeverPayService:
 
         self.configured: bool = bool(settings.SEVERPAY_ENABLED and self.mid and self.token)
         if not self.configured:
-            logging.warning("SeverPayService initialized but not fully configured. Payments disabled.")
+            logging.warning(
+                "SeverPayService initialized but not fully configured. Payments disabled."
+            )
 
     async def _get_session(self) -> ClientSession:
         if self._session is None or self._session.closed:
@@ -69,7 +73,9 @@ class SeverPayService:
 
     def _sign_payload(self, payload: Dict[str, Any]) -> str:
         message = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        return hmac.new(self.token.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
+        return hmac.new(
+            self.token.encode("utf-8"), message.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
 
     def _build_signed_body(self, extra: Dict[str, Any]) -> Dict[str, Any]:
         body: Dict[str, Any] = {
@@ -129,8 +135,14 @@ class SeverPayService:
                 try:
                     response_data = json.loads(response_text) if response_text else {}
                 except json.JSONDecodeError:
-                    logging.error("SeverPay create_payment: invalid JSON response: %s", response_text)
-                    return False, {"status": response.status, "message": "invalid_json", "raw": response_text}
+                    logging.error(
+                        "SeverPay create_payment: invalid JSON response: %s", response_text
+                    )
+                    return False, {
+                        "status": response.status,
+                        "message": "invalid_json",
+                        "raw": response_text,
+                    }
 
                 if response.status != 200 or not response_data.get("status"):
                     logging.error(
@@ -184,14 +196,23 @@ class SeverPayService:
             if payment_db_id is not None:
                 payment = await payment_dal.get_payment_by_db_id(session, payment_db_id)
             if not payment and provider_payment_id:
-                payment = await payment_dal.get_payment_by_provider_payment_id(session, provider_payment_id)
+                payment = await payment_dal.get_payment_by_provider_payment_id(
+                    session, provider_payment_id
+                )
 
             if not payment:
-                logging.error("SeverPay webhook: payment not found (order_id=%s, provider_id=%s)", order_id_raw, provider_payment_id)
+                logging.error(
+                    "SeverPay webhook: payment not found (order_id=%s, provider_id=%s)",
+                    order_id_raw,
+                    provider_payment_id,
+                )
                 return web.json_response({"status": False, "msg": "payment_not_found"}, status=404)
 
-            payment_months = payment.subscription_duration_months or 1
-            sale_mode = "traffic" if self.settings.traffic_sale_mode else "subscription"
+            payment_months = payment.purchased_gb or payment.subscription_duration_months or 1
+            sale_mode = payment.sale_mode or (
+                "traffic" if self.settings.traffic_sale_mode else "subscription"
+            )
+            sale_base = sale_mode.split("@", 1)[0].split("|", 1)[0]
             if status == "success":
                 try:
                     await payment_dal.update_provider_payment_and_status(
@@ -204,48 +225,70 @@ class SeverPayService:
                     activation = await self.subscription_service.activate_subscription(
                         session,
                         payment.user_id,
-                        int(payment_months) if sale_mode != "traffic" else 0,
+                        int(payment_months)
+                        if sale_base == "subscription"
+                        else int(float(payment_months)),
                         float(payment.amount),
                         payment.payment_id,
                         provider="severpay",
                         sale_mode=sale_mode,
-                        traffic_gb=payment_months if sale_mode == "traffic" else None,
+                        traffic_gb=float(payment_months)
+                        if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                        else None,
                     )
 
                     referral_bonus = None
-                    if sale_mode != "traffic":
-                        referral_bonus = await self.referral_service.apply_referral_bonuses_for_payment(
-                            session,
-                            payment.user_id,
-                            int(payment_months),
-                            current_payment_db_id=payment.payment_id,
-                            skip_if_active_before_payment=False,
+                    if sale_base == "subscription":
+                        referral_bonus = (
+                            await self.referral_service.apply_referral_bonuses_for_payment(
+                                session,
+                                payment.user_id,
+                                int(payment_months),
+                                current_payment_db_id=payment.payment_id,
+                                skip_if_active_before_payment=False,
+                            )
                         )
 
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception("SeverPay webhook: failed to process payment %s.", provider_payment_id)
-                    return web.json_response({"status": False, "msg": "processing_error"}, status=500)
+                    logging.exception(
+                        "SeverPay webhook: failed to process payment %s.", provider_payment_id
+                    )
+                    return web.json_response(
+                        {"status": False, "msg": "processing_error"}, status=500
+                    )
 
                 db_user = payment.user or await user_dal.get_user_by_id(session, payment.user_id)
-                lang = db_user.language_code if db_user and db_user.language_code else self.settings.DEFAULT_LANGUAGE
+                lang = (
+                    db_user.language_code
+                    if db_user and db_user.language_code
+                    else self.settings.DEFAULT_LANGUAGE
+                )
                 _ = lambda k, **kw: self.i18n.gettext(lang, k, **kw) if self.i18n else k
 
                 raw_config_link = activation.get("subscription_url") if activation else None
-                config_link_display, connect_button_url = await prepare_config_links(self.settings, raw_config_link)
+                config_link_display, connect_button_url = await prepare_config_links(
+                    self.settings, raw_config_link
+                )
                 config_link_text = config_link_display or _("config_link_not_available")
                 final_end = activation.get("end_date") if activation else None
                 applied_days = 0
-                applied_promo_days = activation.get("applied_promo_bonus_days", 0) if activation else 0
+                applied_promo_days = (
+                    activation.get("applied_promo_bonus_days", 0) if activation else 0
+                )
 
                 if referral_bonus and referral_bonus.get("referee_new_end_date"):
                     final_end = referral_bonus["referee_new_end_date"]
                     applied_days = referral_bonus.get("referee_bonus_applied_days", 0)
 
-                traffic_label = str(int(payment_months)) if float(payment_months).is_integer() else f"{payment_months:g}"
+                traffic_label = (
+                    str(int(payment_months))
+                    if float(payment_months).is_integer()
+                    else f"{payment_months:g}"
+                )
 
-                if sale_mode == "traffic":
+                if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}:
                     text = _(
                         "payment_successful_traffic_full",
                         traffic_gb=traffic_label,
@@ -257,16 +300,26 @@ class SeverPayService:
                     if db_user and db_user.referred_by_id:
                         inviter = await user_dal.get_user_by_id(session, db_user.referred_by_id)
                         if inviter:
-                            safe_name = sanitize_display_name(inviter.first_name) if inviter.first_name else None
+                            safe_name = (
+                                sanitize_display_name(inviter.first_name)
+                                if inviter.first_name
+                                else None
+                            )
                             if safe_name:
                                 inviter_name_display = safe_name
                             elif inviter.username:
-                                inviter_name_display = username_for_display(inviter.username, with_at=False)
+                                inviter_name_display = username_for_display(
+                                    inviter.username, with_at=False
+                                )
 
                     text = _(
                         "payment_successful_with_referral_bonus_full",
                         months=payment_months,
-                        base_end_date=activation["end_date"].strftime("%Y-%m-%d") if activation and activation.get("end_date") else final_end.strftime("%Y-%m-%d") if final_end else "",
+                        base_end_date=activation["end_date"].strftime("%Y-%m-%d")
+                        if activation and activation.get("end_date")
+                        else final_end.strftime("%Y-%m-%d")
+                        if final_end
+                        else "",
                         bonus_days=applied_days,
                         final_end_date=final_end.strftime("%Y-%m-%d") if final_end else "",
                         inviter_name=inviter_name_display,
@@ -305,7 +358,9 @@ class SeverPayService:
                         disable_web_page_preview=True,
                     )
                 except Exception:
-                    logging.exception("SeverPay webhook: failed to notify user %s.", payment.user_id)
+                    logging.exception(
+                        "SeverPay webhook: failed to notify user %s.", payment.user_id
+                    )
 
                 try:
                     notification_service = NotificationService(self.bot, self.settings, self.i18n)
@@ -313,10 +368,14 @@ class SeverPayService:
                         user_id=payment.user_id,
                         amount=float(payment.amount),
                         currency=payment.currency,
-                        months=int(payment_months) if sale_mode != "traffic" else 0,
-                        traffic_gb=payment_months if sale_mode == "traffic" else None,
+                        months=int(payment_months) if sale_base == "subscription" else 0,
+                        traffic_gb=float(payment_months)
+                        if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                        else None,
                         payment_provider="severpay",
                         username=db_user.username if db_user else None,
+                        traffic_is_premium=sale_base == "premium_topup",
+                        tariff_key=getattr(payment, "tariff_key", None),
                     )
                 except Exception:
                     logging.exception("SeverPay webhook: failed to notify admins.")
@@ -334,11 +393,20 @@ class SeverPayService:
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception("SeverPay webhook: failed to mark payment %s as failed.", provider_payment_id)
-                    return web.json_response({"status": False, "msg": "processing_error"}, status=500)
+                    logging.exception(
+                        "SeverPay webhook: failed to mark payment %s as failed.",
+                        provider_payment_id,
+                    )
+                    return web.json_response(
+                        {"status": False, "msg": "processing_error"}, status=500
+                    )
 
                 db_user = payment.user or await user_dal.get_user_by_id(session, payment.user_id)
-                lang = db_user.language_code if db_user and db_user.language_code else self.settings.DEFAULT_LANGUAGE
+                lang = (
+                    db_user.language_code
+                    if db_user and db_user.language_code
+                    else self.settings.DEFAULT_LANGUAGE
+                )
                 _ = lambda k, **kw: self.i18n.gettext(lang, k, **kw) if self.i18n else k
                 try:
                     await self.bot.send_message(payment.user_id, _("payment_failed"))
@@ -357,10 +425,17 @@ class SeverPayService:
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception("SeverPay webhook: failed to update pending status for %s.", provider_payment_id)
+                    logging.exception(
+                        "SeverPay webhook: failed to update pending status for %s.",
+                        provider_payment_id,
+                    )
                 return web.json_response({"status": True})
 
-            logging.warning("SeverPay webhook: unhandled status '%s' for payment %s", status, provider_payment_id)
+            logging.warning(
+                "SeverPay webhook: unhandled status '%s' for payment %s",
+                status,
+                provider_payment_id,
+            )
             return web.json_response({"status": True})
 
 

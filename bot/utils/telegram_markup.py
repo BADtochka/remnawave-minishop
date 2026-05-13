@@ -20,8 +20,7 @@ def remove_profile_link_buttons(
             button
             for button in row
             if not (
-                getattr(button, "url", None)
-                and str(button.url).startswith(TG_USER_LINK_PREFIX)
+                getattr(button, "url", None) and str(button.url).startswith(TG_USER_LINK_PREFIX)
             )
         ]
         if filtered_row:

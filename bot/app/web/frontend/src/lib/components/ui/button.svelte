@@ -1,5 +1,6 @@
 <script>
-  import { cn } from "../../utils.js";
+  import { cva } from "class-variance-authority";
+  import { cn } from "$lib/utils.js";
 
   export let type = "button";
   export let variant = "default";
@@ -10,29 +11,42 @@
   let className = "";
   export { className as class };
 
-  const variants = {
-    default: "btn btn-primary",
-    secondary: "btn btn-secondary",
-    outline: "btn btn-outline",
-    ghost: "btn btn-ghost",
-    telegram: "btn btn-telegram",
-    icon: "btn btn-icon",
-  };
-
-  const sizes = {
-    default: "",
-    sm: "btn-sm",
-    lg: "btn-lg",
-    icon: "btn-square",
-  };
+  const buttonVariants = cva("btn", {
+    variants: {
+      variant: {
+        default: "btn-primary",
+        secondary: "btn-secondary",
+        outline: "btn-outline",
+        ghost: "btn-ghost",
+        telegram: "btn-telegram",
+        icon: "btn-icon",
+      },
+      size: {
+        default: "",
+        sm: "btn-sm",
+        lg: "btn-lg",
+        icon: "btn-square",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  });
 </script>
 
 {#if href}
-  <a class={cn(variants[variant], sizes[size], className)} {href} on:click={onclick} {...$$restProps}>
+  <a class={cn(buttonVariants({ variant, size }), className)} {href} {onclick} {...$$restProps}>
     <slot />
   </a>
 {:else}
-  <button class={cn(variants[variant], sizes[size], className)} {type} {disabled} on:click={onclick} {...$$restProps}>
+  <button
+    class={cn(buttonVariants({ variant, size }), className)}
+    {type}
+    {disabled}
+    {onclick}
+    {...$$restProps}
+  >
     <slot />
   </button>
 {/if}

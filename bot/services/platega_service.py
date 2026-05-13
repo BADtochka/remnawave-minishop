@@ -1,22 +1,22 @@
 import hmac
 import json
 import logging
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional, Dict, Any, Tuple
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any, Dict, Optional, Tuple
 
-from aiohttp import ClientSession, ClientTimeout, web
 from aiogram import Bot
+from aiohttp import ClientSession, ClientTimeout, web
 from sqlalchemy.orm import sessionmaker
 
-from config.settings import Settings
-from bot.middlewares.i18n import JsonI18n
-from bot.services.subscription_service import SubscriptionService
-from bot.services.referral_service import ReferralService
 from bot.keyboards.inline.user_keyboards import get_connect_and_main_keyboard
+from bot.middlewares.i18n import JsonI18n
 from bot.services.notification_service import NotificationService
-from db.dal import payment_dal, user_dal
-from bot.utils.text_sanitizer import sanitize_display_name, username_for_display
+from bot.services.referral_service import ReferralService
+from bot.services.subscription_service import SubscriptionService
 from bot.utils.config_link import prepare_config_links
+from bot.utils.text_sanitizer import sanitize_display_name, username_for_display
+from config.settings import Settings
+from db.dal import payment_dal, user_dal
 
 
 class PlategaService:
@@ -54,14 +54,14 @@ class PlategaService:
             "X-Secret": self.secret or "",
             "Content-Type": "application/json",
         }
-        self.configured: bool = bool(
-            settings.PLATEGA_ENABLED and self.merchant_id and self.secret
-        )
+        self.configured: bool = bool(settings.PLATEGA_ENABLED and self.merchant_id and self.secret)
         if not self.configured:
-            logging.warning("PlategaService initialized but not fully configured. Payments disabled.")
+            logging.warning(
+                "PlategaService initialized but not fully configured. Payments disabled."
+            )
         else:
             logging.info(
-                "PlategaService configured. SBP button: %s (method=%s), Crypto button: %s (method=%s)",
+                "PlategaService configured. SBP button: %s (method=%s), Crypto button: %s (method=%s)",  # noqa: E501
                 "ON" if settings.PLATEGA_SBP_ENABLED else "OFF",
                 self.sbp_method,
                 "ON" if settings.PLATEGA_CRYPTO_ENABLED else "OFF",
@@ -114,7 +114,12 @@ class PlategaService:
             "X-Secret": "***" if self._auth_headers.get("X-Secret") else "",
             "Content-Type": self._auth_headers.get("Content-Type"),
         }
-        logging.info("Platega create_transaction request: url=%s headers=%s body=%s", url, safe_headers, clean_body)
+        logging.info(
+            "Platega create_transaction request: url=%s headers=%s body=%s",
+            url,
+            safe_headers,
+            clean_body,
+        )
 
         try:
             async with session.post(url, json=clean_body, headers=self._auth_headers) as response:
@@ -122,7 +127,9 @@ class PlategaService:
                 try:
                     response_data = json.loads(response_text) if response_text else {}
                 except json.JSONDecodeError:
-                    logging.error("Platega create_transaction: invalid JSON response: %s", response_text)
+                    logging.error(
+                        "Platega create_transaction: invalid JSON response: %s", response_text
+                    )
                     return False, {
                         "status": response.status,
                         "message": "invalid_json",
@@ -173,29 +180,42 @@ class PlategaService:
         async with self.async_session_factory() as session:
             payment = await payment_dal.get_payment_by_provider_payment_id(session, transaction_id)
             if not payment:
-                logging.error("Platega webhook: payment not found for transaction %s", transaction_id)
+                logging.error(
+                    "Platega webhook: payment not found for transaction %s", transaction_id
+                )
                 return web.Response(status=404, text="payment_not_found")
 
             if payment.status == "succeeded" and status == "CONFIRMED":
                 return web.Response(text="ok")
 
-            payment_months = payment.subscription_duration_months or 1
-            sale_mode = "traffic" if self.settings.traffic_sale_mode else "subscription"
+            payment_months = payment.purchased_gb or payment.subscription_duration_months or 1
+            sale_mode = payment.sale_mode or (
+                "traffic" if self.settings.traffic_sale_mode else "subscription"
+            )
+            sale_base = sale_mode.split("@", 1)[0].split("|", 1)[0]
 
             if status == "CONFIRMED":
                 if amount_raw is not None:
                     try:
-                        incoming_amount = Decimal(str(amount_raw)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-                        expected_amount = Decimal(str(payment.amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                        incoming_amount = Decimal(str(amount_raw)).quantize(
+                            Decimal("0.01"), rounding=ROUND_HALF_UP
+                        )
+                        expected_amount = Decimal(str(payment.amount)).quantize(
+                            Decimal("0.01"), rounding=ROUND_HALF_UP
+                        )
                         if incoming_amount != expected_amount:
                             logging.warning(
-                                "Platega webhook: amount mismatch for payment %s (expected %s, got %s)",
+                                "Platega webhook: amount mismatch for payment %s (expected %s, got %s)",  # noqa: E501
                                 payment.payment_id,
                                 expected_amount,
                                 incoming_amount,
                             )
                     except Exception as exc:
-                        logging.warning("Platega webhook: failed to compare amounts for %s: %s", payment.payment_id, exc)
+                        logging.warning(
+                            "Platega webhook: failed to compare amounts for %s: %s",
+                            payment.payment_id,
+                            exc,
+                        )
 
                 try:
                     await payment_dal.update_provider_payment_and_status(
@@ -208,48 +228,68 @@ class PlategaService:
                     activation = await self.subscription_service.activate_subscription(
                         session,
                         payment.user_id,
-                        int(payment_months) if sale_mode != "traffic" else 0,
+                        int(payment_months)
+                        if sale_base == "subscription"
+                        else int(float(payment_months)),
                         float(payment.amount),
                         payment.payment_id,
                         provider="platega",
                         sale_mode=sale_mode,
-                        traffic_gb=payment_months if sale_mode == "traffic" else None,
+                        traffic_gb=float(payment_months)
+                        if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                        else None,
                     )
 
                     referral_bonus = None
-                    if sale_mode != "traffic":
-                        referral_bonus = await self.referral_service.apply_referral_bonuses_for_payment(
-                            session,
-                            payment.user_id,
-                            int(payment_months),
-                            current_payment_db_id=payment.payment_id,
-                            skip_if_active_before_payment=False,
+                    if sale_base == "subscription":
+                        referral_bonus = (
+                            await self.referral_service.apply_referral_bonuses_for_payment(
+                                session,
+                                payment.user_id,
+                                int(payment_months),
+                                current_payment_db_id=payment.payment_id,
+                                skip_if_active_before_payment=False,
+                            )
                         )
 
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception("Platega webhook: failed to process payment %s.", transaction_id)
+                    logging.exception(
+                        "Platega webhook: failed to process payment %s.", transaction_id
+                    )
                     return web.Response(status=500, text="processing_error")
 
                 db_user = await user_dal.get_user_by_id(session, payment.user_id)
-                lang = db_user.language_code if db_user and db_user.language_code else self.settings.DEFAULT_LANGUAGE
+                lang = (
+                    db_user.language_code
+                    if db_user and db_user.language_code
+                    else self.settings.DEFAULT_LANGUAGE
+                )
                 _ = lambda k, **kw: self.i18n.gettext(lang, k, **kw) if self.i18n else k
 
                 raw_config_link = activation.get("subscription_url") if activation else None
-                config_link_display, connect_button_url = await prepare_config_links(self.settings, raw_config_link)
+                config_link_display, connect_button_url = await prepare_config_links(
+                    self.settings, raw_config_link
+                )
                 config_link_text = config_link_display or _("config_link_not_available")
                 final_end = activation.get("end_date") if activation else None
                 applied_days = 0
-                applied_promo_days = activation.get("applied_promo_bonus_days", 0) if activation else 0
+                applied_promo_days = (
+                    activation.get("applied_promo_bonus_days", 0) if activation else 0
+                )
 
                 if referral_bonus and referral_bonus.get("referee_new_end_date"):
                     final_end = referral_bonus["referee_new_end_date"]
                     applied_days = referral_bonus.get("referee_bonus_applied_days", 0)
 
-                traffic_label = str(int(payment_months)) if float(payment_months).is_integer() else f"{payment_months:g}"
+                traffic_label = (
+                    str(int(payment_months))
+                    if float(payment_months).is_integer()
+                    else f"{payment_months:g}"
+                )
 
-                if sale_mode == "traffic":
+                if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}:
                     text = _(
                         "payment_successful_traffic_full",
                         traffic_gb=traffic_label,
@@ -261,16 +301,26 @@ class PlategaService:
                     if db_user and db_user.referred_by_id:
                         inviter = await user_dal.get_user_by_id(session, db_user.referred_by_id)
                         if inviter:
-                            safe_name = sanitize_display_name(inviter.first_name) if inviter.first_name else None
+                            safe_name = (
+                                sanitize_display_name(inviter.first_name)
+                                if inviter.first_name
+                                else None
+                            )
                             if safe_name:
                                 inviter_name_display = safe_name
                             elif inviter.username:
-                                inviter_name_display = username_for_display(inviter.username, with_at=False)
+                                inviter_name_display = username_for_display(
+                                    inviter.username, with_at=False
+                                )
 
                     text = _(
                         "payment_successful_with_referral_bonus_full",
                         months=payment_months,
-                        base_end_date=activation["end_date"].strftime("%Y-%m-%d") if activation and activation.get("end_date") else final_end.strftime("%Y-%m-%d") if final_end else "",
+                        base_end_date=activation["end_date"].strftime("%Y-%m-%d")
+                        if activation and activation.get("end_date")
+                        else final_end.strftime("%Y-%m-%d")
+                        if final_end
+                        else "",
                         bonus_days=applied_days,
                         final_end_date=final_end.strftime("%Y-%m-%d") if final_end else "",
                         inviter_name=inviter_name_display,
@@ -317,10 +367,14 @@ class PlategaService:
                         user_id=payment.user_id,
                         amount=float(payment.amount),
                         currency=currency,
-                        months=int(payment_months) if sale_mode != "traffic" else 0,
-                        traffic_gb=payment_months if sale_mode == "traffic" else None,
+                        months=int(payment_months) if sale_base == "subscription" else 0,
+                        traffic_gb=float(payment_months)
+                        if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                        else None,
                         payment_provider="platega",
                         username=db_user.username if db_user else None,
+                        traffic_is_premium=sale_base == "premium_topup",
+                        tariff_key=getattr(payment, "tariff_key", None),
                     )
                 except Exception:
                     logging.exception("Platega webhook: failed to notify admins.")
@@ -338,11 +392,17 @@ class PlategaService:
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception("Platega webhook: failed to cancel payment %s.", transaction_id)
+                    logging.exception(
+                        "Platega webhook: failed to cancel payment %s.", transaction_id
+                    )
                     return web.Response(status=500, text="processing_error")
 
                 db_user = await user_dal.get_user_by_id(session, payment.user_id)
-                lang = db_user.language_code if db_user and db_user.language_code else self.settings.DEFAULT_LANGUAGE
+                lang = (
+                    db_user.language_code
+                    if db_user and db_user.language_code
+                    else self.settings.DEFAULT_LANGUAGE
+                )
                 _ = lambda k, **kw: self.i18n.gettext(lang, k, **kw) if self.i18n else k
                 try:
                     await self.bot.send_message(payment.user_id, _("payment_failed"))
@@ -350,7 +410,9 @@ class PlategaService:
                     pass
                 return web.Response(text="ok_canceled")
 
-            logging.warning("Platega webhook: unhandled status '%s' for transaction %s", status, transaction_id)
+            logging.warning(
+                "Platega webhook: unhandled status '%s' for transaction %s", status, transaction_id
+            )
             return web.Response(status=202, text="status_ignored")
 
 

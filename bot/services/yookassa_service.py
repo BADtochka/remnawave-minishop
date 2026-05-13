@@ -1,40 +1,44 @@
-import uuid
-import logging
 import asyncio
-from typing import Optional, Dict, Any, List
+import logging
+import uuid
+from typing import Any, Dict, List, Optional
 
-from yookassa import Configuration, Payment as YooKassaPayment
-from yookassa.domain.request.payment_request_builder import PaymentRequestBuilder
+from yookassa import Configuration
+from yookassa import Payment as YooKassaPayment
 from yookassa.domain.common.confirmation_type import ConfirmationType
+from yookassa.domain.request.payment_request_builder import PaymentRequestBuilder
 
 from config.settings import Settings
 
 
 class YooKassaService:
-
-    def __init__(self,
-                 shop_id: Optional[str],
-                 secret_key: Optional[str],
-                 configured_return_url: Optional[str],
-                 bot_username_for_default_return: Optional[str] = None,
-                 settings_obj: Optional[Settings] = None):
+    def __init__(
+        self,
+        shop_id: Optional[str],
+        secret_key: Optional[str],
+        configured_return_url: Optional[str],
+        bot_username_for_default_return: Optional[str] = None,
+        settings_obj: Optional[Settings] = None,
+    ):
 
         self.settings = settings_obj
 
         if self.settings and not self.settings.YOOKASSA_ENABLED:
-            logging.warning("YooKassa is disabled via YOOKASSA_ENABLED flag. Payment functionality will be DISABLED.")
+            logging.warning(
+                "YooKassa is disabled via YOOKASSA_ENABLED flag. Payment functionality will be DISABLED."  # noqa: E501
+            )
             self.configured = False
         elif not shop_id or not secret_key:
             logging.warning(
                 "YooKassa SHOP_ID or SECRET_KEY not configured in settings. "
-                "Payment functionality will be DISABLED.")
+                "Payment functionality will be DISABLED."
+            )
             self.configured = False
         else:
             try:
                 Configuration.configure(shop_id, secret_key)
                 self.configured = True
-                logging.info(
-                    f"YooKassa SDK configured for shop_id: {shop_id[:5]}...")
+                logging.info(f"YooKassa SDK configured for shop_id: {shop_id[:5]}...")
             except Exception:
                 logging.exception("Failed to configure YooKassa SDK.")
                 self.configured = False
@@ -44,7 +48,7 @@ class YooKassaService:
         elif bot_username_for_default_return:
             self.return_url = f"https://t.me/{bot_username_for_default_return}"
             logging.info(
-                f"YOOKASSA_RETURN_URL not set, using dynamic default based on bot username: {self.return_url}"
+                f"YOOKASSA_RETURN_URL not set, using dynamic default based on bot username: {self.return_url}"  # noqa: E501
             )
         else:
             self.return_url = "https://example.com/payment_error_no_return_url_configured"
@@ -52,35 +56,32 @@ class YooKassaService:
                 f"CRITICAL: YOOKASSA_RETURN_URL not set AND bot username not provided. "
                 f"Using placeholder: {self.return_url}. Payments may not complete correctly."
             )
-        logging.info(
-            f"YooKassa Service effective return_url for payments: {self.return_url}"
-        )
+        logging.info(f"YooKassa Service effective return_url for payments: {self.return_url}")
 
     async def create_payment(
-            self,
-            amount: float,
-            currency: str,
-            description: str,
-            metadata: Dict[str, Any],
-            receipt_email: Optional[str] = None,
-            receipt_phone: Optional[str] = None,
-            save_payment_method: bool = False,
-            payment_method_id: Optional[str] = None,
-            capture: bool = True,
-            bind_only: bool = False) -> Optional[Dict[str, Any]]:
+        self,
+        amount: float,
+        currency: str,
+        description: str,
+        metadata: Dict[str, Any],
+        receipt_email: Optional[str] = None,
+        receipt_phone: Optional[str] = None,
+        save_payment_method: bool = False,
+        payment_method_id: Optional[str] = None,
+        capture: bool = True,
+        bind_only: bool = False,
+    ) -> Optional[Dict[str, Any]]:
         if not self.configured:
             logging.error("YooKassa is not configured. Cannot create payment.")
             return None
 
         if not self.settings:
             logging.error(
-                "YooKassaService: Settings object not available. Cannot create payment with receipt details."
+                "YooKassaService: Settings object not available. Cannot create payment with receipt details."  # noqa: E501
             )
             return {
-                "error":
-                True,
-                "internal_message":
-                "Service settings (Settings object) not initialized."
+                "error": True,
+                "internal_message": "Service settings (Settings object) not initialized.",
             }
 
         customer_contact_for_receipt = {}
@@ -89,25 +90,19 @@ class YooKassaService:
         elif receipt_phone:
             customer_contact_for_receipt["phone"] = receipt_phone
         elif self.settings.YOOKASSA_DEFAULT_RECEIPT_EMAIL:
-            customer_contact_for_receipt[
-                "email"] = self.settings.YOOKASSA_DEFAULT_RECEIPT_EMAIL
+            customer_contact_for_receipt["email"] = self.settings.YOOKASSA_DEFAULT_RECEIPT_EMAIL
         else:
             logging.error(
-                "CRITICAL: No email/phone for YooKassa receipt provided and YOOKASSA_DEFAULT_RECEIPT_EMAIL is not set."
+                "CRITICAL: No email/phone for YooKassa receipt provided and YOOKASSA_DEFAULT_RECEIPT_EMAIL is not set."  # noqa: E501
             )
             return {
-                "error":
-                True,
-                "internal_message":
-                "YooKassa receipt customer contact (email/phone) missing and no default email configured."
+                "error": True,
+                "internal_message": "YooKassa receipt customer contact (email/phone) missing and no default email configured.",  # noqa: E501
             }
 
         try:
             builder = PaymentRequestBuilder()
-            builder.set_amount({
-                "value": str(round(amount, 2)),
-                "currency": currency.upper()
-            })
+            builder.set_amount({"value": str(round(amount, 2)), "currency": currency.upper()})
             # For binding cards only, do not capture and set minimal amount
             if bind_only:
                 capture = False
@@ -115,10 +110,9 @@ class YooKassaService:
             builder.set_capture(capture)
             if not payment_method_id:
                 # Saved payment_method_id charges must omit confirmation per YooKassa API
-                builder.set_confirmation({
-                    "type": ConfirmationType.REDIRECT,
-                    "return_url": self.return_url
-                })
+                builder.set_confirmation(
+                    {"type": ConfirmationType.REDIRECT, "return_url": self.return_url}
+                )
             builder.set_description(description)
             builder.set_metadata(metadata)
             if save_payment_method:
@@ -128,26 +122,28 @@ class YooKassaService:
                 # Use a previously saved payment method for merchant-initiated payments
                 builder.set_payment_method_id(payment_method_id)
 
-            receipt_items_list: List[Dict[str, Any]] = [{
-                "description":
-                description[:128],
-                "quantity":
-                "1.00",
-                "amount": {
-                    "value": str(round(amount, 2)),
-                    "currency": currency.upper()
-                },
-                "vat_code":
-                str(self.settings.YOOKASSA_VAT_CODE),
-                "payment_mode":
-                getattr(self.settings, 'yk_receipt_payment_mode', self.settings.YOOKASSA_PAYMENT_MODE),
-                "payment_subject":
-                getattr(self.settings, 'yk_receipt_payment_subject', self.settings.YOOKASSA_PAYMENT_SUBJECT)
-            }]
+            receipt_items_list: List[Dict[str, Any]] = [
+                {
+                    "description": description[:128],
+                    "quantity": "1.00",
+                    "amount": {"value": str(round(amount, 2)), "currency": currency.upper()},
+                    "vat_code": str(self.settings.YOOKASSA_VAT_CODE),
+                    "payment_mode": getattr(
+                        self.settings,
+                        "yk_receipt_payment_mode",
+                        self.settings.YOOKASSA_PAYMENT_MODE,
+                    ),
+                    "payment_subject": getattr(
+                        self.settings,
+                        "yk_receipt_payment_subject",
+                        self.settings.YOOKASSA_PAYMENT_SUBJECT,
+                    ),
+                }
+            ]
 
             receipt_data_dict: Dict[str, Any] = {
                 "customer": customer_contact_for_receipt,
-                "items": receipt_items_list
+                "items": receipt_items_list,
             }
 
             builder.set_receipt(receipt_data_dict)
@@ -167,53 +163,38 @@ class YooKassaService:
             )
 
             logging.info(
-                f"YooKassa Payment.create response: ID={response.id}, Status={response.status}, Paid={response.paid}"
+                f"YooKassa Payment.create response: ID={response.id}, Status={response.status}, Paid={response.paid}"  # noqa: E501
             )
 
             return {
-                "id":
-                response.id,
-                "confirmation_url":
-                response.confirmation.confirmation_url
-                if response.confirmation else None,
-                "status":
-                response.status,
-                "metadata":
-                response.metadata,
-                "amount_value":
-                float(response.amount.value),
-                "amount_currency":
-                response.amount.currency,
-                "idempotence_key_used":
-                idempotence_key,
-                "paid":
-                response.paid,
-                "refundable":
-                response.refundable,
-                "created_at":
-                response.created_at.isoformat() if hasattr(
-                    response.created_at, 'isoformat') else str(
-                        response.created_at),
-                "description_from_yk":
-                response.description,
-                "test_mode":
-                response.test if hasattr(response, 'test') else None,
-                "payment_method": getattr(response, 'payment_method', None),
+                "id": response.id,
+                "confirmation_url": response.confirmation.confirmation_url
+                if response.confirmation
+                else None,
+                "status": response.status,
+                "metadata": response.metadata,
+                "amount_value": float(response.amount.value),
+                "amount_currency": response.amount.currency,
+                "idempotence_key_used": idempotence_key,
+                "paid": response.paid,
+                "refundable": response.refundable,
+                "created_at": response.created_at.isoformat()
+                if hasattr(response.created_at, "isoformat")
+                else str(response.created_at),
+                "description_from_yk": response.description,
+                "test_mode": response.test if hasattr(response, "test") else None,
+                "payment_method": getattr(response, "payment_method", None),
             }
         except Exception:
             logging.exception("YooKassa payment creation failed.")
             return None
 
-    async def get_payment_info(
-            self, payment_id_in_yookassa: str) -> Optional[Dict[str, Any]]:
+    async def get_payment_info(self, payment_id_in_yookassa: str) -> Optional[Dict[str, Any]]:
         if not self.configured:
-            logging.error(
-                "YooKassa is not configured. Cannot get payment info.")
+            logging.error("YooKassa is not configured. Cannot get payment info.")
             return None
         try:
-            logging.info(
-                f"Fetching payment info from YooKassa for ID: {payment_id_in_yookassa}"
-            )
+            logging.info(f"Fetching payment info from YooKassa for ID: {payment_id_in_yookassa}")
 
             payment_info_yk = await asyncio.to_thread(
                 YooKassaPayment.find_one,
@@ -222,20 +203,22 @@ class YooKassaService:
 
             if payment_info_yk:
                 logging.info(
-                    f"YooKassa payment info for {payment_id_in_yookassa}: Status={payment_info_yk.status}, Paid={payment_info_yk.paid}"
+                    f"YooKassa payment info for {payment_id_in_yookassa}: Status={payment_info_yk.status}, Paid={payment_info_yk.paid}"  # noqa: E501
                 )
-                pm = getattr(payment_info_yk, 'payment_method', None)
+                pm = getattr(payment_info_yk, "payment_method", None)
                 pm_payload: Dict[str, Any] = {}
                 if pm:
                     # Collect common fields, including id and hints for last4
-                    pm_id = getattr(pm, 'id', None)
-                    pm_type = getattr(pm, 'type', None)
-                    pm_title = getattr(pm, 'title', None)
-                    account_number = getattr(pm, 'account_number', None) or getattr(pm, 'account', None)
-                    card_obj = getattr(pm, 'card', None)
+                    pm_id = getattr(pm, "id", None)
+                    pm_type = getattr(pm, "type", None)
+                    pm_title = getattr(pm, "title", None)
+                    account_number = getattr(pm, "account_number", None) or getattr(
+                        pm, "account", None
+                    )
+                    card_obj = getattr(pm, "card", None)
                     last4_val = None
-                    if card_obj and hasattr(card_obj, 'last4'):
-                        last4_val = getattr(card_obj, 'last4')
+                    if card_obj and hasattr(card_obj, "last4"):
+                        last4_val = getattr(card_obj, "last4")
                     elif isinstance(account_number, str) and len(account_number) >= 4:
                         last4_val = account_number[-4:]
                     pm_payload = {
@@ -253,11 +236,15 @@ class YooKassaService:
                     "metadata": payment_info_yk.metadata,
                     "description": payment_info_yk.description,
                     "refundable": payment_info_yk.refundable,
-                    "created_at": payment_info_yk.created_at.isoformat() if hasattr(
-                        payment_info_yk.created_at, 'isoformat') else str(payment_info_yk.created_at),
-                    "captured_at": payment_info_yk.captured_at.isoformat() if getattr(payment_info_yk, 'captured_at', None) and hasattr(payment_info_yk.captured_at, 'isoformat') else None,
+                    "created_at": payment_info_yk.created_at.isoformat()
+                    if hasattr(payment_info_yk.created_at, "isoformat")
+                    else str(payment_info_yk.created_at),
+                    "captured_at": payment_info_yk.captured_at.isoformat()
+                    if getattr(payment_info_yk, "captured_at", None)
+                    and hasattr(payment_info_yk.captured_at, "isoformat")
+                    else None,
                     "payment_method": pm_payload,
-                    "test_mode": getattr(payment_info_yk, 'test', None),
+                    "test_mode": getattr(payment_info_yk, "test", None),
                 }
             else:
                 logging.warning(
@@ -265,8 +252,7 @@ class YooKassaService:
                 )
                 return None
         except Exception:
-            logging.exception(
-                "YooKassa get payment info for %s failed.", payment_id_in_yookassa)
+            logging.exception("YooKassa get payment info for %s failed.", payment_id_in_yookassa)
             return None
 
     async def cancel_payment(self, payment_id_in_yookassa: str) -> bool:

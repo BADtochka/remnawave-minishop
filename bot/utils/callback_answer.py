@@ -4,7 +4,6 @@ from typing import Any
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.types import CallbackQuery
 
-
 _EXPIRED_CALLBACK_MARKERS = (
     "query is too old",
     "response timeout expired",

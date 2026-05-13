@@ -17,9 +17,7 @@ from bot.keyboards.inline.user_keyboards import (
 
 class JsonI18nStub:
     def __init__(self):
-        self.translations = json.loads(
-            Path("locales/en.json").read_text(encoding="utf-8")
-        )
+        self.translations = json.loads(Path("locales/en.json").read_text(encoding="utf-8"))
 
     def gettext(self, lang, key, **kwargs):
         text = self.translations[key]
@@ -108,7 +106,9 @@ class UserBotMenuTests(unittest.TestCase):
             "https://app.example.com/invite?utm=channel&ref=uAbC123xYz",
         )
         self.assertEqual(subscription_webapp._normalize_referral_param("uAbC123xYz"), "ABC123XYZ")
-        self.assertEqual(subscription_webapp._normalize_referral_param("ref_uAbC123xYz"), "ABC123XYZ")
+        self.assertEqual(
+            subscription_webapp._normalize_referral_param("ref_uAbC123xYz"), "ABC123XYZ"
+        )
 
     def test_referral_text_places_web_link_after_telegram_link(self):
         text = self.i18n.gettext(

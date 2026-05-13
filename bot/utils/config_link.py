@@ -1,8 +1,8 @@
 import logging
 from typing import Optional, Tuple
 
-from config.settings import Settings
 from bot.services.panel_api_service import PanelApiService
+from config.settings import Settings
 
 
 async def _encrypt_raw_link(settings: Settings, raw_link: str) -> Optional[str]:
@@ -14,7 +14,9 @@ async def _encrypt_raw_link(settings: Settings, raw_link: str) -> Optional[str]:
     return None
 
 
-async def prepare_config_links(settings: Settings, raw_link: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+async def prepare_config_links(
+    settings: Settings, raw_link: Optional[str]
+) -> Tuple[Optional[str], Optional[str]]:
     """
     Build the user-facing connection key and the URL for the connect button.
 
@@ -38,7 +40,9 @@ async def prepare_config_links(settings: Settings, raw_link: Optional[str]) -> T
             display_link = encrypted_payload
             button_link = display_link
         else:
-            logging.error("CRYPT4_ENABLED is set but encryption failed; using raw link as fallback.")
+            logging.error(
+                "CRYPT4_ENABLED is set but encryption failed; using raw link as fallback."
+            )
 
     redirect_base = (settings.CRYPT4_REDIRECT_URL or "").strip()
     if redirect_base and settings.CRYPT4_ENABLED and display_link:

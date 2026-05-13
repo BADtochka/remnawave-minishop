@@ -1,10 +1,10 @@
-import hmac
 import asyncio
+import hmac
 import logging
 
-from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
 from sqlalchemy.orm import sessionmaker
 
 from config.settings import Settings
@@ -72,13 +72,13 @@ async def build_and_start_web_app(
             secret_token=settings.WEBHOOK_SECRET_TOKEN,
         ).register(app, path=telegram_webhook_path)
         logging.info(
-            f"Telegram webhook route configured at: [POST] {telegram_webhook_path} (relative to base URL)"
+            f"Telegram webhook route configured at: [POST] {telegram_webhook_path} (relative to base URL)"  # noqa: E501
         )
 
     from bot.handlers.user.payment import yookassa_webhook_route
     from bot.services.crypto_pay_service import cryptopay_webhook_route
-    from bot.services.panel_webhook_service import panel_webhook_route
     from bot.services.freekassa_service import freekassa_webhook_route
+    from bot.services.panel_webhook_service import panel_webhook_route
     from bot.services.platega_service import platega_webhook_route
     from bot.services.severpay_service import severpay_webhook_route
 

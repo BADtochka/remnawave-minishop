@@ -1,19 +1,18 @@
 import logging
-from aiogram import Router, types, Bot
-from aiogram.filters import Command
-from typing import Optional, Union
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import update, or_
 from datetime import datetime, timezone
+from typing import Optional, Union
 
-from config.settings import Settings
-from bot.services.panel_api_service import PanelApiService
-from bot.services.notification_service import NotificationService
-
-from db.dal import user_dal, subscription_dal, panel_sync_dal
-from db.models import Subscription
+from aiogram import Bot, Router, types
+from aiogram.filters import Command
+from sqlalchemy import or_, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.middlewares.i18n import JsonI18n
+from bot.services.notification_service import NotificationService
+from bot.services.panel_api_service import PanelApiService
+from config.settings import Settings
+from db.dal import panel_sync_dal, subscription_dal, user_dal
+from db.models import Subscription
 
 router = Router(name="admin_sync_router")
 
@@ -26,9 +25,7 @@ def _normalize_panel_email(value: Optional[str]) -> Optional[str]:
 def _extract_lifetime_used_traffic_bytes(panel_user_data: dict) -> Optional[int]:
     user_traffic = panel_user_data.get("userTraffic") or {}
     raw_value = (
-        user_traffic.get("lifetimeUsedTrafficBytes")
-        if isinstance(user_traffic, dict)
-        else None
+        user_traffic.get("lifetimeUsedTrafficBytes") if isinstance(user_traffic, dict) else None
     )
     if raw_value is None:
         raw_value = panel_user_data.get("lifetimeUsedTrafficBytes")
@@ -82,7 +79,7 @@ async def _bind_panel_email_to_user(
                 if not merged_user.email_verified_at:
                     merged_user.email_verified_at = datetime.now(timezone.utc)
                 logging.info(
-                    "Merged email-only user %s into user %s while binding panel email %s for panel UUID %s.",
+                    "Merged email-only user %s into user %s while binding panel email %s for panel UUID %s.",  # noqa: E501
                     user_with_email.user_id,
                     merged_user.user_id,
                     email_from_panel,
@@ -156,9 +153,7 @@ async def perform_sync(
 
         if not panel_users_data:
             status_msg = "No users found in the panel to sync."
-            await panel_sync_dal.update_panel_sync_status(
-                session, "success", status_msg, 0, 0
-            )
+            await panel_sync_dal.update_panel_sync_status(session, "success", status_msg, 0, 0)
             await session.commit()
             return {
                 "status": "success",
@@ -174,17 +169,13 @@ async def perform_sync(
             try:
                 panel_records_checked += 1
                 panel_uuid = panel_user_dict.get("uuid")
-                panel_subscription_uuid = panel_user_dict.get("subscriptionUuid") or panel_user_dict.get(
-                    "shortUuid"
-                )
+                panel_user_dict.get("subscriptionUuid") or panel_user_dict.get("shortUuid")
                 telegram_id_from_panel = panel_user_dict.get("telegramId")
                 email_from_panel = _normalize_panel_email(panel_user_dict.get("email"))
 
                 if not panel_uuid:
                     sync_errors.append(f"Panel user missing UUID: {panel_user_dict}")
-                    logging.warning(
-                        f"Skipping panel user without UUID: {panel_user_dict}"
-                    )
+                    logging.warning(f"Skipping panel user without UUID: {panel_user_dict}")
                     continue
 
                 # Track users without telegram ID
@@ -204,19 +195,15 @@ async def perform_sync(
                             session, telegram_id_from_panel
                         )
                     if existing_user:
-                        logging.debug(
-                            f"Found user by telegramId {telegram_id_from_panel}"
-                        )
+                        logging.debug(f"Found user by telegramId {telegram_id_from_panel}")
 
                 # If not found by telegram ID, try to find by panel UUID.
                 # The panel UUID is the strongest local link for subscription sync.
                 if not existing_user:
-                    existing_user = await user_dal.get_user_by_panel_uuid(
-                        session, panel_uuid
-                    )
+                    existing_user = await user_dal.get_user_by_panel_uuid(session, panel_uuid)
                     if existing_user:
-                        logging.info(
-                            f"Found user by panel UUID {panel_uuid}, telegramId: {existing_user.user_id}"
+                        logging.debug(
+                            f"Found user by panel UUID {panel_uuid}, telegramId: {existing_user.user_id}"  # noqa: E501
                         )
                         # Update telegram ID if it was missing in panel data but we have local user
                         if (
@@ -224,15 +211,13 @@ async def perform_sync(
                             and existing_user.user_id != telegram_id_from_panel
                         ):
                             logging.warning(
-                                f"TelegramId mismatch: panel={telegram_id_from_panel}, local={existing_user.user_id}"
+                                f"TelegramId mismatch: panel={telegram_id_from_panel}, local={existing_user.user_id}"  # noqa: E501
                             )
 
                 # Finally, fall back to email. This mainly catches panel users that
                 # were first imported as email-only identities.
                 if not existing_user and email_from_panel:
-                    existing_user = await user_dal.get_user_by_email(
-                        session, email_from_panel
-                    )
+                    existing_user = await user_dal.get_user_by_email(session, email_from_panel)
                     if existing_user:
                         logging.debug(f"Found user by email {email_from_panel}")
 
@@ -246,11 +231,9 @@ async def perform_sync(
                                 "telegram_id": telegram_id_from_panel,
                                 "email": email_from_panel,
                                 "email_verified_at": (
-                                    datetime.now(timezone.utc)
-                                    if email_from_panel
-                                    else None
+                                    datetime.now(timezone.utc) if email_from_panel else None
                                 ),
-                                "username": None,  # Username will be updated when user interacts with bot
+                                "username": None,  # Username will be updated when user interacts with bot  # noqa: E501
                                 "first_name": None,  # Panel doesn't provide this info
                                 "last_name": None,  # Panel doesn't provide this info
                                 "language_code": "ru",  # Default language
@@ -259,13 +242,11 @@ async def perform_sync(
                                 "referred_by_id": None,
                             }
 
-                            new_user, was_created = await user_dal.create_user(
-                                session, user_data
-                            )
+                            new_user, was_created = await user_dal.create_user(session, user_data)
                             if was_created:
                                 users_created += 1
                                 logging.info(
-                                    f"Created new user {telegram_id_from_panel} from panel sync with UUID {panel_uuid}"
+                                    f"Created new user {telegram_id_from_panel} from panel sync with UUID {panel_uuid}"  # noqa: E501
                                 )
 
                             existing_user = new_user
@@ -289,12 +270,12 @@ async def perform_sync(
                             if was_created:
                                 users_created += 1
                                 logging.info(
-                                    f"Created new email user {new_user.user_id} from panel sync with UUID {panel_uuid}"
+                                    f"Created new email user {new_user.user_id} from panel sync with UUID {panel_uuid}"  # noqa: E501
                                 )
                             existing_user = new_user
                         except Exception as e_create_email:
                             sync_errors.append(
-                                f"Error creating email user {email_from_panel}: {str(e_create_email)}"
+                                f"Error creating email user {email_from_panel}: {str(e_create_email)}"  # noqa: E501
                             )
                             logging.error(
                                 f"Error creating email user {email_from_panel}: {e_create_email}"
@@ -302,7 +283,7 @@ async def perform_sync(
                             continue
                     else:
                         logging.debug(
-                            f"Panel user with UUID {panel_uuid} (no telegramId) not found in local DB - skipping"
+                            f"Panel user with UUID {panel_uuid} (no telegramId) not found in local DB - skipping"  # noqa: E501
                         )
                         continue
 
@@ -318,9 +299,7 @@ async def perform_sync(
                     existing_user.panel_user_uuid = panel_uuid
                     user_was_updated = True
                     users_uuid_updated += 1
-                    logging.info(
-                        f"Updated panel UUID for user {actual_user_id}: {panel_uuid}"
-                    )
+                    logging.info(f"Updated panel UUID for user {actual_user_id}: {panel_uuid}")
                 existing_user, email_was_bound = await _bind_panel_email_to_user(
                     session,
                     existing_user=existing_user,
@@ -329,10 +308,7 @@ async def perform_sync(
                 )
                 if email_was_bound:
                     user_was_updated = True
-                if (
-                    telegram_id_from_panel
-                    and existing_user.telegram_id != telegram_id_from_panel
-                ):
+                if telegram_id_from_panel and existing_user.telegram_id != telegram_id_from_panel:
                     existing_user.telegram_id = telegram_id_from_panel
                     user_was_updated = True
 
@@ -348,32 +324,40 @@ async def perform_sync(
                 try:
                     if panel_uuid and existing_user:
                         description_text = "\n".join(
-                            line for line in [
+                            line
+                            for line in [
                                 existing_user.email or "",
                                 existing_user.username or "",
                                 existing_user.first_name or "",
                                 existing_user.last_name or "",
-                            ] if line
+                            ]
+                            if line
                         )
                         # Update description only when it differs from the current one on panel
                         current_panel_description = (
                             panel_user_dict.get("description") or ""
                         ).strip()
                         desired_description = description_text.strip()
-                        if (
-                            desired_description
-                            and desired_description != current_panel_description
-                        ):
+                        if desired_description and desired_description != current_panel_description:
                             await panel_service.update_user_details_on_panel(
-                                panel_uuid, {
+                                panel_uuid,
+                                {
                                     "description": description_text,
-                                    **({"email": existing_user.email} if existing_user.email else {}),
-                                    **({"telegramId": existing_user.telegram_id} if existing_user.telegram_id else {}),
-                                }
+                                    **(
+                                        {"email": existing_user.email}
+                                        if existing_user.email
+                                        else {}
+                                    ),
+                                    **(
+                                        {"telegramId": existing_user.telegram_id}
+                                        if existing_user.telegram_id
+                                        else {}
+                                    ),
+                                },
                             )
                 except Exception as e_desc:
                     logging.warning(
-                        f"Sync: Failed to update description for panel user {panel_uuid} (tg {actual_user_id}): {e_desc}"
+                        f"Sync: Failed to update description for panel user {panel_uuid} (tg {actual_user_id}): {e_desc}"  # noqa: E501
                     )
 
                 # Sync subscription data
@@ -387,13 +371,12 @@ async def perform_sync(
                         )
 
                         # Prefer syncing by concrete subscription UUID (shortUuid/subscriptionUuid)
-                        subscription_uuid_from_panel = (
-                            panel_user_dict.get("subscriptionUuid")
-                            or panel_user_dict.get("shortUuid")
-                        )
+                        subscription_uuid_from_panel = panel_user_dict.get(
+                            "subscriptionUuid"
+                        ) or panel_user_dict.get("shortUuid")
 
                         if subscription_uuid_from_panel:
-                            # Если панель говорит, что подписка ACTIVE — сначала деактивируем все другие активные
+                            # Если панель говорит, что подписка ACTIVE — сначала деактивируем все другие активные  # noqa: E501
                             if panel_status == "ACTIVE":
                                 await session.execute(
                                     update(Subscription)
@@ -403,9 +386,7 @@ async def perform_sync(
                                         or_(
                                             Subscription.panel_subscription_uuid
                                             != subscription_uuid_from_panel,
-                                            Subscription.panel_subscription_uuid.is_(
-                                                None
-                                            ),
+                                            Subscription.panel_subscription_uuid.is_(None),
                                         ),
                                     )
                                     .values(
@@ -414,7 +395,7 @@ async def perform_sync(
                                     )
                                 )
 
-                            # Try to find subscription by its panel_subscription_uuid first (idempotent)
+                            # Try to find subscription by its panel_subscription_uuid first (idempotent)  # noqa: E501
                             existing_sub_by_uuid = (
                                 await subscription_dal.get_subscription_by_panel_subscription_uuid(
                                     session, subscription_uuid_from_panel
@@ -437,12 +418,12 @@ async def perform_sync(
                                 subscriptions_synced_count += 1
                                 subscriptions_updated += 1
                                 user_was_updated = True
-                                logging.info(
-                                    f"Synced existing subscription {existing_sub_by_uuid.subscription_id} "
-                                    f"for user {actual_user_id}: expires {panel_expire_at}, status {panel_status}"
+                                logging.debug(
+                                    f"Synced existing subscription {existing_sub_by_uuid.subscription_id} "  # noqa: E501
+                                    f"for user {actual_user_id}: expires {panel_expire_at}, status {panel_status}"  # noqa: E501
                                 )
                             else:
-                                # Create a new subscription only when we have a concrete subscription UUID
+                                # Create a new subscription only when we have a concrete subscription UUID  # noqa: E501
                                 sub_payload = {
                                     "user_id": actual_user_id,
                                     "panel_user_uuid": panel_uuid,
@@ -462,16 +443,14 @@ async def perform_sync(
                                 subscriptions_synced_count += 1
                                 subscriptions_created += 1
                                 user_was_updated = True
-                                logging.info(
+                                logging.debug(
                                     f"Created subscription {created_sub.subscription_id} "
-                                    f"for user {actual_user_id} by panel_sub_uuid {subscription_uuid_from_panel}"
+                                    f"for user {actual_user_id} by panel_sub_uuid {subscription_uuid_from_panel}"  # noqa: E501
                                 )
                         else:
-                            # No subscription UUID from panel: only update an already active subscription for this user/panel UUID
-                            active_sub = (
-                                await subscription_dal.get_active_subscription_by_user_id(
-                                    session, actual_user_id, panel_uuid
-                                )
+                            # No subscription UUID from panel: only update an already active subscription for this user/panel UUID  # noqa: E501
+                            active_sub = await subscription_dal.get_active_subscription_by_user_id(
+                                session, actual_user_id, panel_uuid
                             )
                             if active_sub:
                                 await subscription_dal.update_subscription(
@@ -486,30 +465,28 @@ async def perform_sync(
                                 subscriptions_synced_count += 1
                                 subscriptions_updated += 1
                                 user_was_updated = True
-                                logging.info(
+                                logging.debug(
                                     f"Updated active subscription {active_sub.subscription_id} "
-                                    f"for user {actual_user_id}: expires {panel_expire_at}, status {panel_status}"
+                                    f"for user {actual_user_id}: expires {panel_expire_at}, status {panel_status}"  # noqa: E501
                                 )
                             else:
-                                # Without a concrete subscription UUID we avoid creating new records to keep sync idempotent
+                                # Without a concrete subscription UUID we avoid creating new records to keep sync idempotent  # noqa: E501
                                 logging.debug(
-                                    f"No subscriptionUuid for panel user {panel_uuid}; skipped creation for user {actual_user_id}"
+                                    f"No subscriptionUuid for panel user {panel_uuid}; skipped creation for user {actual_user_id}"  # noqa: E501
                                 )
 
                     except Exception as e:
                         sync_errors.append(
                             f"Error syncing subscription for user {actual_user_id}: {str(e)}"
                         )
-                        logging.error(
-                            f"Error syncing subscription for user {actual_user_id}: {e}"
-                        )
+                        logging.error(f"Error syncing subscription for user {actual_user_id}: {e}")
 
                 if user_was_updated:
                     users_updated += 1
 
             except Exception as e_user:
                 sync_errors.append(
-                    f"Error processing panel user {panel_user_dict.get('uuid', 'unknown')}: {str(e_user)}"
+                    f"Error processing panel user {panel_user_dict.get('uuid', 'unknown')}: {str(e_user)}"  # noqa: E501
                 )
                 logging.error(f"Error syncing user: {e_user}")
 
@@ -559,7 +536,7 @@ async def perform_sync(
         await session.commit()
 
         # Detailed logging summary
-        logging.info(f"Sync completed - Summary:")
+        logging.info("Sync completed - Summary:")
         logging.info(f"  Panel records checked: {panel_records_checked}")
         logging.info(f"  Users without telegramId: {users_without_telegram_id}")
         logging.info(f"  Users not found in local DB: {users_not_found_in_db}")
@@ -671,21 +648,15 @@ async def sync_command_handler(
             logging.error(f"Failed to send sync notification: {e_notification}")
 
     except Exception as e_sync_global:
-        logging.error(
-            f"Global error during /sync command: {e_sync_global}", exc_info=True
-        )
+        logging.error(f"Global error during /sync command: {e_sync_global}", exc_info=True)
         await bot.send_message(target_chat_id, _("sync_critical_error"))
 
         # Send notification to log channel about failure
         try:
             notification_service = NotificationService(bot, settings, i18n)
-            await notification_service.notify_panel_sync(
-                "failed", str(e_sync_global), 0, 0
-            )
+            await notification_service.notify_panel_sync("failed", str(e_sync_global), 0, 0)
         except Exception as e_notification:
-            logging.error(
-                f"Failed to send sync failure notification: {e_notification}"
-            )
+            logging.error(f"Failed to send sync failure notification: {e_notification}")
 
 
 @router.message(Command("syncstatus"))
@@ -703,11 +674,7 @@ async def sync_status_command_handler(
     response_text = ""
     if status_record_model:
         last_time_val = status_record_model.last_sync_time
-        last_time_str = (
-            last_time_val.strftime("%Y-%m-%d %H:%M:%S UTC")
-            if last_time_val
-            else "N/A"
-        )
+        last_time_str = last_time_val.strftime("%Y-%m-%d %H:%M:%S UTC") if last_time_val else "N/A"
 
         details_val = status_record_model.details
         details_str = details_val or "N/A"
@@ -716,7 +683,7 @@ async def sync_status_command_handler(
             f"<b>{_('admin_stats_last_sync_header')}</b>\n"
             f"  {_('admin_stats_sync_time')}: {last_time_str}\n"
             f"  {_('admin_stats_sync_status')}: {status_record_model.status}\n"
-            f"  {_('admin_stats_sync_users_processed')}: {status_record_model.users_processed_from_panel}\n"
+            f"  {_('admin_stats_sync_users_processed')}: {status_record_model.users_processed_from_panel}\n"  # noqa: E501
             f"  {_('admin_stats_sync_subs_synced')}: {status_record_model.subscriptions_synced}\n"
             f"  {_('admin_stats_sync_details_label')}: {details_str}"
         )

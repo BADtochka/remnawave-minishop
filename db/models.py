@@ -1,8 +1,21 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, UniqueConstraint, Text, BigInteger, Index, LargeBinary
-from sqlalchemy.orm import relationship, DeclarativeBase
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    LargeBinary,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.ext.asyncio import AsyncAttrs
+from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.sql import func
-from datetime import datetime
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -21,39 +34,36 @@ class User(Base):
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
     language_code = Column(String, default="ru")
-    registration_date = Column(DateTime(timezone=True),
-                               server_default=func.now())
+    registration_date = Column(DateTime(timezone=True), server_default=func.now())
     is_banned = Column(Boolean, default=False)
     panel_user_uuid = Column(String, nullable=True, unique=True, index=True)
     referral_code = Column(String(16), nullable=True, unique=True, index=True)
-    referred_by_id = Column(BigInteger,
-                            ForeignKey("users.user_id"),
-                            nullable=True)
+    referred_by_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=True)
     lifetime_used_traffic_bytes = Column(BigInteger, nullable=True)
     channel_subscription_verified = Column(Boolean, nullable=True)
-    channel_subscription_checked_at = Column(DateTime(timezone=True),
-                                             nullable=True)
+    channel_subscription_checked_at = Column(DateTime(timezone=True), nullable=True)
     channel_subscription_verified_for = Column(BigInteger, nullable=True)
 
     referrer = relationship("User", remote_side=[user_id], backref="referrals")
-    subscriptions = relationship("Subscription",
-                                 back_populates="user",
-                                 cascade="all, delete-orphan")
-    payments = relationship("Payment",
-                            back_populates="user",
-                            cascade="all, delete-orphan")
-    promo_code_activations = relationship("PromoCodeActivation",
-                                          back_populates="user",
-                                          cascade="all, delete-orphan")
-    message_logs_authored = relationship("MessageLog",
-                                         foreign_keys="MessageLog.user_id",
-                                         back_populates="author_user",
-                                         cascade="all, delete-orphan")
+    subscriptions = relationship(
+        "Subscription", back_populates="user", cascade="all, delete-orphan"
+    )
+    payments = relationship("Payment", back_populates="user", cascade="all, delete-orphan")
+    promo_code_activations = relationship(
+        "PromoCodeActivation", back_populates="user", cascade="all, delete-orphan"
+    )
+    message_logs_authored = relationship(
+        "MessageLog",
+        foreign_keys="MessageLog.user_id",
+        back_populates="author_user",
+        cascade="all, delete-orphan",
+    )
     message_logs_targeted = relationship(
         "MessageLog",
         foreign_keys="MessageLog.target_user_id",
         back_populates="target_user",
-        cascade="all, delete-orphan")
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<User(user_id={self.user_id}, username='{self.username}')>"
@@ -90,15 +100,9 @@ class Subscription(Base):
     )
 
     subscription_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger,
-                     ForeignKey("users.user_id"),
-                     nullable=False,
-                     index=True)
+    user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=False, index=True)
     panel_user_uuid = Column(String, nullable=False, index=True)
-    panel_subscription_uuid = Column(String,
-                                     unique=True,
-                                     index=True,
-                                     nullable=True)
+    panel_subscription_uuid = Column(String, unique=True, index=True, nullable=True)
     start_date = Column(DateTime(timezone=True), nullable=True)
     end_date = Column(DateTime(timezone=True), nullable=False, index=True)
     duration_months = Column(Integer, nullable=True)
@@ -110,11 +114,29 @@ class Subscription(Base):
     provider = Column(String, nullable=True)
     skip_notifications = Column(Boolean, default=False)
     auto_renew_enabled = Column(Boolean, default=True, index=True)
+    tariff_key = Column(String, nullable=True, index=True)
+    tier_baseline_bytes = Column(BigInteger, nullable=True)
+    topup_balance_bytes = Column(BigInteger, nullable=False, default=0)
+    premium_baseline_bytes = Column(BigInteger, nullable=False, default=0)
+    premium_topup_balance_bytes = Column(BigInteger, nullable=False, default=0)
+    premium_topup_used_bytes = Column(BigInteger, nullable=False, default=0)
+    premium_used_bytes = Column(BigInteger, nullable=False, default=0)
+    premium_is_limited = Column(Boolean, nullable=False, default=False, index=True)
+    premium_period_start_at = Column(DateTime(timezone=True), nullable=True)
+    premium_unlimited_override = Column(Boolean, nullable=False, default=False, index=True)
+    premium_bonus_bytes = Column(BigInteger, nullable=False, default=0)
+    regular_bonus_bytes = Column(BigInteger, nullable=False, default=0)
+    regular_unlimited_override = Column(Boolean, nullable=False, default=False, index=True)
+    period_start_at = Column(DateTime(timezone=True), nullable=True)
+    is_throttled = Column(Boolean, nullable=False, default=False, index=True)
+    effective_monthly_price_rub = Column(Numeric, nullable=True)
+    hwid_device_limit = Column(Integer, nullable=True)
+    extra_hwid_devices = Column(Integer, nullable=False, default=0)
 
     user = relationship("User", back_populates="subscriptions")
 
     def __repr__(self):
-        return f"<Subscription(id={self.subscription_id}, user_id={self.user_id}, panel_uuid='{self.panel_user_uuid}', ends='{self.end_date}')>"
+        return f"<Subscription(id={self.subscription_id}, user_id={self.user_id}, panel_uuid='{self.panel_user_uuid}', ends='{self.end_date}')>"  # noqa: E501
 
 
 class EmailVerificationCode(Base):
@@ -160,19 +182,11 @@ class SecurityThrottle(Base):
 
 class Payment(Base):
     __tablename__ = "payments"
-    __table_args__ = (
-        Index("ix_payments_user_id_status", "user_id", "status"),
-    )
+    __table_args__ = (Index("ix_payments_user_id_status", "user_id", "status"),)
 
     payment_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger,
-                     ForeignKey("users.user_id"),
-                     nullable=False,
-                     index=True)
-    yookassa_payment_id = Column(String,
-                                 unique=True,
-                                 index=True,
-                                 nullable=True)
+    user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=False, index=True)
+    yookassa_payment_id = Column(String, unique=True, index=True, nullable=True)
     provider_payment_id = Column(String, unique=True, nullable=True)
     provider = Column(String, nullable=False, default="yookassa", index=True)
     idempotence_key = Column(String, unique=True, nullable=True)
@@ -181,17 +195,89 @@ class Payment(Base):
     status = Column(String, nullable=False, index=True)
     description = Column(String, nullable=True)
     subscription_duration_months = Column(Integer, nullable=True)
-    promo_code_id = Column(Integer,
-                           ForeignKey("promo_codes.promo_code_id"),
-                           nullable=True)
+    sale_mode = Column(String, nullable=True, index=True)
+    tariff_key = Column(String, nullable=True, index=True)
+    purchased_gb = Column(Float, nullable=True)
+    purchased_hwid_devices = Column(Integer, nullable=True)
+    promo_code_id = Column(Integer, ForeignKey("promo_codes.promo_code_id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True),
-                        onupdate=func.now(),
-                        nullable=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
     user = relationship("User", back_populates="payments")
-    promo_code_used = relationship("PromoCode",
-                                   back_populates="payments_where_used")
+    promo_code_used = relationship("PromoCode", back_populates="payments_where_used")
+
+
+class TrafficTopup(Base):
+    __tablename__ = "traffic_topups"
+
+    topup_id = Column(Integer, primary_key=True, autoincrement=True)
+    subscription_id = Column(
+        Integer, ForeignKey("subscriptions.subscription_id"), nullable=False, index=True
+    )
+    payment_id = Column(Integer, ForeignKey("payments.payment_id"), nullable=True, index=True)
+    purchased_bytes = Column(BigInteger, nullable=False)
+    kind = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    subscription = relationship("Subscription")
+    payment = relationship("Payment")
+
+
+class HwidDevicePurchase(Base):
+    __tablename__ = "hwid_device_purchases"
+
+    purchase_id = Column(Integer, primary_key=True, autoincrement=True)
+    subscription_id = Column(
+        Integer, ForeignKey("subscriptions.subscription_id"), nullable=False, index=True
+    )
+    payment_id = Column(Integer, ForeignKey("payments.payment_id"), nullable=True, index=True)
+    purchased_devices = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    subscription = relationship("Subscription")
+    payment = relationship("Payment")
+
+
+class TrafficWarning(Base):
+    __tablename__ = "traffic_warnings"
+    __table_args__ = (
+        UniqueConstraint(
+            "subscription_id", "period_start_at", "level", name="uq_traffic_warning_period_level"
+        ),
+    )
+
+    warning_id = Column(Integer, primary_key=True, autoincrement=True)
+    subscription_id = Column(
+        Integer, ForeignKey("subscriptions.subscription_id"), nullable=False, index=True
+    )
+    period_start_at = Column(DateTime(timezone=True), nullable=True)
+    level = Column(Integer, nullable=False)
+    traffic_limit_bytes = Column(BigInteger, nullable=True)
+    sent_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    subscription = relationship("Subscription")
+
+
+class TariffChange(Base):
+    __tablename__ = "tariff_changes"
+
+    change_id = Column(Integer, primary_key=True, autoincrement=True)
+    subscription_id = Column(
+        Integer, ForeignKey("subscriptions.subscription_id"), nullable=False, index=True
+    )
+    from_tariff_key = Column(String, nullable=True)
+    to_tariff_key = Column(String, nullable=False)
+    mode = Column(String, nullable=False, index=True)
+    payment_id = Column(Integer, ForeignKey("payments.payment_id"), nullable=True, index=True)
+    days_before = Column(Integer, nullable=True)
+    days_after = Column(Integer, nullable=True)
+    converted_bytes = Column(BigInteger, nullable=True)
+    eff_price_before = Column(Numeric, nullable=True)
+    eff_price_after = Column(Numeric, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    subscription = relationship("Subscription")
+    payment = relationship("Payment")
 
 
 class UserBilling(Base):
@@ -206,6 +292,7 @@ class UserBilling(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
     user = relationship("User")
+
 
 class UserPaymentMethod(Base):
     __tablename__ = "user_payment_methods"
@@ -222,8 +309,9 @@ class UserPaymentMethod(Base):
 
     user = relationship("User")
     __table_args__ = (
-        UniqueConstraint('user_id', 'provider_payment_method_id', name='uq_user_provider_method'),
+        UniqueConstraint("user_id", "provider_payment_method_id", name="uq_user_provider_method"),
     )
+
 
 class PromoCode(Base):
     __tablename__ = "promo_codes"
@@ -238,63 +326,50 @@ class PromoCode(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     valid_until = Column(DateTime(timezone=True), nullable=True)
 
-    activations = relationship("PromoCodeActivation",
-                               back_populates="promo_code",
-                               cascade="all, delete-orphan")
-    payments_where_used = relationship("Payment",
-                                       back_populates="promo_code_used")
+    activations = relationship(
+        "PromoCodeActivation", back_populates="promo_code", cascade="all, delete-orphan"
+    )
+    payments_where_used = relationship("Payment", back_populates="promo_code_used")
 
 
 class PromoCodeActivation(Base):
     __tablename__ = "promo_code_activations"
 
     activation_id = Column(Integer, primary_key=True, autoincrement=True)
-    promo_code_id = Column(Integer,
-                           ForeignKey("promo_codes.promo_code_id"),
-                           nullable=False)
+    promo_code_id = Column(Integer, ForeignKey("promo_codes.promo_code_id"), nullable=False)
     user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=False)
     activated_at = Column(DateTime(timezone=True), server_default=func.now())
-    payment_id = Column(Integer,
-                        ForeignKey("payments.payment_id"),
-                        nullable=True)
+    payment_id = Column(Integer, ForeignKey("payments.payment_id"), nullable=True)
 
     promo_code = relationship("PromoCode", back_populates="activations")
     user = relationship("User", back_populates="promo_code_activations")
     payment = relationship("Payment")
 
-    __table_args__ = (UniqueConstraint('promo_code_id',
-                                       'user_id',
-                                       name='uq_promo_user_activation'), )
+    __table_args__ = (
+        UniqueConstraint("promo_code_id", "user_id", name="uq_promo_user_activation"),
+    )
 
 
 class MessageLog(Base):
     __tablename__ = "message_logs"
 
     log_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger,
-                     ForeignKey("users.user_id"),
-                     nullable=True,
-                     index=True)
+    user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=True, index=True)
     telegram_username = Column(String, nullable=True)
     telegram_first_name = Column(String, nullable=True)
     event_type = Column(String, nullable=False, index=True)
     content = Column(Text, nullable=True)
     raw_update_preview = Column(Text, nullable=True)
-    timestamp = Column(DateTime(timezone=True),
-                       server_default=func.now(),
-                       index=True)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     is_admin_event = Column(Boolean, default=False)
-    target_user_id = Column(BigInteger,
-                            ForeignKey("users.user_id"),
-                            nullable=True,
-                            index=True)
+    target_user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=True, index=True)
 
-    author_user = relationship("User",
-                               foreign_keys=[user_id],
-                               back_populates="message_logs_authored")
-    target_user = relationship("User",
-                               foreign_keys=[target_user_id],
-                               back_populates="message_logs_targeted")
+    author_user = relationship(
+        "User", foreign_keys=[user_id], back_populates="message_logs_authored"
+    )
+    target_user = relationship(
+        "User", foreign_keys=[target_user_id], back_populates="message_logs_targeted"
+    )
 
 
 class PanelSyncStatus(Base):
@@ -307,7 +382,7 @@ class PanelSyncStatus(Base):
     users_processed_from_panel = Column(Integer, default=0)
     subscriptions_synced = Column(Integer, default=0)
 
-    __table_args__ = (UniqueConstraint('id'), )
+    __table_args__ = (UniqueConstraint("id"),)
 
 
 class AdCampaign(Base):
@@ -327,16 +402,32 @@ class AdCampaign(Base):
     )
 
     def __repr__(self):
-        return f"<AdCampaign(id={self.ad_campaign_id}, source='{self.source}', start_param='{self.start_param}', cost={self.cost})>"
+        return f"<AdCampaign(id={self.ad_campaign_id}, source='{self.source}', start_param='{self.start_param}', cost={self.cost})>"  # noqa: E501
 
 
 class AdAttribution(Base):
     __tablename__ = "ad_attributions"
 
     user_id = Column(BigInteger, ForeignKey("users.user_id"), primary_key=True, index=True)
-    ad_campaign_id = Column(Integer, ForeignKey("ad_campaigns.ad_campaign_id"), nullable=False, index=True)
+    ad_campaign_id = Column(
+        Integer, ForeignKey("ad_campaigns.ad_campaign_id"), nullable=False, index=True
+    )
     first_start_at = Column(DateTime(timezone=True), server_default=func.now())
     trial_activated_at = Column(DateTime(timezone=True), nullable=True)
 
     user = relationship("User")
     campaign = relationship("AdCampaign", back_populates="attributions")
+
+
+class AppSettingOverride(Base):
+    __tablename__ = "app_setting_overrides"
+
+    key = Column(String(128), primary_key=True)
+    value = Column(Text, nullable=True)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    updated_by = Column(BigInteger, nullable=True)

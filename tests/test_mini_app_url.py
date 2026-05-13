@@ -1,0 +1,41 @@
+import unittest
+
+from bot.utils.mini_app_url import append_query_params, subscription_mini_app_topup_url
+from config.settings import Settings
+
+
+class MiniAppUrlTests(unittest.TestCase):
+    def test_append_query_params_adds_topup(self):
+        self.assertEqual(
+            append_query_params("https://app.example.com/home", {"topup": "regular"}),
+            "https://app.example.com/home?topup=regular",
+        )
+
+    def test_append_query_params_merges_existing(self):
+        self.assertEqual(
+            append_query_params("https://app.example.com/?lang=ru", {"topup": "premium"}),
+            "https://app.example.com/?lang=ru&topup=premium",
+        )
+
+    def test_subscription_mini_app_topup_url_none_when_unset(self):
+        s = Settings(
+            _env_file=None,
+            BOT_TOKEN="x",
+            POSTGRES_USER="u",
+            POSTGRES_PASSWORD="p",
+            SUBSCRIPTION_MINI_APP_URL=None,
+        )
+        self.assertIsNone(subscription_mini_app_topup_url(s, "regular"))
+
+    def test_subscription_mini_app_topup_url(self):
+        s = Settings(
+            _env_file=None,
+            BOT_TOKEN="x",
+            POSTGRES_USER="u",
+            POSTGRES_PASSWORD="p",
+            SUBSCRIPTION_MINI_APP_URL="https://app.example.com/webapp",
+        )
+        self.assertEqual(
+            subscription_mini_app_topup_url(s, "regular"),
+            "https://app.example.com/webapp?topup=regular",
+        )

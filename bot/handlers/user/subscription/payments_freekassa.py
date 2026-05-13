@@ -61,12 +61,21 @@ async def pay_fk_callback_handler(
 
     user_id = callback.from_user.id
     human_value = str(int(months)) if float(months).is_integer() else f"{months:g}"
+    sale_base = sale_mode.split("@", 1)[0].split("|", 1)[0]
     payment_description = (
         get_text("payment_description_traffic", traffic_gb=human_value)
-        if sale_mode == "traffic"
-        else get_text("payment_description_subscription", months=int(months))
+        if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+        else (
+            get_text("payment_description_hwid_devices", count=int(months))
+            if sale_base in {"hwid_device", "hwid_devices"}
+            else get_text("payment_description_subscription", months=int(months))
+        )
     )
-    currency_code = getattr(freekassa_service, "default_currency", None) or settings.DEFAULT_CURRENCY_SYMBOL or "RUB"
+    currency_code = (
+        getattr(freekassa_service, "default_currency", None)
+        or settings.DEFAULT_CURRENCY_SYMBOL
+        or "RUB"
+    )
 
     payment_record_payload = {
         "user_id": user_id,
@@ -74,8 +83,16 @@ async def pay_fk_callback_handler(
         "currency": currency_code,
         "status": "pending_freekassa",
         "description": payment_description,
-        "subscription_duration_months": int(months),
+        "subscription_duration_months": int(months) if sale_base == "subscription" else None,
         "provider": "freekassa",
+        "sale_mode": sale_mode,
+        "tariff_key": sale_mode.split("@", 1)[1] if "@" in sale_mode else None,
+        "purchased_gb": float(months)
+        if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+        else None,
+        "purchased_hwid_devices": int(months)
+        if sale_base in {"hwid_device", "hwid_devices"}
+        else None,
     }
 
     try:
@@ -128,12 +145,14 @@ async def pay_fk_callback_handler(
             except Exception as e_status:
                 await session.rollback()
                 logging.error(
-                    f"FreeKassa: failed to store provider order id for payment {payment_record.payment_id}: {e_status}",
+                    f"FreeKassa: failed to store provider order id for payment {payment_record.payment_id}: {e_status}",  # noqa: E501
                     exc_info=True,
                 )
 
         if location:
-            order_identifier_display = str(order_id_api or provider_identifier or payment_record.payment_id)
+            order_identifier_display = str(
+                order_id_api or provider_identifier or payment_record.payment_id
+            )
             order_info_text = get_text(
                 "free_kassa_order_info",
                 order_id=order_identifier_display,
@@ -141,8 +160,11 @@ async def pay_fk_callback_handler(
             )
             try:
                 await callback.message.edit_text(
-                    f"{order_info_text}\n\n" + get_text(
-                        key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                    f"{order_info_text}\n\n"
+                    + get_text(
+                        key="payment_link_message_traffic"
+                        if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                        else "payment_link_message",
                         months=int(months),
                         traffic_gb=human_value,
                     ),
@@ -156,11 +178,16 @@ async def pay_fk_callback_handler(
                     disable_web_page_preview=False,
                 )
             except Exception as e_edit:
-                logging.warning(f"FreeKassa: failed to display payment link ({e_edit}), sending new message.")
+                logging.warning(
+                    f"FreeKassa: failed to display payment link ({e_edit}), sending new message."
+                )
                 try:
                     await callback.message.answer(
-                        f"{order_info_text}\n\n" + get_text(
-                            key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                        f"{order_info_text}\n\n"
+                        + get_text(
+                            key="payment_link_message_traffic"
+                            if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                            else "payment_link_message",
                             months=int(months),
                             traffic_gb=human_value,
                         ),
@@ -182,7 +209,7 @@ async def pay_fk_callback_handler(
             return
 
         logging.error(
-            "FreeKassa: create_order succeeded but no payment link returned for payment %s. Response: %s",
+            "FreeKassa: create_order succeeded but no payment link returned for payment %s. Response: %s",  # noqa: E501
             payment_record.payment_id,
             response_data,
         )
@@ -202,7 +229,10 @@ async def pay_fk_callback_handler(
         await session.commit()
     except Exception as e_status:
         await session.rollback()
-        logging.error(f"FreeKassa: failed to mark payment {payment_record.payment_id} as failed_creation: {e_status}", exc_info=True)
+        logging.error(
+            f"FreeKassa: failed to mark payment {payment_record.payment_id} as failed_creation: {e_status}",  # noqa: E501
+            exc_info=True,
+        )
 
     try:
         await callback.message.edit_text(get_text("error_payment_gateway"))

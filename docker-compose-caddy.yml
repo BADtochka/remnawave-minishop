@@ -9,6 +9,9 @@ services:
       - TZ=UTC
     volumes:
       - ./locales:/app/locales
+      # Tariffs 2.0 configuration. Mount the data directory to persist
+      # changes made via the admin panel.
+      # - ./data:/app/data
     restart: unless-stopped
     depends_on:
       remnawave-minishop-db:

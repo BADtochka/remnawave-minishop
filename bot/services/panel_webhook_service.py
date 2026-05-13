@@ -1,19 +1,25 @@
+import hashlib
+import hmac
 import json
 import logging
-import hmac
-import hashlib
-from aiohttp import web
+from typing import Optional
+
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup
+from aiohttp import web
 from sqlalchemy.orm import sessionmaker
-from typing import Optional
+
+from bot.keyboards.inline.user_keyboards import (
+    get_autorenew_cancel_keyboard,
+    get_subscribe_only_markup,
+)
+from bot.middlewares.i18n import JsonI18n
 from config.settings import Settings
-from .panel_api_service import PanelApiService
+from db.dal import user_dal
+
 from .email_auth_service import EmailAuthService
 from .email_templates import render_subscription_expiring
-from bot.middlewares.i18n import JsonI18n
-from bot.keyboards.inline.user_keyboards import get_subscribe_only_markup, get_autorenew_cancel_keyboard
-from db.dal import user_dal
+from .panel_api_service import PanelApiService
 
 EVENT_MAP = {
     "user.expires_in_72_hours": (3, "subscription_72h_notification"),
@@ -21,8 +27,16 @@ EVENT_MAP = {
     "user.expires_in_24_hours": (1, "subscription_24h_notification"),
 }
 
+
 class PanelWebhookService:
-    def __init__(self, bot: Bot, settings: Settings, i18n: JsonI18n, async_session_factory: sessionmaker, panel_service: PanelApiService):
+    def __init__(
+        self,
+        bot: Bot,
+        settings: Settings,
+        i18n: JsonI18n,
+        async_session_factory: sessionmaker,
+        panel_service: PanelApiService,
+    ):
         self.bot = bot
         self.settings = settings
         self.i18n = i18n
@@ -64,7 +78,11 @@ class PanelWebhookService:
             if not db_user:
                 db_user = await user_dal.get_user_by_id(session, user_id)
             internal_user_id = db_user.user_id if db_user else user_id
-            lang = db_user.language_code if db_user and db_user.language_code else self.settings.DEFAULT_LANGUAGE
+            lang = (
+                db_user.language_code
+                if db_user and db_user.language_code
+                else self.settings.DEFAULT_LANGUAGE
+            )
             first_name = db_user.first_name or f"User {user_id}" if db_user else f"User {user_id}"
             user_email = (db_user.email or "").strip() if db_user else ""
 
@@ -79,11 +97,16 @@ class PanelWebhookService:
                     if subscription_service:
                         async with self.async_session_factory() as session:
                             from db.dal import subscription_dal
-                            sub = await subscription_dal.get_active_subscription_by_user_id(session, internal_user_id)
-                            if sub and sub.auto_renew_enabled and sub.provider == 'yookassa':
+
+                            sub = await subscription_dal.get_active_subscription_by_user_id(
+                                session, internal_user_id
+                            )
+                            if sub and sub.auto_renew_enabled and sub.provider == "yookassa":
                                 try:
-                                    ok = await subscription_service.charge_subscription_renewal(session, sub)
-                                    # If initiation succeeded, suppress the 24h reminder by returning early
+                                    ok = await subscription_service.charge_subscription_renewal(
+                                        session, sub
+                                    )
+                                    # If initiation succeeded, suppress the 24h reminder by returning early  # noqa: E501
                                     if ok:
                                         await session.commit()
                                         return
@@ -99,15 +122,18 @@ class PanelWebhookService:
                 if days_left == 2:
                     async with self.async_session_factory() as session:
                         from db.dal import subscription_dal
-                        sub = await subscription_dal.get_active_subscription_by_user_id(session, internal_user_id)
+
+                        sub = await subscription_dal.get_active_subscription_by_user_id(
+                            session, internal_user_id
+                        )
                         logging.info(
                             "48h webhook check: user_id=%s sub_found=%s auto_renew=%s provider=%s",
                             user_id,
                             bool(sub),
-                            getattr(sub, 'auto_renew_enabled', None) if sub else None,
-                            getattr(sub, 'provider', None) if sub else None,
+                            getattr(sub, "auto_renew_enabled", None) if sub else None,
+                            getattr(sub, "provider", None) if sub else None,
                         )
-                        if sub and sub.auto_renew_enabled and sub.provider == 'yookassa':
+                        if sub and sub.auto_renew_enabled and sub.provider == "yookassa":
                             cancel_kb = get_autorenew_cancel_keyboard(lang, self.i18n)
                             await self._send_message(
                                 user_id,
@@ -142,7 +168,10 @@ class PanelWebhookService:
                     user_name=first_name,
                     end_date=user_payload.get("expireAt", "")[:10],
                 )
-        elif event_name == "user.expired_24_hours_ago" and self.settings.SUBSCRIPTION_NOTIFY_AFTER_EXPIRE:
+        elif (
+            event_name == "user.expired_24_hours_ago"
+            and self.settings.SUBSCRIPTION_NOTIFY_AFTER_EXPIRE
+        ):
             await self._send_message(
                 user_id,
                 lang,
@@ -176,7 +205,9 @@ class PanelWebhookService:
         except Exception:
             logging.exception("Failed to send subscription-expiring email to %s", recipient)
 
-    async def handle_webhook(self, raw_body: bytes, signature_header: Optional[str]) -> web.Response:
+    async def handle_webhook(
+        self, raw_body: bytes, signature_header: Optional[str]
+    ) -> web.Response:
         if not self.settings.PANEL_WEBHOOK_SECRET:
             return web.Response(status=401, text="unauthorized")
 
@@ -214,6 +245,7 @@ class PanelWebhookService:
 
         await self.handle_event(event_name, user_data)
         return web.Response(status=200, text="ok")
+
 
 async def panel_webhook_route(request: web.Request):
     service: PanelWebhookService = request.app["panel_webhook_service"]

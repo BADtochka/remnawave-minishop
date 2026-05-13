@@ -1,11 +1,9 @@
 from aiogram import Router
 
-from . import start
+from . import promo_user, referral, start, trial_handler
+
 # TODO: after splitting subscription into a package, replace this import
 from .subscription import router as subscription_router
-from . import referral
-from . import promo_user
-from . import trial_handler
 
 user_router_aggregate = Router(name="user_router_aggregate")
 

@@ -1,11 +1,11 @@
 import logging
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import and_, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-from sqlalchemy import update, delete, func, and_
 
-from ..models import AdCampaign, AdAttribution, Payment
+from ..models import AdAttribution, AdCampaign, Payment
 
 
 async def create_campaign(
@@ -20,7 +20,7 @@ async def create_campaign(
     await session.flush()
     await session.refresh(campaign)
     logging.info(
-        f"AdCampaign created id={campaign.ad_campaign_id}, source={source}, start={start_param}, cost={cost}"
+        f"AdCampaign created id={campaign.ad_campaign_id}, source={source}, start={start_param}, cost={cost}"  # noqa: E501
     )
     return campaign
 
@@ -31,7 +31,9 @@ async def get_campaign_by_id(session: AsyncSession, campaign_id: int) -> Optiona
     return result.scalar_one_or_none()
 
 
-async def get_campaign_by_start_param(session: AsyncSession, start_param: str) -> Optional[AdCampaign]:
+async def get_campaign_by_start_param(
+    session: AsyncSession, start_param: str
+) -> Optional[AdCampaign]:
     clean = start_param.strip()
     stmt = select(AdCampaign).where(AdCampaign.start_param == clean)
     result = await session.execute(stmt)
@@ -56,7 +58,9 @@ async def toggle_campaign_active(session: AsyncSession, campaign_id: int, is_act
     return result.rowcount > 0
 
 
-async def ensure_attribution(session: AsyncSession, *, user_id: int, campaign_id: int) -> AdAttribution:
+async def ensure_attribution(
+    session: AsyncSession, *, user_id: int, campaign_id: int
+) -> AdAttribution:
     existing = await get_attribution_for_user(session, user_id)
     if existing:
         return existing
@@ -93,7 +97,10 @@ async def get_campaign_stats(session: AsyncSession, campaign_id: int) -> Dict[st
 
     # Trials
     trials_stmt = select(func.count(AdAttribution.user_id)).where(
-        and_(AdAttribution.ad_campaign_id == campaign_id, AdAttribution.trial_activated_at.is_not(None))
+        and_(
+            AdAttribution.ad_campaign_id == campaign_id,
+            AdAttribution.trial_activated_at.is_not(None),
+        )
     )
     trials = (await session.execute(trials_stmt)).scalar() or 0
 
@@ -165,13 +172,10 @@ async def get_totals(session: AsyncSession) -> Dict[str, float]:
     total_cost = float((await session.execute(total_cost_stmt)).scalar() or 0.0)
 
     # Total revenue from all attributed users (unique users counted across all campaigns)
-    attrib_subq = (
-        select(
-            AdAttribution.user_id.label("user_id"),
-            AdAttribution.first_start_at.label("first_start_at"),
-        )
-        .subquery()
-    )
+    attrib_subq = select(
+        AdAttribution.user_id.label("user_id"),
+        AdAttribution.first_start_at.label("first_start_at"),
+    ).subquery()
     revenue_stmt = (
         select(func.coalesce(func.sum(Payment.amount), 0.0))
         .select_from(Payment)

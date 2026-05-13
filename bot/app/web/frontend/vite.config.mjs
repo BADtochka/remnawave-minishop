@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import tailwindcss from "@tailwindcss/vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
 
@@ -8,7 +9,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const templateDir = path.resolve(__dirname, "../templates");
 
 export default defineConfig({
-  plugins: [svelte()],
+  resolve: {
+    alias: {
+      $lib: path.resolve(__dirname, "src/lib"),
+      $components: path.resolve(__dirname, "src/lib/components"),
+    },
+  },
+  plugins: [tailwindcss(), svelte()],
   build: {
     outDir: templateDir,
     emptyOutDir: false,
@@ -22,7 +29,10 @@ export default defineConfig({
       fileName: () => "subscription_webapp.js",
       cssFileName: "subscription_webapp",
     },
-    rollupOptions: {
+    rolldownOptions: {
+      checks: {
+        pluginTimings: false,
+      },
       output: {
         assetFileNames: (assetInfo) => {
           if (assetInfo.name && assetInfo.name.endsWith(".css")) {

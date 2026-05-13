@@ -1,28 +1,28 @@
 import asyncio
-from datetime import datetime
 import hashlib
 import hmac
 import json
 import logging
 import time
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional, Dict, Any, Tuple
+from datetime import datetime
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import parse_qsl
 
-from aiohttp import ClientSession, ClientTimeout, web
 from aiogram import Bot
+from aiohttp import ClientSession, ClientTimeout, web
 from sqlalchemy.orm import sessionmaker
 
-from config.settings import Settings
-from bot.middlewares.i18n import JsonI18n
-from bot.services.subscription_service import SubscriptionService
-from bot.services.referral_service import ReferralService
 from bot.keyboards.inline.user_keyboards import get_connect_and_main_keyboard
+from bot.middlewares.i18n import JsonI18n
 from bot.services.notification_service import NotificationService
-from db.dal import payment_dal, user_dal
-from bot.utils.text_sanitizer import sanitize_display_name, username_for_display
+from bot.services.referral_service import ReferralService
+from bot.services.subscription_service import SubscriptionService
 from bot.utils.config_link import prepare_config_links
 from bot.utils.request_security import ip_in_allowlist, request_client_ip
+from bot.utils.text_sanitizer import sanitize_display_name, username_for_display
+from config.settings import Settings
+from db.dal import payment_dal, user_dal
 
 
 class FreeKassaService:
@@ -58,9 +58,13 @@ class FreeKassaService:
 
         self.configured: bool = bool(settings.FREEKASSA_ENABLED and self.shop_id and self.api_key)
         if not self.configured:
-            logging.warning("FreeKassaService initialized but not fully configured. Payments disabled.")
+            logging.warning(
+                "FreeKassaService initialized but not fully configured. Payments disabled."
+            )
         if settings.FREEKASSA_ENABLED and not self.server_ip:
-            logging.warning("FreeKassaService: FREEKASSA_PAYMENT_IP is not set. Requests may be rejected by the provider.")
+            logging.warning(
+                "FreeKassaService: FREEKASSA_PAYMENT_IP is not set. Requests may be rejected by the provider."  # noqa: E501
+            )
 
     @staticmethod
     def _format_amount(amount: float) -> str:
@@ -124,8 +128,14 @@ class FreeKassaService:
                 try:
                     response_data = json.loads(response_text) if response_text else {}
                 except json.JSONDecodeError:
-                    logging.error("FreeKassa create_order: failed to decode JSON: %s", response_text)
-                    return False, {"status": response.status, "message": "invalid_json", "raw": response_text}
+                    logging.error(
+                        "FreeKassa create_order: failed to decode JSON: %s", response_text
+                    )
+                    return False, {
+                        "status": response.status,
+                        "message": "invalid_json",
+                        "raw": response_text,
+                    }
 
                 if response.status != 200 or response_data.get("type") != "success":
                     logging.error(
@@ -163,7 +173,9 @@ class FreeKassaService:
         ]
         items.sort(key=lambda pair: pair[0])
         message = "|".join(str(value) for _, value in items)
-        return hmac.new(self.api_key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
+        return hmac.new(
+            self.api_key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
 
     async def close(self) -> None:
         if self._session and not self._session.closed:
@@ -210,7 +222,9 @@ class FreeKassaService:
                 else:
                     payload_dict = {
                         str(key): value
-                        for key, value in parse_qsl(raw_body.decode("utf-8"), keep_blank_values=True)
+                        for key, value in parse_qsl(
+                            raw_body.decode("utf-8"), keep_blank_values=True
+                        )
                     }
             except Exception:
                 payload_dict = {}
@@ -255,14 +269,21 @@ class FreeKassaService:
             # Optional amount verification
             try:
                 amount_decimal = Decimal(amount_str)
-                expected_amount = Decimal(str(payment.amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-                if amount_decimal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) != expected_amount:
+                expected_amount = Decimal(str(payment.amount)).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                if (
+                    amount_decimal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                    != expected_amount
+                ):
                     logging.warning(
                         f"FreeKassa webhook: amount mismatch for payment {payment_db_id} "
                         f"(expected {expected_amount}, got {amount_decimal})"
                     )
             except Exception as e:
-                logging.warning(f"FreeKassa webhook: failed to compare amount for payment {payment_db_id}: {e}")
+                logging.warning(
+                    f"FreeKassa webhook: failed to compare amount for payment {payment_db_id}: {e}"
+                )
 
             activation = None
             referral_bonus = None
@@ -274,22 +295,27 @@ class FreeKassaService:
                     new_status="succeeded",
                 )
 
-                months = payment.subscription_duration_months or 1
-                sale_mode = "traffic" if self.settings.traffic_sale_mode else "subscription"
+                months = payment.purchased_gb or payment.subscription_duration_months or 1
+                sale_mode = payment.sale_mode or (
+                    "traffic" if self.settings.traffic_sale_mode else "subscription"
+                )
+                sale_base = sale_mode.split("@", 1)[0].split("|", 1)[0]
 
                 activation = await self.subscription_service.activate_subscription(
                     session,
                     payment.user_id,
-                    int(months) if sale_mode != "traffic" else 0,
+                    int(months) if sale_base == "subscription" else int(float(months)),
                     float(payment.amount),
                     payment.payment_id,
                     provider="freekassa",
                     sale_mode=sale_mode,
-                    traffic_gb=months if sale_mode == "traffic" else None,
+                    traffic_gb=float(months)
+                    if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                    else None,
                 )
 
                 referral_bonus = None
-                if sale_mode != "traffic":
+                if sale_base == "subscription":
                     referral_bonus = await self.referral_service.apply_referral_bonuses_for_payment(
                         session,
                         payment.user_id,
@@ -305,15 +331,24 @@ class FreeKassaService:
                 return web.Response(status=500, text="processing_error")
 
             db_user = payment.user or await user_dal.get_user_by_id(session, payment.user_id)
-            lang = db_user.language_code if db_user and db_user.language_code else self.settings.DEFAULT_LANGUAGE
+            lang = (
+                db_user.language_code
+                if db_user and db_user.language_code
+                else self.settings.DEFAULT_LANGUAGE
+            )
             _ = lambda k, **kw: self.i18n.gettext(lang, k, **kw) if self.i18n else k
 
             raw_config_link = activation.get("subscription_url") if activation else None
-            config_link_display, connect_button_url = await prepare_config_links(self.settings, raw_config_link)
+            config_link_display, connect_button_url = await prepare_config_links(
+                self.settings, raw_config_link
+            )
             config_link_text = config_link_display or _("config_link_not_available")
             final_end = activation.get("end_date") if activation else None
-            months = payment.subscription_duration_months or 1
-            sale_mode = "traffic" if self.settings.traffic_sale_mode else "subscription"
+            months = payment.purchased_gb or payment.subscription_duration_months or 1
+            sale_mode = payment.sale_mode or (
+                "traffic" if self.settings.traffic_sale_mode else "subscription"
+            )
+            sale_base = sale_mode.split("@", 1)[0].split("|", 1)[0]
 
             applied_days = 0
             if referral_bonus and referral_bonus.get("referee_new_end_date"):
@@ -330,25 +365,40 @@ class FreeKassaService:
 
             traffic_label = str(int(months)) if float(months).is_integer() else f"{months:g}"
 
-            if sale_mode == "traffic":
-                text = _("payment_successful_traffic_full",
-                         traffic_gb=traffic_label,
-                         end_date=end_date_str if final_end else "",
-                         config_link=config_link_text)
+            if sale_mode.split("@", 1)[0].split("|", 1)[0] in {
+                "traffic",
+                "traffic_package",
+                "topup",
+                "premium_topup",
+            }:
+                text = _(
+                    "payment_successful_traffic_full",
+                    traffic_gb=traffic_label,
+                    end_date=end_date_str if final_end else "",
+                    config_link=config_link_text,
+                )
             elif applied_days:
                 inviter_name_display = _("friend_placeholder")
                 if db_user and db_user.referred_by_id:
                     inviter = await user_dal.get_user_by_id(session, db_user.referred_by_id)
                     if inviter:
-                        safe_name = sanitize_display_name(inviter.first_name) if inviter.first_name else None
+                        safe_name = (
+                            sanitize_display_name(inviter.first_name)
+                            if inviter.first_name
+                            else None
+                        )
                         if safe_name:
                             inviter_name_display = safe_name
                         elif inviter.username:
-                            inviter_name_display = username_for_display(inviter.username, with_at=False)
+                            inviter_name_display = username_for_display(
+                                inviter.username, with_at=False
+                            )
                 text = _(
                     "payment_successful_with_referral_bonus_full",
                     months=months,
-                    base_end_date=activation["end_date"].strftime("%Y-%m-%d") if activation and activation.get("end_date") else end_date_str,
+                    base_end_date=activation["end_date"].strftime("%Y-%m-%d")
+                    if activation and activation.get("end_date")
+                    else end_date_str,
                     bonus_days=applied_days,
                     final_end_date=end_date_str,
                     inviter_name=inviter_name_display,
@@ -386,7 +436,9 @@ class FreeKassaService:
                     disable_web_page_preview=True,
                 )
             except Exception:
-                logging.exception("FreeKassa notification: failed to send message to user %s.", payment.user_id)
+                logging.exception(
+                    "FreeKassa notification: failed to send message to user %s.", payment.user_id
+                )
 
             try:
                 notification_service = NotificationService(self.bot, self.settings, self.i18n)
@@ -394,10 +446,14 @@ class FreeKassaService:
                     user_id=payment.user_id,
                     amount=float(payment.amount),
                     currency=self.default_currency,
-                    months=int(months) if sale_mode != "traffic" else 0,
-                    traffic_gb=months if sale_mode == "traffic" else None,
+                    months=int(months) if sale_base == "subscription" else 0,
+                    traffic_gb=float(months)
+                    if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                    else None,
                     payment_provider="freekassa",
                     username=db_user.username if db_user else None,
+                    traffic_is_premium=sale_base == "premium_topup",
+                    tariff_key=getattr(payment, "tariff_key", None),
                 )
             except Exception:
                 logging.exception("FreeKassa notification: failed to notify admins.")

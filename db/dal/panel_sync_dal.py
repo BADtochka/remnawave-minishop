@@ -1,27 +1,26 @@
 import logging
-from typing import Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy import update
 from datetime import datetime, timezone
+from typing import Optional
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import PanelSyncStatus
 
 SINGLETON_ID = 1
 
 
-async def get_panel_sync_status(
-        session: AsyncSession) -> Optional[PanelSyncStatus]:
+async def get_panel_sync_status(session: AsyncSession) -> Optional[PanelSyncStatus]:
     return await session.get(PanelSyncStatus, SINGLETON_ID)
 
 
 async def update_panel_sync_status(
-        session: AsyncSession,
-        status: str,
-        details: str,
-        users_processed: int = 0,
-        subs_synced: int = 0,
-        last_sync_time: Optional[datetime] = None) -> PanelSyncStatus:
+    session: AsyncSession,
+    status: str,
+    details: str,
+    users_processed: int = 0,
+    subs_synced: int = 0,
+    last_sync_time: Optional[datetime] = None,
+) -> PanelSyncStatus:
     if last_sync_time is None:
         last_sync_time = datetime.now(timezone.utc)
 
@@ -39,7 +38,8 @@ async def update_panel_sync_status(
             status=status,
             details=details,
             users_processed_from_panel=users_processed,
-            subscriptions_synced=subs_synced)
+            subscriptions_synced=subs_synced,
+        )
         session.add(sync_record)
 
     await session.flush()

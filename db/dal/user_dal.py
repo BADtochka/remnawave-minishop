@@ -1,25 +1,25 @@
 import logging
 import secrets
 import string
-from typing import Optional, List, Dict, Any, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
+
+from sqlalchemy import and_, delete, desc, func, or_, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-from sqlalchemy import update, delete, func, and_, or_, desc
 from sqlalchemy.orm import aliased
-from datetime import datetime, timezone, timedelta
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ..models import (
-    User,
-    UserTelegramAvatar,
-    Subscription,
+    AdAttribution,
+    MessageLog,
     Payment,
     PromoCodeActivation,
-    MessageLog,
+    Subscription,
+    User,
     UserBilling,
     UserPaymentMethod,
-    AdAttribution,
+    UserTelegramAvatar,
 )
 
 REFERRAL_CODE_ALPHABET = string.ascii_uppercase + string.digits
@@ -33,9 +33,7 @@ class UserMergeConflictError(ValueError):
 
 
 def _generate_referral_code_candidate() -> str:
-    return "".join(
-        secrets.choice(REFERRAL_CODE_ALPHABET) for _ in range(REFERRAL_CODE_LENGTH)
-    )
+    return "".join(secrets.choice(REFERRAL_CODE_ALPHABET) for _ in range(REFERRAL_CODE_LENGTH))
 
 
 async def _referral_code_exists(session: AsyncSession, code: str) -> bool:
@@ -105,9 +103,7 @@ async def get_user_by_email(session: AsyncSession, email: str) -> Optional[User]
     return result.scalar_one_or_none()
 
 
-async def get_user_by_telegram_id(
-    session: AsyncSession, telegram_id: int
-) -> Optional[User]:
+async def get_user_by_telegram_id(session: AsyncSession, telegram_id: int) -> Optional[User]:
     stmt = select(User).where(User.telegram_id == telegram_id)
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
@@ -152,9 +148,7 @@ async def upsert_user_telegram_avatar(
     return avatar
 
 
-async def get_user_by_panel_uuid(
-    session: AsyncSession, panel_uuid: str
-) -> Optional[User]:
+async def get_user_by_panel_uuid(session: AsyncSession, panel_uuid: str) -> Optional[User]:
     stmt = select(User).where(User.panel_user_uuid == panel_uuid)
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
@@ -198,9 +192,7 @@ async def create_user(session: AsyncSession, user_data: Dict[str, Any]) -> Tuple
             f"New user {user.user_id} created in DAL. Referred by: {user.referred_by_id or 'N/A'}."
         )
     elif user is not None:
-        logging.info(
-            f"User {user.user_id} already exists in DAL. Proceeding without creation."
-        )
+        logging.info(f"User {user.user_id} already exists in DAL. Proceeding without creation.")
 
     return user, created
 
@@ -399,7 +391,10 @@ async def merge_users(
     for attr in ("username", "first_name", "last_name", "language_code", "telegram_photo_url"):
         if not getattr(target, attr) and getattr(source, attr):
             setattr(target, attr, getattr(source, attr))
-    if not target.channel_subscription_verified and source.channel_subscription_verified is not None:
+    if (
+        not target.channel_subscription_verified
+        and source.channel_subscription_verified is not None
+    ):
         target.channel_subscription_verified = source.channel_subscription_verified
     if not target.channel_subscription_checked_at and source.channel_subscription_checked_at:
         target.channel_subscription_checked_at = source.channel_subscription_checked_at
@@ -407,8 +402,8 @@ async def merge_users(
         target.channel_subscription_verified_for = source.channel_subscription_verified_for
     if source.lifetime_used_traffic_bytes is not None:
         target.lifetime_used_traffic_bytes = (
-            (target.lifetime_used_traffic_bytes or 0) + source.lifetime_used_traffic_bytes
-        )
+            target.lifetime_used_traffic_bytes or 0
+        ) + source.lifetime_used_traffic_bytes
     if not target.referred_by_id and source.referred_by_id != target_user_id:
         target.referred_by_id = source.referred_by_id
     if target.referred_by_id == source_user_id:
@@ -456,9 +451,7 @@ async def merge_users(
         )
     ).scalar_one_or_none()
     if target_has_attribution:
-        await session.execute(
-            delete(AdAttribution).where(AdAttribution.user_id == source_user_id)
-        )
+        await session.execute(delete(AdAttribution).where(AdAttribution.user_id == source_user_id))
     else:
         await session.execute(
             update(AdAttribution)
@@ -492,9 +485,7 @@ async def merge_users(
     )
     for model in (Payment, PromoCodeActivation, UserPaymentMethod):
         await session.execute(
-            update(model)
-            .where(model.user_id == source_user_id)
-            .values(user_id=target_user_id)
+            update(model).where(model.user_id == source_user_id).values(user_id=target_user_id)
         )
 
     await session.execute(
@@ -540,9 +531,7 @@ async def update_user(
     return user
 
 
-async def update_user_language(
-    session: AsyncSession, user_id: int, lang_code: str
-) -> bool:
+async def update_user_language(session: AsyncSession, user_id: int, lang_code: str) -> bool:
     stmt = update(User).where(User.user_id == user_id).values(language_code=lang_code)
     result = await session.execute(stmt)
     return result.rowcount > 0
@@ -550,11 +539,7 @@ async def update_user_language(
 
 async def get_banned_users(session: AsyncSession) -> List[User]:
     """Get all banned users"""
-    stmt = (
-        select(User)
-        .where(User.is_banned == True)
-        .order_by(User.registration_date.desc())
-    )
+    stmt = select(User).where(User.is_banned == True).order_by(User.registration_date.desc())
     result = await session.execute(stmt)
     return result.scalars().all()
 
@@ -597,23 +582,25 @@ async def get_all_users_with_panel_uuid(session: AsyncSession) -> List[User]:
 async def get_enhanced_user_statistics(session: AsyncSession) -> Dict[str, Any]:
     """Get comprehensive user statistics including active users, trial users, etc."""
     from datetime import datetime, timezone
-    
+
     # Use timezone-aware UTC to avoid naive/aware comparison issues in SQL queries
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    
+
     # Total users
     total_users_stmt = select(func.count(User.user_id))
     total_users = (await session.execute(total_users_stmt)).scalar() or 0
-    
+
     # Banned users
     banned_users_stmt = select(func.count(User.user_id)).where(User.is_banned == True)
     banned_users = (await session.execute(banned_users_stmt)).scalar() or 0
-    
+
     # Active users today (proxy: registered today)
-    active_today_stmt = select(func.count(User.user_id)).where(User.registration_date >= today_start)
+    active_today_stmt = select(func.count(User.user_id)).where(
+        User.registration_date >= today_start
+    )
     active_today = (await session.execute(active_today_stmt)).scalar() or 0
-    
+
     # Users with active paid subscriptions (non-trial providers only)
     paid_subs_stmt = (
         select(func.count(func.distinct(Subscription.user_id)))
@@ -622,12 +609,12 @@ async def get_enhanced_user_statistics(session: AsyncSession) -> Dict[str, Any]:
             and_(
                 Subscription.is_active == True,
                 Subscription.end_date > now,
-                Subscription.provider.is_not(None)  # Not trial
+                Subscription.provider.is_not(None),  # Not trial
             )
         )
     )
     paid_subs_users = (await session.execute(paid_subs_stmt)).scalar() or 0
-    
+
     # Users on trial period
     trial_subs_stmt = (
         select(func.count(func.distinct(Subscription.user_id)))
@@ -636,19 +623,19 @@ async def get_enhanced_user_statistics(session: AsyncSession) -> Dict[str, Any]:
             and_(
                 Subscription.is_active == True,
                 Subscription.end_date > now,
-                Subscription.provider.is_(None)  # Trial subscriptions
+                Subscription.provider.is_(None),  # Trial subscriptions
             )
         )
     )
     trial_users = (await session.execute(trial_subs_stmt)).scalar() or 0
-    
+
     # Inactive users (no active subscription)
     inactive_users = total_users - paid_subs_users - trial_users - banned_users
-    
+
     # Users attracted via referral
     referral_users_stmt = select(func.count(User.user_id)).where(User.referred_by_id.is_not(None))
     referral_users = (await session.execute(referral_users_stmt)).scalar() or 0
-    
+
     return {
         "total_users": total_users,
         "banned_users": banned_users,
@@ -656,13 +643,14 @@ async def get_enhanced_user_statistics(session: AsyncSession) -> Dict[str, Any]:
         "paid_subscriptions": paid_subs_users,
         "trial_users": trial_users,
         "inactive_users": max(0, inactive_users),
-        "referral_users": referral_users
+        "referral_users": referral_users,
     }
 
 
 async def get_user_ids_with_active_subscription(session: AsyncSession) -> List[int]:
     """Return non-banned user IDs who have an active subscription (paid or trial)."""
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
 
     stmt = (
@@ -683,6 +671,7 @@ async def get_user_ids_with_active_subscription(session: AsyncSession) -> List[i
 async def get_user_ids_without_active_subscription(session: AsyncSession) -> List[int]:
     """Return non-banned user IDs who do NOT have any active subscription."""
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
 
     active_subs = aliased(Subscription)
@@ -729,15 +718,9 @@ async def delete_user_and_relations(session: AsyncSession, user_id: int) -> bool
         )
     )
     await session.execute(delete(Payment).where(Payment.user_id == user_id))
-    await session.execute(
-        delete(Subscription).where(Subscription.user_id == user_id)
-    )
-    await session.execute(
-        delete(PromoCodeActivation).where(PromoCodeActivation.user_id == user_id)
-    )
-    await session.execute(
-        delete(UserPaymentMethod).where(UserPaymentMethod.user_id == user_id)
-    )
+    await session.execute(delete(Subscription).where(Subscription.user_id == user_id))
+    await session.execute(delete(PromoCodeActivation).where(PromoCodeActivation.user_id == user_id))
+    await session.execute(delete(UserPaymentMethod).where(UserPaymentMethod.user_id == user_id))
     await session.execute(delete(UserBilling).where(UserBilling.user_id == user_id))
     await session.execute(delete(AdAttribution).where(AdAttribution.user_id == user_id))
     await session.execute(delete(UserTelegramAvatar).where(UserTelegramAvatar.user_id == user_id))

@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 
 def add_months(base_dt: datetime, months_to_add: int) -> datetime:
@@ -25,3 +26,11 @@ def add_months(base_dt: datetime, months_to_add: int) -> datetime:
     return base_dt.replace(year=year, month=month, day=clamped_day)
 
 
+def month_start(base_dt: Optional[datetime] = None) -> datetime:
+    """Return the first instant of the month in UTC for a datetime."""
+    moment = base_dt or datetime.now(timezone.utc)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    else:
+        moment = moment.astimezone(timezone.utc)
+    return datetime(moment.year, moment.month, 1, tzinfo=timezone.utc)

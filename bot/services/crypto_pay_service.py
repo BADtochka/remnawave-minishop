@@ -1,25 +1,25 @@
 import hashlib
-import logging
-import json
 import hmac
+import json
+import logging
 from typing import Optional
 
+from aiocryptopay import AioCryptoPay, Networks
+from aiocryptopay.models.update import Update
 from aiogram import Bot
 from aiohttp import web
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
-from aiocryptopay import AioCryptoPay, Networks
-from aiocryptopay.models.update import Update
 
-from config.settings import Settings
-from bot.middlewares.i18n import JsonI18n
-from bot.services.subscription_service import SubscriptionService
-from bot.services.referral_service import ReferralService
 from bot.keyboards.inline.user_keyboards import get_connect_and_main_keyboard
+from bot.middlewares.i18n import JsonI18n
 from bot.services.notification_service import NotificationService
-from db.dal import payment_dal, user_dal
-from bot.utils.text_sanitizer import sanitize_display_name, username_for_display
+from bot.services.referral_service import ReferralService
+from bot.services.subscription_service import SubscriptionService
 from bot.utils.config_link import prepare_config_links
+from bot.utils.text_sanitizer import sanitize_display_name, username_for_display
+from config.settings import Settings
+from db.dal import payment_dal, user_dal
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,7 @@ class CryptoPayService:
 
         # Create pending payment in DB and commit to persist
         try:
+            sale_base = sale_mode.split("@", 1)[0].split("|", 1)[0]
             payment_record = await payment_dal.create_payment_record(
                 session,
                 {
@@ -86,8 +87,15 @@ class CryptoPayService:
                     "currency": self.settings.CRYPTOPAY_ASSET,
                     "status": "pending_cryptopay",
                     "description": description,
-                    "subscription_duration_months": int(months),
+                    "subscription_duration_months": int(months)
+                    if sale_base == "subscription"
+                    else None,
                     "provider": "cryptopay",
+                    "sale_mode": sale_mode,
+                    "tariff_key": sale_mode.split("@", 1)[1] if "@" in sale_mode else None,
+                    "purchased_gb": float(months)
+                    if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                    else None,
                 },
             )
             await session.commit()
@@ -98,19 +106,27 @@ class CryptoPayService:
                 exc_info=True,
             )
             return None
-        payload = json.dumps({
-            "user_id": str(user_id),
-            "subscription_months": str(months),
-            "payment_db_id": str(payment_record.payment_id),
-            "sale_mode": sale_mode,
-            "traffic_gb": str(months) if sale_mode == "traffic" else None,
-        })
+        payload = json.dumps(
+            {
+                "user_id": str(user_id),
+                "subscription_months": str(months),
+                "payment_db_id": str(payment_record.payment_id),
+                "sale_mode": sale_mode,
+                "traffic_gb": str(months)
+                if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                else None,
+            }
+        )
         try:
             invoice = await self.client.create_invoice(
                 amount=amount,
                 currency_type=self.settings.CRYPTOPAY_CURRENCY_TYPE,
-                fiat=self.settings.CRYPTOPAY_ASSET if self.settings.CRYPTOPAY_CURRENCY_TYPE == "fiat" else None,
-                asset=self.settings.CRYPTOPAY_ASSET if self.settings.CRYPTOPAY_CURRENCY_TYPE == "crypto" else None,
+                fiat=self.settings.CRYPTOPAY_ASSET
+                if self.settings.CRYPTOPAY_CURRENCY_TYPE == "fiat"
+                else None,
+                asset=self.settings.CRYPTOPAY_ASSET
+                if self.settings.CRYPTOPAY_CURRENCY_TYPE == "crypto"
+                else None,
                 description=description,
                 payload=payload,
             )
@@ -150,7 +166,10 @@ class CryptoPayService:
             user_id = int(meta["user_id"])
             months = float(meta.get("subscription_months") or 0)
             payment_db_id = int(meta["payment_db_id"])
-            sale_mode = meta.get("sale_mode") or ("traffic" if self.settings.traffic_sale_mode else "subscription")
+            sale_mode = meta.get("sale_mode") or (
+                "traffic" if self.settings.traffic_sale_mode else "subscription"
+            )
+            sale_base = sale_mode.split("@", 1)[0].split("|", 1)[0]
             traffic_gb = float(meta.get("traffic_gb")) if meta.get("traffic_gb") else months
         except Exception:
             logging.exception("Failed to parse CryptoPay payload.")
@@ -174,15 +193,17 @@ class CryptoPayService:
                 activation = await subscription_service.activate_subscription(
                     session,
                     user_id,
-                    int(months) if sale_mode != "traffic" else 0,
+                    int(months) if sale_base == "subscription" else int(float(traffic_gb)),
                     float(invoice.amount),
                     payment_db_id,
                     provider="cryptopay",
                     sale_mode=sale_mode,
-                    traffic_gb=traffic_gb if sale_mode == "traffic" else None,
+                    traffic_gb=traffic_gb
+                    if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                    else None,
                 )
                 referral_bonus = None
-                if sale_mode != "traffic":
+                if sale_base == "subscription":
                     referral_bonus = await referral_service.apply_referral_bonuses_for_payment(
                         session,
                         user_id,
@@ -198,7 +219,11 @@ class CryptoPayService:
 
             db_user = await user_dal.get_user_by_id(session, user_id)
             # Use DB language for user-facing messages
-            lang = db_user.language_code if db_user and db_user.language_code else settings.DEFAULT_LANGUAGE
+            lang = (
+                db_user.language_code
+                if db_user and db_user.language_code
+                else settings.DEFAULT_LANGUAGE
+            )
             _ = lambda k, **kw: i18n.gettext(lang, k, **kw)
 
             raw_config_link = activation.get("subscription_url") if activation else None
@@ -210,33 +235,47 @@ class CryptoPayService:
                 final_end = referral_bonus["referee_new_end_date"]
                 applied_days = referral_bonus.get("referee_bonus_applied_days", 0)
 
-            if sale_mode == "traffic":
-                text = _("payment_successful_traffic_full",
-                         traffic_gb=str(int(traffic_gb)) if float(traffic_gb).is_integer() else f"{traffic_gb:g}",
-                         end_date=final_end.strftime('%Y-%m-%d') if final_end else "—",
-                         config_link=config_link_text)
+            if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}:
+                text = _(
+                    "payment_successful_traffic_full",
+                    traffic_gb=str(int(traffic_gb))
+                    if float(traffic_gb).is_integer()
+                    else f"{traffic_gb:g}",
+                    end_date=final_end.strftime("%Y-%m-%d") if final_end else "—",
+                    config_link=config_link_text,
+                )
             elif applied_days:
                 inviter_name_display = _("friend_placeholder")
                 if db_user and db_user.referred_by_id:
                     inviter = await user_dal.get_user_by_id(session, db_user.referred_by_id)
                     if inviter:
-                        safe_name = sanitize_display_name(inviter.first_name) if inviter.first_name else None
+                        safe_name = (
+                            sanitize_display_name(inviter.first_name)
+                            if inviter.first_name
+                            else None
+                        )
                         if safe_name:
                             inviter_name_display = safe_name
                         elif inviter.username:
-                            inviter_name_display = username_for_display(inviter.username, with_at=False)
-                text = _("payment_successful_with_referral_bonus_full",
-                         months=int(months),
-                         base_end_date=activation["end_date"].strftime('%Y-%m-%d'),
-                         bonus_days=applied_days,
-                         final_end_date=final_end.strftime('%Y-%m-%d'),
-                         inviter_name=inviter_name_display,
-                         config_link=config_link_text)
+                            inviter_name_display = username_for_display(
+                                inviter.username, with_at=False
+                            )
+                text = _(
+                    "payment_successful_with_referral_bonus_full",
+                    months=int(months),
+                    base_end_date=activation["end_date"].strftime("%Y-%m-%d"),
+                    bonus_days=applied_days,
+                    final_end_date=final_end.strftime("%Y-%m-%d"),
+                    inviter_name=inviter_name_display,
+                    config_link=config_link_text,
+                )
             else:
-                text = _("payment_successful_full",
-                         months=int(months),
-                         end_date=final_end.strftime('%Y-%m-%d') if final_end else "—",
-                         config_link=config_link_text)
+                text = _(
+                    "payment_successful_full",
+                    months=int(months),
+                    end_date=final_end.strftime("%Y-%m-%d") if final_end else "—",
+                    config_link=config_link_text,
+                )
 
             markup = get_connect_and_main_keyboard(
                 lang,
@@ -259,16 +298,24 @@ class CryptoPayService:
 
             # Send notification about payment
             try:
+                payment_row = await payment_dal.get_payment_by_db_id(session, payment_db_id)
+            except Exception:
+                payment_row = None
+            try:
                 notification_service = NotificationService(bot, settings, i18n)
                 user = await user_dal.get_user_by_id(session, user_id)
                 await notification_service.notify_payment_received(
                     user_id=user_id,
                     amount=float(invoice.amount),
                     currency=invoice.asset or settings.DEFAULT_CURRENCY_SYMBOL,
-                    months=int(months) if sale_mode != "traffic" else 0,
-                    traffic_gb=traffic_gb if sale_mode == "traffic" else None,
+                    months=int(months) if sale_base == "subscription" else 0,
+                    traffic_gb=traffic_gb
+                    if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
+                    else None,
                     payment_provider="crypto_pay",
-                    username=user.username if user else None
+                    username=user.username if user else None,
+                    traffic_is_premium=sale_base == "premium_topup",
+                    tariff_key=getattr(payment_row, "tariff_key", None) if payment_row else None,
                 )
             except Exception:
                 logging.exception("Failed to send crypto_pay payment notification.")

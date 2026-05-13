@@ -1,5 +1,5 @@
 <script>
-  import { cn } from "../../utils.js";
+  import { cn } from "$lib/utils.js";
 
   export let value = "";
   export let type = "text";

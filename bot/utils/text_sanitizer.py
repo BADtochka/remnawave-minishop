@@ -153,9 +153,7 @@ def _normalize_for_detection(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value)
     normalized = normalized.translate(_PRE_LOWER_TRANSLATION)
     normalized = normalized.lower()
-    normalized = "".join(
-        ch for ch in normalized if unicodedata.category(ch) != "Mn"
-    )
+    normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
     normalized = normalized.translate(_POST_LOWER_TRANSLATION)
     normalized = normalized.replace("rn", "m")
 

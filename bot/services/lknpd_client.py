@@ -18,12 +18,14 @@ logger = logging.getLogger(__name__)
 
 class PaymentType(str, Enum):
     """Payment type for income registration."""
+
     CASH = "CASH"
     WIRE = "WIRE"
 
 
 class IncomeType(str, Enum):
     """Income source type."""
+
     FROM_INDIVIDUAL = "FROM_INDIVIDUAL"
     FROM_LEGAL_ENTITY = "FROM_LEGAL_ENTITY"
     FROM_FOREIGN_AGENCY = "FROM_FOREIGN_AGENCY"
@@ -31,6 +33,7 @@ class IncomeType(str, Enum):
 
 class LknpdApiError(Exception):
     """Base exception for LKNPD API errors."""
+
     def __init__(self, message: str, status_code: int | None = None):
         super().__init__(message)
         self.status_code = status_code
@@ -38,11 +41,13 @@ class LknpdApiError(Exception):
 
 class LknpdAuthError(LknpdApiError):
     """Authentication error (401)."""
+
     pass
 
 
 class LknpdValidationError(LknpdApiError):
     """Validation error (400)."""
+
     pass
 
 

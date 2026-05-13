@@ -1,9 +1,9 @@
-from aiogram import Router, F
+from aiogram import F, Router
 
-from bot.handlers.user import user_router_aggregate
+from bot.filters.admin_filter import AdminFilter
 from bot.handlers import inline_mode
 from bot.handlers.admin import admin_router_aggregate
-from bot.filters.admin_filter import AdminFilter
+from bot.handlers.user import user_router_aggregate
 from config.settings import Settings
 
 
@@ -27,4 +27,3 @@ def build_root_router(settings: Settings) -> Router:
     root.include_router(admin_main_router)
 
     return root
-

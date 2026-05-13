@@ -1,20 +1,20 @@
 from aiogram import Bot
 from sqlalchemy.orm import sessionmaker
 
-from config.settings import Settings
 from bot.middlewares.i18n import JsonI18n
-from bot.services.yookassa_service import YooKassaService
-from bot.services.panel_api_service import PanelApiService
-from bot.services.subscription_service import SubscriptionService
-from bot.services.referral_service import ReferralService
-from bot.services.promo_code_service import PromoCodeService
-from bot.services.stars_service import StarsService
 from bot.services.crypto_pay_service import CryptoPayService
-from bot.services.panel_webhook_service import PanelWebhookService
 from bot.services.freekassa_service import FreeKassaService
-from bot.services.platega_service import PlategaService
-from bot.services.severpay_service import SeverPayService
 from bot.services.lknpd_service import LknpdService
+from bot.services.panel_api_service import PanelApiService
+from bot.services.panel_webhook_service import PanelWebhookService
+from bot.services.platega_service import PlategaService
+from bot.services.promo_code_service import PromoCodeService
+from bot.services.referral_service import ReferralService
+from bot.services.severpay_service import SeverPayService
+from bot.services.stars_service import StarsService
+from bot.services.subscription_service import SubscriptionService
+from bot.services.yookassa_service import YooKassaService
+from config.settings import Settings
 
 
 def build_core_services(
@@ -65,7 +65,9 @@ def build_core_services(
         referral_service=referral_service,
         default_return_url=bot_username_for_default_return,
     )
-    panel_webhook_service = PanelWebhookService(bot, settings, i18n, async_session_factory, panel_service)
+    panel_webhook_service = PanelWebhookService(
+        bot, settings, i18n, async_session_factory, panel_service
+    )
     yookassa_service = YooKassaService(
         shop_id=settings.YOOKASSA_SHOP_ID,
         secret_key=settings.YOOKASSA_SECRET_KEY,

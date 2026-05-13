@@ -1,5 +1,5 @@
-import base64
 import asyncio
+import base64
 import hashlib
 import hmac
 import json
@@ -44,9 +44,7 @@ def create_webapp_session_token(settings: Settings, user_id: int) -> str:
         "iat": now,
         "exp": now + max(60, int(settings.WEBAPP_SESSION_TTL_SECONDS)),
     }
-    payload_part = _urlsafe_b64encode(
-        json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    )
+    payload_part = _urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     signature = hmac.new(
         _session_secret(settings),
         payload_part.encode("ascii"),
@@ -86,9 +84,7 @@ def create_telegram_oauth_nonce(settings: Settings, *, ttl_seconds: int = 600) -
         "iat": now,
         "exp": now + max(60, int(ttl_seconds)),
     }
-    payload_part = _urlsafe_b64encode(
-        json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    )
+    payload_part = _urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     signature = hmac.new(
         _session_secret(settings),
         f"telegram-oauth-nonce.{payload_part}".encode("ascii"),
@@ -321,9 +317,7 @@ def validate_telegram_login_widget_data(
             parsed_data = dict(parse_qsl(auth_data or "", keep_blank_values=True))
         elif isinstance(auth_data, dict):
             parsed_data = {
-                str(key): str(value)
-                for key, value in auth_data.items()
-                if value is not None
+                str(key): str(value) for key, value in auth_data.items() if value is not None
             }
         else:
             return None

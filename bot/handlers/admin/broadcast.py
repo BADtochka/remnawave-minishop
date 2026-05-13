@@ -1,25 +1,28 @@
-import logging
 import asyncio
-from aiogram import Router, F, types, Bot
-from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
-
-from aiogram.fsm.context import FSMContext
+import logging
 from typing import Optional
+
+from aiogram import Bot, F, Router, types
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.settings import Settings
-
-from db.dal import user_dal, message_log_dal
-
-from bot.states.admin_states import AdminStates
 from bot.keyboards.inline.admin_keyboards import (
-    get_broadcast_confirmation_keyboard,
-    get_back_to_admin_panel_keyboard,
     get_admin_panel_keyboard,
+    get_back_to_admin_panel_keyboard,
+    get_broadcast_confirmation_keyboard,
 )
 from bot.middlewares.i18n import JsonI18n
+from bot.states.admin_states import AdminStates
+from bot.utils import (
+    MessageContent,
+    get_message_content,
+    send_message_by_type,
+    send_message_via_queue,
+)
 from bot.utils.message_queue import get_queue_manager
-from bot.utils import get_message_content, send_message_by_type, send_message_via_queue, MessageContent
+from config.settings import Settings
+from db.dal import message_log_dal, user_dal
 
 router = Router(name="admin_broadcast_router")
 
@@ -48,9 +51,7 @@ async def broadcast_message_prompt_handler(
                 reply_markup=get_back_to_admin_panel_keyboard(current_lang, i18n),
             )
         except Exception as e:
-            logging.warning(
-                f"Could not edit message for broadcast prompt: {e}. Sending new."
-            )
+            logging.warning(f"Could not edit message for broadcast prompt: {e}. Sending new.")
             await callback.message.answer(
                 prompt_text,
                 reply_markup=get_back_to_admin_panel_keyboard(current_lang, i18n),
@@ -100,8 +101,8 @@ async def process_broadcast_message_handler(
         # Для медиа-сообщений используем caption_entities, для текста - entities
         if content.content_type == "text":
             await send_message_by_type(
-                bot, 
-                chat_id=message.chat.id, 
+                bot,
+                chat_id=message.chat.id,
                 content=content,
                 parse_mode="HTML",
                 entities=entities,
@@ -110,8 +111,8 @@ async def process_broadcast_message_handler(
             )
         else:
             await send_message_by_type(
-                bot, 
-                chat_id=message.chat.id, 
+                bot,
+                chat_id=message.chat.id,
                 content=content,
                 parse_mode="HTML",
                 caption_entities=entities,
@@ -159,26 +160,20 @@ async def change_broadcast_target_handler(
         return
 
     await state.update_data(broadcast_target=new_target)
-    user_fsm_data = await state.get_data()
+    await state.get_data()
     _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs)
-    confirmation_prompt = _(
-        "admin_broadcast_confirm_prompt_short"
-    )
+    confirmation_prompt = _("admin_broadcast_confirm_prompt_short")
     try:
         await callback.message.edit_text(
             confirmation_prompt,
-            reply_markup=get_broadcast_confirmation_keyboard(
-                current_lang, i18n, target=new_target
-            ),
+            reply_markup=get_broadcast_confirmation_keyboard(current_lang, i18n, target=new_target),
         )
     except Exception:
         pass
     await callback.answer()
 
 
-@router.callback_query(
-    F.data == "admin_action:main", AdminStates.waiting_for_broadcast_message
-)
+@router.callback_query(F.data == "admin_action:main", AdminStates.waiting_for_broadcast_message)
 async def cancel_broadcast_at_prompt_stage(
     callback: types.CallbackQuery,
     state: FSMContext,
@@ -194,9 +189,7 @@ async def cancel_broadcast_at_prompt_stage(
     _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs)
 
     try:
-        await callback.message.edit_text(
-            _("admin_broadcast_cancelled_nav_back"), reply_markup=None
-        )
+        await callback.message.edit_text(_("admin_broadcast_cancelled_nav_back"), reply_markup=None)
     except Exception:
         await callback.message.answer(_("admin_broadcast_cancelled_nav_back"))
 
@@ -236,16 +229,14 @@ async def confirm_broadcast_callback_handler(
         content = MessageContent(
             content_type=user_fsm_data.get("broadcast_content_type", "text"),
             file_id=user_fsm_data.get("broadcast_file_id"),
-            text=user_fsm_data.get("broadcast_text")
+            text=user_fsm_data.get("broadcast_text"),
         )
         entities = user_fsm_data.get("broadcast_entities", [])
-        
+
         if not content.text and content.content_type == "text":
             await callback.message.edit_text(_("admin_broadcast_error_no_message"))
             await state.clear()
-            await callback.answer(
-                _("admin_broadcast_error_no_message_alert"), show_alert=True
-            )
+            await callback.answer(_("admin_broadcast_error_no_message_alert"), show_alert=True)
             return
 
         await callback.message.edit_text(_("admin_broadcast_sending_started"), reply_markup=None)
@@ -263,13 +254,15 @@ async def confirm_broadcast_callback_handler(
         failed_count = 0
         admin_user = callback.from_user
         logging.info(
-            f"Admin {admin_user.id} broadcasting '{(content.text or '')[:50]}...' to {len(user_ids)} users."
+            f"Admin {admin_user.id} broadcasting '{(content.text or '')[:50]}...' to {len(user_ids)} users."  # noqa: E501
         )
 
         # Get message queue manager
         queue_manager = get_queue_manager()
         if not queue_manager:
-            await callback.message.edit_text("❌ Ошибка: система очередей не инициализирована", reply_markup=None)
+            await callback.message.edit_text(
+                "❌ Ошибка: система очередей не инициализирована", reply_markup=None
+            )
             return
 
         # Queue all messages for sending
@@ -278,8 +271,8 @@ async def confirm_broadcast_callback_handler(
                 # Для медиа-сообщений используем caption_entities, для текста - entities
                 if content.content_type == "text":
                     await send_message_via_queue(
-                        queue_manager, 
-                        uid, 
+                        queue_manager,
+                        uid,
                         content,
                         parse_mode="HTML",
                         entities=entities,
@@ -287,15 +280,15 @@ async def confirm_broadcast_callback_handler(
                     )
                 else:
                     await send_message_via_queue(
-                        queue_manager, 
-                        uid, 
+                        queue_manager,
+                        uid,
                         content,
                         parse_mode="HTML",
                         caption_entities=entities,
                         disable_web_page_preview=True,
                     )
                 sent_count += 1
-                
+
                 # Log successful queuing
                 await message_log_dal.create_message_log(
                     session,
@@ -304,16 +297,14 @@ async def confirm_broadcast_callback_handler(
                         "telegram_username": admin_user.username,
                         "telegram_first_name": admin_user.first_name,
                         "event_type": "admin_broadcast_queued",
-                        "content": f"To user {uid}: [{content.content_type}] {(content.text or '')[:70]}...",
+                        "content": f"To user {uid}: [{content.content_type}] {(content.text or '')[:70]}...",  # noqa: E501
                         "is_admin_event": True,
                         "target_user_id": uid,
                     },
                 )
             except Exception as e:
                 failed_count += 1
-                logging.warning(
-                    f"Failed to queue broadcast to {uid}: {type(e).__name__} – {e}"
-                )
+                logging.warning(f"Failed to queue broadcast to {uid}: {type(e).__name__} – {e}")
                 await message_log_dal.create_message_log(
                     session,
                     {
@@ -387,14 +378,10 @@ async def confirm_broadcast_callback_handler(
                         if "message is not modified" in str(e):
                             last_text = new_text
                         else:
-                            logging.debug(
-                                "Broadcast queue auto-update stopped: %s", e
-                            )
+                            logging.debug("Broadcast queue auto-update stopped: %s", e)
                             break
                     except Exception as e:
-                        logging.debug(
-                            "Broadcast queue auto-update unexpected error: %s", e
-                        )
+                        logging.debug("Broadcast queue auto-update unexpected error: %s", e)
                         break
 
                 if queues_drained:

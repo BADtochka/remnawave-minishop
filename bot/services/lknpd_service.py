@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from .lknpd_client import LknpdClient, PaymentType, LknpdApiError
+from .lknpd_client import LknpdApiError, LknpdClient, PaymentType
 
 
 class LknpdService:

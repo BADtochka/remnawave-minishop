@@ -64,7 +64,9 @@ def request_client_ip(
     return forwarded_ip
 
 
-def ip_in_allowlist(ip_value: Optional[str], allowed_entries: Optional[Sequence[str] | str]) -> bool:
+def ip_in_allowlist(
+    ip_value: Optional[str], allowed_entries: Optional[Sequence[str] | str]
+) -> bool:
     parsed_ip = _parse_ip(ip_value)
     if parsed_ip is None:
         return False

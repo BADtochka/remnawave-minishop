@@ -1,14 +1,15 @@
 import logging
-from aiogram import Router, F, types
+from typing import Optional
+
+from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.settings import Settings
 from bot.middlewares.i18n import JsonI18n
-from db.dal import ad_dal
 from bot.states.admin_states import AdminStates
+from config.settings import Settings
+from db.dal import ad_dal
 
 router = Router(name="admin_ads_router")
 
@@ -17,7 +18,9 @@ PAGE_SIZE = 5
 
 
 @router.callback_query(F.data == "admin_action:ads")
-async def show_ads_menu(callback: types.CallbackQuery, settings: Settings, i18n_data: dict, session: AsyncSession):
+async def show_ads_menu(
+    callback: types.CallbackQuery, settings: Settings, i18n_data: dict, session: AsyncSession
+):
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
     _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs) if i18n else key
@@ -35,14 +38,20 @@ async def show_ads_menu(callback: types.CallbackQuery, settings: Settings, i18n_
     if total_count == 0:
         text = overview + "\n\n" + _("admin_ads_empty")
         from bot.keyboards.inline.admin_keyboards import get_ads_menu_keyboard
+
         reply_markup = get_ads_menu_keyboard(i18n, current_lang)
     else:
         current_page = 0
         total_pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
-        campaigns = await ad_dal.list_campaigns_paged(session, page=current_page, page_size=PAGE_SIZE)
+        campaigns = await ad_dal.list_campaigns_paged(
+            session, page=current_page, page_size=PAGE_SIZE
+        )
         text = overview + "\n\n" + _("admin_ads_header")
         from bot.keyboards.inline.admin_keyboards import get_ads_list_keyboard
-        reply_markup = get_ads_list_keyboard(i18n, current_lang, campaigns, current_page, total_pages)
+
+        reply_markup = get_ads_list_keyboard(
+            i18n, current_lang, campaigns, current_page, total_pages
+        )
     await callback.message.edit_text(text, reply_markup=reply_markup)
     try:
         await callback.answer()
@@ -51,7 +60,9 @@ async def show_ads_menu(callback: types.CallbackQuery, settings: Settings, i18n_
 
 
 @router.callback_query(F.data.startswith("admin_ads:page:"))
-async def ads_list_pagination(callback: types.CallbackQuery, settings: Settings, i18n_data: dict, session: AsyncSession):
+async def ads_list_pagination(
+    callback: types.CallbackQuery, settings: Settings, i18n_data: dict, session: AsyncSession
+):
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
     _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs) if i18n else key
@@ -65,7 +76,11 @@ async def ads_list_pagination(callback: types.CallbackQuery, settings: Settings,
         page = 0
 
     totals = await ad_dal.get_totals(session)
-    overview = _("admin_ads_overview", revenue=f"{totals.get('revenue', 0.0):.2f}", cost=f"{totals.get('cost', 0.0):.2f}")
+    overview = _(
+        "admin_ads_overview",
+        revenue=f"{totals.get('revenue', 0.0):.2f}",
+        cost=f"{totals.get('cost', 0.0):.2f}",
+    )
     total_count = await ad_dal.count_campaigns(session)
     total_pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
     page = max(0, min(page, total_pages - 1))
@@ -73,6 +88,7 @@ async def ads_list_pagination(callback: types.CallbackQuery, settings: Settings,
     campaigns = await ad_dal.list_campaigns_paged(session, page=page, page_size=PAGE_SIZE)
     text = overview + "\n\n" + _("admin_ads_header")
     from bot.keyboards.inline.admin_keyboards import get_ads_list_keyboard
+
     reply_markup = get_ads_list_keyboard(i18n, current_lang, campaigns, page, total_pages)
     try:
         await callback.message.edit_text(text, reply_markup=reply_markup)
@@ -83,7 +99,9 @@ async def ads_list_pagination(callback: types.CallbackQuery, settings: Settings,
 
 
 @router.callback_query(F.data.startswith("admin_ads:card:"))
-async def show_ad_card(callback: types.CallbackQuery, settings: Settings, i18n_data: dict, session: AsyncSession):
+async def show_ad_card(
+    callback: types.CallbackQuery, settings: Settings, i18n_data: dict, session: AsyncSession
+):
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
     _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs) if i18n else key
@@ -118,6 +136,7 @@ async def show_ad_card(callback: types.CallbackQuery, settings: Settings, i18n_d
     )
 
     from bot.keyboards.inline.admin_keyboards import get_ad_card_keyboard
+
     reply_markup = get_ad_card_keyboard(i18n, current_lang, camp.ad_campaign_id, back_page)
     try:
         await callback.message.edit_text(text, reply_markup=reply_markup, parse_mode="HTML")
@@ -144,6 +163,7 @@ async def ads_delete_prompt(callback: types.CallbackQuery, settings: Settings, i
         return
 
     from bot.keyboards.inline.admin_keyboards import get_confirmation_keyboard
+
     confirm_text = i18n.gettext(current_lang, "admin_ads_delete_confirm", id=camp_id)
     kb = get_confirmation_keyboard(
         yes_callback_data=f"admin_ads:delete_confirm:{camp_id}:{back_page}",
@@ -159,7 +179,9 @@ async def ads_delete_prompt(callback: types.CallbackQuery, settings: Settings, i
 
 
 @router.callback_query(F.data.startswith("admin_ads:delete_cancel:"))
-async def ads_delete_cancel(callback: types.CallbackQuery, settings: Settings, i18n_data: dict, session: AsyncSession):
+async def ads_delete_cancel(
+    callback: types.CallbackQuery, settings: Settings, i18n_data: dict, session: AsyncSession
+):
     # Return to the ad card view
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
@@ -197,6 +219,7 @@ async def ads_delete_cancel(callback: types.CallbackQuery, settings: Settings, i
         revenue=f"{stats['revenue']:.2f}",
     )
     from bot.keyboards.inline.admin_keyboards import get_ad_card_keyboard
+
     reply_markup = get_ad_card_keyboard(i18n, current_lang, camp.ad_campaign_id, back_page)
     try:
         await callback.message.edit_text(text, reply_markup=reply_markup, parse_mode="HTML")
@@ -206,7 +229,9 @@ async def ads_delete_cancel(callback: types.CallbackQuery, settings: Settings, i
 
 
 @router.callback_query(F.data.startswith("admin_ads:delete_confirm:"))
-async def ads_delete_confirm(callback: types.CallbackQuery, settings: Settings, i18n_data: dict, session: AsyncSession):
+async def ads_delete_confirm(
+    callback: types.CallbackQuery, settings: Settings, i18n_data: dict, session: AsyncSession
+):
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
     _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs) if i18n else key
@@ -241,15 +266,21 @@ async def ads_delete_confirm(callback: types.CallbackQuery, settings: Settings, 
     campaigns = await ad_dal.list_campaigns_paged(session, page=page, page_size=PAGE_SIZE)
     text = overview + "\n\n" + _("admin_ads_header")
     from bot.keyboards.inline.admin_keyboards import get_ads_list_keyboard
+
     reply_markup = get_ads_list_keyboard(i18n, current_lang, campaigns, page, total_pages)
     try:
         await callback.message.edit_text(text, reply_markup=reply_markup)
         await callback.answer(_("admin_ads_deleted_success"), show_alert=True)
     except Exception:
         await callback.answer(_("admin_ads_deleted_success"), show_alert=True)
+
+
 @router.callback_query(F.data == "admin_action:ads_create")
-async def ads_create_start(callback: types.CallbackQuery, state: FSMContext, settings: Settings, i18n_data: dict):
+async def ads_create_start(
+    callback: types.CallbackQuery, state: FSMContext, settings: Settings, i18n_data: dict
+):
     from bot.states.admin_states import AdminStates
+
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
     _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs) if i18n else key
@@ -274,7 +305,13 @@ async def ads_create_start(callback: types.CallbackQuery, state: FSMContext, set
     ),
     F.text,
 )
-async def ads_create_flow(message: types.Message, state: FSMContext, settings: Settings, i18n_data: dict, session: AsyncSession):
+async def ads_create_flow(
+    message: types.Message,
+    state: FSMContext,
+    settings: Settings,
+    i18n_data: dict,
+    session: AsyncSession,
+):
     current_state = await state.get_state()
     if current_state not in (
         AdminStates.waiting_for_ad_source.state,
@@ -301,6 +338,7 @@ async def ads_create_flow(message: types.Message, state: FSMContext, settings: S
         start_param = message.text.strip()
         # Allow alnum underscore dash only
         import re as _re
+
         if not _re.match(r"^[A-Za-z0-9_\-]{2,64}$", start_param):
             await message.answer(_("admin_ads_invalid_start_param"))
             return
@@ -354,6 +392,7 @@ async def ads_create_flow(message: types.Message, state: FSMContext, settings: S
         )
         # Offer back to ads menu
         from bot.keyboards.inline.admin_keyboards import get_ads_menu_keyboard
-        await message.answer(_("admin_ads_back_to_menu_hint"), reply_markup=get_ads_menu_keyboard(i18n, current_lang))
 
-
+        await message.answer(
+            _("admin_ads_back_to_menu_hint"), reply_markup=get_ads_menu_keyboard(i18n, current_lang)
+        )

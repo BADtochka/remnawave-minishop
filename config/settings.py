@@ -1,10 +1,12 @@
 import logging
 import os
 import secrets
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, ValidationError, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from config.tariffs_config import TariffsConfig, load_tariffs_config
 
 
 def _split_csv(value: Optional[str]) -> List[str]:
@@ -87,6 +89,7 @@ class WebAppSettings(BaseModel):
     primary_color: str
     logo_url: Optional[str]
     logo_emoji: str
+    logo_emoji_font: str
     session_ttl_seconds: int
     session_secret: str
     webhook_secret_token: str
@@ -101,9 +104,8 @@ class WebAppSettings(BaseModel):
 class Settings(BaseSettings):
     BOT_TOKEN: str
     ADMIN_IDS_STR: str = Field(
-        default="",
-        alias="ADMIN_IDS",
-        description="Comma-separated list of admin Telegram User IDs")
+        default="", alias="ADMIN_IDS", description="Comma-separated list of admin Telegram User IDs"
+    )
 
     POSTGRES_USER: str = Field(...)
     POSTGRES_PASSWORD: str = Field(...)
@@ -120,11 +122,12 @@ class Settings(BaseSettings):
     PRIVACY_POLICY_URL: Optional[str] = Field(default=None)
     USER_AGREEMENT_URL: Optional[str] = Field(default=None)
     REQUIRED_CHANNEL_ID: Optional[int] = Field(
-        default=None,
-        description="Telegram channel ID the user must join to access the bot")
+        default=None, description="Telegram channel ID the user must join to access the bot"
+    )
     REQUIRED_CHANNEL_LINK: Optional[str] = Field(
         default=None,
-        description="Public username or invite link to the required channel for join button")
+        description="Public username or invite link to the required channel for join button",
+    )
 
     YOOKASSA_SHOP_ID: Optional[str] = None
     YOOKASSA_SECRET_KEY: Optional[str] = None
@@ -135,43 +138,43 @@ class Settings(BaseSettings):
     # Deprecated: explicit receipt fields are now derived from YOOKASSA_AUTOPAYMENTS_ENABLED
     YOOKASSA_PAYMENT_MODE: str = Field(default="full_prepayment")
     YOOKASSA_PAYMENT_SUBJECT: str = Field(default="service")
-    # Single toggle to enable recurring payments (saving cards, managing payment methods, auto-renew)
+    # Single toggle to enable recurring payments (saving cards, managing payment methods, auto-renew)  # noqa: E501
     YOOKASSA_AUTOPAYMENTS_ENABLED: bool = Field(default=False)
     YOOKASSA_AUTOPAYMENTS_REQUIRE_CARD_BINDING: bool = Field(
         default=True,
-        description="When true, new YooKassa payments in autopay mode force card binding without a user checkbox."
+        description="When true, new YooKassa payments in autopay mode force card binding without a user checkbox.",  # noqa: E501
     )
 
     LKNPD_INN: Optional[str] = Field(
         default=None,
         alias="NALOGO_INN",
-        description="INN for lknpd.nalog.ru (self-employed) authentication"
+        description="INN for lknpd.nalog.ru (self-employed) authentication",
     )
     LKNPD_PASSWORD: Optional[str] = Field(
         default=None,
         alias="NALOGO_PASSWORD",
-        description="Password for lknpd.nalog.ru (self-employed) authentication"
+        description="Password for lknpd.nalog.ru (self-employed) authentication",
     )
     LKNPD_API_URL: str = Field(
         default="https://lknpd.nalog.ru/api",
         alias="NALOGO_API_URL",
-        description="Base URL for LKNPD API (can be overridden for proxies)"
+        description="Base URL for LKNPD API (can be overridden for proxies)",
     )
     LKNPD_RECEIPT_NAME_SUBSCRIPTION: str = Field(
         default="subscription {months} months",
         alias="NALOGO_RECEIPT_NAME_SUBSCRIPTION",
-        description="Receipt item name for time-based subscriptions. Use {months} placeholder for duration."
+        description="Receipt item name for time-based subscriptions. Use {months} placeholder for duration.",  # noqa: E501
     )
     LKNPD_RECEIPT_NAME_TRAFFIC: str = Field(
         default="traffic package {gb} GB",
         alias="NALOGO_RECEIPT_NAME_TRAFFIC",
-        description="Receipt item name for traffic packages. Use {gb} placeholder for traffic amount."
+        description="Receipt item name for traffic packages. Use {gb} placeholder for traffic amount.",  # noqa: E501
     )
 
     WEBHOOK_BASE_URL: Optional[str] = None
     TRUSTED_PROXIES: Optional[str] = Field(
         default="127.0.0.1,::1",
-        description="Comma-separated list of reverse proxy IPs or CIDRs trusted to forward X-Forwarded-For.",
+        description="Comma-separated list of reverse proxy IPs or CIDRs trusted to forward X-Forwarded-For.",  # noqa: E501
     )
 
     CRYPTOPAY_TOKEN: Optional[str] = None
@@ -185,7 +188,7 @@ class Settings(BaseSettings):
     PLATEGA_SECRET: Optional[str] = None
     PLATEGA_PAYMENT_METHOD: int = Field(
         default=2,
-        description="Legacy Platega payment method ID. Used as fallback for PLATEGA_SBP_METHOD when the new field is unset.",
+        description="Legacy Platega payment method ID. Used as fallback for PLATEGA_SBP_METHOD when the new field is unset.",  # noqa: E501
     )
     PLATEGA_SBP_ENABLED: bool = Field(
         default=False,
@@ -233,7 +236,7 @@ class Settings(BaseSettings):
     STARS_ENABLED: bool = Field(default=True)
     PAYMENT_METHODS_ORDER: Optional[str] = Field(
         default=None,
-        description="Comma-separated list of payment methods to show (e.g., severpay,freekassa,yookassa,platega,stars,cryptopay)",
+        description="Comma-separated list of payment methods to show (e.g., severpay,freekassa,yookassa,platega,stars,cryptopay)",  # noqa: E501
     )
 
     MONTH_1_ENABLED: bool = Field(default=True, alias="1_MONTH_ENABLED")
@@ -254,11 +257,16 @@ class Settings(BaseSettings):
 
     TRAFFIC_PACKAGES: Optional[str] = Field(
         default=None,
-        description="Comma-separated list of traffic packages in the format '<GB>:<price>', e.g. '10:199,50:799'",
+        description="Comma-separated list of traffic packages in the format '<GB>:<price>', e.g. '10:199,50:799'",  # noqa: E501
     )
     STARS_TRAFFIC_PACKAGES: Optional[str] = Field(
         default=None,
-        description="Comma-separated list of traffic packages priced in Stars, e.g. '5:500,20:1500'",
+        description="Comma-separated list of traffic packages priced in Stars, e.g. '5:500,20:1500'",  # noqa: E501
+    )
+    TARIFFS_CONFIG_PATH: str = Field(default="data/tariffs.json")
+    TARIFF_TRAFFIC_WARNING_LEVELS: str = Field(
+        default="85,90,95",
+        description="Comma-separated traffic usage warning levels for tariff traffic limits, e.g. '85,90,95'",  # noqa: E501
     )
 
     SUBSCRIPTION_NOTIFICATIONS_ENABLED: bool = Field(default=True)
@@ -267,35 +275,43 @@ class Settings(BaseSettings):
     SUBSCRIPTION_NOTIFY_DAYS_BEFORE: int = Field(default=3)
 
     REFERRAL_BONUS_DAYS_INVITER_1_MONTH: Optional[int] = Field(
-        default=3, alias="REFERRAL_BONUS_DAYS_1_MONTH")
+        default=3, alias="REFERRAL_BONUS_DAYS_1_MONTH"
+    )
     REFERRAL_BONUS_DAYS_INVITER_3_MONTHS: Optional[int] = Field(
-        default=7, alias="REFERRAL_BONUS_DAYS_3_MONTHS")
+        default=7, alias="REFERRAL_BONUS_DAYS_3_MONTHS"
+    )
     REFERRAL_BONUS_DAYS_INVITER_6_MONTHS: Optional[int] = Field(
-        default=15, alias="REFERRAL_BONUS_DAYS_6_MONTHS")
+        default=15, alias="REFERRAL_BONUS_DAYS_6_MONTHS"
+    )
     REFERRAL_BONUS_DAYS_INVITER_12_MONTHS: Optional[int] = Field(
-        default=30, alias="REFERRAL_BONUS_DAYS_12_MONTHS")
+        default=30, alias="REFERRAL_BONUS_DAYS_12_MONTHS"
+    )
 
     REFERRAL_BONUS_DAYS_REFEREE_1_MONTH: Optional[int] = Field(
-        default=1, alias="REFEREE_BONUS_DAYS_1_MONTH")
+        default=1, alias="REFEREE_BONUS_DAYS_1_MONTH"
+    )
     REFERRAL_BONUS_DAYS_REFEREE_3_MONTHS: Optional[int] = Field(
-        default=3, alias="REFEREE_BONUS_DAYS_3_MONTHS")
+        default=3, alias="REFEREE_BONUS_DAYS_3_MONTHS"
+    )
     REFERRAL_BONUS_DAYS_REFEREE_6_MONTHS: Optional[int] = Field(
-        default=7, alias="REFEREE_BONUS_DAYS_6_MONTHS")
+        default=7, alias="REFEREE_BONUS_DAYS_6_MONTHS"
+    )
     REFERRAL_BONUS_DAYS_REFEREE_12_MONTHS: Optional[int] = Field(
-        default=15, alias="REFEREE_BONUS_DAYS_12_MONTHS")
+        default=15, alias="REFEREE_BONUS_DAYS_12_MONTHS"
+    )
 
     # Referral program configuration
     REFERRAL_ONE_BONUS_PER_REFEREE: bool = Field(
         default=True,
-        description="When true, referral bonuses (for inviter and referee) are applied only once per invited user - on their first successful payment."
+        description="When true, referral bonuses (for inviter and referee) are applied only once per invited user - on their first successful payment.",  # noqa: E501
     )
     REFERRAL_WELCOME_BONUS_DAYS: int = Field(
         default=3,
-        description="Welcome bonus days granted to a newly registered user who joined via referral link.",
+        description="Welcome bonus days granted to a newly registered user who joined via referral link.",  # noqa: E501
     )
     LEGACY_REFS: bool = Field(
         default=True,
-        description="Allow legacy referral links like ref_<telegram_id> to continue working. Defaults to True when unset."
+        description="Allow legacy referral links like ref_<telegram_id> to continue working. Defaults to True when unset.",  # noqa: E501
     )
 
     PANEL_API_URL: Optional[str] = None
@@ -304,20 +320,25 @@ class Settings(BaseSettings):
     USER_TRAFFIC_STRATEGY: str = Field(default="NO_RESET")
     USER_SQUAD_UUIDS: Optional[str] = Field(
         default=None,
-        description=
-        "Comma-separated UUIDs of internal squads to assign to new panel users")
+        description="Comma-separated UUIDs of internal squads to assign to new panel users",
+    )
     USER_EXTERNAL_SQUAD_UUID: Optional[str] = Field(
         default=None,
-        description=
-        "UUID of the external squad to assign to new panel users (optional)")
+        description="UUID of the external squad to assign to new panel users (optional)",
+    )
 
     TRIAL_ENABLED: bool = Field(default=True)
     TRIAL_DURATION_DAYS: int = Field(default=3)
     TRIAL_TRAFFIC_LIMIT_GB: Optional[float] = Field(default=5.0)
     TRIAL_TRAFFIC_STRATEGY: str = Field(default="NO_RESET")
 
-    CRYPT4_ENABLED: bool = Field(default=False, description="Enable happ crypt4 encryption for subscription URLs")
-    CRYPT4_REDIRECT_URL: Optional[str] = Field(default=None, description="Base redirect URL used for the connect button when crypt4 is enabled")
+    CRYPT4_ENABLED: bool = Field(
+        default=False, description="Enable happ crypt4 encryption for subscription URLs"
+    )
+    CRYPT4_REDIRECT_URL: Optional[str] = Field(
+        default=None,
+        description="Base redirect URL used for the connect button when crypt4 is enabled",
+    )
 
     WEB_SERVER_HOST: str = Field(default="0.0.0.0")
     WEB_SERVER_PORT: int = Field(default=8080)
@@ -332,6 +353,13 @@ class Settings(BaseSettings):
     WEBAPP_PRIMARY_COLOR: str = Field(default="#00fe7a")
     WEBAPP_LOGO_URL: Optional[str] = Field(default=None)
     WEBAPP_LOGO_EMOJI: str = Field(default="🫥")
+    WEBAPP_LOGO_EMOJI_FONT: str = Field(
+        default="system",
+        description=(
+            "Emoji font for logo fallback: system, noto-color, noto-color-animated, "
+            "noto-emoji, twemoji, openmoji, apple, segoe, noto-local"
+        ),
+    )
     WEBAPP_SESSION_SECRET: str = Field(default_factory=lambda: secrets.token_urlsafe(32))
     WEBHOOK_SECRET_TOKEN: str = Field(default_factory=lambda: secrets.token_urlsafe(32))
     WEBAPP_SESSION_TTL_SECONDS: int = Field(default=24 * 60 * 60)
@@ -339,15 +367,15 @@ class Settings(BaseSettings):
     WEBAPP_LOGIN_TOKEN_TTL_SECONDS: int = Field(default=10 * 60)
     TELEGRAM_OAUTH_CLIENT_ID: Optional[int] = Field(
         default=None,
-        description="Telegram Web Login Client ID from BotFather. Defaults to the numeric bot ID from BOT_TOKEN.",
+        description="Telegram Web Login Client ID from BotFather. Defaults to the numeric bot ID from BOT_TOKEN.",  # noqa: E501
     )
     TELEGRAM_OAUTH_CLIENT_SECRET: Optional[str] = Field(
         default=None,
-        description="Telegram Web Login Client Secret from BotFather. Reserved for full OIDC authorization code integrations.",
+        description="Telegram Web Login Client Secret from BotFather. Reserved for full OIDC authorization code integrations.",  # noqa: E501
     )
     TELEGRAM_OAUTH_REQUEST_ACCESS: Optional[str] = Field(
         default="write",
-        description="Comma-separated Telegram Login permissions to request: write,phone. Leave empty to request only OpenID profile.",
+        description="Comma-separated Telegram Login permissions to request: write,phone. Leave empty to request only OpenID profile.",  # noqa: E501
     )
 
     SMTP_HOST: str = Field(default="smtp-relay.brevo.com")
@@ -365,7 +393,7 @@ class Settings(BaseSettings):
     EMAIL_CODE_MAX_ATTEMPTS: int = Field(default=5)
     BRUTE_FORCE_MAX_FAILURES: int = Field(
         default=5,
-        description="Maximum failed code attempts allowed within the throttle window before a temporary lockout is applied.",
+        description="Maximum failed code attempts allowed within the throttle window before a temporary lockout is applied.",  # noqa: E501
     )
     BRUTE_FORCE_WINDOW_SECONDS: int = Field(
         default=15 * 60,
@@ -377,26 +405,38 @@ class Settings(BaseSettings):
     )
 
     LOGS_PAGE_SIZE: int = Field(default=10)
+    LOG_ADMIN_ACTIONS: bool = Field(
+        default=True,
+        description="Log updates/events triggered by users from ADMIN_IDS.",
+    )
 
     SUBSCRIPTION_MINI_APP_URL: Optional[str] = Field(default=None)
 
     START_COMMAND_DESCRIPTION: Optional[str] = Field(default=None)
-    DISABLE_WELCOME_MESSAGE: bool = Field(default=False, description="Disable welcome message on /start command")
+    DISABLE_WELCOME_MESSAGE: bool = Field(
+        default=False, description="Disable welcome message on /start command"
+    )
 
     MY_DEVICES_SECTION_ENABLED: bool = Field(
-        default=False,
-        description="Enable the My Devices section in the subscription menu"
+        default=False, description="Enable the My Devices section in the subscription menu"
     )
     USER_HWID_DEVICE_LIMIT: Optional[int] = Field(
-        default=None,
-        description="Default hardware device limit for panel users (0 = unlimited)"
+        default=None, description="Default hardware device limit for panel users (0 = unlimited)"
     )
-    
+
     # Inline mode thumbnail URLs
-    INLINE_REFERRAL_THUMBNAIL_URL: str = Field(default="https://cdn-icons-png.flaticon.com/512/1077/1077114.png")
-    INLINE_USER_STATS_THUMBNAIL_URL: str = Field(default="https://cdn-icons-png.flaticon.com/512/681/681494.png")
-    INLINE_FINANCIAL_STATS_THUMBNAIL_URL: str = Field(default="https://cdn-icons-png.flaticon.com/512/2769/2769339.png")
-    INLINE_SYSTEM_STATS_THUMBNAIL_URL: str = Field(default="https://cdn-icons-png.flaticon.com/512/2920/2920277.png")
+    INLINE_REFERRAL_THUMBNAIL_URL: str = Field(
+        default="https://cdn-icons-png.flaticon.com/512/1077/1077114.png"
+    )
+    INLINE_USER_STATS_THUMBNAIL_URL: str = Field(
+        default="https://cdn-icons-png.flaticon.com/512/681/681494.png"
+    )
+    INLINE_FINANCIAL_STATS_THUMBNAIL_URL: str = Field(
+        default="https://cdn-icons-png.flaticon.com/512/2769/2769339.png"
+    )
+    INLINE_SYSTEM_STATS_THUMBNAIL_URL: str = Field(
+        default="https://cdn-icons-png.flaticon.com/512/2920/2920277.png"
+    )
 
     @computed_field
     @property
@@ -489,6 +529,7 @@ class Settings(BaseSettings):
             primary_color=self.WEBAPP_PRIMARY_COLOR,
             logo_url=self.WEBAPP_LOGO_URL,
             logo_emoji=self.WEBAPP_LOGO_EMOJI,
+            logo_emoji_font=self.WEBAPP_LOGO_EMOJI_FONT,
             session_ttl_seconds=self.WEBAPP_SESSION_TTL_SECONDS,
             session_secret=self.WEBAPP_SESSION_SECRET,
             webhook_secret_token=self.WEBHOOK_SECRET_TOKEN,
@@ -507,12 +548,12 @@ class Settings(BaseSettings):
             try:
                 return [
                     int(admin_id.strip())
-                    for admin_id in self.ADMIN_IDS_STR.split(',')
+                    for admin_id in self.ADMIN_IDS_STR.split(",")
                     if admin_id.strip().isdigit()
                 ]
             except ValueError:
                 logging.error(
-                    f"Invalid ADMIN_IDS_STR format: '{self.ADMIN_IDS_STR}'. Expected comma-separated integers."
+                    f"Invalid ADMIN_IDS_STR format: '{self.ADMIN_IDS_STR}'. Expected comma-separated integers."  # noqa: E501
                 )
                 return []
         return []
@@ -541,11 +582,7 @@ class Settings(BaseSettings):
     @property
     def parsed_user_squad_uuids(self) -> Optional[List[str]]:
         if self.USER_SQUAD_UUIDS:
-            return [
-                uuid.strip()
-                for uuid in self.USER_SQUAD_UUIDS.split(',')
-                if uuid.strip()
-            ]
+            return [uuid.strip() for uuid in self.USER_SQUAD_UUIDS.split(",") if uuid.strip()]
         return None
 
     @computed_field
@@ -747,7 +784,31 @@ class Settings(BaseSettings):
     @property
     def traffic_sale_mode(self) -> bool:
         """When true, the bot sells traffic packages instead of time-based subscriptions."""
+        if self.tariffs_config is not None:
+            return False
         return bool(self.traffic_packages or self.stars_traffic_packages)
+
+    @computed_field
+    @property
+    def tariff_traffic_warning_levels(self) -> List[int]:
+        levels: List[int] = []
+        for part in (self.TARIFF_TRAFFIC_WARNING_LEVELS or "").split(","):
+            chunk = part.strip()
+            if not chunk:
+                continue
+            try:
+                level = int(float(chunk))
+            except ValueError:
+                logging.warning("Invalid TARIFF_TRAFFIC_WARNING_LEVELS entry skipped: %s", chunk)
+                continue
+            if 0 < level < 100 and level not in levels:
+                levels.append(level)
+        return sorted(levels) or [85, 90, 95]
+
+    @computed_field
+    @property
+    def tariffs_config(self) -> Optional[TariffsConfig]:
+        return load_tariffs_config(self.TARIFFS_CONFIG_PATH)
 
     @computed_field
     @property
@@ -818,7 +879,7 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def platega_sbp_method_resolved(self) -> int:
-        """SBP method ID, falling back to legacy PLATEGA_PAYMENT_METHOD when SBP-specific value is the default."""
+        """SBP method ID, falling back to legacy PLATEGA_PAYMENT_METHOD when SBP-specific value is the default."""  # noqa: E501
         if self.PLATEGA_SBP_METHOD != 2:
             return self.PLATEGA_SBP_METHOD
         return self.PLATEGA_PAYMENT_METHOD or 2
@@ -851,16 +912,20 @@ class Settings(BaseSettings):
         for item in (self.SMTP_FALLBACK_PORTS or "").split(","):
             add_port(item)
         return ports
-    
+
     # Logging Configuration
     LOG_LEVEL: str = Field(
         default="INFO",
         description="Global log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
     )
-    LOG_CHAT_ID: Optional[int] = Field(default=None, description="Telegram chat/group ID for sending notifications")
-    LOG_THREAD_ID: Optional[int] = Field(default=None, description="Thread ID for supergroup messages (optional)")
-    
-    @field_validator('LOG_LEVEL', mode='before')
+    LOG_CHAT_ID: Optional[int] = Field(
+        default=None, description="Telegram chat/group ID for sending notifications"
+    )
+    LOG_THREAD_ID: Optional[int] = Field(
+        default=None, description="Thread ID for supergroup messages (optional)"
+    )
+
+    @field_validator("LOG_LEVEL", mode="before")
     @classmethod
     def normalize_log_level(cls, v):
         if isinstance(v, str):
@@ -869,7 +934,7 @@ class Settings(BaseSettings):
             return "INFO"
         return v
 
-    @field_validator('POSTGRES_USER', 'POSTGRES_PASSWORD', mode='before')
+    @field_validator("POSTGRES_USER", "POSTGRES_PASSWORD", mode="before")
     @classmethod
     def validate_required_db_credentials(cls, v):
         if isinstance(v, str):
@@ -878,7 +943,7 @@ class Settings(BaseSettings):
             raise ValueError("must not be empty")
         return v
 
-    @field_validator('WEBAPP_SESSION_SECRET', 'WEBHOOK_SECRET_TOKEN', mode='before')
+    @field_validator("WEBAPP_SESSION_SECRET", "WEBHOOK_SECRET_TOKEN", mode="before")
     @classmethod
     def normalize_webapp_secrets(cls, v):
         if isinstance(v, str):
@@ -889,40 +954,42 @@ class Settings(BaseSettings):
             return v
         return secrets.token_urlsafe(32)
 
-    @field_validator('LOG_CHAT_ID', 'LOG_THREAD_ID', mode='before')
+    @field_validator("LOG_CHAT_ID", "LOG_THREAD_ID", mode="before")
     @classmethod
     def validate_optional_int_fields(cls, v):
         """Convert empty strings to None for optional integer fields"""
-        if isinstance(v, str) and v.strip() == '':
+        if isinstance(v, str) and v.strip() == "":
             return None
         return v
 
     @field_validator(
-        'REQUIRED_CHANNEL_LINK',
-        'PLATEGA_RETURN_URL',
-        'PLATEGA_FAILED_URL',
-        'SEVERPAY_RETURN_URL',
-        'CRYPT4_REDIRECT_URL',
-        'PRIVACY_POLICY_URL',
-        'USER_AGREEMENT_URL',
-        'SUBSCRIPTION_MINI_APP_URL',
-        'WEBAPP_LOGO_URL',
-        'TELEGRAM_OAUTH_CLIENT_SECRET',
-        'TELEGRAM_OAUTH_REQUEST_ACCESS',
-        'SMTP_USERNAME',
-        'SMTP_PASSWORD',
-        'SMTP_FROM_EMAIL',
-        'SMTP_FROM_NAME',
-        'SMTP_FALLBACK_PORTS',
-        mode='before',
+        "REQUIRED_CHANNEL_LINK",
+        "PLATEGA_RETURN_URL",
+        "PLATEGA_FAILED_URL",
+        "SEVERPAY_RETURN_URL",
+        "CRYPT4_REDIRECT_URL",
+        "PRIVACY_POLICY_URL",
+        "USER_AGREEMENT_URL",
+        "SUBSCRIPTION_MINI_APP_URL",
+        "WEBAPP_LOGO_URL",
+        "TELEGRAM_OAUTH_CLIENT_SECRET",
+        "TELEGRAM_OAUTH_REQUEST_ACCESS",
+        "SMTP_USERNAME",
+        "SMTP_PASSWORD",
+        "SMTP_FROM_EMAIL",
+        "SMTP_FROM_NAME",
+        "SMTP_FALLBACK_PORTS",
+        mode="before",
     )
     @classmethod
     def sanitize_optional_link(cls, v):
         if isinstance(v, str) and not v.strip():
             return None
         return v
-    
-    @field_validator('USER_HWID_DEVICE_LIMIT', 'SEVERPAY_MID', 'SEVERPAY_LIFETIME_MINUTES', mode='before')
+
+    @field_validator(
+        "USER_HWID_DEVICE_LIMIT", "SEVERPAY_MID", "SEVERPAY_LIFETIME_MINUTES", mode="before"
+    )
     @classmethod
     def validate_optional_int(cls, v):
         if isinstance(v, str):
@@ -930,18 +997,27 @@ class Settings(BaseSettings):
             if not v:
                 return None
         return v
-    
-    # Notification types
-    LOG_NEW_USERS: bool = Field(default=True, description="Send notifications for new user registrations")
-    LOG_PAYMENTS: bool = Field(default=True, description="Send notifications for successful payments")
-    LOG_PROMO_ACTIVATIONS: bool = Field(default=True, description="Send notifications for promo code activations")
-    LOG_TRIAL_ACTIVATIONS: bool = Field(default=True, description="Send notifications for trial activations")
-    LOG_SUSPICIOUS_ACTIVITY: bool = Field(default=True, description="Send notifications for suspicious promo attempts")
 
-    model_config = SettingsConfigDict(env_file='.env',
-                                      env_file_encoding='utf-8',
-                                      extra='ignore',
-                                      populate_by_name=True)
+    # Notification types
+    LOG_NEW_USERS: bool = Field(
+        default=True, description="Send notifications for new user registrations"
+    )
+    LOG_PAYMENTS: bool = Field(
+        default=True, description="Send notifications for successful payments"
+    )
+    LOG_PROMO_ACTIVATIONS: bool = Field(
+        default=True, description="Send notifications for promo code activations"
+    )
+    LOG_TRIAL_ACTIVATIONS: bool = Field(
+        default=True, description="Send notifications for trial activations"
+    )
+    LOG_SUSPICIOUS_ACTIVITY: bool = Field(
+        default=True, description="Send notifications for suspicious promo attempts"
+    )
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore", populate_by_name=True
+    )
 
 
 _settings_instance: Optional[Settings] = None
@@ -955,7 +1031,8 @@ def get_settings() -> Settings:
             if not _settings_instance.ADMIN_IDS:
                 logging.warning(
                     "CRITICAL: ADMIN_IDS not set or contains no valid integer IDs in .env. "
-                    "Admin functionality will be restricted.")
+                    "Admin functionality will be restricted."
+                )
 
             if not _settings_instance.PANEL_API_URL:
                 logging.warning(
@@ -963,22 +1040,21 @@ def get_settings() -> Settings:
                 )
             if not os.getenv("WEBAPP_SESSION_SECRET"):
                 logging.warning(
-                    "WEBAPP_SESSION_SECRET is not set. A generated secret will be used for this process only."
+                    "WEBAPP_SESSION_SECRET is not set. A generated secret will be used for this process only."  # noqa: E501
                 )
             if not os.getenv("WEBHOOK_SECRET_TOKEN"):
                 logging.warning(
-                    "WEBHOOK_SECRET_TOKEN is not set. A generated secret will be used for this process only."
-                )
-            if not _settings_instance.YOOKASSA_SHOP_ID or not _settings_instance.YOOKASSA_SECRET_KEY:
-                logging.warning(
-                    "CRITICAL: YooKassa credentials (SHOP_ID or SECRET_KEY) are not set. Payments will not work."
+                    "WEBHOOK_SECRET_TOKEN is not set. A generated secret will be used for this process only."  # noqa: E501
                 )
             if (
-                _settings_instance.LKNPD_INN
-                or _settings_instance.LKNPD_PASSWORD
-            ) and not (
-                _settings_instance.LKNPD_INN
-                and _settings_instance.LKNPD_PASSWORD
+                not _settings_instance.YOOKASSA_SHOP_ID
+                or not _settings_instance.YOOKASSA_SECRET_KEY
+            ):
+                logging.warning(
+                    "CRITICAL: YooKassa credentials (SHOP_ID or SECRET_KEY) are not set. Payments will not work."  # noqa: E501
+                )
+            if (_settings_instance.LKNPD_INN or _settings_instance.LKNPD_PASSWORD) and not (
+                _settings_instance.LKNPD_INN and _settings_instance.LKNPD_PASSWORD
             ):
                 logging.warning(
                     "WARNING: LKNPD credentials are incomplete. Receipt sending will be disabled."
@@ -989,15 +1065,15 @@ def get_settings() -> Settings:
                     or not _settings_instance.FREEKASSA_API_KEY
                 ):
                     logging.warning(
-                        "CRITICAL: FreeKassa is enabled but SHOP_ID or API key is missing. FreeKassa payments will not work."
+                        "CRITICAL: FreeKassa is enabled but SHOP_ID or API key is missing. FreeKassa payments will not work."  # noqa: E501
                     )
                 if not _settings_instance.FREEKASSA_SECOND_SECRET:
                     logging.warning(
-                        "WARNING: FreeKassa second secret is not set. Incoming payment notifications cannot be verified."
+                        "WARNING: FreeKassa second secret is not set. Incoming payment notifications cannot be verified."  # noqa: E501
                     )
                 if not _settings_instance.subscription_options:
                     logging.warning(
-                        "CRITICAL: FreeKassa is enabled but no subscription prices are configured (RUB_PRICE_*). Users will not see payment buttons."
+                        "CRITICAL: FreeKassa is enabled but no subscription prices are configured (RUB_PRICE_*). Users will not see payment buttons."  # noqa: E501
                     )
 
             if _settings_instance.PLATEGA_ENABLED:
@@ -1006,17 +1082,16 @@ def get_settings() -> Settings:
                     or not _settings_instance.PLATEGA_SECRET
                 ):
                     logging.warning(
-                        "CRITICAL: Platega is enabled but merchant credentials (PLATEGA_MERCHANT_ID/PLATEGA_SECRET) are missing. Platega payments will not work."
+                        "CRITICAL: Platega is enabled but merchant credentials (PLATEGA_MERCHANT_ID/PLATEGA_SECRET) are missing. Platega payments will not work."  # noqa: E501
                     )
             if _settings_instance.SEVERPAY_ENABLED:
                 if not _settings_instance.SEVERPAY_MID or not _settings_instance.SEVERPAY_TOKEN:
                     logging.warning(
-                        "CRITICAL: SeverPay is enabled but MID or TOKEN is missing. SeverPay payments will not work."
+                        "CRITICAL: SeverPay is enabled but MID or TOKEN is missing. SeverPay payments will not work."  # noqa: E501
                     )
 
         except ValidationError as e:
-            logging.critical(
-                f"Pydantic validation error while loading settings: {e}")
+            logging.critical(f"Pydantic validation error while loading settings: {e}")
 
             raise SystemExit(
                 f"CRITICAL SETTINGS ERROR: {e}. Please check your .env file and Settings model."

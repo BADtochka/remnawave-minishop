@@ -1,16 +1,16 @@
 import logging
-from typing import Callable, Dict, Any, Awaitable, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 from aiogram import BaseMiddleware
-from aiogram.types import Update, User as TgUser
+from aiogram.types import Update
+from aiogram.types import User as TgUser
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.utils.text_sanitizer import sanitize_display_name, sanitize_username, username_for_display
 from db.dal import user_dal
-from bot.utils.text_sanitizer import sanitize_username, sanitize_display_name, username_for_display
 
 
 class ProfileSyncMiddleware(BaseMiddleware):
-
     async def __call__(
         self,
         handler: Callable[[Update, Dict[str, Any]], Awaitable[Any]],
@@ -43,19 +43,23 @@ class ProfileSyncMiddleware(BaseMiddleware):
                     if update_payload:
                         await user_dal.update_user(session, db_user.user_id, update_payload)
                         logging.info(
-                            f"ProfileSyncMiddleware: Updated user {tg_user.id} profile fields: {list(update_payload.keys())}"
+                            f"ProfileSyncMiddleware: Updated user {tg_user.id} profile fields: {list(update_payload.keys())}"  # noqa: E501
                         )
 
                         # Also update description on panel if linked
                         try:
                             panel_service = data.get("panel_service")
                             if panel_service and db_user.panel_user_uuid:
-                                description_text = "\n".join([
-                                    db_user.email or "",
-                                    username_for_display(tg_user.username, with_at=False) if sanitized_username is not None else "",
-                                    sanitized_first_name or "",
-                                    sanitized_last_name or "",
-                                ]).strip()
+                                description_text = "\n".join(
+                                    [
+                                        db_user.email or "",
+                                        username_for_display(tg_user.username, with_at=False)
+                                        if sanitized_username is not None
+                                        else "",
+                                        sanitized_first_name or "",
+                                        sanitized_last_name or "",
+                                    ]
+                                ).strip()
                                 panel_payload = {
                                     "description": description_text,
                                     "telegramId": tg_user.id,
@@ -68,13 +72,12 @@ class ProfileSyncMiddleware(BaseMiddleware):
                                 )
                         except Exception as e_upd_desc:
                             logging.warning(
-                                f"ProfileSyncMiddleware: Failed to update panel description for user {tg_user.id}: {e_upd_desc}"
+                                f"ProfileSyncMiddleware: Failed to update panel description for user {tg_user.id}: {e_upd_desc}"  # noqa: E501
                             )
             except Exception as e:
                 logging.error(
-                    f"ProfileSyncMiddleware: Failed to sync profile for user {getattr(tg_user, 'id', 'N/A')}: {e}",
+                    f"ProfileSyncMiddleware: Failed to sync profile for user {getattr(tg_user, 'id', 'N/A')}: {e}",  # noqa: E501
                     exc_info=True,
                 )
 
         return await handler(event, data)
-

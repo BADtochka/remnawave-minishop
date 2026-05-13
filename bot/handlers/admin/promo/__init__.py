@@ -1,8 +1,6 @@
 from aiogram import Router
 
-from . import create
-from . import manage  
-from . import bulk
+from . import bulk, create, manage
 
 promo_router_aggregate = Router(name="promo_features_router")
 

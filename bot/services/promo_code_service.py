@@ -1,26 +1,27 @@
 import logging
-from html import escape as html_escape
 from datetime import datetime
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, Tuple, Dict
+from html import escape as html_escape
+from typing import Tuple
+
 from aiogram import Bot
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.settings import Settings
-from db.dal import security_dal
-
-from db.dal import promo_code_dal, user_dal
-from db.models import PromoCode, User
-
-from .subscription_service import SubscriptionService
 from bot.middlewares.i18n import JsonI18n
+from config.settings import Settings
+from db.dal import promo_code_dal, security_dal, user_dal
+
 from .notification_service import NotificationService
+from .subscription_service import SubscriptionService
 
 
 class PromoCodeService:
-
-    def __init__(self, settings: Settings,
-                 subscription_service: SubscriptionService, bot: Bot,
-                 i18n: JsonI18n):
+    def __init__(
+        self,
+        settings: Settings,
+        subscription_service: SubscriptionService,
+        bot: Bot,
+        i18n: JsonI18n,
+    ):
         self.settings = settings
         self.subscription_service = subscription_service
         self.bot = bot
@@ -53,7 +54,8 @@ class PromoCodeService:
             )
 
         promo_data = await promo_code_dal.get_active_promo_code_by_code_str(
-            session, code_input_upper)
+            session, code_input_upper
+        )
 
         if not promo_data:
             throttle_result = await security_dal.record_throttle_failure(
@@ -67,15 +69,16 @@ class PromoCodeService:
             if throttle_result.locked:
                 return False, _(
                     "promo_code_too_many_attempts",
-                    seconds=throttle_result.retry_after or max(1, int(self.settings.BRUTE_FORCE_LOCK_SECONDS)),
+                    seconds=throttle_result.retry_after
+                    or max(1, int(self.settings.BRUTE_FORCE_LOCK_SECONDS)),
                 )
             return False, _("promo_code_not_found", code=code_display)
 
         existing_activation = await promo_code_dal.get_user_activation_for_promo(
-            session, promo_data.promo_code_id, user_id)
+            session, promo_data.promo_code_id, user_id
+        )
         if existing_activation:
-            return False, _("promo_code_already_used_by_user",
-                            code=code_display)
+            return False, _("promo_code_already_used_by_user", code=code_display)
 
         bonus_days = promo_data.bonus_days
 
@@ -83,13 +86,16 @@ class PromoCodeService:
             session=session,
             user_id=user_id,
             bonus_days=bonus_days,
-            reason=f"promo code {code_input_upper}")
+            reason=f"promo code {code_input_upper}",
+        )
 
         if new_end_date:
             activation_recorded = await promo_code_dal.record_promo_activation(
-                session, promo_data.promo_code_id, user_id, payment_id=None)
+                session, promo_data.promo_code_id, user_id, payment_id=None
+            )
             promo_incremented = await promo_code_dal.increment_promo_code_usage(
-                session, promo_data.promo_code_id)
+                session, promo_data.promo_code_id
+            )
 
             if activation_recorded and promo_incremented:
                 await security_dal.clear_throttle_state(
@@ -105,16 +111,15 @@ class PromoCodeService:
                         user_id=user_id,
                         promo_code=code_input_upper,
                         bonus_days=bonus_days,
-                        username=user.username if user else None
+                        username=user.username if user else None,
                     )
                 except Exception as e:
                     logging.error(f"Failed to send promo activation notification: {e}")
-                
+
                 return True, new_end_date
             else:
-
                 logging.error(
-                    f"Failed to record activation or increment usage for promo {promo_data.code} by user {user_id}"
+                    f"Failed to record activation or increment usage for promo {promo_data.code} by user {user_id}"  # noqa: E501
                 )
                 return False, _("error_applying_promo_bonus")
         else:

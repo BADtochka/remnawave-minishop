@@ -8,14 +8,7 @@ import { transform } from "esbuild";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const sourcePath = path.join(
-  repoRoot,
-  "bot",
-  "app",
-  "web",
-  "templates",
-  "subscription_webapp.js",
-);
+const sourcePath = path.join(repoRoot, "bot", "app", "web", "templates", "subscription_webapp.js");
 
 function normalizeLineEndings(value) {
   return value.replace(/\r\n/g, "\n");
@@ -35,16 +28,17 @@ function stripMarkedBlock(source, startMarker, endMarker) {
 
 function stripFallbackI18n(source) {
   const fallbackStart = source.indexOf("    const FALLBACK_I18N = {");
-  const i18nLine = "    const I18N = readJsonScript('i18n') || (MOCK && MOCK.i18n) || FALLBACK_I18N;";
+  const i18nLine =
+    "    const I18N = readJsonScript('i18n') || (MOCK && MOCK.i18n) || FALLBACK_I18N;";
   const i18nLineIndex = source.indexOf(i18nLine);
   if (fallbackStart === -1 || i18nLineIndex === -1 || i18nLineIndex < fallbackStart) {
     return source;
   }
 
   return (
-    source.slice(0, fallbackStart)
-    + "    const I18N = readJsonScript('i18n') || (MOCK && MOCK.i18n) || {};\n"
-    + source.slice(i18nLineIndex + i18nLine.length)
+    source.slice(0, fallbackStart) +
+    "    const I18N = readJsonScript('i18n') || (MOCK && MOCK.i18n) || {};\n" +
+    source.slice(i18nLineIndex + i18nLine.length)
   );
 }
 
@@ -53,9 +47,12 @@ async function removeOldMinifiedAssets(assetDir, keepName) {
   await Promise.all(
     entries
       .filter(
-        (entry) => entry.isFile() && /^subscription_webapp\.min\.[0-9a-f]{8}\.js$/.test(entry.name) && entry.name !== keepName,
+        (entry) =>
+          entry.isFile() &&
+          /^subscription_webapp\.min\.[0-9a-f]{8}\.js$/.test(entry.name) &&
+          entry.name !== keepName
       )
-      .map((entry) => unlink(path.join(assetDir, entry.name))),
+      .map((entry) => unlink(path.join(assetDir, entry.name)))
   );
 }
 
@@ -64,7 +61,7 @@ async function main() {
   const withoutMocks = stripMarkedBlock(
     normalizeLineEndings(rawSource),
     "/* WEBAPP_DEV_MOCK_START */",
-    "/* WEBAPP_DEV_MOCK_END */",
+    "/* WEBAPP_DEV_MOCK_END */"
   );
   const strippedSource = stripFallbackI18n(withoutMocks);
   const result = await transform(strippedSource, {
@@ -77,14 +74,13 @@ async function main() {
 
   const code = `${result.code.replace(/[ \t]+$/gm, "").trimEnd()}\n`;
   const hash = createHash("sha256").update(code, "utf8").digest("hex").slice(0, 8);
-  const outputPath = path.join(
-    path.dirname(sourcePath),
-    `subscription_webapp.min.${hash}.js`,
-  );
+  const outputPath = path.join(path.dirname(sourcePath), `subscription_webapp.min.${hash}.js`);
 
   await removeOldMinifiedAssets(path.dirname(sourcePath), path.basename(outputPath));
   await writeFile(outputPath, code, "utf8");
-  console.log(`Wrote ${path.relative(repoRoot, outputPath)} (${Buffer.byteLength(code, "utf8")} bytes)`);
+  console.log(
+    `Wrote ${path.relative(repoRoot, outputPath)} (${Buffer.byteLength(code, "utf8")} bytes)`
+  );
 }
 
 await main();
