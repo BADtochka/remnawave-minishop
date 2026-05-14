@@ -1,6 +1,13 @@
 # ruff: noqa: F401,F403,F405,I001
 from ._runtime import *  # noqa: F403,F405
 
+from config.webapp_themes_config import (
+    default_webapp_theme_asset_file,
+    default_webapp_theme_css_files,
+    ensure_default_webapp_theme_descriptor_files,
+    public_themes_catalog_payload,
+)
+
 
 async def health_route(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
@@ -8,6 +15,111 @@ async def health_route(request: web.Request) -> web.Response:
 
 async def css_asset_route(request: web.Request) -> web.Response:
     return await _serve_template_asset(request, "subscription_webapp.css", "text/css")
+
+
+def _safe_theme_css_relative_path(raw_path: str) -> Optional[Path]:
+    return _safe_theme_relative_path(raw_path, allowed_suffixes={".css"}, max_length=180)
+
+
+def _safe_theme_asset_relative_path(raw_path: str) -> Optional[Path]:
+    return _safe_theme_relative_path(
+        raw_path,
+        allowed_suffixes=set(WEBAPP_THEME_ASSET_CONTENT_TYPES),
+        max_length=220,
+    )
+
+
+def _safe_theme_relative_path(
+    raw_path: str,
+    *,
+    allowed_suffixes: set[str],
+    max_length: int,
+) -> Optional[Path]:
+    value = str(raw_path or "").replace("\\", "/").strip().lstrip("/")
+    if not value or len(value) > max_length or "\x00" in value:
+        return None
+    parts = [part for part in value.split("/") if part]
+    if len(parts) < 2 or any(part in {".", ".."} for part in parts):
+        return None
+    if any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", part) for part in parts):
+        return None
+    rel_path = Path(*parts)
+    if rel_path.suffix.lower() not in allowed_suffixes:
+        return None
+    return rel_path
+
+
+async def theme_css_asset_route(request: web.Request) -> web.Response:
+    settings: Settings = request.app["settings"]
+    if not settings.WEBAPP_ENABLED:
+        raise web.HTTPNotFound(text="webapp_disabled")
+
+    ensure_default_webapp_theme_descriptor_files(settings.WEBAPP_THEMES_DIR)
+    rel_path = _safe_theme_css_relative_path(request.match_info.get("path") or "")
+    if rel_path is None:
+        raise web.HTTPNotFound(text="theme_css_not_found")
+
+    root = Path(settings.WEBAPP_THEMES_DIR).expanduser().resolve()
+    path = (root / rel_path).resolve()
+    try:
+        path.relative_to(root)
+    except ValueError:
+        raise web.HTTPNotFound(text="theme_css_not_found") from None
+
+    try:
+        if path.stat().st_size > WEBAPP_THEME_CSS_MAX_BYTES:
+            raise web.HTTPNotFound(text="theme_css_too_large")
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        defaults = default_webapp_theme_css_files()
+        text = defaults.get(rel_path.as_posix())
+        if text is None:
+            raise web.HTTPNotFound(text="theme_css_not_found") from None
+
+    response = web.Response(text=text, content_type="text/css", charset="utf-8")
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+async def theme_asset_route(request: web.Request) -> web.Response:
+    settings: Settings = request.app["settings"]
+    if not settings.WEBAPP_ENABLED:
+        raise web.HTTPNotFound(text="webapp_disabled")
+
+    ensure_default_webapp_theme_descriptor_files(settings.WEBAPP_THEMES_DIR)
+    rel_path = _safe_theme_asset_relative_path(request.match_info.get("path") or "")
+    if rel_path is None:
+        raise web.HTTPNotFound(text="theme_asset_not_found")
+
+    root = Path(settings.WEBAPP_THEMES_DIR).expanduser().resolve()
+    path = (root / rel_path).resolve()
+    try:
+        path.relative_to(root)
+    except ValueError:
+        raise web.HTTPNotFound(text="theme_asset_not_found") from None
+
+    suffix = rel_path.suffix.lower()
+    content_type = WEBAPP_THEME_ASSET_CONTENT_TYPES.get(suffix)
+    if not content_type:
+        raise web.HTTPNotFound(text="theme_asset_not_found")
+
+    try:
+        if path.stat().st_size > WEBAPP_THEME_ASSET_MAX_BYTES:
+            raise web.HTTPNotFound(text="theme_asset_too_large")
+        body = path.read_bytes()
+    except OSError:
+        fallback = default_webapp_theme_asset_file(rel_path)
+        if fallback is None:
+            raise web.HTTPNotFound(text="theme_asset_not_found") from None
+        body, fallback_suffix = fallback
+        content_type = WEBAPP_THEME_ASSET_CONTENT_TYPES.get(fallback_suffix, content_type)
+
+    if not body or len(body) > WEBAPP_THEME_ASSET_MAX_BYTES:
+        raise web.HTTPNotFound(text="theme_asset_not_found")
+
+    response = web.Response(body=body, content_type=content_type)
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
 
 
 def _resolve_webapp_logo_url(settings: Settings) -> str:
@@ -628,9 +740,16 @@ async def index_route(request: web.Request) -> web.Response:
 
     html = TEMPLATE_PATH.read_text(encoding="utf-8")
     cached = _get_cached_webapp_settings(request)
+    themes_catalog = settings.webapp_themes_catalog
     config = {
         "title": settings.WEBAPP_TITLE,
         "primaryColor": settings.WEBAPP_PRIMARY_COLOR,
+        "themesCatalog": public_themes_catalog_payload(
+            themes_catalog,
+            settings.WEBAPP_PRIMARY_COLOR or "#00fe7a",
+            enabled_only=True,
+        ),
+        "themesDir": settings.WEBAPP_THEMES_DIR,
         "logoUrl": cached["logo_url"],
         "logoEmoji": settings.WEBAPP_LOGO_EMOJI,
         "logoEmojiFont": settings.WEBAPP_LOGO_EMOJI_FONT,

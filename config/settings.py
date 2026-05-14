@@ -7,6 +7,10 @@ from pydantic import BaseModel, Field, ValidationError, computed_field, field_va
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from config.tariffs_config import TariffsConfig, load_tariffs_config
+from config.webapp_themes_config import (
+    WebappThemesConfig,
+    resolved_webapp_themes_catalog,
+)
 
 
 def _split_csv(value: Optional[str]) -> List[str]:
@@ -351,6 +355,19 @@ class Settings(BaseSettings):
     WEBAPP_SERVER_PORT: int = Field(default=8081)
     WEBAPP_TITLE: str = Field(default="Моя подписка")
     WEBAPP_PRIMARY_COLOR: str = Field(default="#00fe7a")
+    WEBAPP_THEMES_DIR: str = Field(
+        default="data/themes",
+        description=(
+            "Directory with per-theme folders. Each theme lives in "
+            "<key>/theme.json with optional CSS/assets next to it."
+        ),
+    )
+    WEBAPP_DEFAULT_THEME: Optional[str] = Field(
+        default=None,
+        description=(
+            "Override the descriptor-marked default theme when set to an existing theme key."
+        ),
+    )
     WEBAPP_LOGO_URL: Optional[str] = Field(default=None)
     WEBAPP_LOGO_EMOJI: str = Field(default="🫥")
     WEBAPP_LOGO_EMOJI_FONT: str = Field(
@@ -809,6 +826,15 @@ class Settings(BaseSettings):
     @property
     def tariffs_config(self) -> Optional[TariffsConfig]:
         return load_tariffs_config(self.TARIFFS_CONFIG_PATH)
+
+    @computed_field
+    @property
+    def webapp_themes_catalog(self) -> WebappThemesConfig:
+        return resolved_webapp_themes_catalog(
+            primary_accent=self.WEBAPP_PRIMARY_COLOR or "#00fe7a",
+            env_default_theme=self.WEBAPP_DEFAULT_THEME,
+            theme_dir=self.WEBAPP_THEMES_DIR,
+        )
 
     @computed_field
     @property

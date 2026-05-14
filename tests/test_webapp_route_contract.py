@@ -59,6 +59,7 @@ class WebAppRouteContractTests(unittest.TestCase):
             ("GET", "/webapp-logo"): "webapp_logo_route",
             ("GET", "/webapp-emoji/{codepoints}/512.{ext}"): "webapp_animated_emoji_route",
             ("GET", "/subscription_webapp.css"): "css_asset_route",
+            ("GET", "/webapp-theme-css/{path}"): "theme_css_asset_route",
             ("GET", "/subscription_webapp.min.{asset_hash}.js"): "js_asset_route",
             ("GET", "/subscription_webapp.js"): "js_asset_route",
             ("POST", "/api/auth/telegram/nonce"): "telegram_oauth_nonce_route",
@@ -136,6 +137,8 @@ class WebAppRouteContractTests(unittest.TestCase):
             ("PATCH", "/api/admin/settings"): "admin_settings_patch_route",
             ("GET", "/api/admin/tariffs"): "admin_tariffs_get_route",
             ("PUT", "/api/admin/tariffs"): "admin_tariffs_save_route",
+            ("GET", "/api/admin/themes"): "admin_themes_get_route",
+            ("PUT", "/api/admin/themes"): "admin_themes_save_route",
             ("GET", "/api/admin/panel/internal-squads"): "admin_panel_internal_squads_route",
         }
 

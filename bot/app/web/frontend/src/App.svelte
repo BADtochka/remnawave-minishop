@@ -40,6 +40,13 @@
   import { normalizedEmail, telegramName } from "./lib/webapp/formatters.js";
   import { activeTariffName, buildTariffCatalog } from "./lib/webapp/tariffs.js";
   import { premiumTrafficPercent, trafficPercent } from "./lib/webapp/traffic.js";
+  import {
+    findThemeEntry,
+    resolveEffectiveThemeKey,
+    themeCssHref,
+    themeEntryToInlineStyle,
+    themeRootClass,
+  } from "./lib/webapp/themeStyle.js";
 
   /** Used-traffic percent from which top-up modals and CTAs unlock in the web app home screen */
   const TRAFFIC_TOPUP_UNLOCK_PERCENT = 80;
@@ -243,7 +250,6 @@
     emoji: brandEmoji,
     emojiFont: brandEmojiFont,
   });
-  $: accent = CFG.primaryColor || "#00fe7a";
   $: plans = data?.plans?.length ? data.plans : DEV_MOCK.data.plans;
   $: methods = data?.payment_methods?.length ? data.payment_methods : [];
   $: appSettings = data?.settings || DEV_MOCK.data.settings;
@@ -300,6 +306,26 @@
       premiumTrafficPercent(subscription) >= TRAFFIC_TOPUP_UNLOCK_PERCENT)
   );
   $: user = data?.user || {};
+  $: themesCatalog = data?.themes_catalog ||
+    CFG.themesCatalog || { default_theme: "dark", themes: [] };
+  $: resolvedThemeKey = resolveEffectiveThemeKey(themesCatalog);
+  $: activeThemeEntry = findThemeEntry(themesCatalog, resolvedThemeKey);
+  $: darkThemeEntry = findThemeEntry(themesCatalog, "dark");
+  $: effectiveThemeEntry =
+    screen === "admin" && activeThemeEntry?.use_in_admin === false
+      ? darkThemeEntry || activeThemeEntry
+      : activeThemeEntry;
+  $: shellStyle = themeEntryToInlineStyle(effectiveThemeEntry, CFG.primaryColor);
+  $: shellToneClass =
+    effectiveThemeEntry?.tokens?.color_scheme === "light" ? "theme-light" : "theme-dark";
+  $: shellThemeClass = themeRootClass(effectiveThemeEntry);
+  $: shellThemeCssHref = themeCssHref(effectiveThemeEntry);
+  $: if (typeof document !== "undefined" && effectiveThemeEntry?.tokens) {
+    const scheme = effectiveThemeEntry.tokens.color_scheme || "dark";
+    document.documentElement.style.colorScheme = scheme;
+    const bg = effectiveThemeEntry.tokens.bg;
+    if (bg) document.body.style.backgroundColor = bg;
+  }
   $: isAdmin = Boolean(user?.is_admin);
   $: if (screen === "admin" && !isAdmin) {
     screen = "settings";
@@ -873,6 +899,9 @@
 
 <svelte:head>
   <title>{brandTitle}</title>
+  {#if shellThemeCssHref}
+    <link rel="stylesheet" href={shellThemeCssHref} data-theme-css={resolvedThemeKey} />
+  {/if}
 </svelte:head>
 
 <Tooltip.Provider>
@@ -880,7 +909,7 @@
     {#if isPreviewBoard}
       <PreviewBoard config={CFG} mockData={DEV_MOCK.data} />
     {:else}
-      <div class="app-shell" style={`--accent: ${accent};`}>
+      <div class="app-shell {shellToneClass} {shellThemeClass}" style={shellStyle}>
         {#if mode === "loading"}
           <div class="loader">
             <BrandMark {brand} size="md" />
@@ -931,6 +960,7 @@
             onSectionChange={handleAdminSectionChange}
             onSettingsSaved={handleAdminPersistedSaved}
             onTariffsSaved={handleAdminPersistedSaved}
+            onThemesSaved={handleAdminPersistedSaved}
             {brandTitle}
             {brand}
             appVersion={CFG.appVersion}

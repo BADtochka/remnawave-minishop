@@ -195,6 +195,30 @@ export async function mockApi(path, options = {}, context = {}) {
       },
     };
   }
+  if (path === "/admin/themes") {
+    if (String(options.method || "GET").toUpperCase() === "PUT") {
+      try {
+        const body = options?.body ? JSON.parse(String(options.body)) : {};
+        const catalog = body.catalog || body;
+        if (catalog?.themes) {
+          DEV_MOCK.config.themesCatalog = clone(catalog);
+          DEV_MOCK.data.themes_catalog = clone(catalog);
+        }
+      } catch (_e) {
+        void _e;
+      }
+      return {
+        ok: true,
+        themes_dir: "data/themes",
+        catalog: clone(DEV_MOCK.config.themesCatalog),
+      };
+    }
+    return {
+      ok: true,
+      themes_dir: "data/themes",
+      catalog: clone(DEV_MOCK.config.themesCatalog),
+    };
+  }
   if (path === "/admin/settings") return { ok: true, sections: [] };
   if (cleanPath.startsWith("/admin/"))
     return { ok: true, payments: [], promos: [], logs: [], campaigns: [], total: 0 };

@@ -222,6 +222,133 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(response.text, "console.log('minified');")
 
+    async def test_theme_css_asset_route_serves_file_from_configured_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            themes_dir = Path(tmpdir)
+            (themes_dir / "custom").mkdir()
+            (themes_dir / "custom" / "theme.css").write_text(
+                ".theme-key-custom { --bg: red; }", encoding="utf-8"
+            )
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=str(themes_dir),
+                    )
+                },
+                match_info={"path": "custom/theme.css"},
+            )
+
+            response = await subscription_webapp.theme_css_asset_route(request)
+
+            self.assertEqual(response.content_type, "text/css")
+            self.assertEqual(response.headers["Cache-Control"], "no-cache")
+            self.assertIn("--bg: red", response.text)
+
+    async def test_theme_css_asset_route_serves_default_theme_asset_from_theme_folder(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=tmpdir,
+                    )
+                },
+                match_info={"path": "light/style.css"},
+            )
+
+            response = await subscription_webapp.theme_css_asset_route(request)
+
+            self.assertEqual(response.content_type, "text/css")
+            self.assertIn(".theme-key-light", response.text)
+            self.assertTrue((Path(tmpdir) / "light" / "theme.json").exists())
+            self.assertTrue((Path(tmpdir) / "light" / "style.css").exists())
+
+    async def test_theme_css_asset_route_rejects_path_traversal(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=tmpdir,
+                    )
+                },
+                match_info={"path": "../secret.css"},
+            )
+
+            with self.assertRaises(webapp_assets.web.HTTPNotFound):
+                await subscription_webapp.theme_css_asset_route(request)
+
+    async def test_theme_asset_route_serves_image_from_configured_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            themes_dir = Path(tmpdir)
+            (themes_dir / "custom" / "icons").mkdir(parents=True)
+            (themes_dir / "custom" / "icons" / "save.png").write_bytes(b"png-bytes")
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=str(themes_dir),
+                    )
+                },
+                match_info={"path": "custom/icons/save.png"},
+            )
+
+            response = await subscription_webapp.theme_asset_route(request)
+
+            self.assertEqual(response.content_type, "image/png")
+            self.assertEqual(response.headers["Cache-Control"], "public, max-age=3600")
+            self.assertEqual(response.body, b"png-bytes")
+
+    async def test_theme_asset_route_serves_default_theme_icon_from_theme_folder(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=tmpdir,
+                    )
+                },
+                match_info={"path": "windows95/icons/save.png"},
+            )
+
+            response = await subscription_webapp.theme_asset_route(request)
+
+            self.assertEqual(response.content_type, "image/png")
+            self.assertGreater(len(response.body), 0)
+            self.assertTrue((Path(tmpdir) / "windows95" / "theme.json").exists())
+            self.assertTrue((Path(tmpdir) / "windows95" / "icons" / "save.png").exists())
+
+    async def test_theme_asset_route_rejects_path_traversal(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=tmpdir,
+                    )
+                },
+                match_info={"path": "../secret.png"},
+            )
+
+            with self.assertRaises(webapp_assets.web.HTTPNotFound):
+                await subscription_webapp.theme_asset_route(request)
+
+    async def test_theme_asset_route_rejects_non_image_suffix(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=tmpdir,
+                    )
+                },
+                match_info={"path": "custom/icons/readme.txt"},
+            )
+
+            with self.assertRaises(webapp_assets.web.HTTPNotFound):
+                await subscription_webapp.theme_asset_route(request)
+
     def test_webapp_logo_disk_cache_roundtrip(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             logo_url = "https://cdn.example.com/logo.png"

@@ -20,6 +20,8 @@ def setup_subscription_webapp_routes(app: web.Application) -> None:
         webapp_animated_emoji_route,
     )
     app.router.add_get("/subscription_webapp.css", css_asset_route)
+    app.router.add_get(r"/webapp-theme-css/{path:.+}", theme_css_asset_route)
+    app.router.add_get(r"/webapp-theme-assets/{path:.+}", theme_asset_route)
     app.router.add_get("/subscription_webapp.min.{asset_hash}.js", js_asset_route)
     app.router.add_get("/subscription_webapp.js", js_asset_route)
     app.router.add_post("/api/auth/telegram/nonce", telegram_oauth_nonce_route)

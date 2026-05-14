@@ -1,0 +1,46 @@
+.theme-key-light {
+  color-scheme: light;
+  --accent: #047857;
+  --bg: #f7f8fb;
+  --panel: #ffffff;
+  --panel-2: #f1f5f9;
+  --panel-3: #e8edf3;
+  --border: rgba(15, 23, 42, 0.11);
+  --border-strong: rgba(15, 23, 42, 0.2);
+  --text: #0f172a;
+  --muted: #475569;
+  --dim: #64748b;
+  --danger: #dc2626;
+  --blue: #2563eb;
+  --radius: 8px;
+  --accent-contrast: #ffffff;
+  --surface-sheen: rgba(15, 23, 42, 0.035);
+  --surface-sheen-soft: rgba(15, 23, 42, 0.012);
+  --surface-hover: rgba(15, 23, 42, 0.045);
+  --surface-muted: rgba(15, 23, 42, 0.035);
+  --surface-subtle-border: rgba(15, 23, 42, 0.1);
+  --overlay-scrim: rgba(15, 23, 42, 0.34);
+  --nav-bg: rgba(255, 255, 255, 0.88);
+  --rail-bg: rgba(255, 255, 255, 0.72);
+  --shadow-soft: 0 16px 38px rgba(15, 23, 42, 0.08);
+  --shadow-strong: 0 24px 64px rgba(15, 23, 42, 0.16);
+  --shadow-popover: 0 18px 34px rgba(15, 23, 42, 0.14);
+  --inset-highlight: rgba(255, 255, 255, 0.75);
+  --admin-bg: #f7f8fb;
+  --admin-surface: #ffffff;
+  --admin-surface-2: #f1f5f9;
+  --admin-elev: #e8edf3;
+  --admin-border: rgba(15, 23, 42, 0.1);
+  --admin-border-strong: rgba(15, 23, 42, 0.18);
+  --admin-text: #0f172a;
+  --admin-muted: #64748b;
+  --admin-dim: #94a3b8;
+}
+
+.theme-key-light.app-shell {
+  background: var(--bg) !important;
+}
+
+.theme-key-light .phone-screen {
+  background: var(--bg);
+}

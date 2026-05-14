@@ -54,4 +54,6 @@ def setup_admin_routes(app: web.Application) -> None:
 
     router.add_get("/api/admin/tariffs", admin_tariffs_get_route)
     router.add_put("/api/admin/tariffs", admin_tariffs_save_route)
+    router.add_get("/api/admin/themes", admin_themes_get_route)
+    router.add_put("/api/admin/themes", admin_themes_save_route)
     router.add_get("/api/admin/panel/internal-squads", admin_panel_internal_squads_route)

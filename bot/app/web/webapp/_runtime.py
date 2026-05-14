@@ -76,6 +76,17 @@ WEBAPP_RATE_LIMIT_WINDOW_SECONDS = 60
 WEBAPP_RATE_LIMIT_MAX_REQUESTS = 30
 WEBAPP_LOGO_MAX_BYTES = 2 * 1024 * 1024
 WEBAPP_EMOJI_MAX_BYTES = 4 * 1024 * 1024
+WEBAPP_THEME_CSS_MAX_BYTES = 512 * 1024
+WEBAPP_THEME_ASSET_MAX_BYTES = 1024 * 1024
+WEBAPP_THEME_ASSET_CONTENT_TYPES = {
+    ".gif": "image/gif",
+    ".ico": "image/x-icon",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+}
 WEBAPP_TELEGRAM_AVATAR_MAX_BYTES = 128 * 1024
 WEBAPP_TELEGRAM_AVATAR_REFRESH_SECONDS = 24 * 60 * 60
 WEBAPP_TELEGRAM_AVATAR_FETCH_TIMEOUT_SECONDS = 4
