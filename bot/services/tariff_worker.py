@@ -23,6 +23,11 @@ PREMIUM_WARNING_LEVEL_OFFSET = 1000
 # Single warning per premium billing period when usage reached or exceeded the quota.
 PREMIUM_WARNING_DEPLETED_LEVEL = PREMIUM_WARNING_LEVEL_OFFSET + 100
 
+# Process active subscriptions in chunks and prefetch panel data concurrently
+# to avoid an N+1 serial chain to the Remnawave panel each tick.
+TARIFF_WORKER_BATCH_SIZE = 50
+TARIFF_WORKER_PANEL_CONCURRENCY = 10
+
 
 class TariffTrafficWorker:
     def __init__(
@@ -117,48 +122,71 @@ class TariffTrafficWorker:
                 Subscription.tariff_key.is_not(None),
             )
         )
-        for sub in result.scalars().all():
-            try:
-                tariff = self.settings.tariffs_config.require(sub.tariff_key)
-            except Exception:
-                continue
-            panel_data = (
-                await self.panel_service.get_user_by_uuid(sub.panel_user_uuid, log_response=False)
-                or {}
-            )
-            used, limit, panel_strategy = self.subscription_service._extract_panel_traffic_details(
-                panel_data
-            )
-            panel_status = str(panel_data.get("status") or "").upper()
-            panel_username = panel_data.get("username") if isinstance(panel_data, dict) else None
-            if used is not None and used != sub.traffic_used_bytes:
-                sub.traffic_used_bytes = used
-            if limit is not None and limit != sub.traffic_limit_bytes:
-                sub.traffic_limit_bytes = limit
-            if panel_status and panel_status != (sub.status_from_panel or "").upper():
-                sub.status_from_panel = panel_status
+        subs = list(result.scalars().all())
+        if not subs:
+            return
 
-            if tariff.billing_model == "period":
-                await self._ensure_period_reset_strategy(sub, tariff, limit, panel_strategy)
-            await self._maybe_warn_or_throttle(
-                session,
-                sub,
-                tariff,
-                used,
-                limit,
-                warning_period_start=warning_period_start
-                if tariff.billing_model == "period"
-                else None,
-            )
+        semaphore = asyncio.Semaphore(TARIFF_WORKER_PANEL_CONCURRENCY)
 
-            await self._sync_premium_squad_limit(
-                session,
-                sub,
-                tariff,
-                now,
-                panel_username=panel_username,
-                panel_user_dict=panel_data,
-            )
+        async def _fetch_panel(sub: Subscription) -> dict:
+            async with semaphore:
+                try:
+                    data = await self.panel_service.get_user_by_uuid(
+                        sub.panel_user_uuid, log_response=False
+                    )
+                except Exception:
+                    logging.exception(
+                        "TariffTrafficWorker: failed to fetch panel user %s",
+                        sub.panel_user_uuid,
+                    )
+                    return {}
+            return data or {}
+
+        for chunk_start in range(0, len(subs), TARIFF_WORKER_BATCH_SIZE):
+            chunk = subs[chunk_start : chunk_start + TARIFF_WORKER_BATCH_SIZE]
+            panel_payloads = await asyncio.gather(*(_fetch_panel(s) for s in chunk))
+            for sub, panel_data in zip(chunk, panel_payloads):
+                try:
+                    tariff = self.settings.tariffs_config.require(sub.tariff_key)
+                except Exception:
+                    continue
+                (
+                    used,
+                    limit,
+                    panel_strategy,
+                ) = self.subscription_service._extract_panel_traffic_details(panel_data)
+                panel_status = str(panel_data.get("status") or "").upper()
+                panel_username = (
+                    panel_data.get("username") if isinstance(panel_data, dict) else None
+                )
+                if used is not None and used != sub.traffic_used_bytes:
+                    sub.traffic_used_bytes = used
+                if limit is not None and limit != sub.traffic_limit_bytes:
+                    sub.traffic_limit_bytes = limit
+                if panel_status and panel_status != (sub.status_from_panel or "").upper():
+                    sub.status_from_panel = panel_status
+
+                if tariff.billing_model == "period":
+                    await self._ensure_period_reset_strategy(sub, tariff, limit, panel_strategy)
+                await self._maybe_warn_or_throttle(
+                    session,
+                    sub,
+                    tariff,
+                    used,
+                    limit,
+                    warning_period_start=warning_period_start
+                    if tariff.billing_model == "period"
+                    else None,
+                )
+
+                await self._sync_premium_squad_limit(
+                    session,
+                    sub,
+                    tariff,
+                    now,
+                    panel_username=panel_username,
+                    panel_user_dict=panel_data,
+                )
 
     async def _ensure_period_reset_strategy(
         self,

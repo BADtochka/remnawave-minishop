@@ -130,31 +130,54 @@ async def on_startup_configured(dispatcher: Dispatcher):
     except Exception:
         logging.exception("STARTUP: Failed to initialize message queue manager.")
 
-    # Automatic sync on startup
+    # Automatic sync on startup — runs in background so the dispatcher can
+    # start serving Telegram webhooks immediately even if the panel is slow.
+    # perform_sync is single-flight, so concurrent admin-triggered runs will
+    # be skipped while this one is in progress.
     try:
-        logging.info("STARTUP: Running automatic panel sync...")
+        logging.info("STARTUP: Scheduling automatic panel sync in background...")
+        asyncio.create_task(
+            _background_startup_sync(
+                panel_service=panel_service,
+                session_factory=async_session_factory,
+                settings=settings,
+                i18n_instance=i18n_instance,
+            ),
+            name="StartupPanelSync",
+        )
+    except Exception:
+        logging.exception("STARTUP: Failed to schedule automatic sync.")
 
-        async with async_session_factory() as session:
+    logging.info("STARTUP: Bot on_startup_configured completed.")
+
+
+async def _background_startup_sync(
+    *,
+    panel_service: PanelApiService,
+    session_factory: sessionmaker,
+    settings: Settings,
+    i18n_instance: JsonI18n,
+) -> None:
+    try:
+        async with session_factory() as session:
             sync_result = await perform_sync(
                 panel_service=panel_service,
                 session=session,
                 settings=settings,
                 i18n_instance=i18n_instance,
             )
-
-        if sync_result.get("status") == "completed":
-            logging.info(
-                f"STARTUP: Automatic sync completed successfully. Details: {sync_result.get('details', 'N/A')}"  # noqa: E501
-            )
+        status = sync_result.get("status")
+        details = sync_result.get("details", "N/A")
+        if status == "completed":
+            logging.info(f"STARTUP: Background sync completed successfully. Details: {details}")
+        elif status == "skipped":
+            logging.info(f"STARTUP: Background sync skipped: {details}")
         else:
             logging.warning(
-                f"STARTUP: Automatic sync completed with issues. Status: {sync_result.get('status', 'unknown')}"  # noqa: E501
+                f"STARTUP: Background sync finished with status '{status}'. Details: {details}"
             )
-
     except Exception:
-        logging.exception("STARTUP: Failed to run automatic sync.")
-
-    logging.info("STARTUP: Bot on_startup_configured completed.")
+        logging.exception("STARTUP: Background sync failed.")
 
 
 async def on_shutdown_configured(dispatcher: Dispatcher):

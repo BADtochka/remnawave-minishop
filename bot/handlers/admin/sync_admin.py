@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Optional, Union
@@ -15,6 +16,11 @@ from db.dal import panel_sync_dal, subscription_dal, user_dal
 from db.models import Subscription
 
 router = Router(name="admin_sync_router")
+
+# Single-flight guard: panel sync runs concurrently with the bot, but only one
+# sync at a time. Overlapping callers (startup, /sync, admin API) return early
+# instead of queueing behind the running sync.
+_sync_lock = asyncio.Lock()
 
 
 def _normalize_panel_email(value: Optional[str]) -> Optional[str]:
@@ -118,6 +124,31 @@ async def _bind_panel_email_to_user(
 
 
 async def perform_sync(
+    panel_service: PanelApiService,
+    session: AsyncSession,
+    settings: Settings,
+    i18n_instance: JsonI18n,
+) -> dict:
+    """Single-flight entry point — skips when another sync is already running."""
+    if _sync_lock.locked():
+        logging.info("perform_sync: skipped because another sync is already in progress")
+        return {
+            "status": "skipped",
+            "details": "Another sync run is already in progress.",
+            "errors": [],
+            "users_processed": 0,
+            "subs_synced": 0,
+        }
+    async with _sync_lock:
+        return await _perform_sync_impl(
+            panel_service=panel_service,
+            session=session,
+            settings=settings,
+            i18n_instance=i18n_instance,
+        )
+
+
+async def _perform_sync_impl(
     panel_service: PanelApiService,
     session: AsyncSession,
     settings: Settings,
