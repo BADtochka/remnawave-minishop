@@ -33,6 +33,21 @@ class ThemeTokens(BaseModel):
     muted: Optional[str] = None
     dim: Optional[str] = None
     danger: Optional[str] = None
+    danger_text: Optional[str] = None
+    danger_soft: Optional[str] = None
+    danger_border: Optional[str] = None
+    success: Optional[str] = None
+    success_text: Optional[str] = None
+    success_soft: Optional[str] = None
+    success_border: Optional[str] = None
+    warning: Optional[str] = None
+    warning_text: Optional[str] = None
+    warning_soft: Optional[str] = None
+    warning_border: Optional[str] = None
+    info: Optional[str] = None
+    info_text: Optional[str] = None
+    info_soft: Optional[str] = None
+    info_border: Optional[str] = None
     blue: Optional[str] = None
     radius: Optional[str] = None
     font_sans: Optional[str] = None
@@ -350,7 +365,7 @@ def _builtin_theme_assets_need_refresh(key: str, target_dir: Path) -> bool:
     except OSError:
         return True
     if key == "light":
-        return ".theme-key-light.app-shell" not in style
+        return "--success-text" not in style or ".theme-key-light.app-shell" not in style
     if key == "ascii":
         return (
             ".theme-key-ascii" not in style

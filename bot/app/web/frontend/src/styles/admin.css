@@ -546,11 +546,11 @@
 }
 
 .admin-revenue-kpi-growth.is-up {
-  color: color-mix(in srgb, #3ecf8e 92%, var(--admin-text));
+  color: var(--success-text);
 }
 
 .admin-revenue-kpi-growth.is-down {
-  color: color-mix(in srgb, #ff6b6b 88%, var(--admin-text));
+  color: var(--danger-text);
 }
 
 .admin-revenue-chart {
@@ -2088,11 +2088,11 @@
 }
 
 .admin-traffic-card-premium {
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--admin-border));
+  border-color: var(--info-border);
 }
 
 .admin-traffic-card-warning {
-  border-color: color-mix(in srgb, #ffb454 46%, var(--admin-border));
+  border-color: var(--warning-border);
 }
 
 .admin-traffic-head,
@@ -2134,11 +2134,11 @@
 }
 
 .admin-traffic-bar-premium span {
-  background: linear-gradient(90deg, #66e3ff, var(--accent));
+  background: linear-gradient(90deg, var(--info), color-mix(in srgb, var(--info) 64%, #ffffff));
 }
 
 .admin-traffic-card-warning .admin-traffic-bar span {
-  background: linear-gradient(90deg, #ffb454, #ff6b6b);
+  background: linear-gradient(90deg, var(--warning), var(--danger));
 }
 
 .admin-traffic-meta {
@@ -2656,8 +2656,8 @@
 }
 
 .admin-switch-root[data-state="checked"] {
-  background: color-mix(in srgb, var(--accent) 80%, var(--admin-elev));
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--success) 82%, var(--admin-elev));
+  border-color: color-mix(in srgb, var(--success) 52%, transparent);
 }
 
 .admin-switch-root:focus-visible {
@@ -3080,9 +3080,9 @@
 }
 
 .admin-danger-zone {
-  border: 1px solid color-mix(in srgb, #ff6b6b 32%, transparent);
+  border: 1px solid var(--danger-border);
   border-radius: 12px;
-  background: color-mix(in srgb, #ff6b6b 6%, var(--admin-surface));
+  background: var(--danger-soft);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -3099,13 +3099,13 @@
 .admin-danger-zone-head strong {
   font-size: 13px;
   font-weight: 700;
-  color: #ffb4b4;
+  color: var(--danger-text);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .admin-danger-zone-head small {
-  color: color-mix(in srgb, #ffb4b4 70%, var(--admin-muted));
+  color: color-mix(in srgb, var(--danger-text) 70%, var(--admin-muted));
   font-size: 12px;
   line-height: 1.45;
 }

@@ -171,15 +171,15 @@
 }
 
 .admin-cn-badge-destructive {
-  background: color-mix(in srgb, var(--danger) 16%, var(--admin-surface));
-  border-color: color-mix(in srgb, var(--danger) 35%, var(--admin-border));
-  color: color-mix(in srgb, var(--danger) 92%, var(--admin-text));
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+  color: var(--danger-text);
 }
 
 .admin-cn-badge-success {
-  background: color-mix(in srgb, var(--accent) 14%, var(--admin-surface));
-  border-color: color-mix(in srgb, var(--accent) 32%, var(--admin-border));
-  color: color-mix(in srgb, var(--accent) 88%, var(--admin-text));
+  background: var(--success-soft);
+  border-color: var(--success-border);
+  color: var(--success-text);
 }
 
 .admin-cn-badge-muted {
