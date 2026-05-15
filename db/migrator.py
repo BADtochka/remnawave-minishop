@@ -729,6 +729,21 @@ def _migration_0017_reconcile_legacy_admin_api_schema(connection: Connection) ->
         )
 
 
+def _migration_0022_add_indexes_for_admin_reports(connection: Connection) -> None:
+    connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_payments_status_created_at "
+            "ON payments (status, created_at)"
+        )
+    )
+    connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_message_logs_timestamp "
+            "ON message_logs (timestamp DESC)"
+        )
+    )
+
+
 MIGRATIONS: List[Migration] = [
     Migration(
         id="0001_add_channel_subscription_fields",
@@ -845,6 +860,11 @@ MIGRATIONS: List[Migration] = [
         id="0021_add_regular_unlimited_override",
         description="Admin toggle for effectively unlimited main traffic limit",
         upgrade=_migration_0021_add_regular_unlimited_override,
+    ),
+    Migration(
+        id="0022_add_indexes_for_admin_reports",
+        description="Indexes to speed up financial stats and admin log queries",
+        upgrade=_migration_0022_add_indexes_for_admin_reports,
     ),
 ]
 
