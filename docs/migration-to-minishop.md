@@ -1,5 +1,10 @@
 # Миграция с `remnawave-tg-shop` на `remnawave-minishop`
 
+> Примечание для новой Docker-архитектуры: основной production stack теперь состоит из
+> `frontend`, `backend`, `worker`, `migrate`, `postgres` и `redis`. После переноса данных
+> запускайте корневой `docker-compose.yml`; миграции применит one-shot сервис `migrate`, а логи
+> приложения смотрите через `docker compose logs -f backend worker frontend`.
+
 Начиная с этой версии контейнеры и тома названы `remnawave-minishop*` вместо `remnawave-tg-shop*`. Старый и новый стеки используют **разные имена томов**, поэтому простой `docker compose up -d` после `git pull` создаст пустую БД. Эта инструкция описывает, как перенести данные.
 
 Есть два пути:
@@ -9,7 +14,7 @@
 
 В обоих случаях:
 - старые тома **не удаляются** автоматически — это безопасный бэкап на случай отката;
-- сертификаты Caddy (если используется `docker-compose-caddy.yml`) тоже переносятся, чтобы Let's Encrypt не выписывал их заново и не упереться в rate limit.
+- сертификаты Caddy (если используется `deploy/compose/docker-compose-caddy.yml`) тоже переносятся, чтобы Let's Encrypt не выписывал их заново и не упереться в rate limit.
 
 ## Автоматический способ (через скрипт)
 
@@ -42,7 +47,7 @@ bash scripts/migrate_to_minishop.sh
 
 ```bash
 # Caddy-вариант из raw
-COMPOSE_FILE=docker-compose-caddy.yml \
+COMPOSE_FILE=deploy/compose/docker-compose-caddy.yml \
   bash <(curl -fsSL https://raw.githubusercontent.com/3252a8/remnawave-minishop/main/scripts/migrate_to_minishop.sh)
 
 # С переключением origin на форк 3252a8
@@ -99,10 +104,10 @@ docker volume rm remnawave-tg-shop-caddy-data remnawave-tg-shop-caddy-config 2>/
     docker compose up --no-start --build
 
     # Или Caddy-вариант
-    docker compose -f docker-compose-caddy.yml up --no-start --build
+    docker compose -f deploy/compose/docker-compose-caddy.yml up --no-start
 
     # Или готовый образ
-    docker compose -f docker-compose-remote-server.yml up --no-start
+    docker compose -f deploy/compose/docker-compose-remote-server.yml up --no-start
     ```
 
 4.  **Перенесите том БД в новое имя:**
@@ -130,16 +135,16 @@ docker volume rm remnawave-tg-shop-caddy-data remnawave-tg-shop-caddy-config 2>/
     ```bash
     docker compose up -d
     # или
-    docker compose -f docker-compose-caddy.yml up -d --build
+    docker compose -f deploy/compose/docker-compose-caddy.yml up -d
     # или
-    docker compose -f docker-compose-remote-server.yml up -d
+    docker compose -f deploy/compose/docker-compose-remote-server.yml up -d
     ```
 
 7.  **Проверьте:**
 
     ```bash
     docker compose ps
-    docker compose logs -f remnawave-minishop
+    docker compose logs -f backend worker frontend
     ```
 
 8.  **(Опционально) удалите старые тома**, когда убедитесь, что новый стек стабилен:

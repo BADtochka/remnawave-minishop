@@ -43,13 +43,13 @@ Remnawave Minishop - Telegram-бот и Web App (Mini App) для продажи
 
 ## Стек
 
-Сборка и runtime задаются **Dockerfile** и **docker-compose.yml**; точные версии пакетов — в **requirements.txt** и **package.json**.
+Сборка и runtime задаются **deploy/docker/Dockerfile** и **docker-compose.yml**; точные версии пакетов — в **backend/requirements.txt** и **frontend/package.json**.
 
 | Слой | Технологии |
 | --- | --- |
 | Backend | Python **3.12**, [aiogram](https://docs.aiogram.dev/) 3.x (Telegram), **aiohttp** (HTTP и Web App), **SQLAlchemy** 2 async, **asyncpg**, **Pydantic** / pydantic-settings, **httpx**, платёжные SDK (в т.ч. YooKassa, aiocryptopay), **PyJWT** |
-| Данные | **PostgreSQL** **17** (сервис `remnawave-minishop-db` в Compose) |
-| Сборка Web App | **Node.js** **22**, **Svelte** **5**, **Vite**, **Tailwind CSS** 4; артефакты попадают в шаблоны `bot/app/web/templates/` |
+| Данные | **PostgreSQL** **17** (сервис `postgres` в Compose) и **Redis** **7** (сервис `redis`) |
+| Сборка Web App | **Node.js** **22**, **Svelte** **5**, **Vite**, **Tailwind CSS** 4; артефакты попадают в шаблоны `backend/bot/app/web/templates/` |
 
 Локальная разработка без Docker возможна при установленных Python 3.12, PostgreSQL и (для пересборки фронта) Node 22; типичный сценарий — всё через Compose.
 
@@ -68,7 +68,7 @@ cd remnawave-minishop
 cp .env.example .env
 nano .env
 docker compose up -d --build
-docker compose logs -f remnawave-minishop
+docker compose logs -f backend worker frontend
 ```
 
 Минимально заполните в `.env`:
@@ -98,14 +98,20 @@ chmod -R u+rwX data
 docker compose up -d --build
 
 # Логи приложения
-docker compose logs -f remnawave-minishop
+docker compose logs -f backend worker frontend
 
 # Запуск с Caddy
-docker compose -f docker-compose-caddy.yml up -d --build
+docker compose -f deploy/compose/docker-compose-caddy.yml up -d
 
 # Запуск из готового образа
-IMAGE_TAG=3.1.0 docker compose -f docker-compose-remote-server.yml up -d
+IMAGE_TAG=3.1.0 docker compose -f deploy/compose/docker-compose-remote-server.yml up -d
 ```
+
+GHCR image names for releases:
+
+- `ghcr.io/3252a8/remnawave-minishop-backend`
+- `ghcr.io/3252a8/remnawave-minishop-worker`
+- `ghcr.io/3252a8/remnawave-minishop-frontend`
 
 ## Поддержка
 

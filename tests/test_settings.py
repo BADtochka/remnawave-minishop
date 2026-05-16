@@ -1,8 +1,12 @@
 import json
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from pydantic import ValidationError
 
+from bot.services import settings_override_service
 from config.settings import Settings
 
 
@@ -67,9 +71,6 @@ class SettingsTests(unittest.TestCase):
         self.assertTrue(settings.traffic_sale_mode)
 
     def test_existing_tariffs_config_disables_legacy_traffic_mode(self):
-        import tempfile
-        from pathlib import Path
-
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "tariffs.json"
             path.write_text(
@@ -105,6 +106,40 @@ class SettingsTests(unittest.TestCase):
 
             self.assertIsNotNone(settings.tariffs_config)
             self.assertFalse(settings.traffic_sale_mode)
+
+    def test_appearance_backup_roundtrip_preserves_logo_theme_and_favicon_settings(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+        )
+        settings.WEBAPP_LOGO_URL = "/webapp-uploaded-logo/logo-1111111111111111.png"
+        settings.WEBAPP_LOGO_USE_EMOJI = False
+        settings.WEBAPP_LOGO_FAVICON_URL = "/webapp-favicon/aaaaaaaaaaaaaaaa/icon-180.png"
+        settings.WEBAPP_FAVICON_USE_CUSTOM = True
+        settings.WEBAPP_FAVICON_URL = "/webapp-favicon/bbbbbbbbbbbbbbbb/icon-180.png"
+        settings.WEBAPP_PRIMARY_COLOR = "#123456"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            backup_path = Path(tmpdir) / "appearance-settings.json"
+            with patch.object(
+                settings_override_service,
+                "APPEARANCE_OVERRIDES_BACKUP_PATH",
+                backup_path,
+            ):
+                settings_override_service.write_appearance_backup(settings)
+                restored = settings_override_service._read_appearance_backup()
+
+        self.assertEqual(
+            restored["WEBAPP_LOGO_URL"],
+            "/webapp-uploaded-logo/logo-1111111111111111.png",
+        )
+        self.assertEqual(restored["WEBAPP_PRIMARY_COLOR"], "#123456")
+        self.assertEqual(
+            restored["WEBAPP_FAVICON_URL"],
+            "/webapp-favicon/bbbbbbbbbbbbbbbb/icon-180.png",
+        )
 
     def test_trial_traffic_strategy_is_available(self):
         settings = Settings(

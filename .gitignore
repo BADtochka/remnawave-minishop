@@ -5,6 +5,7 @@ bot_database.sqlite3
 .env
 .env.*
 !.env.example
+docker-compose-dev.yml
 scratch_*.py
 *.local.*
 node_modules/
@@ -14,6 +15,9 @@ node_modules/
 bot/app/web/templates/subscription_webapp.css
 bot/app/web/templates/subscription_webapp.js
 bot/app/web/templates/subscription_webapp.min.*.js
+backend/bot/app/web/templates/subscription_webapp.css
+backend/bot/app/web/templates/subscription_webapp.js
+backend/bot/app/web/templates/subscription_webapp.min.*.js
 tmp
 .claude
 
@@ -32,4 +36,3 @@ locales/en_backup.json
 db/models_old.py
 data/*
 !data/tariffs.example.json
-docker-compose-dev.yml

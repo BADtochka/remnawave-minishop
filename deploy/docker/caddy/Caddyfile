@@ -1,0 +1,11 @@
+{$PUBLIC_HOST:localhost} {
+	encode zstd gzip
+
+	@webhooks path /tg/webhook /webhook/*
+	reverse_proxy @webhooks backend:8080
+
+	@backend_health path /health /healthz
+	reverse_proxy @backend_health backend:8080
+
+	reverse_proxy frontend:80
+}

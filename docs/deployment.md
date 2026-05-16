@@ -1,295 +1,251 @@
 # Развертывание
 
-Документ описывает запуск через Docker Compose, маршруты вебхуков и варианты reverse proxy. Перед запуском заполните `.env` по [configuration.md](configuration.md).
+Документ описывает продакшен-запуск после разделения проекта на `backend`, `frontend` и `worker`.
+Перед стартом заполните `.env` по [configuration.md](configuration.md).
 
-## Docker Compose
+## Быстрый старт
 
-Локальная сборка:
+```bash
+cp .env.example .env
+nano .env
+docker compose up -d --build
+docker compose ps
+docker compose logs -f backend worker frontend
+```
+
+Обычный `docker compose up -d --build` поднимает:
+
+- `postgres` и `redis` с проверками здоровья;
+- `migrate` как одноразовый сервис на backend-образе;
+- `backend` только после успешных миграций;
+- `worker` только после успешных миграций;
+- `frontend` как отдельный nginx-образ без Python runtime.
+
+Для обратного прокси с Caddy используйте отдельный `deploy/compose/docker-compose-caddy.yml`.
+
+Миграции не запускаются внутри backend. Их выполняет отдельный сервис `migrate`, поэтому старт
+приложения не создает гонки на схеме БД.
+
+## Миграции
+
+При обычном старте миграции применяются автоматически:
 
 ```bash
 docker compose up -d --build
-docker compose logs -f remnawave-minishop
 ```
 
-Запуск из готового образа:
+Для ручного повторного запуска:
 
 ```bash
-IMAGE_TAG=3.1.0 docker compose -f docker-compose-remote-server.yml up -d
+docker compose run --rm migrate
 ```
 
-`docker-compose-remote-server.yml` можно использовать как шаблон и заменить `image:` на нужный образ. По умолчанию используется `ghcr.io/3252a8/remnawave-minishop:latest`.
-
-### Права на `./data`
-
-Если в Compose включен bind mount `./data:/app/data` или `./data:/app/data:rw`, каталог на хосте должен быть доступен на запись пользователю контейнера. Контейнер запускает приложение от `appuser` с UID `10001`; запуск Docker от `root` на Ubuntu не делает этот каталог writable внутри контейнера, если на хосте он принадлежит `root:root` с обычными правами `755`.
-
-Перед запуском или после добавления mount выполните на сервере из каталога проекта:
+Проверить логи миграций:
 
 ```bash
-mkdir -p data/themes data/webapp-logo data/webapp-emoji
+docker compose logs migrate
+```
+
+`backend` и `worker` зависят от `migrate` через `service_completed_successfully`; если миграции
+падают, приложение не стартует поверх неподготовленной БД.
+
+## Сервисы
+
+- `backend`: aiohttp API, Telegram webhook, платежные webhooks, panel webhooks, проверка здоровья `/healthz`.
+- `worker`: TariffTrafficWorker, задачи синхронизации с панелью, обработка рассылок, потребители очереди webhooks.
+- `frontend`: статические Svelte-ассеты через nginx.
+- `postgres`: PostgreSQL 17.
+- `redis`: Redis 7 для FSM, кеша, rate-limit, очередей и locks.
+
+`deploy/compose/docker-compose-caddy.yml` добавляет `caddy` как внешний HTTP/HTTPS reverse proxy.
+
+## Логи и проверка
+
+```bash
+docker compose ps
+docker compose logs -f backend
+docker compose logs -f worker
+docker compose logs -f frontend
+```
+
+Эндпоинты проверки здоровья:
+
+```bash
+curl http://127.0.0.1:8080/healthz
+curl http://127.0.0.1:8080/health
+```
+
+В обычном compose backend публикуется на `127.0.0.1:${WEB_SERVER_PORT:-8080}`, frontend на
+`127.0.0.1:${FRONTEND_PORT:-8082}`. В Caddy-варианте проверяйте `HTTP_BIND`.
+
+## Обновление
+
+Локальная сборка из репозитория:
+
+```bash
+git pull
+docker compose up -d --build
+docker compose logs -f migrate backend worker
+```
+
+Если нужно пересобрать только образы приложения:
+
+```bash
+docker compose build frontend backend worker
+docker compose up -d
+```
+
+## Образы GHCR
+
+Образы приложения называются единообразно:
+
+```text
+ghcr.io/3252a8/remnawave-minishop-backend:<tag>
+ghcr.io/3252a8/remnawave-minishop-worker:<tag>
+ghcr.io/3252a8/remnawave-minishop-frontend:<tag>
+```
+
+Сборка образов с конкретным тегом:
+
+```bash
+IMAGE_TAG=3.2.0 scripts/docker-build-images.sh
+```
+
+Публикация после `docker login ghcr.io`:
+
+```bash
+IMAGE_TAG=3.2.0 scripts/docker-push-images.sh
+```
+
+Для PowerShell есть варианты `scripts/docker-build-images.ps1` и
+`scripts/docker-push-images.ps1`. Если публикуете образы в другой registry, namespace или с другим
+префиксом имени, переопределите `IMAGE_NAMESPACE`, `IMAGE_REGISTRY` или `IMAGE_PREFIX`.
+
+Если PowerShell блокирует локальные скрипты ошибкой `PSSecurityException` / Execution Policy,
+запустите те же скрипты с обходом политики только для текущего процесса:
+
+```powershell
+$env:IMAGE_TAG = "3.2.0"
+docker login ghcr.io
+powershell -ExecutionPolicy Bypass -File .\scripts\docker-build-images.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\docker-push-images.ps1
+```
+
+Этот bypass действует только для запущенного процесса `powershell` и не меняет системную политику.
+
+## Масштабирование
+
+В текущих Compose-файлах заданы явные `container_name`, поэтому `docker compose --scale` для
+`backend`, `frontend` и `worker` не используется: Docker не может создать несколько контейнеров с
+одним именем. Если понадобится горизонтальное масштабирование, уберите `container_name` у
+масштабируемых сервисов или перенесите конфигурацию в orchestrator.
+
+Состояние FSM, rate-limit и краткоживущие кеши вынесены в Redis, а tariff tick защищен Redis
+distributed lock; код подготовлен к нескольким репликам, но текущие Compose-файлы ориентированы на
+фиксированные имена контейнеров.
+
+## Данные и volumes
+
+Продакшен compose использует именованные volumes:
+
+- `postgres-data`;
+- `redis-data`;
+- `shop-data`;
+В Caddy-варианте также используются `caddy-data` и `caddy-config`.
+
+`shop-data` монтируется целиком в `/app/data`; внутри него лежат тарифы, темы, логотипы и прочие
+файловые данные приложения.
+
+Если вместо именованного volume включаете bind mount `./data:/app/data`, на сервере заранее дайте права
+пользователю контейнера `10001`:
+
+```bash
+mkdir -p data/themes data/webapp-logo data/webapp-emoji data/tariffs
 chown -R 10001:10001 data
 chmod -R u+rwX data
-docker compose up -d --force-recreate remnawave-minishop
+docker compose up -d --force-recreate backend worker
 ```
 
 Проверка прав:
 
 ```bash
-docker compose exec remnawave-minishop sh -lc 'id; ls -ldn /app/data /app/data/themes /app/data/webapp-emoji; touch /app/data/themes/test /app/data/webapp-emoji/test && rm /app/data/themes/test /app/data/webapp-emoji/test'
+docker compose exec backend sh -lc 'id; touch /app/data/themes/test && rm /app/data/themes/test'
 ```
 
-Если проверочный `touch` проходит без `Permission denied`, Web App сможет сохранять каталог тарифов, темы в `/app/data/themes`, кеш логотипов в `/app/data/webapp-logo` и кеш animated emoji в `/app/data/webapp-emoji`.
-
-## Обновление версии
-
-Образ приложения: `ghcr.io/3252a8/remnawave-minishop`. Тег задаётся переменной окружения **`IMAGE_TAG`** (в Compose подставляется как `${IMAGE_TAG:-latest}`). Для продакшена разумно закрепить **конкретный тег релиза** вместо `latest`, чтобы обновляться осознанно и иметь откат.
-
-**Запуск из готового образа** (`docker-compose-remote-server.yml` или свой файл с тем же шаблоном):
-
-1. Сделайте резервную копию базы (особенно перед крупными обновлениями) — см. раздел «Резервная копия и восстановление PostgreSQL» ниже на этой странице.
-2. Укажите нужный тег, например в `.env`: `IMAGE_TAG=3.2.0` (или экспортируйте переменную перед командой).
-3. Подтяните образ и пересоздайте контейнер приложения (БД при этом не удаляется, том данных сохраняется):
+## Резервная копия PostgreSQL
 
 ```bash
-docker compose -f docker-compose-remote-server.yml pull remnawave-minishop
-docker compose -f docker-compose-remote-server.yml up -d --no-deps remnawave-minishop
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > backup.sql
 ```
 
-При необходимости перезапустите оба сервиса: `docker compose -f docker-compose-remote-server.yml up -d`. Флаг `--force-recreate` добавляют, если нужно гарантированно пересоздать контейнер при неизменённом образе.
-
-**Локальная сборка из репозитория** (ваш `Dockerfile`):
+Восстановление в чистую БД:
 
 ```bash
-git pull
-docker compose up -d --build
+docker compose stop backend worker
+docker compose exec postgres sh -c 'dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB"'
+docker compose exec postgres sh -c 'createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
+docker compose exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backup.sql
+docker compose run --rm migrate
+docker compose up -d backend worker
 ```
 
-После обновления проверьте логи (`docker compose logs -f remnawave-minishop`), работу бота, вебхуков и Web App. Совместимость с панелью Remnawave — см. раздел «Совместимость» в [README.md](../README.md).
+## Обратный прокси
 
-## Резервная копия и восстановление PostgreSQL
+Вариант `deploy/compose/docker-compose-caddy.yml` проксирует:
 
-Имя контейнера БД в типичном Compose — `remnawave-minishop-db`. Учётные данные уже передаются в контейнер через `env_file: .env`, поэтому надёжнее вызывать `pg_dump` / `psql` **внутри** контейнера через `sh -c '...'`, чтобы переменные раскрылись там, а не на хосте.
+- статические ассеты frontend;
+- API и webhook-маршруты backend;
+- эндпоинты проверки здоровья.
 
-Если написать на хосте `pg_dump -U "$POSTGRES_USER" ...` без экспорта переменных из `.env`, подставится пустая строка: PostgreSQL тогда берёт имя пользователя ОС (часто `root`) и выдаёт `FATAL: role "root" does not exist`. В **PowerShell** `$POSTGRES_DB` из файла `.env` сам не подхватывается — пустое имя базы даёт у `dropdb` ошибку `missing required argument database name`.
-
-**Вариант A (рекомендуется):** переменные только внутри контейнера:
-
-```bash
-docker exec remnawave-minishop-db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > backup.sql
-```
-
-**Вариант B:** сначала загрузить `.env` в текущую сессию на сервере, затем обычная команда (переменные раскроются на хосте):
-
-```bash
-set -a && source .env && set +a
-docker exec remnawave-minishop-db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" > backup.sql
-```
-
-Такой файл удобно хранить вне сервера. При необходимости добавьте к `pg_dump` параметры сжатия или расписание через cron.
-
-### Восстановление из `backup.sql`
-
-Дамп выше — **обычный текст SQL** без удаления существующих объектов. Чтобы накатить его на **чистую** базу с тем же именем:
-
-1. Остановите приложение, чтобы не было записей в БД:
-
-```bash
-docker compose -f docker-compose-remote-server.yml stop remnawave-minishop
-```
-
-(или ваш файл Compose без `-f`, если работаете из каталога проекта.)
-
-2. Удалите базу и создайте пустую с тем же именем — пользователь из `.env` в официальном образе PostgreSQL обычно суперпользователь и может это сделать:
-
-```bash
-docker exec remnawave-minishop-db sh -c 'dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB"'
-docker exec remnawave-minishop-db sh -c 'createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
-```
-
-Имя базы у `dropdb` — последний аргумент; флаг **`--if-exists`** ставьте перед ним (иначе клиент может неверно разобрать командную строку).
-
-Если `dropdb` сообщает, что база занята, убедитесь, что остановлен сервис `remnawave-minishop` и к базе нет других подключений.
-
-3. Восстановите данные из файла на хосте. Переменные снова должны раскрываться **внутри** контейнера; на стороне `psql` имеет смысл включить **`ON_ERROR_STOP`**, чтобы при первой ошибке в дампе команда завершилась с ненулевым кодом.
-
-**Bash:**
-
-```bash
-docker exec -i remnawave-minishop-db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backup.sql
-```
-
-**PowerShell** (перенаправление `<` в `docker exec` часто не подходит; надёжнее передать дамп в stdin через pipe; явная **UTF-8**, чтобы кириллица в комментариях/SQL не исказилась):
-
-```powershell
-Get-Content backup.sql -Encoding utf8 | docker exec -i remnawave-minishop-db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
-```
-
-Если путь к файлу содержит пробелы, используйте кавычки: `Get-Content "E:\backups\backup.sql" -Encoding utf8 | ...`
-
-4. Запустите приложение снова:
-
-```bash
-docker compose -f docker-compose-remote-server.yml start remnawave-minishop
-```
-
-Проверьте логи и работу бота. При ошибках импорта убедитесь, что версия приложения совместима со схемой в дампе (после обновлений бота иногда нужны шаги из changelog релиза).
-
-### Замечание про «накат поверх» без пересоздания БД
-
-Если нужно применить дамп к уже заполненной базе без `dropdb`, создавайте резервные копии с **`pg_dump --clean --if-exists`** — в файл попадут команды `DROP` перед `CREATE`, и `psql` сможет перезаписать объекты. Это разрушительно для текущих данных; перед таким сценарием сделайте отдельный свежий бэкап.
-
-## Порты
-
-| Порт | Назначение |
-| --- | --- |
-| `WEB_SERVER_PORT` (`8080`) | Telegram webhook, платежные вебхуки, Remnawave webhook. |
-| `WEBAPP_SERVER_PORT` (`8081`) | Web App / Mini App. |
-
-Web App не должен проксироваться на `WEB_SERVER_PORT`.
-
-## Маршруты вебхуков
-
-Проксируйте платежные и системные вебхуки на `WEB_SERVER_PORT`:
-
-- `https://<webhook-domain>/webhook/yookassa` -> `http://remnawave-minishop:<WEB_SERVER_PORT>/webhook/yookassa`;
-- `https://<webhook-domain>/webhook/freekassa` -> `http://remnawave-minishop:<WEB_SERVER_PORT>/webhook/freekassa`;
-- `https://<webhook-domain>/webhook/platega` -> `http://remnawave-minishop:<WEB_SERVER_PORT>/webhook/platega`;
-- `https://<webhook-domain>/webhook/severpay` -> `http://remnawave-minishop:<WEB_SERVER_PORT>/webhook/severpay`;
-- `https://<webhook-domain>/webhook/cryptopay` -> `http://remnawave-minishop:<WEB_SERVER_PORT>/webhook/cryptopay`;
-- `https://<webhook-domain>/webhook/panel` -> `http://remnawave-minishop:<WEB_SERVER_PORT>/webhook/panel`.
-
-Telegram webhook устанавливается приложением, если задан `WEBHOOK_BASE_URL`. Полный URL — это базовый URL **без** токена в пути, с суффиксом **`/tg/webhook`** (например `https://webhook.domain.com/tg/webhook`). Прокси должен передавать на приложение POST-запросы по этому пути на `WEB_SERVER_PORT`.
-
-## Nginx рядом с Remnawave
-
-Пример upstream и server-блока для домена вебхуков:
+Для внешнего Nginx используйте DNS-имена сервисов внутри Docker network:
 
 ```nginx
-upstream remnawave-minishop {
-    server remnawave-minishop:8080;
+upstream remnawave_backend_webhooks {
+    server backend:8080;
 }
 
-map $http_upgrade $connection_upgrade {
-    default upgrade;
-    "" close;
+upstream remnawave_backend_webapp {
+    server backend:8081;
 }
 
-server {
-    server_name webhook.domain.com;
-    listen 443 ssl;
-    http2 on;
-
-    ssl_certificate "/etc/nginx/ssl/webhook_fullchain.pem";
-    ssl_certificate_key "/etc/nginx/ssl/webhook_privkey.key";
-    ssl_trusted_certificate "/etc/nginx/ssl/webhook_fullchain.pem";
-
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection $connection_upgrade;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Host $host;
-    proxy_set_header X-Forwarded-Port $server_port;
-    proxy_send_timeout 60s;
-    proxy_read_timeout 60s;
-    proxy_intercept_errors on;
-    error_page 400 404 500 502 @redirect;
-
-    location / {
-        proxy_pass http://remnawave-minishop$request_uri;
-    }
-
-    location @redirect {
-        return 404;
-    }
+upstream remnawave_frontend {
+    server frontend:80;
 }
 ```
 
-Для Web App используйте отдельный upstream на `WEBAPP_SERVER_PORT`; пример есть в [webapp.md](webapp.md).
+Webhook и health-маршруты должны идти в `backend:8080`. Статические ассеты Mini App отдавайте через
+`frontend:80`; frontend nginx уже проксирует `/api/*`, `/auth/*` и ассеты тем/логотипов в
+`backend:8081`.
 
-## SSL для домена вебхуков
+## Newt
 
-Пример выпуска сертификата через `acme.sh`:
+Если `newt` запущен в одной Compose network с приложением, указывайте внутренние имена сервисов,
+а не порты на хосте.
+
+Если используете Caddy-вариант и хотите публиковать стек одной точкой через Newt/Pangolin, укажите:
+
+```text
+http://caddy:80
+```
+
+Если публикуете через Newt/Pangolin без Caddy, настройте отдельные ресурсы:
+
+```text
+Mini App / frontend: http://frontend:80
+Webhooks / backend:  http://backend:8080
+```
+
+Такой вариант нормальный: Caddy не обязателен. Он нужен только если вы хотите заранее объединить
+frontend и backend-маршруты в один внутренний upstream.
+
+`backend:8081` является внутренним WebApp API/auth-сервером для frontend nginx; обычно его не нужно
+указывать в Newt напрямую.
+
+## Переменный env-файл
+
+По умолчанию compose читает `.env`. Для smoke-тестов или отдельного окружения можно подставить
+другой файл:
 
 ```bash
-sudo apt-get install cron socat
-curl https://get.acme.sh | sh -s email=EMAIL
-source ~/.bashrc
-ufw allow 80/tcp
-ufw reload
-
-acme.sh --set-default-ca --server letsencrypt
-acme.sh --issue --standalone -d 'webhook.domain.com' \
-  --key-file /opt/remnawave/nginx/webhook_privkey.key \
-  --fullchain-file /opt/remnawave/nginx/webhook_fullchain.pem
+APP_ENV_FILE=.env.staging docker compose --env-file .env.staging up -d --build
 ```
-
-Если Nginx панели Remnawave запускается в Docker, добавьте сертификаты в `volumes` сервиса Nginx:
-
-```yaml
-services:
-  remnawave-nginx:
-    volumes:
-      - ./webhook_fullchain.pem:/etc/nginx/ssl/webhook_fullchain.pem:ro
-      - ./webhook_privkey.key:/etc/nginx/ssl/webhook_privkey.key:ro
-```
-
-После изменения конфигурации перезапустите Nginx:
-
-```bash
-cd /opt/remnawave/nginx
-docker compose down
-docker compose up -d
-docker compose logs -f -t
-```
-
-## Caddy
-
-Для схемы с Caddy используйте `docker-compose-caddy.yml` и `Caddyfile`. Caddy публикует наружу `80` и `443`, выпускает TLS-сертификаты и проксирует вебхуки и Web App на разные внутренние порты.
-
-Пример `Caddyfile`:
-
-```caddyfile
-webhook.domain.com {
-    encode zstd gzip
-    reverse_proxy remnawave-minishop:{$WEB_SERVER_PORT:8080}
-}
-
-app.domain.com {
-    encode zstd gzip
-    reverse_proxy remnawave-minishop:{$WEBAPP_SERVER_PORT:8081}
-}
-```
-
-В `.env` укажите:
-
-```env
-WEBHOOK_BASE_URL=https://webhook.domain.com
-SUBSCRIPTION_MINI_APP_URL=https://app.domain.com/
-```
-
-Запуск:
-
-```bash
-docker compose -f docker-compose-caddy.yml up -d --build
-```
-
-В BotFather укажите домен Mini App через настройки домена, чтобы он совпадал с `SUBSCRIPTION_MINI_APP_URL`.
-
-## Проверка
-
-```bash
-docker compose ps
-docker compose logs -f remnawave-minishop
-```
-
-Проверьте:
-
-- бот отвечает в Telegram;
-- Telegram webhook установлен без ошибок в логах;
-- платежные вебхуки доходят до приложения;
-- Remnawave webhook проходит проверку `PANEL_WEBHOOK_SECRET`;
-- Web App открывается по домену из `SUBSCRIPTION_MINI_APP_URL`;
-- в BotFather разрешены URL Web App и callback.

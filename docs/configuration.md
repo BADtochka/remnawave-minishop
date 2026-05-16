@@ -96,7 +96,7 @@ nano .env
 
 Если файл из `TARIFFS_CONFIG_PATH` существует, бот использует каталог тарифов. Если файла нет, применяется конфигурация из переменных `.env`.
 
-В штатном `docker-compose.yml` том `./data:/app/data` у сервиса приложения **закомментирован по умолчанию**. Раскомментируйте блок `volumes`, чтобы админка сохраняла `data/tariffs.json`, каталог тем (`data/themes`), кеш логотипа Web App (`data/webapp-logo`) и animated emoji (`data/webapp-emoji`). Отдельный `docker-compose-dev.yml` в репозиторий не входит (может быть у вас локально); логика та же — монтирование `./data` в `/app/data`. Если bind mount включён на Ubuntu-сервере, создайте подкаталоги и отдайте `data` UID `10001`, под которым работает приложение внутри контейнера:
+В штатном `docker-compose.yml` данные хранятся в named volumes. Если для локальной разработки включён bind mount `./data:/app/data`, админка сможет сохранять `data/tariffs.json`, каталог тем (`data/themes`), кеш логотипа Web App (`data/webapp-logo`) и animated emoji (`data/webapp-emoji`) прямо в рабочую копию. Если bind mount включён на Ubuntu-сервере, создайте подкаталоги и отдайте `data` UID `10001`, под которым работает приложение внутри контейнера:
 
 ```bash
 mkdir -p data/themes data/webapp-logo data/webapp-emoji
@@ -119,7 +119,7 @@ docker compose up -d --build --force-recreate
 | Переменная | Назначение |
 | --- | --- |
 | `WEBAPP_ENABLED` | Включает Web App в том же контейнере. |
-| `WEBAPP_SERVER_HOST` / `WEBAPP_SERVER_PORT` | Хост и порт Web App. По умолчанию порт `8081`. |
+| `WEBAPP_SERVER_HOST` / `WEBAPP_SERVER_PORT` | Внутренний aiohttp server для WebApp API/auth/theme assets. По умолчанию порт `8081`; статический frontend отдается отдельным nginx image. |
 | `SUBSCRIPTION_MINI_APP_URL` | Публичный URL Web App. |
 | `WEBAPP_TITLE` | Заголовок Web App. |
 | `WEBAPP_THEMES_DIR` | Каталог тем Web App. По умолчанию `data/themes`; внутри ожидаются папки `<key>/theme.json` и опциональные CSS/ассеты. |

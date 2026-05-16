@@ -1235,6 +1235,8 @@
   "admin_themes_catalog_empty": "Каталог пуст. Добавьте папку темы в data/themes и обновите список.",
   "admin_themes_saved": "Темы сохранены",
   "admin_themes_save_failed": "Не удалось сохранить темы",
+  "appearance_logo_uploaded_pending": "Логотип загружен и применен.",
+  "appearance_favicon_uploaded_pending": "Favicon загружена и применена.",
   "admin_no_description": "Без описания",
   "admin_tariff_model_traffic": "Трафик",
   "admin_tariff_model_periods": "Периоды",

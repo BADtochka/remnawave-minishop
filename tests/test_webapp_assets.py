@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from PIL import Image
 
@@ -86,6 +86,8 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertNotIn("https://telegram.org/js/telegram-web-app.js", html)
         self.assertNotIn("https://fonts.googleapis.com", html)
+        self.assertNotIn('id="logo-preload"', html)
+        self.assertNotIn('href=""', html)
         self.assertLess(html.index("/subscription_webapp.css"), html.index("WEBAPP_JS_SCRIPT"))
 
     def test_https_webapp_logo_uses_same_origin_proxy(self):
@@ -105,6 +107,23 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             subscription_webapp._resolve_webapp_logo_url(settings),
             "/webapp-uploaded-logo/logo-abcdef1234567890.png",
         )
+
+    async def test_webapp_logo_route_serves_configured_uploaded_logo(self):
+        settings = SimpleNamespace(
+            WEBAPP_LOGO_USE_EMOJI=False,
+            WEBAPP_LOGO_URL="/webapp-uploaded-logo/logo-1111111111111111.png",
+        )
+        request = SimpleNamespace(app={"settings": settings})
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logo_dir = Path(tmpdir)
+            (logo_dir / "logo-1111111111111111.png").write_bytes(b"logo")
+            with patch.object(webapp_assets, "WEBAPP_UPLOADED_LOGO_DIR", logo_dir):
+                response = await webapp_assets.webapp_logo_route(request)
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.content_type, "image/png")
+        self.assertEqual(response.body, b"logo")
 
     def test_webapp_logo_is_hidden_when_emoji_logo_is_enabled(self):
         settings = SimpleNamespace(
@@ -171,6 +190,88 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue((Path(tmpdir) / digest / "icon-32.png").exists())
             self.assertTrue((Path(tmpdir) / digest / "apple-touch-icon.png").exists())
             self.assertTrue((Path(tmpdir) / digest / "favicon.ico").exists())
+
+    def test_prune_unused_appearance_assets_keeps_only_referenced_logo_and_favicons(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            uploads = root / "uploads"
+            favicons = root / "favicons"
+            emoji = root / "emoji"
+            uploads.mkdir()
+            favicons.mkdir()
+            emoji.mkdir()
+            (uploads / "logo-1111111111111111.png").write_bytes(b"keep")
+            (uploads / "logo-2222222222222222.png").write_bytes(b"remove")
+            (favicons / "aaaaaaaaaaaaaaaa").mkdir()
+            (favicons / "bbbbbbbbbbbbbbbb").mkdir()
+            (favicons / "cccccccccccccccc").mkdir()
+            (favicons / "aaaaaaaaaaaaaaaa" / "icon-180.png").write_bytes(b"keep")
+            (favicons / "bbbbbbbbbbbbbbbb" / "icon-180.png").write_bytes(b"keep")
+            (favicons / "cccccccccccccccc" / "icon-180.png").write_bytes(b"remove")
+            (emoji / "1f929.512.gif").write_bytes(b"keep")
+            (emoji / "1f929.512.webp").write_bytes(b"keep")
+            (emoji / "1f525.512.gif").write_bytes(b"remove")
+            settings = SimpleNamespace(
+                WEBAPP_LOGO_URL="/webapp-uploaded-logo/logo-1111111111111111.png",
+                WEBAPP_FAVICON_URL="/webapp-favicon/aaaaaaaaaaaaaaaa/icon-180.png",
+                WEBAPP_LOGO_FAVICON_URL="/webapp-favicon/bbbbbbbbbbbbbbbb/icon-180.png",
+                WEBAPP_LOGO_USE_EMOJI=True,
+                WEBAPP_LOGO_EMOJI="🤩",
+                WEBAPP_LOGO_EMOJI_FONT="noto-color-animated",
+            )
+
+            with (
+                patch.object(admin_themes, "WEBAPP_UPLOADED_LOGO_DIR", uploads),
+                patch.object(admin_themes, "WEBAPP_FAVICON_DIR", favicons),
+                patch.object(admin_themes, "WEBAPP_EMOJI_CACHE_DIR", emoji),
+            ):
+                admin_themes.prune_unused_appearance_assets(settings)
+
+            self.assertTrue((uploads / "logo-1111111111111111.png").exists())
+            self.assertFalse((uploads / "logo-2222222222222222.png").exists())
+            self.assertTrue((favicons / "aaaaaaaaaaaaaaaa").exists())
+            self.assertTrue((favicons / "bbbbbbbbbbbbbbbb").exists())
+            self.assertFalse((favicons / "cccccccccccccccc").exists())
+            self.assertTrue((emoji / "1f929.512.gif").exists())
+            self.assertTrue((emoji / "1f929.512.webp").exists())
+            self.assertFalse((emoji / "1f525.512.gif").exists())
+
+    async def test_persist_appearance_upload_writes_overrides_and_clears_caches(self):
+        settings = SimpleNamespace()
+        request = SimpleNamespace(
+            app={
+                "settings": settings,
+                "async_session_factory": object(),
+                "webapp_settings_cache": {"ts": 123.0, "data": {"stale": True}},
+                "webapp_logo_cache": ("url", b"body", "image/png"),
+            }
+        )
+        updates = {
+            "WEBAPP_LOGO_URL": "/webapp-uploaded-logo/logo-1111111111111111.png",
+            "WEBAPP_LOGO_USE_EMOJI": False,
+        }
+
+        with (
+            patch.object(
+                admin_themes,
+                "update_overrides",
+                AsyncMock(return_value={"ok": True}),
+            ) as update_mock,
+            patch.object(admin_themes, "prune_unused_appearance_assets") as prune_mock,
+        ):
+            persisted = await admin_themes._persist_appearance_upload(request, updates, 42)
+
+        self.assertTrue(persisted)
+        update_mock.assert_awaited_once_with(
+            settings,
+            request.app["async_session_factory"],
+            updates=updates,
+            deletes=[],
+            actor_id=42,
+        )
+        self.assertEqual(request.app["webapp_settings_cache"], {"ts": 0.0, "data": {}})
+        self.assertIsNone(request.app["webapp_logo_cache"])
+        prune_mock.assert_called_once_with(settings)
 
     def test_initial_theme_head_markup_includes_css_and_tokens(self):
         cfg = builtin_webapp_themes_config("#123456")

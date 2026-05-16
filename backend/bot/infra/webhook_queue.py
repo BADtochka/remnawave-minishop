@@ -1,0 +1,63 @@
+import json
+import logging
+import time
+from typing import Any, Dict, Optional
+
+from bot.infra.redis import get_redis, redis_key
+from config.settings import Settings
+
+logger = logging.getLogger(__name__)
+
+
+def webhook_queue_key(settings: Settings) -> str:
+    return redis_key(settings, "queue", settings.WEBHOOK_QUEUE_NAME)
+
+
+async def enqueue_webhook_event(
+    settings: Settings,
+    provider: str,
+    payload: Dict[str, Any],
+    *,
+    event_id: Optional[str] = None,
+) -> bool:
+    redis = await get_redis(settings)
+    if redis is None:
+        return False
+
+    dedupe_id = event_id or payload.get("id") or payload.get("event_id")
+    if dedupe_id:
+        dedupe_key = redis_key(settings, "webhook", "seen", provider, dedupe_id)
+        if not await redis.set(dedupe_key, "1", nx=True, ex=24 * 60 * 60):
+            logger.info("Skipping duplicate %s webhook event %s", provider, dedupe_id)
+            return True
+
+    message = {
+        "provider": provider,
+        "event_id": dedupe_id,
+        "payload": payload,
+        "enqueued_at": time.time(),
+    }
+    await redis.lpush(webhook_queue_key(settings), json.dumps(message, ensure_ascii=False))
+    return True
+
+
+async def pop_webhook_event(settings: Settings, timeout_seconds: int = 5) -> Optional[dict]:
+    redis = await get_redis(settings)
+    if redis is None:
+        return None
+    item = await redis.brpop(webhook_queue_key(settings), timeout=timeout_seconds)
+    if not item:
+        return None
+    _, raw = item
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("Invalid webhook queue payload discarded")
+        return None
+
+
+async def webhook_queue_depth(settings: Settings) -> int:
+    redis = await get_redis(settings)
+    if redis is None:
+        return 0
+    return int(await redis.llen(webhook_queue_key(settings)))

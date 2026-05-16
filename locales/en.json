@@ -1235,6 +1235,8 @@
   "admin_themes_catalog_empty": "The catalog is empty. Add a theme folder to data/themes and refresh.",
   "admin_themes_saved": "Themes saved",
   "admin_themes_save_failed": "Failed to save themes",
+  "appearance_logo_uploaded_pending": "Logo uploaded and applied.",
+  "appearance_favicon_uploaded_pending": "Favicon uploaded and applied.",
   "admin_no_description": "No description",
   "admin_tariff_model_traffic": "Traffic",
   "admin_tariff_model_periods": "Periods",
