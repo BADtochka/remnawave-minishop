@@ -373,7 +373,7 @@ class WebAppSecurityTests(unittest.IsolatedAsyncioTestCase):
         csp = response.headers["Content-Security-Policy"]
 
         self.assertNotIn("'unsafe-eval'", csp)
-        self.assertIn("img-src 'self' data: https:;", csp)
+        self.assertIn("img-src 'self' data: blob: https:;", csp)
         self.assertNotIn("img-src 'self' data: https: http:;", csp)
 
 

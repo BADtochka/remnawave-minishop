@@ -1,6 +1,6 @@
 # Web App / Mini App
 
-Web App запускается в том же контейнере, что и бот, но слушает отдельный порт `WEBAPP_SERVER_PORT` (по умолчанию `8081`). Порт `WEB_SERVER_PORT` остается для Telegram, платежных и Remnawave вебхуков.
+Web App собирается в отдельный `frontend` image и отдается через nginx. Static/Mini App запросы идут в `frontend:80`; frontend nginx проксирует `/api/*`, `/auth/*` и theme/logo assets в backend WebApp server на `backend:8081`. Telegram, payment и panel webhook routes остаются на backend webhook server `backend:8080`.
 
 ## Что показывает Web App
 
@@ -24,10 +24,8 @@ WEBAPP_SERVER_HOST=0.0.0.0
 WEBAPP_SERVER_PORT=8081
 SUBSCRIPTION_MINI_APP_URL=https://app.domain.com/
 WEBAPP_TITLE="Моя подписка"
-WEBAPP_PRIMARY_COLOR="#00fe7a"
-WEBAPP_LOGO_URL=
-WEBAPP_LOGO_EMOJI="🫥"
-WEBAPP_LOGO_EMOJI_FONT=system
+WEBAPP_THEMES_DIR=data/themes
+WEBAPP_DEFAULT_THEME=
 WEBAPP_SESSION_SECRET=<stable-random-secret>
 WEBHOOK_SECRET_TOKEN=<stable-random-secret>
 WEBAPP_SESSION_TTL_SECONDS=86400
@@ -49,7 +47,9 @@ SMTP_FROM_EMAIL=no-reply@domain.com
 SMTP_FROM_NAME=Remnawave Minishop
 ```
 
-Если `WEBAPP_LOGO_URL` пустой, в шапке и на экране входа показывается запасной **emoji-логотип** (`WEBAPP_LOGO_EMOJI`) и при необходимости стиль отрисовки (`WEBAPP_LOGO_EMOJI_FONT`: например `system`, `noto-color`, `noto-color-animated`, `twemoji`). Если SMTP-настройки не заполнены, вход по email скрывается.
+Внешний вид настраивается в админке: раздел **Внешний вид** управляет логотипом, emoji-логотипом, accent-цветом, выбранной темой и масштабом логотипа. Кастомные темы читаются из `WEBAPP_THEMES_DIR`, а `WEBAPP_DEFAULT_THEME` может принудительно выбрать тему по ключу. Подробный контракт `theme.json`, CSS/asset-роуты и пайплайн создания темы описаны в [webapp-themes.md](webapp-themes.md).
+
+Если SMTP-настройки не заполнены, вход по email скрывается.
 
 ## Telegram-авторизация
 
@@ -89,8 +89,16 @@ Email-вход работает через одноразовый код:
 Web App должен проксироваться отдельно от вебхуков:
 
 ```nginx
-upstream remnawave-minishop-webapp {
-    server remnawave-minishop:8081;
+upstream remnawave_frontend {
+    server frontend:80;
+}
+
+upstream remnawave_backend_webapp {
+    server backend:8081;
+}
+
+upstream remnawave_backend_webhooks {
+    server backend:8080;
 }
 
 server {
@@ -102,7 +110,25 @@ server {
     ssl_certificate_key "/etc/nginx/ssl/app_privkey.key";
 
     location / {
-        proxy_pass http://remnawave-minishop-webapp;
+        proxy_pass http://remnawave_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location ~ ^/(api|auth)/ {
+        proxy_pass http://remnawave_backend_webapp;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /webhook/ {
+        proxy_pass http://remnawave_backend_webhooks;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -112,12 +138,16 @@ server {
 }
 ```
 
-В `docker-compose.yml` порт Web App публикуется отдельно:
+В default `docker-compose.yml` наружу публикуются `frontend` и webhook/backend port, а внутри Docker network сервисы доступны друг другу по service DNS names:
 
 ```yaml
-ports:
-  - 127.0.0.1:8080:8080
-  - 127.0.0.1:${WEBAPP_SERVER_PORT:-8081}:${WEBAPP_SERVER_PORT:-8081}
+services:
+  frontend:
+    expose:
+      - "80"
+  backend:
+    expose:
+      - "8080"
 ```
 
 ## Реферальные ссылки

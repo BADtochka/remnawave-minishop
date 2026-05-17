@@ -3,11 +3,13 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from bot.services.panel_api_service import PanelApiService
 from bot.services.subscription_service import SubscriptionService
 from config.settings import Settings
+from db.dal.subscription_dal import _subscription_model_payload
 
 GIB = 1024**3
 
@@ -187,6 +189,59 @@ class SubscriptionServiceCalculationTests(unittest.TestCase):
 
 
 class SubscriptionServiceActivationDispatchTests(unittest.IsolatedAsyncioTestCase):
+    async def test_activate_trial_keeps_panel_strategy_out_of_local_subscription_payload(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = _make_settings(
+                _tariffs_config_payload(),
+                tmpdir,
+                TRIAL_ENABLED=True,
+                TRIAL_DURATION_DAYS=3,
+                TRIAL_TRAFFIC_LIMIT_GB=5,
+                TRIAL_TRAFFIC_STRATEGY="WEEK",
+                USER_SQUAD_UUIDS="trial-squad",
+            )
+            service = _make_service(settings)
+            service.has_had_any_subscription = AsyncMock(return_value=False)
+            service._get_or_create_panel_user_link_details = AsyncMock(
+                return_value=("panel-user", "panel-sub", "short", True)
+            )
+            service.panel_service.update_user_details_on_panel = AsyncMock(
+                return_value={"subscriptionUrl": "https://example.test/sub", "shortUuid": "short"}
+            )
+            session = AsyncMock()
+            db_user = SimpleNamespace(
+                user_id=42,
+                telegram_id=42,
+                email=None,
+                username="trial-user",
+                first_name="Trial",
+                last_name="User",
+            )
+
+            with (
+                patch(
+                    "bot.services.subscription_service_impl.trial.user_dal.get_user_by_id",
+                    AsyncMock(return_value=db_user),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.trial.subscription_dal.deactivate_other_active_subscriptions",
+                    AsyncMock(),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.trial.subscription_dal.upsert_subscription",
+                    AsyncMock(),
+                ) as upsert_subscription,
+            ):
+                result = await service.activate_trial_subscription(session, user_id=42)
+
+            self.assertTrue(result["activated"])
+            sub_payload = upsert_subscription.await_args.args[1]
+            self.assertNotIn("traffic_limit_strategy", sub_payload)
+            self.assertEqual(sub_payload["traffic_limit_bytes"], 5 * GIB)
+
+            panel_payload = service.panel_service.update_user_details_on_panel.await_args.args[1]
+            self.assertEqual(panel_payload["trafficLimitStrategy"], "WEEK")
+
     async def test_activate_subscription_dispatches_traffic_sale_mode(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings = _make_settings(_tariffs_config_payload(), tmpdir)
@@ -286,6 +341,22 @@ class SubscriptionServiceActivationDispatchTests(unittest.IsolatedAsyncioTestCas
             self.assertEqual(kwargs["device_count"], 2)
             self.assertEqual(kwargs["tariff_key"], "standard")
             self.assertEqual(kwargs["payment_db_id"], 12)
+
+
+class SubscriptionDalPayloadTests(unittest.TestCase):
+    def test_subscription_model_payload_drops_panel_only_keys(self):
+        payload = _subscription_model_payload(
+            {
+                "user_id": 42,
+                "panel_user_uuid": "panel-user",
+                "panel_subscription_uuid": "panel-sub",
+                "end_date": datetime(2026, 1, 1, tzinfo=timezone.utc),
+                "traffic_limit_strategy": "WEEK",
+            }
+        )
+
+        self.assertEqual(payload["user_id"], 42)
+        self.assertNotIn("traffic_limit_strategy", payload)
 
 
 if __name__ == "__main__":

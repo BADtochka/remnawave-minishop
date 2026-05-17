@@ -12,7 +12,8 @@ scratch/
 .claude/
 *.local.*
 node_modules/
-docker-compose-dev.yml
+frontend/node_modules/
+deploy/compose/docker-compose-dev.yml
 data/*
 !data/tariffs.example.json
 
@@ -24,15 +25,14 @@ data/*
 
 # Docker
 docker-compose.yml
-Dockerfile
-.docker
+deploy/compose/*.yml
 .dockerignore
 tmp/
 
 # WebApp build artifacts (regenerated inside Docker)
-bot/app/web/templates/subscription_webapp.css
-bot/app/web/templates/subscription_webapp.js
-bot/app/web/templates/subscription_webapp.min.*.js
+backend/bot/app/web/templates/subscription_webapp.css
+backend/bot/app/web/templates/subscription_webapp.js
+backend/bot/app/web/templates/subscription_webapp.min.*.js
 
 # Byte-compiled / optimized / DLL files
 **/__pycache__/

@@ -1,40 +1,151 @@
-# Миграция с `remnawave-tg-shop` на `remnawave-minishop`
+# Миграция с `remnawave-tg-shop` (≤ v2.7.0) на `remnawave-minishop` (v3.4+)
 
-Начиная с этой версии контейнеры и тома названы `remnawave-minishop*` вместо `remnawave-tg-shop*`. Старый и новый стеки используют **разные имена томов**, поэтому простой `docker compose up -d` после `git pull` создаст пустую БД. Эта инструкция описывает, как перенести данные.
+## Короткий путь без смены ветки и сборки
 
-Есть два пути:
+Если вы используете только готовые Docker-образы и не собираете проект
+локально, git-команды из ручного способа не нужны. Достаточно обновить
+compose-файл до варианта с готовыми образами (`deploy/compose/docker-compose-remote-server.yml`)
+и перенести/обновить БД.
 
-- [Автоматический](#автоматический-способ-через-скрипт) — один скрипт, идемпотентный, проверяет состояние на каждом шаге.
-- [Ручной](#ручной-способ) — команды, которые делает скрипт, если хочется понимать происходящее или выполнить выборочно.
+Минимальная последовательность:
+
+```bash
+docker compose down
+
+# Замените compose-файл на актуальный вариант для готовых образов.
+# Если файл лежит рядом, можно запускать его явно:
+IMAGE_TAG=3.4.0 docker compose -f deploy/compose/docker-compose-remote-server.yml up --no-start
+
+# Нужно только при переходе со старого имени volume remnawave-tg-shop-db-data.
+# Если у вас уже есть remnawave-minishop-db-data, этот шаг пропустите.
+docker run --rm \
+  -v remnawave-tg-shop-db-data:/from:ro \
+  -v remnawave-minishop-db-data:/to \
+  alpine sh -c "cd /from && cp -a . /to"
+
+IMAGE_TAG=3.4.0 docker compose -f deploy/compose/docker-compose-remote-server.yml up -d
+docker compose -f deploy/compose/docker-compose-remote-server.yml logs migrate
+```
+
+Сервис `migrate` сам применит недостающие схемные миграции к перенесённому
+тому PostgreSQL. Новые тома `remnawave-minishop-redis-data` и
+`remnawave-minishop-shop-data` переносить не нужно: они создаются пустыми.
+
+Этот документ описывает обновление стека, поднятого по `remnawave-tg-shop`
+(включая последний релиз `v2.7.0` форка `kavore/remnawave-tg-shop`), до
+текущей версии `remnawave-minishop` (v3.4+). Между этими версиями произошли
+две независимые перетряски, и скрипт пытается отработать обе одной командой:
+
+1. **Переименование стека** (v3.1.0): контейнеры и тома `remnawave-tg-shop-*`
+   стали `remnawave-minishop-*`. Простой `docker compose up -d` после
+   `git pull` создаёт пустую БД — без переноса тома данные теряются.
+2. **Разделение бота на сервисы** (v3.4.0): из одного контейнера выделены
+   `backend`, `worker`, `frontend`, `migrate` + новые `postgres`, `redis`.
+   Появились новые volumes `redis-data` и `shop-data`, новые обязательные
+   переменные окружения, а схема БД обновляется автоматически one-shot
+   сервисом `migrate`.
+
+После миграции `docker compose ps` должен показать как минимум: `backend`,
+`worker`, `frontend`, `postgres`, `redis` (running) и `migrate` (exited 0).
+Логи: `docker compose logs -f backend worker frontend`.
+
+Доступные пути:
+
+- [Автоматический](#автоматический-способ-через-скрипт) — скрипт-обёртка
+  останавливает старый стек, накатывает свежий код, переносит том БД,
+  поднимает новые сервисы. Идемпотентный.
+- [Ручной](#ручной-способ) — те же шаги командами, для тех, кому нужно
+  понимать каждое действие или выполнить выборочно.
 
 В обоих случаях:
-- старые тома **не удаляются** автоматически — это безопасный бэкап на случай отката;
-- сертификаты Caddy (если используется `docker-compose-caddy.yml`) тоже переносятся, чтобы Let's Encrypt не выписывал их заново и не упереться в rate limit.
+
+- старые тома **не удаляются** автоматически — это безопасный бэкап на случай
+  отката;
+- сертификаты Caddy (если используется `deploy/compose/docker-compose-caddy.yml`)
+  тоже переносятся, чтобы Let's Encrypt не выписывал их заново и не упереться
+  в rate limit;
+- схема БД обновляется автоматически: при первом `docker compose up -d` сервис
+  `migrate` накатывает на перенесённый том все недостающие миграции (от
+  alembic-схемы v2.7.0 до текущей).
+
+## Что меняется в архитектуре
+
+**Контейнеры**:
+
+| Версия | Сервисы |
+| --- | --- |
+| `v2.7.0` | `remnawave-tg-shop`, `remnawave-tg-shop-db` |
+| `v3.1.x–v3.3.x` | `remnawave-minishop`, `remnawave-minishop-db` |
+| `v3.4+` (текущая) | `remnawave-minishop-backend`, `remnawave-minishop-worker`, `remnawave-minishop-frontend`, `remnawave-minishop-migrate`, `remnawave-minishop-postgres`, `remnawave-minishop-redis` |
+
+Внутри Docker-сети сервисы доступны по коротким DNS-именам (`backend`, `worker`,
+`frontend`, `postgres`, `redis`), а не по полному `container_name`. Это важно
+для внешнего reverse-proxy — см. раздел [Внешний reverse-proxy](#внешний-reverse-proxy) ниже.
+
+**Volumes**:
+
+| Volume | v2.7.0 | v3.4+ | Что внутри |
+| --- | --- | --- | --- |
+| `remnawave-minishop-db-data` | переименовать из `remnawave-tg-shop-db-data` | переносится скриптом | PostgreSQL |
+| `remnawave-minishop-redis-data` | — | создаётся пустым | Redis (FSM, rate-limit, cache, очередь webhooks, distributed locks) |
+| `remnawave-minishop-shop-data` | — | создаётся пустым | `/app/data`: `tariffs.json`, темы Web App, кэш логотипа/emoji |
+| `remnawave-minishop-caddy-data` / `…-caddy-config` | переименовать из `remnawave-tg-shop-caddy-*` | переносится скриптом | только при Caddy-варианте |
+
+`redis-data` и `shop-data` стартуют пустыми — это нормально. Redis ничего
+долгоживущего не хранит (всё либо FSM, либо кеш с TTL), а `data/` инициализируется
+из образа при первом старте (`tariffs.json` пуст пока вы не сконфигурируете
+тарифы через админ-панель).
+
+## Переменные окружения, которые могли исчезнуть или переехать
+
+Перед запуском нового стека проверьте `.env`. Ниже — только то, что точно
+менялось между v2.7.0 и v3.4+:
+
+| Было (v2.7.0) | Стало (v3.4+) | Действие |
+| --- | --- | --- |
+| `TELEGRAM_WEBHOOK_SECRET` | `WEBHOOK_SECRET_TOKEN` | Переименовать. Если пусто — будет сгенерирован при старте, но тогда Telegram переустановит webhook (на это не реагирует существующий запрос). |
+| `TELEGRAM_WEBHOOK_PATH` | удалена | Путь вебхука теперь генерируется из `BOT_TOKEN` автоматически. |
+| `REQUIRED_CHANNEL_SUBSCRIBE_TO_USE` | удалена | Гейт включается автоматически, как только задан `REQUIRED_CHANNEL_ID`. |
+| `STARS_PROVIDER_TOKEN` | удалена | Telegram Stars (XTR) используются напрямую. |
+| `REFERRAL_ENABLED` | удалена | Реферальная программа активна по умолчанию; чтобы выключить — обнулите `REFERRAL_BONUS_DAYS_*` и `REFEREE_BONUS_DAYS_*`. |
+| `POSTGRES_HOST=remnawave-tg-shop-db` | в `.env` — `remnawave-minishop-db` или пусто | Под compose значение всё равно переопределяется на сервисное имя `postgres` (см. `environment:` в compose-файлах), поэтому скрипт правит `.env` только для bare-metal сценариев. |
+| `WEBHOOK_BASE_URL` | **обязательна** | Polling-режим удалён, без публичного URL бот не стартует. |
+| — | `REDIS_URL=redis://redis:6379/0` | Обязательна для воркера, очередей и rate-limit. По умолчанию в compose-файлах уже задана. |
+| — | `WEBAPP_SESSION_SECRET`, `WEBAPP_ENABLED`, `WEBAPP_SERVER_PORT`, `WEBAPP_THEMES_DIR`, `TARIFFS_CONFIG_PATH` | Новые настройки Web App / тарифного каталога. Безопасные дефолты есть в `.env.example`. |
+
+Полный референс — [docs/configuration.md](configuration.md). Скрипт миграции
+эти переменные **не правит** автоматически (только `POSTGRES_HOST`), потому
+что у каждой инсталляции свой шаблон `.env` с кастомными значениями. Лучше
+сравнить свой `.env` с `.env.example` глазами один раз, чем получить
+несовместимый шаблон автоматом.
 
 ## Автоматический способ (через скрипт)
 
-Если helper ещё не лежит у вас локально, запускайте его прямо из `raw` из корня старого репозитория:
+Если helper ещё не лежит у вас локально, запускайте его прямо из `raw` из
+корня старого репозитория:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/3252a8/remnawave-minishop/main/scripts/migrate_to_minishop.sh)
 ```
 
-> Команда выше рассчитана на `bash` / Git Bash / WSL. Если вы запускаете из PowerShell, удобнее сначала открыть Git Bash.
+> Команда выше рассчитана на `bash` / Git Bash / WSL. Если вы запускаете из
+> PowerShell, удобнее сначала открыть Git Bash.
 
-Если вы уже подтянули новую версию и файл есть локально, можно запускать и так:
+Если вы уже подтянули новую версию и файл есть локально, можно запускать так:
 
 ```bash
 bash scripts/migrate_to_minishop.sh
 ```
 
-По умолчанию скрипт работает с `docker-compose.yml` и переключается на ветку `main`. Можно переопределить через переменные окружения:
+По умолчанию скрипт работает с `docker-compose.yml` и переключается на ветку
+`main`. Можно переопределить через переменные окружения:
 
 | Переменная        | Назначение                                                              | По умолчанию           |
 | ----------------- | ----------------------------------------------------------------------- | ---------------------- |
 | `PROJECT_ROOT`    | Явный путь к корню старого репозитория, если запуск не из него          | текущая директория     |
 | `COMPOSE_FILE`    | Какой compose-файл стартовать в конце                                   | `docker-compose.yml`   |
 | `TARGET_BRANCH`   | На какую ветку переключаться и подтягивать обновления                   | `main`                 |
-| `GIT_REMOTE`     | Какой remote использовать для `fetch`/`pull`                            | `origin`               |
+| `GIT_REMOTE`      | Какой remote использовать для `fetch`/`pull`                            | `origin`               |
 | `NEW_ORIGIN_URL`  | Если задано и не совпадает с URL выбранного remote — он будет обновлён  | (не меняется)          |
 | `ASSUME_YES`      | `1` — не задавать интерактивных вопросов                                | `0`                    |
 
@@ -42,7 +153,7 @@ bash scripts/migrate_to_minishop.sh
 
 ```bash
 # Caddy-вариант из raw
-COMPOSE_FILE=docker-compose-caddy.yml \
+COMPOSE_FILE=deploy/compose/docker-compose-caddy.yml \
   bash <(curl -fsSL https://raw.githubusercontent.com/3252a8/remnawave-minishop/main/scripts/migrate_to_minishop.sh)
 
 # С переключением origin на форк 3252a8
@@ -56,24 +167,40 @@ ASSUME_YES=1 \
 
 Что делает скрипт:
 
-1. **Останавливает текущий стек**: проверяет известные контейнеры старой и новой схемы и останавливает их, если они запущены.
-2. **Переключает `origin`**, если задана переменная `NEW_ORIGIN_URL`, иначе оставляет как есть.
-3. **Подтягивает целевую ветку** (`git fetch` + `git switch` + `git pull --ff-only`). Прерывается, если в рабочем дереве есть незакоммиченные изменения.
-4. **Обновляет `.env`** и правит `POSTGRES_HOST`, если он ещё указывает на старый контейнер.
-5. **Подготавливает новый стек в режиме `--no-start`**, чтобы Compose сам создал тома и не ругался на уже существующий volume.
-6. **Переносит тома** `remnawave-tg-shop-*` → `remnawave-minishop-*` через одноразовый `alpine`-контейнер. Если новый том уже непустой, копирование пропускается.
-7. **Стартует новый стек** (`docker compose -f $COMPOSE_FILE up -d --remove-orphans`, а для локальной сборки ещё и `--build`) и печатает `docker compose ps`.
+1. **Останавливает текущий стек**: ищет известные контейнеры старой схемы
+   (`remnawave-tg-shop`, `…-db`, `…-caddy`), переходного периода
+   (`remnawave-minishop`, `…-db`, `…-caddy`) и новой схемы
+   (`…-backend`, `…-worker`, `…-frontend`, `…-migrate`, `…-postgres`, `…-redis`)
+   и останавливает их, если запущены. Безопасно при повторном запуске.
+2. **Переключает `origin`**, если задана переменная `NEW_ORIGIN_URL`, иначе
+   оставляет как есть.
+3. **Подтягивает целевую ветку** (`git fetch` + `git switch` + `git pull --ff-only`).
+   Прерывается, если в рабочем дереве есть незакоммиченные изменения.
+4. **Правит `POSTGRES_HOST` в `.env`** (только для bare-metal сценариев — в
+   compose это значение перебивает `environment:` блок).
+5. **Подготавливает новый стек в режиме `--no-start`**, чтобы Compose сам
+   создал тома `db-data`, `redis-data`, `shop-data` и не ругался на уже
+   существующий volume.
+6. **Переносит том БД** `remnawave-tg-shop-db-data` → `remnawave-minishop-db-data`
+   (и Caddy-тома, если применимо) через одноразовый `alpine`-контейнер. Если
+   новый том уже непустой — копирование пропускается. Новые volumes
+   `redis-data` и `shop-data` остаются пустыми (их и не должно быть в старом
+   стеке).
+7. **Стартует новый стек** (`docker compose up -d --remove-orphans` плюс
+   `--build` для локальной сборки). `migrate` отработает первым, накатит
+   на перенесённый том все недостающие миграции (от alembic-схемы v2.7.0 до
+   текущей) и завершится. Затем стартуют `backend`, `worker`, `frontend`.
 
-Скрипт идемпотентен: повторный запуск ничего не сломает, просто пропустит уже выполненные шаги.
+Скрипт идемпотентен: повторный запуск ничего не сломает, просто пропустит уже
+выполненные шаги.
 
-После того как убедитесь, что бот работает и данные на месте, удалите старые тома:
+После того как убедитесь, что бот работает и данные на месте, удалите старые
+тома:
 
 ```bash
 docker volume rm remnawave-tg-shop-db-data
 docker volume rm remnawave-tg-shop-caddy-data remnawave-tg-shop-caddy-config 2>/dev/null || true
 ```
-
-> ⚠️ Если у вас есть внешний reverse proxy (Nginx и т.п.), не забудьте поправить в его конфиге `upstream`/`proxy_pass`: имя хоста контейнера изменилось с `remnawave-tg-shop` на `remnawave-minishop`. Скрипт не трогает внешние конфиги.
 
 ## Ручной способ
 
@@ -86,26 +213,39 @@ docker volume rm remnawave-tg-shop-caddy-data remnawave-tg-shop-caddy-config 2>/
     git pull --ff-only origin main
     ```
 
-2.  **Обновите `.env`:**
+2.  **(Только для bare-metal без compose)** обновите `.env`, если в нём ещё
+    жёстко прописан старый контейнер БД:
 
     ```bash
     sed -i.bak 's/^POSTGRES_HOST=remnawave-tg-shop-db$/POSTGRES_HOST=remnawave-minishop-db/' .env
     ```
 
-3.  **Подготовьте новый стек без запуска:**
+    Под `docker compose up` это не нужно: compose сам выставляет
+    `POSTGRES_HOST: postgres` (имя сервиса) в `environment:` и `.env`-значение
+    не используется.
+
+3.  **Проверьте `.env`** на наличие переменных, которые исчезли или
+    переименовались — см. раздел
+    [Переменные окружения](#переменные-окружения-которые-могли-исчезнуть-или-переехать)
+    выше. Главное: `WEBHOOK_SECRET_TOKEN` (бывший `TELEGRAM_WEBHOOK_SECRET`),
+    обязательный `WEBHOOK_BASE_URL` и наличие `REDIS_URL` (по умолчанию задано
+    в compose).
+
+4.  **Подготовьте новый стек без запуска**, чтобы Compose создал новые volumes
+    (`db-data`, `redis-data`, `shop-data`) и контейнеры:
 
     ```bash
     # Локальная сборка
     docker compose up --no-start --build
 
     # Или Caddy-вариант
-    docker compose -f docker-compose-caddy.yml up --no-start --build
+    docker compose -f deploy/compose/docker-compose-caddy.yml up --no-start
 
     # Или готовый образ
-    docker compose -f docker-compose-remote-server.yml up --no-start
+    docker compose -f deploy/compose/docker-compose-remote-server.yml up --no-start
     ```
 
-4.  **Перенесите том БД в новое имя:**
+5.  **Перенесите том БД в новое имя:**
 
     ```bash
     docker run --rm \
@@ -114,7 +254,12 @@ docker volume rm remnawave-tg-shop-caddy-data remnawave-tg-shop-caddy-config 2>/
       alpine sh -c "cd /from && cp -a . /to"
     ```
 
-5.  **(Только для Caddy)** перенесите тома Caddy с TLS-сертификатами и состоянием ACME:
+    `remnawave-minishop-redis-data` и `remnawave-minishop-shop-data` — новые,
+    переносить нечего. Они инициализируются на лету: Redis пуст, а `data/`
+    наполняется при первом обращении к настройкам Web App / каталогу тарифов.
+
+6.  **(Только для Caddy)** перенесите тома Caddy с TLS-сертификатами и
+    состоянием ACME:
 
     ```bash
     for v in caddy-data caddy-config; do
@@ -125,26 +270,86 @@ docker volume rm remnawave-tg-shop-caddy-data remnawave-tg-shop-caddy-config 2>/
     done
     ```
 
-6.  **Запустите новый стек:**
+7.  **Запустите новый стек:**
 
     ```bash
     docker compose up -d
     # или
-    docker compose -f docker-compose-caddy.yml up -d --build
+    docker compose -f deploy/compose/docker-compose-caddy.yml up -d
     # или
-    docker compose -f docker-compose-remote-server.yml up -d
+    docker compose -f deploy/compose/docker-compose-remote-server.yml up -d
     ```
 
-7.  **Проверьте:**
+    Сервис `migrate` запустится первым, обнаружит перенесённый том,
+    применит недостающие схемные миграции (`Base.metadata.create_all` +
+    последовательные миграции `0001..00NN` из `backend/db/migrator.py`) и
+    выйдет с кодом 0. Только после этого стартуют `backend` и `worker`.
+
+8.  **Проверьте состояние:**
 
     ```bash
     docker compose ps
-    docker compose logs -f remnawave-minishop
+    docker compose logs -f backend worker frontend
+    docker compose logs migrate   # должен закончиться "Migrator: migration 00NN applied successfully"
     ```
 
-8.  **(Опционально) удалите старые тома**, когда убедитесь, что новый стек стабилен:
+9.  **(Опционально) удалите старые тома**, когда убедитесь, что новый стек
+    стабилен:
 
     ```bash
     docker volume rm remnawave-tg-shop-db-data
     docker volume rm remnawave-tg-shop-caddy-data remnawave-tg-shop-caddy-config 2>/dev/null || true
     ```
+
+## Внешний reverse-proxy
+
+В v2.7.0 был один upstream — `remnawave-tg-shop:8000`. В v3.4+ функциональность
+разнесена по портам и сервисам:
+
+| Назначение | DNS-имя сервиса | Порт |
+| --- | --- | --- |
+| Telegram / платёжные / panel webhooks | `backend` | `8080` |
+| Health-чек | `backend` | `8080` (`/healthz`) |
+| Web App API (`/api/*`, `/auth/*`, ассеты тем и логотипов) | `backend` | `8081` (доступен только из Docker-сети) |
+| Статический фронт Web App | `frontend` | `80` (внутри `frontend` уже проксирует `/api/*` и `/auth/*` на `backend:8081`) |
+
+Минимальная замена для внешнего Nginx, который раньше слал всё на один
+upstream:
+
+```nginx
+upstream remnawave_backend_webhooks { server backend:8080; }
+upstream remnawave_frontend         { server frontend:80; }
+
+server {
+    server_name app.domain.com;
+    listen 443 ssl;
+    http2 on;
+    # ssl_certificate / ssl_certificate_key — без изменений
+
+    location /webhook/ { proxy_pass http://remnawave_backend_webhooks; }
+    location /healthz  { proxy_pass http://remnawave_backend_webhooks; }
+    location /         { proxy_pass http://remnawave_frontend;         }
+}
+```
+
+Полные примеры (Caddy, Newt/Pangolin) — в [docs/deployment.md](deployment.md)
+и [docs/webapp.md](webapp.md). Если раньше прокси указывал на
+`remnawave-tg-shop:8000` напрямую, после миграции нужно либо переключиться на
+`backend:8080` / `frontend:80`, либо использовать встроенный Caddy-вариант,
+который уже знает правильную маршрутизацию.
+
+## Если что-то пошло не так
+
+`migrate` упал → читайте `docker compose logs migrate`. Том БД остался
+не тронут, можно откатиться, переключив compose-файл обратно на старый
+коммит и подняв старый стек на старом томе `remnawave-tg-shop-db-data`
+(пока вы его не удалили).
+
+`backend` не стартует → чаще всего `WEBHOOK_BASE_URL` пуст, либо
+`WEBHOOK_SECRET_TOKEN` отличается от того, что Telegram ждёт. Поставьте
+свежий секрет в `.env` и перезапустите — Telegram переустановит webhook
+автоматически.
+
+Web App пуст / 502 → проверьте, что `frontend` живёт (`docker compose ps`),
+а внешний прокси шлёт на `frontend:80`, а не на старый
+`remnawave-tg-shop:8000`.

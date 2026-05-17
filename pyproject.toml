@@ -6,7 +6,7 @@ exclude = [
     ".pytest_cache",
     "__pycache__",
     "node_modules",
-    "bot/app/web/templates",
+    "backend/bot/app/web/templates",
 ]
 
 [tool.ruff.lint]
@@ -22,7 +22,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["bot", "config", "db", "tests"]
+known-first-party = ["app_logging", "bot", "config", "db", "tests"]
 
 [tool.ruff.format]
 quote-style = "double"

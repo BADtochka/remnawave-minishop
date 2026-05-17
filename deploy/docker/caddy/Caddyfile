@@ -1,0 +1,12 @@
+# Replace the example domains with your real webhook and Mini App hostnames.
+app.example.com {
+	encode zstd gzip
+
+	reverse_proxy backend:8080
+}
+
+web.example.com {
+	encode zstd gzip
+
+	reverse_proxy frontend:80
+}

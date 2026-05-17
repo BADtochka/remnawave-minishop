@@ -1,4 +1,5 @@
 import asyncio
+import io
 import json
 import os
 import tempfile
@@ -6,11 +7,15 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
+
+from PIL import Image
 
 from bot.app.web import subscription_webapp
+from bot.app.web.admin_api_impl import themes as admin_themes
 from bot.app.web.webapp import assets as webapp_assets
 from config.settings import Settings
+from config.webapp_themes_config import builtin_webapp_themes_config
 
 
 class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
@@ -81,6 +86,8 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertNotIn("https://telegram.org/js/telegram-web-app.js", html)
         self.assertNotIn("https://fonts.googleapis.com", html)
+        self.assertNotIn('id="logo-preload"', html)
+        self.assertNotIn('href=""', html)
         self.assertLess(html.index("/subscription_webapp.css"), html.index("WEBAPP_JS_SCRIPT"))
 
     def test_https_webapp_logo_uses_same_origin_proxy(self):
@@ -90,6 +97,193 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             subscription_webapp._resolve_webapp_logo_url(settings),
             r"^/webapp-logo\?v=[0-9a-f]{12}$",
         )
+
+    def test_uploaded_webapp_logo_url_is_served_directly(self):
+        settings = SimpleNamespace(
+            WEBAPP_LOGO_URL="/webapp-uploaded-logo/logo-abcdef1234567890.png"
+        )
+
+        self.assertEqual(
+            subscription_webapp._resolve_webapp_logo_url(settings),
+            "/webapp-uploaded-logo/logo-abcdef1234567890.png",
+        )
+
+    async def test_webapp_logo_route_serves_configured_uploaded_logo(self):
+        settings = SimpleNamespace(
+            WEBAPP_LOGO_USE_EMOJI=False,
+            WEBAPP_LOGO_URL="/webapp-uploaded-logo/logo-1111111111111111.png",
+        )
+        request = SimpleNamespace(app={"settings": settings})
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logo_dir = Path(tmpdir)
+            (logo_dir / "logo-1111111111111111.png").write_bytes(b"logo")
+            with patch.object(webapp_assets, "WEBAPP_UPLOADED_LOGO_DIR", logo_dir):
+                response = await webapp_assets.webapp_logo_route(request)
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.content_type, "image/png")
+        self.assertEqual(response.body, b"logo")
+
+    def test_webapp_logo_is_hidden_when_emoji_logo_is_enabled(self):
+        settings = SimpleNamespace(
+            WEBAPP_LOGO_USE_EMOJI=True,
+            WEBAPP_LOGO_URL="/webapp-uploaded-logo/logo-abcdef1234567890.png",
+        )
+
+        self.assertEqual(subscription_webapp._resolve_webapp_logo_url(settings), "")
+
+    def test_custom_webapp_favicon_takes_precedence(self):
+        settings = SimpleNamespace(
+            WEBAPP_FAVICON_USE_CUSTOM=True,
+            WEBAPP_FAVICON_URL="/webapp-favicon/abcdef1234567890/icon-180.png",
+            WEBAPP_LOGO_FAVICON_URL="/webapp-favicon/1111111111111111/icon-180.png",
+        )
+
+        self.assertEqual(
+            subscription_webapp._resolve_webapp_favicon_url(settings, "/logo.png"),
+            "/webapp-favicon/abcdef1234567890/icon-180.png",
+        )
+
+    def test_logo_generated_favicon_is_used_when_custom_disabled(self):
+        settings = SimpleNamespace(
+            WEBAPP_FAVICON_USE_CUSTOM=False,
+            WEBAPP_FAVICON_URL="/webapp-favicon/abcdef1234567890/icon-180.png",
+            WEBAPP_LOGO_FAVICON_URL="/webapp-favicon/1111111111111111/icon-180.png",
+        )
+
+        self.assertEqual(
+            subscription_webapp._resolve_webapp_favicon_url(settings, "/logo.png"),
+            "/webapp-favicon/1111111111111111/icon-180.png",
+        )
+
+    def test_logo_generated_favicon_is_not_used_without_logo(self):
+        settings = SimpleNamespace(
+            WEBAPP_FAVICON_USE_CUSTOM=False,
+            WEBAPP_FAVICON_URL="/webapp-favicon/abcdef1234567890/icon-180.png",
+            WEBAPP_LOGO_FAVICON_URL="/webapp-favicon/1111111111111111/icon-180.png",
+        )
+
+        self.assertEqual(subscription_webapp._resolve_webapp_favicon_url(settings, ""), "")
+
+    def test_favicon_head_markup_includes_touch_icon(self):
+        markup = subscription_webapp._favicon_head_markup(
+            "/webapp-favicon/abcdef1234567890/icon-180.png"
+        )
+
+        self.assertIn('rel="apple-touch-icon"', markup)
+        self.assertIn("/webapp-favicon/abcdef1234567890/icon-32.png", markup)
+
+    def test_favicon_set_generation_writes_common_icon_sizes(self):
+        buffer = io.BytesIO()
+        Image.new("RGBA", (2, 2), (0, 254, 122, 255)).save(buffer, format="PNG")
+        png_body = buffer.getvalue()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.object(admin_themes, "WEBAPP_FAVICON_DIR", Path(tmpdir)):
+                payload = admin_themes._write_favicon_set(png_body, "image/png", "icon.png")
+
+            self.assertRegex(
+                payload["favicon_url"],
+                r"^/webapp-favicon/[0-9a-f]{16}/icon-180\.png$",
+            )
+            digest = payload["favicon_url"].split("/")[2]
+            self.assertTrue((Path(tmpdir) / digest / "icon-32.png").exists())
+            self.assertTrue((Path(tmpdir) / digest / "apple-touch-icon.png").exists())
+            self.assertTrue((Path(tmpdir) / digest / "favicon.ico").exists())
+
+    def test_prune_unused_appearance_assets_keeps_only_referenced_logo_and_favicons(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            uploads = root / "uploads"
+            favicons = root / "favicons"
+            emoji = root / "emoji"
+            uploads.mkdir()
+            favicons.mkdir()
+            emoji.mkdir()
+            (uploads / "logo-1111111111111111.png").write_bytes(b"keep")
+            (uploads / "logo-2222222222222222.png").write_bytes(b"remove")
+            (favicons / "aaaaaaaaaaaaaaaa").mkdir()
+            (favicons / "bbbbbbbbbbbbbbbb").mkdir()
+            (favicons / "cccccccccccccccc").mkdir()
+            (favicons / "aaaaaaaaaaaaaaaa" / "icon-180.png").write_bytes(b"keep")
+            (favicons / "bbbbbbbbbbbbbbbb" / "icon-180.png").write_bytes(b"keep")
+            (favicons / "cccccccccccccccc" / "icon-180.png").write_bytes(b"remove")
+            (emoji / "1f929.512.gif").write_bytes(b"keep")
+            (emoji / "1f929.512.webp").write_bytes(b"keep")
+            (emoji / "1f525.512.gif").write_bytes(b"remove")
+            settings = SimpleNamespace(
+                WEBAPP_LOGO_URL="/webapp-uploaded-logo/logo-1111111111111111.png",
+                WEBAPP_FAVICON_URL="/webapp-favicon/aaaaaaaaaaaaaaaa/icon-180.png",
+                WEBAPP_LOGO_FAVICON_URL="/webapp-favicon/bbbbbbbbbbbbbbbb/icon-180.png",
+                WEBAPP_LOGO_USE_EMOJI=True,
+                WEBAPP_LOGO_EMOJI="🤩",
+                WEBAPP_LOGO_EMOJI_FONT="noto-color-animated",
+            )
+
+            with (
+                patch.object(admin_themes, "WEBAPP_UPLOADED_LOGO_DIR", uploads),
+                patch.object(admin_themes, "WEBAPP_FAVICON_DIR", favicons),
+                patch.object(admin_themes, "WEBAPP_EMOJI_CACHE_DIR", emoji),
+            ):
+                admin_themes.prune_unused_appearance_assets(settings)
+
+            self.assertTrue((uploads / "logo-1111111111111111.png").exists())
+            self.assertFalse((uploads / "logo-2222222222222222.png").exists())
+            self.assertTrue((favicons / "aaaaaaaaaaaaaaaa").exists())
+            self.assertTrue((favicons / "bbbbbbbbbbbbbbbb").exists())
+            self.assertFalse((favicons / "cccccccccccccccc").exists())
+            self.assertTrue((emoji / "1f929.512.gif").exists())
+            self.assertTrue((emoji / "1f929.512.webp").exists())
+            self.assertFalse((emoji / "1f525.512.gif").exists())
+
+    async def test_persist_appearance_upload_writes_overrides_and_clears_caches(self):
+        settings = SimpleNamespace()
+        request = SimpleNamespace(
+            app={
+                "settings": settings,
+                "async_session_factory": object(),
+                "webapp_settings_cache": {"ts": 123.0, "data": {"stale": True}},
+                "webapp_logo_cache": ("url", b"body", "image/png"),
+            }
+        )
+        updates = {
+            "WEBAPP_LOGO_URL": "/webapp-uploaded-logo/logo-1111111111111111.png",
+            "WEBAPP_LOGO_USE_EMOJI": False,
+        }
+
+        with (
+            patch.object(
+                admin_themes,
+                "update_overrides",
+                AsyncMock(return_value={"ok": True}),
+            ) as update_mock,
+            patch.object(admin_themes, "prune_unused_appearance_assets") as prune_mock,
+        ):
+            persisted = await admin_themes._persist_appearance_upload(request, updates, 42)
+
+        self.assertTrue(persisted)
+        update_mock.assert_awaited_once_with(
+            settings,
+            request.app["async_session_factory"],
+            updates=updates,
+            deletes=[],
+            actor_id=42,
+        )
+        self.assertEqual(request.app["webapp_settings_cache"], {"ts": 0.0, "data": {}})
+        self.assertIsNone(request.app["webapp_logo_cache"])
+        prune_mock.assert_called_once_with(settings)
+
+    def test_initial_theme_head_markup_includes_css_and_tokens(self):
+        cfg = builtin_webapp_themes_config("#123456")
+        theme = cfg.theme_by_key("light")
+        request = SimpleNamespace(get=lambda key, default="": "nonce-value")
+
+        markup = subscription_webapp._initial_theme_head_markup(request, theme, "#123456")
+
+        self.assertIn("/webapp-theme-css/light/style.css", markup)
+        self.assertIn('nonce="nonce-value"', markup)
+        self.assertIn("--accent:#123456", markup)
+        self.assertIn("color-scheme:light", markup)
 
     def test_animated_emoji_asset_path_uses_same_origin_route(self):
         self.assertEqual(
@@ -222,6 +416,155 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(response.text, "console.log('minified');")
 
+    async def test_theme_css_asset_route_serves_file_from_configured_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            themes_dir = Path(tmpdir)
+            (themes_dir / "custom").mkdir()
+            (themes_dir / "custom" / "theme.css").write_text(
+                ".theme-key-custom { --bg: red; }", encoding="utf-8"
+            )
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=str(themes_dir),
+                    )
+                },
+                match_info={"path": "custom/theme.css"},
+            )
+
+            response = await subscription_webapp.theme_css_asset_route(request)
+
+            self.assertEqual(response.content_type, "text/css")
+            self.assertEqual(response.headers["Cache-Control"], "no-cache")
+            self.assertIn("--bg: red", response.text)
+
+    async def test_theme_css_asset_route_serves_default_theme_asset_from_theme_folder(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=tmpdir,
+                    )
+                },
+                match_info={"path": "light/style.css"},
+            )
+
+            response = await subscription_webapp.theme_css_asset_route(request)
+
+            self.assertEqual(response.content_type, "text/css")
+            self.assertIn(".theme-key-light", response.text)
+            self.assertTrue((Path(tmpdir) / "light" / "theme.json").exists())
+            self.assertTrue((Path(tmpdir) / "light" / "style.css").exists())
+
+    async def test_theme_css_asset_route_rejects_path_traversal(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=tmpdir,
+                    )
+                },
+                match_info={"path": "../secret.css"},
+            )
+
+            with self.assertRaises(webapp_assets.web.HTTPNotFound):
+                await subscription_webapp.theme_css_asset_route(request)
+
+    async def test_theme_asset_route_serves_image_from_configured_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            themes_dir = Path(tmpdir)
+            (themes_dir / "custom" / "icons").mkdir(parents=True)
+            (themes_dir / "custom" / "icons" / "save.png").write_bytes(b"png-bytes")
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=str(themes_dir),
+                    )
+                },
+                match_info={"path": "custom/icons/save.png"},
+            )
+
+            response = await subscription_webapp.theme_asset_route(request)
+
+            self.assertEqual(response.content_type, "image/png")
+            self.assertEqual(response.headers["Cache-Control"], "public, max-age=3600")
+            self.assertEqual(response.body, b"png-bytes")
+
+    async def test_theme_asset_route_uses_immutable_cache_for_versioned_assets(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            themes_dir = Path(tmpdir)
+            (themes_dir / "custom" / "icons").mkdir(parents=True)
+            (themes_dir / "custom" / "icons" / "save.png").write_bytes(b"png-bytes")
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=str(themes_dir),
+                    )
+                },
+                match_info={"path": "custom/icons/save.png"},
+                query={"v": "6"},
+            )
+
+            response = await subscription_webapp.theme_asset_route(request)
+
+            self.assertEqual(
+                response.headers["Cache-Control"], "public, max-age=31536000, immutable"
+            )
+
+    async def test_theme_asset_route_serves_default_theme_icon_from_theme_folder(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=tmpdir,
+                    )
+                },
+                match_info={"path": "windows95/icons/save.png"},
+            )
+
+            response = await subscription_webapp.theme_asset_route(request)
+
+            self.assertEqual(response.content_type, "image/png")
+            self.assertGreater(len(response.body), 0)
+            self.assertTrue((Path(tmpdir) / "windows95" / "theme.json").exists())
+            self.assertTrue((Path(tmpdir) / "windows95" / "icons" / "save.png").exists())
+
+    async def test_theme_asset_route_rejects_path_traversal(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=tmpdir,
+                    )
+                },
+                match_info={"path": "../secret.png"},
+            )
+
+            with self.assertRaises(webapp_assets.web.HTTPNotFound):
+                await subscription_webapp.theme_asset_route(request)
+
+    async def test_theme_asset_route_rejects_non_image_suffix(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=tmpdir,
+                    )
+                },
+                match_info={"path": "custom/icons/readme.txt"},
+            )
+
+            with self.assertRaises(webapp_assets.web.HTTPNotFound):
+                await subscription_webapp.theme_asset_route(request)
+
     def test_webapp_logo_disk_cache_roundtrip(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             logo_url = "https://cdn.example.com/logo.png"
@@ -237,7 +580,7 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             logo_url = "https://cdn.example.com/logo.png"
             logo = (b"cached-logo", "image/png")
             app = {
-                "settings": SimpleNamespace(WEBAPP_LOGO_URL=logo_url),
+                "settings": SimpleNamespace(WEBAPP_LOGO_URL=logo_url, WEBAPP_LOGO_USE_EMOJI=False),
                 "webapp_logo_cache": None,
                 "webapp_logo_cache_lock": asyncio.Lock(),
             }
@@ -276,6 +619,7 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             app = {
                 "settings": SimpleNamespace(
+                    WEBAPP_LOGO_USE_EMOJI=True,
                     WEBAPP_LOGO_EMOJI="🤩",
                     WEBAPP_LOGO_EMOJI_FONT="noto-color-animated",
                 ),
