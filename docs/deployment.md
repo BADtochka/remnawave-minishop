@@ -58,6 +58,7 @@ docker compose logs migrate
 - `redis`: Redis 7 для FSM, кеша, rate-limit, очередей и locks.
 
 `deploy/compose/docker-compose-caddy.yml` добавляет `caddy` как внешний HTTP/HTTPS reverse proxy.
+Перед запуском замените example-домены прямо в `deploy/docker/caddy/Caddyfile`.
 
 ## Логи и проверка
 
@@ -193,9 +194,26 @@ docker compose up -d backend worker
 
 Вариант `deploy/compose/docker-compose-caddy.yml` проксирует:
 
-- статические ассеты frontend;
-- API и webhook-маршруты backend;
-- эндпоинты проверки здоровья.
+- webhook-домен целиком в `backend:8080`;
+- Mini App-домен целиком в `frontend:80`;
+- API/auth/theme routes Mini App дальше проксируются frontend nginx в `backend:8081`.
+
+Встроенный `deploy/docker/caddy/Caddyfile` намеренно повторяет старую двухдоменную структуру:
+
+```caddyfile
+# Replace the example domains with your real webhook and Mini App hostnames.
+app.example.com {
+	encode zstd gzip
+
+	reverse_proxy backend:8080
+}
+
+web.example.com {
+	encode zstd gzip
+
+	reverse_proxy frontend:80
+}
+```
 
 Для внешнего Nginx используйте DNS-имена сервисов внутри Docker network:
 

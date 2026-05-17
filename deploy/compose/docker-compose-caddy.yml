@@ -123,8 +123,6 @@ services:
   caddy:
     image: caddy:2-alpine
     container_name: remnawave-minishop-caddy
-    environment:
-      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
     depends_on:
       frontend:
         condition: service_healthy

@@ -1,11 +1,12 @@
-{$PUBLIC_HOST:localhost} {
+# Replace the example domains with your real webhook and Mini App hostnames.
+app.example.com {
 	encode zstd gzip
 
-	@webhooks path /tg/webhook /webhook/*
-	reverse_proxy @webhooks backend:8080
+	reverse_proxy backend:8080
+}
 
-	@backend_health path /health /healthz
-	reverse_proxy @backend_health backend:8080
+web.example.com {
+	encode zstd gzip
 
 	reverse_proxy frontend:80
 }
