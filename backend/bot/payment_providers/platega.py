@@ -497,6 +497,7 @@ def create_service(ctx: ServiceFactoryContext) -> PlategaService:
 
 
 async def _create_webapp_payment(ctx: WebAppPaymentContext, variant: str) -> web.Response:
+    settings: Settings = ctx.request.app["settings"]
     service: PlategaService = ctx.request.app["platega_service"]
     if not service or not service.configured:
         return payment_unavailable()
