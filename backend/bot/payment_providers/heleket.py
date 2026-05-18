@@ -25,6 +25,7 @@ from .base import (
     ProviderManifestField,
     ServiceFactoryContext,
     WebAppPaymentContext,
+    provider_env_file,
 )
 from .shared import (
     HttpClientMixin,
@@ -60,7 +61,7 @@ class HeleketConfig(ProviderEnvConfig):
     """All Heleket-specific env vars. Lives inside the provider module."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=provider_env_file(),
         env_file_encoding="utf-8",
         env_prefix="HELEKET_",
         extra="ignore",
@@ -118,7 +119,7 @@ class HeleketPresentation(ProviderEnvConfig):
     """Admin-tunable button text/icon overrides for Heleket."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=provider_env_file(),
         env_file_encoding="utf-8",
         env_prefix="PAYMENT_HELEKET_",
         extra="ignore",

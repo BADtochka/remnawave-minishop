@@ -279,31 +279,6 @@ SETTINGS_MANIFEST: List[SettingField] = [
     SettingField("PLATEGA_FAILED_URL", "url", "payments", "Failed URL", subsection="Platega"),
     *_payment_presentation_fields("PLATEGA_SBP", "Platega SBP", default_icon="CreditCard"),
     *_payment_presentation_fields("PLATEGA_CRYPTO", "Platega Crypto", default_icon="Bitcoin"),
-    # CryptoPay
-    SettingField("CRYPTOPAY_ENABLED", "bool", "payments", "Включена", subsection="CryptoPay"),
-    SettingField(
-        "CRYPTOPAY_TOKEN", "string", "payments", "Token", subsection="CryptoPay", secret=True
-    ),
-    SettingField(
-        "CRYPTOPAY_NETWORK",
-        "string",
-        "payments",
-        "Network",
-        "mainnet или testnet",
-        subsection="CryptoPay",
-    ),
-    SettingField(
-        "CRYPTOPAY_CURRENCY_TYPE",
-        "string",
-        "payments",
-        "Currency type",
-        "fiat или crypto",
-        subsection="CryptoPay",
-    ),
-    SettingField(
-        "CRYPTOPAY_ASSET", "string", "payments", "Asset", placeholder="RUB", subsection="CryptoPay"
-    ),
-    *_payment_presentation_fields("CRYPTOPAY", "CryptoPay", default_icon="Bitcoin"),
     # ─── Trial ─────────────────────────────────────────────────────
     SettingField("TRIAL_ENABLED", "bool", "trial", "Триал включён"),
     SettingField("TRIAL_DURATION_DAYS", "int", "trial", "Длительность триала (дней)", min=0),

@@ -28,6 +28,7 @@ from .base import (
     ProviderManifestField,
     ServiceFactoryContext,
     WebAppPaymentContext,
+    provider_env_file,
 )
 from .shared import (
     HttpClientMixin,
@@ -56,7 +57,7 @@ _LOG = "freekassa"
 
 class FreeKassaConfig(ProviderEnvConfig):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=provider_env_file(),
         env_file_encoding="utf-8",
         env_prefix="FREEKASSA_",
         extra="ignore",
@@ -104,7 +105,7 @@ class FreeKassaConfig(ProviderEnvConfig):
 
 class FreeKassaPresentation(ProviderEnvConfig):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=provider_env_file(),
         env_file_encoding="utf-8",
         env_prefix="PAYMENT_FREEKASSA_",
         extra="ignore",

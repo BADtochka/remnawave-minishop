@@ -49,11 +49,6 @@ class PaymentSettings(BaseModel):
     platega_crypto_method: int
     platega_return_url: Optional[str]
     platega_failed_url: Optional[str]
-    cryptopay_enabled: bool
-    cryptopay_token: Optional[str]
-    cryptopay_network: str
-    cryptopay_currency_type: str
-    cryptopay_asset: str
 
 
 class EmailSettings(BaseModel):
@@ -187,11 +182,6 @@ class Settings(BaseSettings):
         description="Comma-separated list of reverse proxy IPs or CIDRs trusted to forward X-Forwarded-For.",  # noqa: E501
     )
 
-    CRYPTOPAY_TOKEN: Optional[str] = None
-    CRYPTOPAY_NETWORK: str = Field(default="mainnet")
-    CRYPTOPAY_CURRENCY_TYPE: str = Field(default="fiat")
-    CRYPTOPAY_ASSET: str = Field(default="RUB")
-    CRYPTOPAY_ENABLED: bool = Field(default=True)
     PLATEGA_ENABLED: bool = Field(default=False)
     PLATEGA_BASE_URL: str = Field(default="https://app.platega.io")
     PLATEGA_MERCHANT_ID: Optional[str] = None
@@ -249,12 +239,6 @@ class Settings(BaseSettings):
     PAYMENT_STARS_TELEGRAM_LABEL_RU: Optional[str] = None
     PAYMENT_STARS_TELEGRAM_LABEL_EN: Optional[str] = None
     PAYMENT_STARS_TELEGRAM_EMOJI: Optional[str] = None
-    PAYMENT_CRYPTOPAY_WEBAPP_LABEL_RU: Optional[str] = None
-    PAYMENT_CRYPTOPAY_WEBAPP_LABEL_EN: Optional[str] = None
-    PAYMENT_CRYPTOPAY_WEBAPP_ICON: Optional[str] = None
-    PAYMENT_CRYPTOPAY_TELEGRAM_LABEL_RU: Optional[str] = None
-    PAYMENT_CRYPTOPAY_TELEGRAM_LABEL_EN: Optional[str] = None
-    PAYMENT_CRYPTOPAY_TELEGRAM_EMOJI: Optional[str] = None
 
     MONTH_1_ENABLED: bool = Field(default=True, alias="1_MONTH_ENABLED")
     MONTH_3_ENABLED: bool = Field(default=True, alias="3_MONTHS_ENABLED")
@@ -513,11 +497,6 @@ class Settings(BaseSettings):
             platega_crypto_method=self.PLATEGA_CRYPTO_METHOD,
             platega_return_url=self.PLATEGA_RETURN_URL,
             platega_failed_url=self.PLATEGA_FAILED_URL,
-            cryptopay_enabled=self.CRYPTOPAY_ENABLED,
-            cryptopay_token=self.CRYPTOPAY_TOKEN,
-            cryptopay_network=self.CRYPTOPAY_NETWORK,
-            cryptopay_currency_type=self.CRYPTOPAY_CURRENCY_TYPE,
-            cryptopay_asset=self.CRYPTOPAY_ASSET,
         )
 
     @computed_field
@@ -656,18 +635,6 @@ class Settings(BaseSettings):
             return f"{base.rstrip('/')}{self.panel_webhook_path}"
         return None
 
-    @computed_field
-    @property
-    def cryptopay_webhook_path(self) -> str:
-        return "/webhook/cryptopay"
-
-    @computed_field
-    @property
-    def cryptopay_full_webhook_url(self) -> Optional[str]:
-        base = self.WEBHOOK_BASE_URL
-        if base:
-            return f"{base.rstrip('/')}{self.cryptopay_webhook_path}"
-        return None
 
 
     @computed_field

@@ -27,6 +27,7 @@ from .base import (
     ProviderManifestField,
     ServiceFactoryContext,
     WebAppPaymentContext,
+    provider_env_file,
 )
 from .shared import (
     HttpClientMixin,
@@ -58,7 +59,7 @@ _LOG = "wata"
 
 class WataConfig(ProviderEnvConfig):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=provider_env_file(),
         env_file_encoding="utf-8",
         env_prefix="WATA_",
         extra="ignore",
@@ -103,7 +104,7 @@ class WataConfig(ProviderEnvConfig):
 
 class WataPresentation(ProviderEnvConfig):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=provider_env_file(),
         env_file_encoding="utf-8",
         env_prefix="PAYMENT_WATA_",
         extra="ignore",

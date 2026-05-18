@@ -50,6 +50,11 @@ def build_provider_configs() -> Dict[str, ProviderConfigBundle]:
     Specs with neither ``config_class`` nor ``presentation_class`` are skipped.
     The result is cached as the process-wide bundle.
     """
+    from .base import provider_env_file
+
+    env_file = provider_env_file()
+    init_kwargs = {"_env_file": env_file} if env_file is not None else {"_env_file": None}
+
     bundles: Dict[str, ProviderConfigBundle] = {}
     seen: set[str] = set()
     for spec in PAYMENT_PROVIDER_SPECS:
@@ -59,8 +64,8 @@ def build_provider_configs() -> Dict[str, ProviderConfigBundle]:
             continue
         seen.add(spec.service_key)
         bundles[spec.service_key] = ProviderConfigBundle(
-            config=spec.config_class() if spec.config_class else None,
-            presentation=spec.presentation_class() if spec.presentation_class else None,
+            config=spec.config_class(**init_kwargs) if spec.config_class else None,
+            presentation=spec.presentation_class(**init_kwargs) if spec.presentation_class else None,
         )
     _provider_configs.clear()
     _provider_configs.update(bundles)

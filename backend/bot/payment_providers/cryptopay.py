@@ -8,6 +8,8 @@ from aiocryptopay import AioCryptoPay, Networks
 from aiocryptopay.models.update import Update
 from aiogram import Bot, F, Router, types
 from aiohttp import web
+from pydantic import Field, field_validator
+from pydantic_settings import SettingsConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -17,7 +19,14 @@ from bot.services.subscription_service import SubscriptionService
 from config.settings import Settings
 from db.dal import payment_dal
 
-from .base import PaymentProviderSpec, ServiceFactoryContext, WebAppPaymentContext
+from .base import (
+    PaymentProviderSpec,
+    ProviderEnvConfig,
+    ProviderManifestField,
+    ServiceFactoryContext,
+    WebAppPaymentContext,
+    provider_env_file,
+)
 from .shared import (
     PaymentSuccessRequest,
     describe_payment,
@@ -38,13 +47,54 @@ logger = logging.getLogger(__name__)
 _LOG = "cryptopay"
 
 
+class CryptoPayConfig(ProviderEnvConfig):
+    model_config = SettingsConfigDict(
+        env_file=provider_env_file(),
+        env_file_encoding="utf-8",
+        env_prefix="CRYPTOPAY_",
+        extra="ignore",
+    )
+
+    ENABLED: bool = Field(default=True)
+    TOKEN: Optional[str] = None
+    NETWORK: str = Field(default="mainnet")
+    CURRENCY_TYPE: str = Field(default="fiat")
+    ASSET: str = Field(default="RUB")
+
+    @field_validator("TOKEN", mode="before")
+    @classmethod
+    def _strip_optional(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @property
+    def webhook_path(self) -> str:
+        return "/webhook/cryptopay"
+
+
+class CryptoPayPresentation(ProviderEnvConfig):
+    model_config = SettingsConfigDict(
+        env_file=provider_env_file(),
+        env_file_encoding="utf-8",
+        env_prefix="PAYMENT_CRYPTOPAY_",
+        extra="ignore",
+    )
+
+    WEBAPP_LABEL_RU: Optional[str] = None
+    WEBAPP_LABEL_EN: Optional[str] = None
+    WEBAPP_ICON: Optional[str] = None
+    TELEGRAM_LABEL_RU: Optional[str] = None
+    TELEGRAM_LABEL_EN: Optional[str] = None
+    TELEGRAM_EMOJI: Optional[str] = None
+
+
 class CryptoPayService:
     def __init__(
         self,
-        token: Optional[str],
-        network: str,
         bot: Bot,
         settings: Settings,
+        config: CryptoPayConfig,
         i18n: JsonI18n,
         async_session_factory: sessionmaker,
         subscription_service: SubscriptionService,
@@ -52,14 +102,15 @@ class CryptoPayService:
     ):
         self.bot = bot
         self.settings = settings
+        self.config = config
         self.i18n = i18n
         self.async_session_factory = async_session_factory
         self.subscription_service = subscription_service
         self.referral_service = referral_service
-        self.token = token
-        if token:
-            net = Networks.TEST_NET if str(network).lower() == "testnet" else Networks.MAIN_NET
-            self.client = AioCryptoPay(token=token, network=net)
+        self.token = config.TOKEN
+        if self.token:
+            net = Networks.TEST_NET if str(config.NETWORK).lower() == "testnet" else Networks.MAIN_NET
+            self.client = AioCryptoPay(token=self.token, network=net)
             self.client.register_pay_handler(self._invoice_paid_handler)
             self.configured = True
         else:
@@ -97,7 +148,7 @@ class CryptoPayService:
                 {
                     "user_id": user_id,
                     "amount": float(amount),
-                    "currency": self.settings.CRYPTOPAY_ASSET,
+                    "currency": self.config.ASSET,
                     "status": "pending_cryptopay",
                     "description": description,
                     "subscription_duration_months": (
@@ -127,13 +178,9 @@ class CryptoPayService:
         try:
             invoice = await self.client.create_invoice(
                 amount=amount,
-                currency_type=self.settings.CRYPTOPAY_CURRENCY_TYPE,
-                fiat=self.settings.CRYPTOPAY_ASSET
-                if self.settings.CRYPTOPAY_CURRENCY_TYPE == "fiat"
-                else None,
-                asset=self.settings.CRYPTOPAY_ASSET
-                if self.settings.CRYPTOPAY_CURRENCY_TYPE == "crypto"
-                else None,
+                currency_type=self.config.CURRENCY_TYPE,
+                fiat=self.config.ASSET if self.config.CURRENCY_TYPE == "fiat" else None,
+                asset=self.config.ASSET if self.config.CURRENCY_TYPE == "crypto" else None,
                 description=description,
                 payload=payload,
             )
@@ -284,8 +331,7 @@ async def pay_crypto_callback_handler(
         return
 
     if (
-        not settings.CRYPTOPAY_ENABLED
-        or not cryptopay_service
+        not cryptopay_service
         or not getattr(cryptopay_service, "configured", False)
     ):
         await notify_service_unavailable(callback, translator)
@@ -324,15 +370,16 @@ async def pay_crypto_callback_handler(
 
 
 def create_service(ctx: ServiceFactoryContext) -> CryptoPayService:
+    bundle = ctx.config_for("cryptopay_service")
+    config = bundle.config if bundle and isinstance(bundle.config, CryptoPayConfig) else CryptoPayConfig()
     return CryptoPayService(
-        ctx.settings.CRYPTOPAY_TOKEN,
-        ctx.settings.CRYPTOPAY_NETWORK,
-        ctx.bot,
-        ctx.settings,
-        ctx.i18n,
-        ctx.async_session_factory,
-        ctx.subscription_service,
-        ctx.referral_service,
+        bot=ctx.bot,
+        settings=ctx.settings,
+        config=config,
+        i18n=ctx.i18n,
+        async_session_factory=ctx.async_session_factory,
+        subscription_service=ctx.subscription_service,
+        referral_service=ctx.referral_service,
     )
 
 
@@ -354,6 +401,45 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
     return payment_link_response(payment_url=url, payment_id=None)
 
 
+_PRESENTATION_MANIFEST = tuple(
+    ProviderManifestField(
+        key=key, type=type_, label=label, description=description,
+        placeholder=placeholder, subsection="CryptoPay",
+        target="presentation", attr=attr,
+    )
+    for key, type_, label, description, placeholder, attr in (
+        ("PAYMENT_CRYPTOPAY_WEBAPP_LABEL_RU", "string", "WebApp button text (RU)",
+         "Custom Russian text shown in the Web App payment method button.", "", "WEBAPP_LABEL_RU"),
+        ("PAYMENT_CRYPTOPAY_WEBAPP_LABEL_EN", "string", "WebApp button text (EN)",
+         "Custom English text shown in the Web App payment method button.", "", "WEBAPP_LABEL_EN"),
+        ("PAYMENT_CRYPTOPAY_WEBAPP_ICON", "icon", "WebApp button icon",
+         "Lucide icon name rendered inside the Web App payment method button.",
+         "Bitcoin", "WEBAPP_ICON"),
+        ("PAYMENT_CRYPTOPAY_TELEGRAM_LABEL_RU", "string", "Telegram button text (RU)",
+         "Custom Russian text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_RU"),
+        ("PAYMENT_CRYPTOPAY_TELEGRAM_LABEL_EN", "string", "Telegram button text (EN)",
+         "Custom English text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_EN"),
+        ("PAYMENT_CRYPTOPAY_TELEGRAM_EMOJI", "string", "Telegram button emoji",
+         "Emoji prepended to the Telegram bot payment button when customized.",
+         "₿", "TELEGRAM_EMOJI"),
+    )
+)
+
+_CONFIG_MANIFEST = (
+    ProviderManifestField("CRYPTOPAY_ENABLED", "bool", "Включена",
+                          subsection="CryptoPay", attr="ENABLED"),
+    ProviderManifestField("CRYPTOPAY_TOKEN", "string", "Token",
+                          subsection="CryptoPay", secret=True, attr="TOKEN"),
+    ProviderManifestField("CRYPTOPAY_NETWORK", "string", "Network",
+                          placeholder="mainnet", subsection="CryptoPay", attr="NETWORK"),
+    ProviderManifestField("CRYPTOPAY_CURRENCY_TYPE", "string", "Currency type",
+                          description="fiat or crypto.",
+                          placeholder="fiat", subsection="CryptoPay", attr="CURRENCY_TYPE"),
+    ProviderManifestField("CRYPTOPAY_ASSET", "string", "Asset",
+                          placeholder="RUB", subsection="CryptoPay", attr="ASSET"),
+)
+
+
 SPEC = PaymentProviderSpec(
     id="cryptopay",
     provider_key="cryptopay",
@@ -363,14 +449,17 @@ SPEC = PaymentProviderSpec(
     webapp_icon="Bitcoin",
     telegram_labels={"ru": "CryptoBot", "en": "CryptoBot"},
     pending_status="pending_cryptopay",
-    enabled=lambda settings: settings.CRYPTOPAY_ENABLED,
+    enabled=lambda config: bool(getattr(config, "ENABLED", False)),
     service_key="cryptopay_service",
     callback_prefix="pay_crypto",
     router=router,
     create_service=create_service,
-    webhook_path=lambda settings: settings.cryptopay_webhook_path,
+    webhook_path=lambda source: "/webhook/cryptopay",
     webhook_route=cryptopay_webhook_route,
     create_webapp_payment=create_webapp_payment,
     emoji="₿",
     telegram_emoji="₿",
+    config_class=CryptoPayConfig,
+    presentation_class=CryptoPayPresentation,
+    manifest_fields=_CONFIG_MANIFEST + _PRESENTATION_MANIFEST,
 )

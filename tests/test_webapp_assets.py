@@ -332,15 +332,27 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plans[1]["stars_price"], 2500)
 
     def test_serialize_payment_methods_respects_runtime_provider_toggles(self):
+        # Provider toggles now live in per-provider BaseSettings models. Disable
+        # all providers by giving each one an empty bundle (default ENABLED is
+        # False for everything except cryptopay/yookassa, so override those too).
+        from bot.payment_providers import (
+            build_provider_configs,
+            current_provider_configs,
+        )
+
+        build_provider_configs()
+        configs = current_provider_configs()
+        for service_key in ("cryptopay_service", "yookassa_service"):
+            bundle = configs.get(service_key)
+            if bundle and bundle.config is not None and hasattr(bundle.config, "ENABLED"):
+                bundle.config.ENABLED = False
+
         settings = Settings(
             _env_file=None,
             BOT_TOKEN="token",
             POSTGRES_USER="app_user",
             POSTGRES_PASSWORD="app_password",
             TARIFFS_CONFIG_PATH="missing-tariffs.json",
-            CRYPTOPAY_ENABLED=False,
-            FREEKASSA_ENABLED=False,
-            SEVERPAY_ENABLED=False,
             YOOKASSA_ENABLED=False,
             PLATEGA_ENABLED=False,
             STARS_ENABLED=False,

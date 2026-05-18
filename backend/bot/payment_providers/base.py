@@ -1,9 +1,23 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, List, Mapping, Optional, Sequence, Type
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def provider_env_file() -> Optional[str]:
+    """Resolve the env file every provider config should read.
+
+    Tests set ``PROVIDER_ENV_FILE=""`` via conftest so per-provider
+    BaseSettings models don't pick up real credentials from the project's
+    .env. Production reads from ``.env`` as usual.
+    """
+    value = os.environ.get("PROVIDER_ENV_FILE")
+    if value is None:
+        return ".env"
+    return value or None
 
 
 class ProviderEnvConfig(BaseSettings):

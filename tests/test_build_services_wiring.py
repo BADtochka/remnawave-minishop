@@ -13,17 +13,34 @@ silently swallows the wiring step.
 """
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from bot.app.factories.build_services import build_core_services
 from bot.payment_providers.yookassa import YooKassaService
 from bot.services.panel_webhook_service import PanelWebhookService
 from bot.services.subscription_service import SubscriptionService
 from config.settings import Settings
+
+
+# Strip all provider env so per-provider BaseSettings models don't pick up
+# real credentials from the local .env file during tests.
+_PROVIDER_ENV_PREFIXES = (
+    "FREEKASSA_", "PLATEGA_", "SEVERPAY_", "WATA_", "HELEKET_",
+    "CRYPTOPAY_", "YOOKASSA_", "STARS_",
+)
+
+
+def _clean_env() -> dict[str, str]:
+    return {
+        k: v for k, v in os.environ.items()
+        if not any(k.startswith(p) for p in _PROVIDER_ENV_PREFIXES)
+        and not k.startswith("PAYMENT_")
+    }
 
 
 def _make_settings(tmpdir: str, **overrides: Any) -> Settings:

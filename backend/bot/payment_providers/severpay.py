@@ -24,6 +24,7 @@ from .base import (
     ProviderManifestField,
     ServiceFactoryContext,
     WebAppPaymentContext,
+    provider_env_file,
 )
 from .shared import (
     HttpClientMixin,
@@ -53,7 +54,7 @@ _LOG = "severpay"
 
 class SeverPayConfig(ProviderEnvConfig):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=provider_env_file(),
         env_file_encoding="utf-8",
         env_prefix="SEVERPAY_",
         extra="ignore",
@@ -89,7 +90,7 @@ class SeverPayConfig(ProviderEnvConfig):
 
 class SeverPayPresentation(ProviderEnvConfig):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=provider_env_file(),
         env_file_encoding="utf-8",
         env_prefix="PAYMENT_SEVERPAY_",
         extra="ignore",
