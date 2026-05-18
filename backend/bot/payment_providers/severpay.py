@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional, Tuple
 
 from aiogram import Bot, F, Router, types
 from aiohttp import web
+from pydantic import Field, field_validator
+from pydantic_settings import SettingsConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -16,7 +18,13 @@ from bot.services.subscription_service import SubscriptionService
 from config.settings import Settings
 from db.dal import payment_dal
 
-from .base import PaymentProviderSpec, ServiceFactoryContext, WebAppPaymentContext
+from .base import (
+    PaymentProviderSpec,
+    ProviderEnvConfig,
+    ProviderManifestField,
+    ServiceFactoryContext,
+    WebAppPaymentContext,
+)
 from .shared import (
     HttpClientMixin,
     PaymentSuccessRequest,
@@ -43,12 +51,65 @@ from .shared import (
 _LOG = "severpay"
 
 
+class SeverPayConfig(ProviderEnvConfig):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="SEVERPAY_",
+        extra="ignore",
+    )
+
+    ENABLED: bool = Field(default=False)
+    MID: Optional[int] = None
+    TOKEN: Optional[str] = None
+    RETURN_URL: Optional[str] = None
+    BASE_URL: str = Field(default="https://severpay.io/api/merchant")
+    LIFETIME_MINUTES: Optional[int] = None
+
+    @field_validator("MID", "LIFETIME_MINUTES", mode="before")
+    @classmethod
+    def _empty_to_none_int(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return None
+        return v
+
+    @field_validator("TOKEN", "RETURN_URL", mode="before")
+    @classmethod
+    def _strip_optional(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @property
+    def webhook_path(self) -> str:
+        return "/webhook/severpay"
+
+
+class SeverPayPresentation(ProviderEnvConfig):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="PAYMENT_SEVERPAY_",
+        extra="ignore",
+    )
+
+    WEBAPP_LABEL_RU: Optional[str] = None
+    WEBAPP_LABEL_EN: Optional[str] = None
+    WEBAPP_ICON: Optional[str] = None
+    TELEGRAM_LABEL_RU: Optional[str] = None
+    TELEGRAM_LABEL_EN: Optional[str] = None
+    TELEGRAM_EMOJI: Optional[str] = None
+
+
 class SeverPayService(HttpClientMixin):
     def __init__(
         self,
         *,
         bot: Bot,
         settings: Settings,
+        config: SeverPayConfig,
         i18n: JsonI18n,
         async_session_factory: sessionmaker,
         subscription_service: SubscriptionService,
@@ -57,22 +118,21 @@ class SeverPayService(HttpClientMixin):
     ):
         self.bot = bot
         self.settings = settings
+        self.config = config
         self.i18n = i18n
         self.async_session_factory = async_session_factory
         self.subscription_service = subscription_service
         self.referral_service = referral_service
 
-        self.base_url = (settings.SEVERPAY_BASE_URL or "https://severpay.io/api/merchant").rstrip(
-            "/"
-        )
-        self.mid = settings.SEVERPAY_MID
-        self.token = settings.SEVERPAY_TOKEN or ""
-        self.return_url = settings.SEVERPAY_RETURN_URL or f"https://t.me/{default_return_url}"
-        self.lifetime_minutes = settings.SEVERPAY_LIFETIME_MINUTES
+        self.base_url = (config.BASE_URL or "https://severpay.io/api/merchant").rstrip("/")
+        self.mid = config.MID
+        self.token = config.TOKEN or ""
+        self.return_url = config.RETURN_URL or f"https://t.me/{default_return_url}"
+        self.lifetime_minutes = config.LIFETIME_MINUTES
 
         self._init_http_client(total_timeout=15)
 
-        self.configured: bool = bool(settings.SEVERPAY_ENABLED and self.mid and self.token)
+        self.configured: bool = bool(config.ENABLED and self.mid and self.token)
         if not self.configured:
             logging.warning(
                 "SeverPayService initialized but not fully configured. Payments disabled."
@@ -373,9 +433,12 @@ async def pay_severpay_callback_handler(
 
 
 def create_service(ctx: ServiceFactoryContext) -> SeverPayService:
+    bundle = ctx.config_for("severpay_service")
+    config = bundle.config if bundle and isinstance(bundle.config, SeverPayConfig) else SeverPayConfig()
     return SeverPayService(
         bot=ctx.bot,
         settings=ctx.settings,
+        config=config,
         i18n=ctx.i18n,
         async_session_factory=ctx.async_session_factory,
         subscription_service=ctx.subscription_service,
@@ -422,6 +485,47 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
     )
 
 
+_PRESENTATION_MANIFEST = tuple(
+    ProviderManifestField(
+        key=key, type=type_, label=label, description=description,
+        placeholder=placeholder, subsection="SeverPay",
+        target="presentation", attr=attr,
+    )
+    for key, type_, label, description, placeholder, attr in (
+        ("PAYMENT_SEVERPAY_WEBAPP_LABEL_RU", "string", "WebApp button text (RU)",
+         "Custom Russian text shown in the Web App payment method button.", "", "WEBAPP_LABEL_RU"),
+        ("PAYMENT_SEVERPAY_WEBAPP_LABEL_EN", "string", "WebApp button text (EN)",
+         "Custom English text shown in the Web App payment method button.", "", "WEBAPP_LABEL_EN"),
+        ("PAYMENT_SEVERPAY_WEBAPP_ICON", "icon", "WebApp button icon",
+         "Lucide icon name rendered inside the Web App payment method button.",
+         "CreditCard", "WEBAPP_ICON"),
+        ("PAYMENT_SEVERPAY_TELEGRAM_LABEL_RU", "string", "Telegram button text (RU)",
+         "Custom Russian text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_RU"),
+        ("PAYMENT_SEVERPAY_TELEGRAM_LABEL_EN", "string", "Telegram button text (EN)",
+         "Custom English text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_EN"),
+        ("PAYMENT_SEVERPAY_TELEGRAM_EMOJI", "string", "Telegram button emoji",
+         "Emoji prepended to the Telegram bot payment button when customized.",
+         "💳", "TELEGRAM_EMOJI"),
+    )
+)
+
+_CONFIG_MANIFEST = (
+    ProviderManifestField("SEVERPAY_ENABLED", "bool", "Включена",
+                          subsection="SeverPay", attr="ENABLED"),
+    ProviderManifestField("SEVERPAY_MID", "int", "MID", subsection="SeverPay", attr="MID"),
+    ProviderManifestField("SEVERPAY_TOKEN", "string", "Token", subsection="SeverPay",
+                          secret=True, attr="TOKEN"),
+    ProviderManifestField("SEVERPAY_BASE_URL", "url", "Base URL",
+                          placeholder="https://severpay.io/api/merchant",
+                          subsection="SeverPay", attr="BASE_URL"),
+    ProviderManifestField("SEVERPAY_RETURN_URL", "url", "Return URL",
+                          subsection="SeverPay", attr="RETURN_URL"),
+    ProviderManifestField("SEVERPAY_LIFETIME_MINUTES", "int", "Payment link lifetime (minutes)",
+                          description="30..4320; leave empty for the SeverPay default.",
+                          subsection="SeverPay", min=30, max=4320, attr="LIFETIME_MINUTES"),
+)
+
+
 SPEC = PaymentProviderSpec(
     id="severpay",
     provider_key="severpay",
@@ -432,12 +536,15 @@ SPEC = PaymentProviderSpec(
     telegram_labels={"ru": "SeverPay", "en": "SeverPay"},
     telegram_emoji="💳",
     pending_status="pending_severpay",
-    enabled=lambda settings: settings.SEVERPAY_ENABLED,
+    enabled=lambda config: bool(getattr(config, "ENABLED", False)),
     service_key="severpay_service",
     callback_prefix="pay_severpay",
     router=router,
     create_service=create_service,
-    webhook_path=lambda settings: settings.severpay_webhook_path,
+    webhook_path=lambda source: "/webhook/severpay",
     webhook_route=severpay_webhook_route,
     create_webapp_payment=create_webapp_payment,
+    config_class=SeverPayConfig,
+    presentation_class=SeverPayPresentation,
+    manifest_fields=_CONFIG_MANIFEST + _PRESENTATION_MANIFEST,
 )

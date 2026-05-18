@@ -56,12 +56,6 @@ class PaymentSettings(BaseModel):
     platega_crypto_method: int
     platega_return_url: Optional[str]
     platega_failed_url: Optional[str]
-    severpay_enabled: bool
-    severpay_mid: Optional[int]
-    severpay_token: Optional[str]
-    severpay_return_url: Optional[str]
-    severpay_base_url: str
-    severpay_lifetime_minutes: Optional[int]
     wata_enabled: bool
     wata_api_token: Optional[str]
     wata_base_url: str
@@ -254,16 +248,6 @@ class Settings(BaseSettings):
         description="Comma-separated FreeKassa webhook IP allowlist.",
     )
 
-    SEVERPAY_ENABLED: bool = Field(default=False)
-    SEVERPAY_MID: Optional[int] = None
-    SEVERPAY_TOKEN: Optional[str] = None
-    SEVERPAY_RETURN_URL: Optional[str] = None
-    SEVERPAY_BASE_URL: str = Field(default="https://severpay.io/api/merchant")
-    SEVERPAY_LIFETIME_MINUTES: Optional[int] = Field(
-        default=None,
-        description="Lifetime of the payment link in minutes (30-4320, defaults to provider value)",
-    )
-
     WATA_ENABLED: bool = Field(default=False)
     WATA_API_TOKEN: Optional[str] = None
     WATA_BASE_URL: str = Field(default="https://api.wata.pro/api/h2h")
@@ -307,12 +291,6 @@ class Settings(BaseSettings):
     PAYMENT_PLATEGA_CRYPTO_TELEGRAM_LABEL_RU: Optional[str] = None
     PAYMENT_PLATEGA_CRYPTO_TELEGRAM_LABEL_EN: Optional[str] = None
     PAYMENT_PLATEGA_CRYPTO_TELEGRAM_EMOJI: Optional[str] = None
-    PAYMENT_SEVERPAY_WEBAPP_LABEL_RU: Optional[str] = None
-    PAYMENT_SEVERPAY_WEBAPP_LABEL_EN: Optional[str] = None
-    PAYMENT_SEVERPAY_WEBAPP_ICON: Optional[str] = None
-    PAYMENT_SEVERPAY_TELEGRAM_LABEL_RU: Optional[str] = None
-    PAYMENT_SEVERPAY_TELEGRAM_LABEL_EN: Optional[str] = None
-    PAYMENT_SEVERPAY_TELEGRAM_EMOJI: Optional[str] = None
     PAYMENT_WATA_WEBAPP_LABEL_RU: Optional[str] = None
     PAYMENT_WATA_WEBAPP_LABEL_EN: Optional[str] = None
     PAYMENT_WATA_WEBAPP_ICON: Optional[str] = None
@@ -602,12 +580,6 @@ class Settings(BaseSettings):
             platega_crypto_method=self.PLATEGA_CRYPTO_METHOD,
             platega_return_url=self.PLATEGA_RETURN_URL,
             platega_failed_url=self.PLATEGA_FAILED_URL,
-            severpay_enabled=self.SEVERPAY_ENABLED,
-            severpay_mid=self.SEVERPAY_MID,
-            severpay_token=self.SEVERPAY_TOKEN,
-            severpay_return_url=self.SEVERPAY_RETURN_URL,
-            severpay_base_url=self.SEVERPAY_BASE_URL,
-            severpay_lifetime_minutes=self.SEVERPAY_LIFETIME_MINUTES,
             wata_enabled=self.WATA_ENABLED,
             wata_api_token=self.WATA_API_TOKEN,
             wata_base_url=self.WATA_BASE_URL,
@@ -789,19 +761,6 @@ class Settings(BaseSettings):
         base = self.WEBHOOK_BASE_URL
         if base:
             return f"{base.rstrip('/')}{self.freekassa_webhook_path}"
-        return None
-
-    @computed_field
-    @property
-    def severpay_webhook_path(self) -> str:
-        return "/webhook/severpay"
-
-    @computed_field
-    @property
-    def severpay_full_webhook_url(self) -> Optional[str]:
-        base = self.WEBHOOK_BASE_URL
-        if base:
-            return f"{base.rstrip('/')}{self.severpay_webhook_path}"
         return None
 
     @computed_field
@@ -1164,7 +1123,6 @@ class Settings(BaseSettings):
         "REQUIRED_CHANNEL_LINK",
         "PLATEGA_RETURN_URL",
         "PLATEGA_FAILED_URL",
-        "SEVERPAY_RETURN_URL",
         "WATA_RETURN_URL",
         "WATA_FAILED_URL",
         "WATA_API_TOKEN",
@@ -1189,9 +1147,7 @@ class Settings(BaseSettings):
             return None
         return v
 
-    @field_validator(
-        "USER_HWID_DEVICE_LIMIT", "SEVERPAY_MID", "SEVERPAY_LIFETIME_MINUTES", mode="before"
-    )
+    @field_validator("USER_HWID_DEVICE_LIMIT", mode="before")
     @classmethod
     def validate_optional_int(cls, v):
         if isinstance(v, str):
@@ -1296,11 +1252,6 @@ def get_settings() -> Settings:
                 ):
                     logging.warning(
                         "CRITICAL: Platega is enabled but merchant credentials (PLATEGA_MERCHANT_ID/PLATEGA_SECRET) are missing. Platega payments will not work."  # noqa: E501
-                    )
-            if _settings_instance.SEVERPAY_ENABLED:
-                if not _settings_instance.SEVERPAY_MID or not _settings_instance.SEVERPAY_TOKEN:
-                    logging.warning(
-                        "CRITICAL: SeverPay is enabled but MID or TOKEN is missing. SeverPay payments will not work."  # noqa: E501
                     )
             if _settings_instance.WATA_ENABLED:
                 if not _settings_instance.WATA_API_TOKEN:

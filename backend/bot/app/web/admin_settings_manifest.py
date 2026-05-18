@@ -336,32 +336,6 @@ SETTINGS_MANIFEST: List[SettingField] = [
     SettingField("PLATEGA_FAILED_URL", "url", "payments", "Failed URL", subsection="Platega"),
     *_payment_presentation_fields("PLATEGA_SBP", "Platega SBP", default_icon="CreditCard"),
     *_payment_presentation_fields("PLATEGA_CRYPTO", "Platega Crypto", default_icon="Bitcoin"),
-    # SeverPay
-    SettingField("SEVERPAY_ENABLED", "bool", "payments", "Включена", subsection="SeverPay"),
-    SettingField("SEVERPAY_MID", "int", "payments", "MID", subsection="SeverPay"),
-    SettingField(
-        "SEVERPAY_TOKEN", "string", "payments", "Token", subsection="SeverPay", secret=True
-    ),
-    SettingField(
-        "SEVERPAY_BASE_URL",
-        "url",
-        "payments",
-        "Base URL",
-        placeholder="https://severpay.io/api/merchant",
-        subsection="SeverPay",
-    ),
-    SettingField("SEVERPAY_RETURN_URL", "url", "payments", "Return URL", subsection="SeverPay"),
-    SettingField(
-        "SEVERPAY_LIFETIME_MINUTES",
-        "int",
-        "payments",
-        "Срок жизни ссылки (мин)",
-        "30..4320; пусто — значение провайдера",
-        subsection="SeverPay",
-        min=30,
-        max=4320,
-    ),
-    *_payment_presentation_fields("SEVERPAY", "SeverPay", default_icon="CreditCard"),
     # Wata
     SettingField("WATA_ENABLED", "bool", "payments", "Enabled", subsection="Wata"),
     SettingField(
