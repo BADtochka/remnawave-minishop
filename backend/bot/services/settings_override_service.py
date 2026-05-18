@@ -333,6 +333,30 @@ def overridable_keys() -> list:
 
 
 def current_value(settings: Settings, key: str) -> Any:
+    # Provider-owned keys live on per-provider BaseSettings bundles, not the
+    # central Settings — check there first.
+    from bot.payment_providers import (
+        find_manifest_owner,
+        get_provider_bundle,
+        get_spec_presentation,
+    )
+
+    owner = find_manifest_owner(key)
+    if owner is not None:
+        spec, manifest_field = owner
+        if manifest_field.target == "presentation":
+            target = get_spec_presentation(spec.id)
+            if target is None:
+                bundle = get_provider_bundle(spec.service_key)
+                target = bundle.presentation if bundle else None
+        else:
+            bundle = get_provider_bundle(spec.service_key)
+            target = bundle.config if bundle else None
+        if target is not None:
+            attr = manifest_field.attr or key
+            return getattr(target, attr, None)
+        return None
+
     attr_name = _resolve_attribute_name(settings, key)
     if not attr_name:
         return None

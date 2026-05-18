@@ -393,12 +393,21 @@ class AdminSettingsSecurityTests(unittest.IsolatedAsyncioTestCase):
             async def __aexit__(self, exc_type, exc, tb):
                 return False
 
+        from bot.payment_providers import (
+            build_provider_configs,
+            get_provider_bundle,
+        )
+
+        build_provider_configs()
+        bundle = get_provider_bundle("yookassa_service")
+        if bundle and bundle.config is not None:
+            bundle.config.SECRET_KEY = "super-secret"
+
         settings = Settings(
             _env_file=None,
             BOT_TOKEN="token",
             POSTGRES_USER="app_user",
             POSTGRES_PASSWORD="app_password",
-            YOOKASSA_SECRET_KEY="super-secret",
             SHOP_NAME="Visible shop",
         )
         request = SimpleNamespace(

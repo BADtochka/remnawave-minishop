@@ -371,6 +371,22 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(methods, [])
 
     def test_serialize_payment_methods_includes_provider_presentation(self):
+        from bot.payment_providers import (
+            build_provider_configs,
+            get_provider_bundle,
+            get_spec_presentation,
+        )
+
+        build_provider_configs()
+        bundle = get_provider_bundle("yookassa_service")
+        if bundle and bundle.config is not None:
+            bundle.config.ENABLED = True
+        presentation = get_spec_presentation("yookassa")
+        if presentation is not None:
+            presentation.WEBAPP_LABEL_RU = "Карта"
+            presentation.WEBAPP_LABEL_EN = "Bank card"
+            presentation.WEBAPP_ICON = "WalletCards"
+
         settings = Settings(
             _env_file=None,
             BOT_TOKEN="token",
@@ -378,10 +394,6 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             POSTGRES_PASSWORD="app_password",
             TARIFFS_CONFIG_PATH="missing-tariffs.json",
             PAYMENT_METHODS_ORDER="yookassa",
-            YOOKASSA_ENABLED=True,
-            PAYMENT_YOOKASSA_WEBAPP_LABEL_RU="Карта",
-            PAYMENT_YOOKASSA_WEBAPP_LABEL_EN="Bank card",
-            PAYMENT_YOOKASSA_WEBAPP_ICON="WalletCards",
         )
         app = {"yookassa_service": SimpleNamespace(configured=True)}
 

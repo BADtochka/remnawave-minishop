@@ -27,19 +27,6 @@ class DBSettings(BaseModel):
     database: str
 
 
-class PaymentSettings(BaseModel):
-    yookassa_enabled: bool
-    yookassa_shop_id: Optional[str]
-    yookassa_secret_key: Optional[str]
-    yookassa_return_url: Optional[str]
-    yookassa_default_receipt_email: Optional[str]
-    yookassa_vat_code: int
-    yookassa_payment_mode: str
-    yookassa_payment_subject: str
-    yookassa_autopayments_enabled: bool
-    yookassa_autopayments_require_card_binding: bool
-
-
 class EmailSettings(BaseModel):
     smtp_host: str
     smtp_port: int
@@ -123,22 +110,6 @@ class Settings(BaseSettings):
         description="Public username or invite link to the required channel for join button",
     )
 
-    YOOKASSA_SHOP_ID: Optional[str] = None
-    YOOKASSA_SECRET_KEY: Optional[str] = None
-    YOOKASSA_RETURN_URL: Optional[str] = None
-
-    YOOKASSA_DEFAULT_RECEIPT_EMAIL: Optional[str] = Field(default=None)
-    YOOKASSA_VAT_CODE: int = Field(default=1)
-    # Deprecated: explicit receipt fields are now derived from YOOKASSA_AUTOPAYMENTS_ENABLED
-    YOOKASSA_PAYMENT_MODE: str = Field(default="full_prepayment")
-    YOOKASSA_PAYMENT_SUBJECT: str = Field(default="service")
-    # Single toggle to enable recurring payments (saving cards, managing payment methods, auto-renew)  # noqa: E501
-    YOOKASSA_AUTOPAYMENTS_ENABLED: bool = Field(default=False)
-    YOOKASSA_AUTOPAYMENTS_REQUIRE_CARD_BINDING: bool = Field(
-        default=True,
-        description="When true, new YooKassa payments in autopay mode force card binding without a user checkbox.",  # noqa: E501
-    )
-
     LKNPD_INN: Optional[str] = Field(
         default=None,
         alias="NALOGO_INN",
@@ -171,18 +142,11 @@ class Settings(BaseSettings):
         description="Comma-separated list of reverse proxy IPs or CIDRs trusted to forward X-Forwarded-For.",  # noqa: E501
     )
 
-    YOOKASSA_ENABLED: bool = Field(default=True)
     STARS_ENABLED: bool = Field(default=True)
     PAYMENT_METHODS_ORDER: Optional[str] = Field(
         default=None,
         description="Comma-separated list of payment methods to show (e.g., severpay,wata,freekassa,yookassa,platega,stars,cryptopay)",  # noqa: E501
     )
-    PAYMENT_YOOKASSA_WEBAPP_LABEL_RU: Optional[str] = None
-    PAYMENT_YOOKASSA_WEBAPP_LABEL_EN: Optional[str] = None
-    PAYMENT_YOOKASSA_WEBAPP_ICON: Optional[str] = None
-    PAYMENT_YOOKASSA_TELEGRAM_LABEL_RU: Optional[str] = None
-    PAYMENT_YOOKASSA_TELEGRAM_LABEL_EN: Optional[str] = None
-    PAYMENT_YOOKASSA_TELEGRAM_EMOJI: Optional[str] = None
 
     MONTH_1_ENABLED: bool = Field(default=True, alias="1_MONTH_ENABLED")
     MONTH_3_ENABLED: bool = Field(default=True, alias="3_MONTHS_ENABLED")
@@ -418,22 +382,6 @@ class Settings(BaseSettings):
 
     @computed_field
     @property
-    def payment_settings(self) -> PaymentSettings:
-        return PaymentSettings(
-            yookassa_enabled=self.YOOKASSA_ENABLED,
-            yookassa_shop_id=self.YOOKASSA_SHOP_ID,
-            yookassa_secret_key=self.YOOKASSA_SECRET_KEY,
-            yookassa_return_url=self.YOOKASSA_RETURN_URL,
-            yookassa_default_receipt_email=self.YOOKASSA_DEFAULT_RECEIPT_EMAIL,
-            yookassa_vat_code=self.YOOKASSA_VAT_CODE,
-            yookassa_payment_mode=self.YOOKASSA_PAYMENT_MODE,
-            yookassa_payment_subject=self.YOOKASSA_PAYMENT_SUBJECT,
-            yookassa_autopayments_enabled=self.YOOKASSA_AUTOPAYMENTS_ENABLED,
-            yookassa_autopayments_require_card_binding=self.YOOKASSA_AUTOPAYMENTS_REQUIRE_CARD_BINDING,
-        )
-
-    @computed_field
-    @property
     def email_settings(self) -> EmailSettings:
         return EmailSettings(
             smtp_host=self.SMTP_HOST,
@@ -543,20 +491,6 @@ class Settings(BaseSettings):
 
     @computed_field
     @property
-    def yookassa_webhook_path(self) -> str:
-
-        return "/webhook/yookassa"
-
-    @computed_field
-    @property
-    def yookassa_full_webhook_url(self) -> Optional[str]:
-        base = self.WEBHOOK_BASE_URL
-        if base:
-            return f"{base.rstrip('/')}{self.yookassa_webhook_path}"
-        return None
-
-    @computed_field
-    @property
     def panel_webhook_path(self) -> str:
         return "/webhook/panel"
 
@@ -567,21 +501,6 @@ class Settings(BaseSettings):
         if base:
             return f"{base.rstrip('/')}{self.panel_webhook_path}"
         return None
-
-
-
-    # Computed YooKassa receipt fields based on recurring toggle
-    @computed_field
-    @property
-    def yk_receipt_payment_mode(self) -> str:
-        # If autopayments are enabled, use service; otherwise full prepayment
-        return "service" if self.YOOKASSA_AUTOPAYMENTS_ENABLED else "full_prepayment"
-
-    @computed_field
-    @property
-    def yk_receipt_payment_subject(self) -> str:
-        # If autopayments are enabled, use full_payment; otherwise payment
-        return "full_payment" if self.YOOKASSA_AUTOPAYMENTS_ENABLED else "payment"
 
     @computed_field
     @property
@@ -769,11 +688,19 @@ class Settings(BaseSettings):
             bonuses[12] = self.REFERRAL_BONUS_DAYS_REFEREE_12_MONTHS
         return bonuses
 
-    @computed_field
     @property
     def yookassa_autopayments_active(self) -> bool:
-        """Autopay features are available only when YooKassa itself is enabled."""
-        return bool(self.YOOKASSA_ENABLED and self.YOOKASSA_AUTOPAYMENTS_ENABLED)
+        """Autopay features are available only when YooKassa itself is enabled.
+
+        Proxies into the YooKassaConfig BaseSettings model that lives in the
+        yookassa provider module — env-config is owned by the provider now.
+        """
+        from bot.payment_providers import get_provider_bundle
+
+        bundle = get_provider_bundle("yookassa_service")
+        if bundle is None or bundle.config is None:
+            return False
+        return bool(bundle.config.autopayments_active)
 
     @computed_field
     @property
@@ -965,13 +892,6 @@ def get_settings() -> Settings:
             if not os.getenv("WEBHOOK_SECRET_TOKEN"):
                 logging.warning(
                     "WEBHOOK_SECRET_TOKEN is not set. A generated secret will be used for this process only."  # noqa: E501
-                )
-            if (
-                not _settings_instance.YOOKASSA_SHOP_ID
-                or not _settings_instance.YOOKASSA_SECRET_KEY
-            ):
-                logging.warning(
-                    "CRITICAL: YooKassa credentials (SHOP_ID or SECRET_KEY) are not set. Payments will not work."  # noqa: E501
                 )
             if (_settings_instance.LKNPD_INN or _settings_instance.LKNPD_PASSWORD) and not (
                 _settings_instance.LKNPD_INN and _settings_instance.LKNPD_PASSWORD

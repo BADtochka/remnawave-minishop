@@ -30,67 +30,6 @@ class SettingField:
     i18n_description_key: Optional[str] = None
 
 
-def _payment_presentation_fields(
-    method_key: str,
-    subsection: str,
-    *,
-    default_icon: str,
-) -> List[SettingField]:
-    prefix = f"PAYMENT_{method_key}"
-    return [
-        SettingField(
-            f"{prefix}_WEBAPP_LABEL_RU",
-            "string",
-            "payments",
-            "WebApp button text (RU)",
-            "Custom Russian text shown in the Web App payment method button.",
-            subsection=subsection,
-        ),
-        SettingField(
-            f"{prefix}_WEBAPP_LABEL_EN",
-            "string",
-            "payments",
-            "WebApp button text (EN)",
-            "Custom English text shown in the Web App payment method button.",
-            subsection=subsection,
-        ),
-        SettingField(
-            f"{prefix}_WEBAPP_ICON",
-            "icon",
-            "payments",
-            "WebApp button icon",
-            "Lucide icon name rendered inside the Web App payment method button.",
-            subsection=subsection,
-            placeholder=default_icon,
-        ),
-        SettingField(
-            f"{prefix}_TELEGRAM_LABEL_RU",
-            "string",
-            "payments",
-            "Telegram button text (RU)",
-            "Custom Russian text shown in Telegram bot payment buttons.",
-            subsection=subsection,
-        ),
-        SettingField(
-            f"{prefix}_TELEGRAM_LABEL_EN",
-            "string",
-            "payments",
-            "Telegram button text (EN)",
-            "Custom English text shown in Telegram bot payment buttons.",
-            subsection=subsection,
-        ),
-        SettingField(
-            f"{prefix}_TELEGRAM_EMOJI",
-            "string",
-            "payments",
-            "Telegram button emoji",
-            "Emoji prepended to the Telegram bot payment button when customized.",
-            subsection=subsection,
-            placeholder="💳",
-        ),
-    ]
-
-
 SETTINGS_MANIFEST: List[SettingField] = [
     # ─── General ────────────────────────────────────────────────────
     SettingField(
@@ -205,50 +144,6 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "Через запятую: severpay,freekassa,yookassa,platega,stars,cryptopay",
         subsection="Общие",
     ),
-    # YooKassa
-    SettingField("YOOKASSA_ENABLED", "bool", "payments", "Включена", subsection="YooKassa"),
-    SettingField("YOOKASSA_SHOP_ID", "string", "payments", "Shop ID", subsection="YooKassa"),
-    SettingField(
-        "YOOKASSA_SECRET_KEY",
-        "string",
-        "payments",
-        "Secret key",
-        subsection="YooKassa",
-        secret=True,
-    ),
-    SettingField("YOOKASSA_RETURN_URL", "url", "payments", "Return URL", subsection="YooKassa"),
-    SettingField(
-        "YOOKASSA_DEFAULT_RECEIPT_EMAIL",
-        "string",
-        "payments",
-        "Email для чека по умолчанию",
-        subsection="YooKassa",
-    ),
-    SettingField(
-        "YOOKASSA_VAT_CODE",
-        "int",
-        "payments",
-        "VAT code",
-        "1..6 в зависимости от системы налогообложения",
-        subsection="YooKassa",
-        min=1,
-        max=6,
-    ),
-    SettingField(
-        "YOOKASSA_AUTOPAYMENTS_ENABLED",
-        "bool",
-        "payments",
-        "Автоплатежи (recurring)",
-        subsection="YooKassa",
-    ),
-    SettingField(
-        "YOOKASSA_AUTOPAYMENTS_REQUIRE_CARD_BINDING",
-        "bool",
-        "payments",
-        "Принудительная привязка карты",
-        subsection="YooKassa",
-    ),
-    *_payment_presentation_fields("YOOKASSA", "YooKassa", default_icon="CreditCard"),
     # ─── Trial ─────────────────────────────────────────────────────
     SettingField("TRIAL_ENABLED", "bool", "trial", "Триал включён"),
     SettingField("TRIAL_DURATION_DAYS", "int", "trial", "Длительность триала (дней)", min=0),

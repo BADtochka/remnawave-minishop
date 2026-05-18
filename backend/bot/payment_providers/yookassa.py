@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from aiogram import Bot, F, Router, types
 from aiohttp import web
+from pydantic import Field, field_validator
+from pydantic_settings import SettingsConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import sessionmaker
@@ -41,8 +43,11 @@ from db.models import Payment
 
 from .base import (
     PaymentProviderSpec,
+    ProviderEnvConfig,
+    ProviderManifestField,
     ServiceFactoryContext,
     WebAppPaymentContext,
+    provider_env_file,
 )
 from .shared import (
     SuccessMessage,
@@ -66,6 +71,67 @@ from .shared import (
 )
 
 
+class YooKassaConfig(ProviderEnvConfig):
+    model_config = SettingsConfigDict(
+        env_file=provider_env_file(),
+        env_file_encoding="utf-8",
+        env_prefix="YOOKASSA_",
+        extra="ignore",
+    )
+
+    ENABLED: bool = Field(default=True)
+    SHOP_ID: Optional[str] = None
+    SECRET_KEY: Optional[str] = None
+    RETURN_URL: Optional[str] = None
+    DEFAULT_RECEIPT_EMAIL: Optional[str] = None
+    VAT_CODE: int = Field(default=1)
+    PAYMENT_MODE: str = Field(default="full_prepayment")
+    PAYMENT_SUBJECT: str = Field(default="service")
+    AUTOPAYMENTS_ENABLED: bool = Field(default=False)
+    AUTOPAYMENTS_REQUIRE_CARD_BINDING: bool = Field(default=True)
+
+    @field_validator(
+        "SHOP_ID", "SECRET_KEY", "RETURN_URL", "DEFAULT_RECEIPT_EMAIL", mode="before"
+    )
+    @classmethod
+    def _strip_optional(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @property
+    def autopayments_active(self) -> bool:
+        return bool(self.ENABLED and self.AUTOPAYMENTS_ENABLED)
+
+    @property
+    def yk_receipt_payment_mode(self) -> str:
+        return "service" if self.AUTOPAYMENTS_ENABLED else "full_prepayment"
+
+    @property
+    def yk_receipt_payment_subject(self) -> str:
+        return "full_payment" if self.AUTOPAYMENTS_ENABLED else "payment"
+
+    @property
+    def webhook_path(self) -> str:
+        return "/webhook/yookassa"
+
+
+class YooKassaPresentation(ProviderEnvConfig):
+    model_config = SettingsConfigDict(
+        env_file=provider_env_file(),
+        env_file_encoding="utf-8",
+        env_prefix="PAYMENT_YOOKASSA_",
+        extra="ignore",
+    )
+
+    WEBAPP_LABEL_RU: Optional[str] = None
+    WEBAPP_LABEL_EN: Optional[str] = None
+    WEBAPP_ICON: Optional[str] = None
+    TELEGRAM_LABEL_RU: Optional[str] = None
+    TELEGRAM_LABEL_EN: Optional[str] = None
+    TELEGRAM_EMOJI: Optional[str] = None
+
+
 class YooKassaService:
     def __init__(
         self,
@@ -74,11 +140,13 @@ class YooKassaService:
         configured_return_url: Optional[str],
         bot_username_for_default_return: Optional[str] = None,
         settings_obj: Optional[Settings] = None,
+        config: Optional[YooKassaConfig] = None,
     ):
 
         self.settings = settings_obj
+        self.config = config or YooKassaConfig()
 
-        if self.settings and not self.settings.YOOKASSA_ENABLED:
+        if not self.config.ENABLED:
             logging.warning(
                 "YooKassa is disabled via YOOKASSA_ENABLED flag. Payment functionality will be DISABLED."  # noqa: E501
             )
@@ -144,8 +212,8 @@ class YooKassaService:
             customer_contact_for_receipt["email"] = receipt_email
         elif receipt_phone:
             customer_contact_for_receipt["phone"] = receipt_phone
-        elif self.settings.YOOKASSA_DEFAULT_RECEIPT_EMAIL:
-            customer_contact_for_receipt["email"] = self.settings.YOOKASSA_DEFAULT_RECEIPT_EMAIL
+        elif self.config.DEFAULT_RECEIPT_EMAIL:
+            customer_contact_for_receipt["email"] = self.config.DEFAULT_RECEIPT_EMAIL
         else:
             logging.error(
                 "CRITICAL: No email/phone for YooKassa receipt provided and YOOKASSA_DEFAULT_RECEIPT_EMAIL is not set."  # noqa: E501
@@ -182,17 +250,9 @@ class YooKassaService:
                     "description": description[:128],
                     "quantity": "1.00",
                     "amount": {"value": str(round(amount, 2)), "currency": currency.upper()},
-                    "vat_code": str(self.settings.YOOKASSA_VAT_CODE),
-                    "payment_mode": getattr(
-                        self.settings,
-                        "yk_receipt_payment_mode",
-                        self.settings.YOOKASSA_PAYMENT_MODE,
-                    ),
-                    "payment_subject": getattr(
-                        self.settings,
-                        "yk_receipt_payment_subject",
-                        self.settings.YOOKASSA_PAYMENT_SUBJECT,
-                    ),
+                    "vat_code": str(self.config.VAT_CODE),
+                    "payment_mode": self.config.yk_receipt_payment_mode,
+                    "payment_subject": self.config.yk_receipt_payment_subject,
                 }
             ]
 
@@ -1181,7 +1241,7 @@ async def _initiate_yk_payment(
     if payment_method_id:
         yookassa_metadata["used_saved_payment_method_id"] = payment_method_id
 
-    receipt_email_for_yk = settings.YOOKASSA_DEFAULT_RECEIPT_EMAIL
+    receipt_email_for_yk = yookassa_service.config.DEFAULT_RECEIPT_EMAIL
 
     payment_response_yk = await yookassa_service.create_payment(
         amount=price_rub,
@@ -1971,7 +2031,7 @@ async def payment_method_bind(
         currency="RUB",
         description="Bind card",
         metadata=metadata,
-        receipt_email=settings.YOOKASSA_DEFAULT_RECEIPT_EMAIL,
+        receipt_email=yookassa_service.config.DEFAULT_RECEIPT_EMAIL,
         save_payment_method=True,
         capture=False,
         bind_only=True,
@@ -2423,12 +2483,15 @@ logger = logging.getLogger(__name__)
 
 
 def create_service(ctx: ServiceFactoryContext) -> YooKassaService:
+    bundle = ctx.config_for("yookassa_service")
+    config = bundle.config if bundle and isinstance(bundle.config, YooKassaConfig) else YooKassaConfig()
     return YooKassaService(
-        shop_id=ctx.settings.YOOKASSA_SHOP_ID,
-        secret_key=ctx.settings.YOOKASSA_SECRET_KEY,
-        configured_return_url=ctx.settings.YOOKASSA_RETURN_URL,
+        shop_id=config.SHOP_ID,
+        secret_key=config.SECRET_KEY,
+        configured_return_url=config.RETURN_URL,
         bot_username_for_default_return=ctx.bot_username_for_default_return,
         settings_obj=ctx.settings,
+        config=config,
     )
 
 
@@ -2477,10 +2540,10 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
             currency="RUB",
             description=ctx.description,
             metadata=metadata,
-            receipt_email=settings.YOOKASSA_DEFAULT_RECEIPT_EMAIL,
+            receipt_email=service.config.DEFAULT_RECEIPT_EMAIL,
             save_payment_method=bool(
-                settings.yookassa_autopayments_active
-                and settings.YOOKASSA_AUTOPAYMENTS_REQUIRE_CARD_BINDING
+                service.config.autopayments_active
+                and service.config.AUTOPAYMENTS_REQUIRE_CARD_BINDING
             ),
         )
         payment_url = response.get("confirmation_url") if response else None
@@ -2502,6 +2565,54 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
         return payment_failed()
 
 
+_PRESENTATION_MANIFEST = tuple(
+    ProviderManifestField(
+        key=key, type=type_, label=label, description=description,
+        placeholder=placeholder, subsection="YooKassa",
+        target="presentation", attr=attr,
+    )
+    for key, type_, label, description, placeholder, attr in (
+        ("PAYMENT_YOOKASSA_WEBAPP_LABEL_RU", "string", "WebApp button text (RU)",
+         "Custom Russian text shown in the Web App payment method button.", "", "WEBAPP_LABEL_RU"),
+        ("PAYMENT_YOOKASSA_WEBAPP_LABEL_EN", "string", "WebApp button text (EN)",
+         "Custom English text shown in the Web App payment method button.", "", "WEBAPP_LABEL_EN"),
+        ("PAYMENT_YOOKASSA_WEBAPP_ICON", "icon", "WebApp button icon",
+         "Lucide icon name rendered inside the Web App payment method button.",
+         "CreditCard", "WEBAPP_ICON"),
+        ("PAYMENT_YOOKASSA_TELEGRAM_LABEL_RU", "string", "Telegram button text (RU)",
+         "Custom Russian text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_RU"),
+        ("PAYMENT_YOOKASSA_TELEGRAM_LABEL_EN", "string", "Telegram button text (EN)",
+         "Custom English text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_EN"),
+        ("PAYMENT_YOOKASSA_TELEGRAM_EMOJI", "string", "Telegram button emoji",
+         "Emoji prepended to the Telegram bot payment button when customized.",
+         "💳", "TELEGRAM_EMOJI"),
+    )
+)
+
+_CONFIG_MANIFEST = (
+    ProviderManifestField("YOOKASSA_ENABLED", "bool", "Включена",
+                          subsection="YooKassa", attr="ENABLED"),
+    ProviderManifestField("YOOKASSA_SHOP_ID", "string", "Shop ID",
+                          subsection="YooKassa", attr="SHOP_ID"),
+    ProviderManifestField("YOOKASSA_SECRET_KEY", "string", "Secret key",
+                          subsection="YooKassa", secret=True, attr="SECRET_KEY"),
+    ProviderManifestField("YOOKASSA_RETURN_URL", "url", "Return URL",
+                          subsection="YooKassa", attr="RETURN_URL"),
+    ProviderManifestField("YOOKASSA_DEFAULT_RECEIPT_EMAIL", "string",
+                          "Email для чека по умолчанию",
+                          subsection="YooKassa", attr="DEFAULT_RECEIPT_EMAIL"),
+    ProviderManifestField("YOOKASSA_VAT_CODE", "int", "VAT code",
+                          description="1..6 в зависимости от системы налогообложения",
+                          subsection="YooKassa", min=1, max=6, attr="VAT_CODE"),
+    ProviderManifestField("YOOKASSA_AUTOPAYMENTS_ENABLED", "bool",
+                          "Автоплатежи (recurring)",
+                          subsection="YooKassa", attr="AUTOPAYMENTS_ENABLED"),
+    ProviderManifestField("YOOKASSA_AUTOPAYMENTS_REQUIRE_CARD_BINDING", "bool",
+                          "Принудительная привязка карты",
+                          subsection="YooKassa", attr="AUTOPAYMENTS_REQUIRE_CARD_BINDING"),
+)
+
+
 SPEC = PaymentProviderSpec(
     id="yookassa",
     provider_key="yookassa",
@@ -2512,13 +2623,16 @@ SPEC = PaymentProviderSpec(
     telegram_labels={"ru": "ЮKassa", "en": "YooKassa"},
     telegram_emoji="💳",
     pending_status="pending_yookassa",
-    enabled=lambda settings: settings.YOOKASSA_ENABLED,
+    enabled=lambda config: bool(getattr(config, "ENABLED", False)),
     service_key="yookassa_service",
     callback_prefix="pay_yk",
     router=router,
     create_service=create_service,
-    webhook_path=lambda settings: settings.yookassa_webhook_path,
+    webhook_path=lambda source: "/webhook/yookassa",
     webhook_route=yookassa_webhook_route,
     webhook_requires_base_url=True,
     create_webapp_payment=create_webapp_payment,
+    config_class=YooKassaConfig,
+    presentation_class=YooKassaPresentation,
+    manifest_fields=_CONFIG_MANIFEST + _PRESENTATION_MANIFEST,
 )

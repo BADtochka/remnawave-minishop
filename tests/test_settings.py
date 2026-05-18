@@ -153,25 +153,38 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.TRIAL_TRAFFIC_STRATEGY, "WEEK")
 
     def test_payment_button_presentation_env_values_are_available(self):
-        settings = Settings(
-            _env_file=None,
-            BOT_TOKEN="token",
-            POSTGRES_USER="app_user",
-            POSTGRES_PASSWORD="app_password",
-            PAYMENT_YOOKASSA_WEBAPP_LABEL_RU="Карта",
-            PAYMENT_YOOKASSA_WEBAPP_LABEL_EN="Card",
-            PAYMENT_YOOKASSA_WEBAPP_ICON="CreditCard",
-            PAYMENT_YOOKASSA_TELEGRAM_LABEL_RU="Банковская карта",
-            PAYMENT_YOOKASSA_TELEGRAM_LABEL_EN="Bank card",
-            PAYMENT_YOOKASSA_TELEGRAM_EMOJI="💳",
-        )
+        """Presentation overrides now live on each provider's BaseSettings
+        model instead of the central Settings — verify they're loaded from
+        env and exposed via the provider bundle."""
+        import os
+        from bot.payment_providers import build_provider_configs, get_spec_presentation
 
-        self.assertEqual(settings.PAYMENT_YOOKASSA_WEBAPP_LABEL_RU, "Карта")
-        self.assertEqual(settings.PAYMENT_YOOKASSA_WEBAPP_LABEL_EN, "Card")
-        self.assertEqual(settings.PAYMENT_YOOKASSA_WEBAPP_ICON, "CreditCard")
-        self.assertEqual(settings.PAYMENT_YOOKASSA_TELEGRAM_LABEL_RU, "Банковская карта")
-        self.assertEqual(settings.PAYMENT_YOOKASSA_TELEGRAM_LABEL_EN, "Bank card")
-        self.assertEqual(settings.PAYMENT_YOOKASSA_TELEGRAM_EMOJI, "💳")
+        os.environ["PAYMENT_YOOKASSA_WEBAPP_LABEL_RU"] = "Карта"
+        os.environ["PAYMENT_YOOKASSA_WEBAPP_LABEL_EN"] = "Card"
+        os.environ["PAYMENT_YOOKASSA_WEBAPP_ICON"] = "CreditCard"
+        os.environ["PAYMENT_YOOKASSA_TELEGRAM_LABEL_RU"] = "Банковская карта"
+        os.environ["PAYMENT_YOOKASSA_TELEGRAM_LABEL_EN"] = "Bank card"
+        os.environ["PAYMENT_YOOKASSA_TELEGRAM_EMOJI"] = "💳"
+        try:
+            build_provider_configs()
+            presentation = get_spec_presentation("yookassa")
+            self.assertIsNotNone(presentation)
+            self.assertEqual(presentation.WEBAPP_LABEL_RU, "Карта")
+            self.assertEqual(presentation.WEBAPP_LABEL_EN, "Card")
+            self.assertEqual(presentation.WEBAPP_ICON, "CreditCard")
+            self.assertEqual(presentation.TELEGRAM_LABEL_RU, "Банковская карта")
+            self.assertEqual(presentation.TELEGRAM_LABEL_EN, "Bank card")
+            self.assertEqual(presentation.TELEGRAM_EMOJI, "💳")
+        finally:
+            for key in (
+                "PAYMENT_YOOKASSA_WEBAPP_LABEL_RU",
+                "PAYMENT_YOOKASSA_WEBAPP_LABEL_EN",
+                "PAYMENT_YOOKASSA_WEBAPP_ICON",
+                "PAYMENT_YOOKASSA_TELEGRAM_LABEL_RU",
+                "PAYMENT_YOOKASSA_TELEGRAM_LABEL_EN",
+                "PAYMENT_YOOKASSA_TELEGRAM_EMOJI",
+            ):
+                os.environ.pop(key, None)
 
     def test_tariff_warning_levels_are_parsed(self):
         settings = Settings(
