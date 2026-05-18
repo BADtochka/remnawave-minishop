@@ -28,7 +28,12 @@ PAYMENT_PROVIDER_SPECS: tuple[PaymentProviderSpec, ...] = (
 # singleton populated by build_provider_configs() on startup. Modules that need
 # to read provider configs without changing call signatures (e.g. presentation
 # resolution from arbitrary callers) can look them up via current_provider_configs().
+#
+# Keyed by ``service_key`` because multiple SPECs (Platega SBP / Platega Crypto)
+# can share the same backing service. Per-SPEC presentation overrides live in
+# ``_provider_presentations`` instead, indexed by ``spec.id``.
 _provider_configs: Dict[str, ProviderConfigBundle] = {}
+_provider_presentations: Dict[str, Any] = {}
 
 
 def iter_provider_specs() -> Iterable[PaymentProviderSpec]:
@@ -47,29 +52,40 @@ def build_provider_configs() -> Dict[str, ProviderConfigBundle]:
     """Instantiate per-provider BaseSettings models declared on each SPEC.
 
     Returns a mapping ``service_key`` → ``ProviderConfigBundle(config, presentation)``.
-    Specs with neither ``config_class`` nor ``presentation_class`` are skipped.
-    The result is cached as the process-wide bundle.
+    For SPECs that share a service (Platega SBP + Platega Crypto), only the
+    first one's presentation lands in the shared bundle — per-SPEC presentation
+    overrides live separately in ``_provider_presentations`` keyed by ``spec.id``.
     """
     from .base import provider_env_file
 
     env_file = provider_env_file()
-    init_kwargs = {"_env_file": env_file} if env_file is not None else {"_env_file": None}
+    init_kwargs = {"_env_file": env_file}
 
     bundles: Dict[str, ProviderConfigBundle] = {}
-    seen: set[str] = set()
+    presentations: Dict[str, Any] = {}
+    seen_services: set[str] = set()
     for spec in PAYMENT_PROVIDER_SPECS:
-        if not spec.service_key or spec.service_key in seen:
+        if spec.presentation_class is not None:
+            presentations[spec.id] = spec.presentation_class(**init_kwargs)
+
+        if not spec.service_key or spec.service_key in seen_services:
             continue
         if spec.config_class is None and spec.presentation_class is None:
             continue
-        seen.add(spec.service_key)
+        seen_services.add(spec.service_key)
         bundles[spec.service_key] = ProviderConfigBundle(
             config=spec.config_class(**init_kwargs) if spec.config_class else None,
-            presentation=spec.presentation_class(**init_kwargs) if spec.presentation_class else None,
+            presentation=presentations.get(spec.id),
         )
     _provider_configs.clear()
     _provider_configs.update(bundles)
+    _provider_presentations.clear()
+    _provider_presentations.update(presentations)
     return bundles
+
+
+def get_spec_presentation(spec_id: str) -> Optional[Any]:
+    return _provider_presentations.get(spec_id)
 
 
 def current_provider_configs() -> Mapping[str, ProviderConfigBundle]:
@@ -119,11 +135,14 @@ def _provider_presentation_value(
     *,
     language: Optional[str] = None,
 ) -> Optional[str]:
-    bundle = _provider_configs.get(spec.service_key) if spec.service_key else None
-    if not bundle or not bundle.presentation:
+    presentation = _provider_presentations.get(spec.id)
+    if presentation is None:
+        bundle = _provider_configs.get(spec.service_key) if spec.service_key else None
+        presentation = bundle.presentation if bundle else None
+    if presentation is None:
         return None
     attr = _presentation_attr(suffix, language=language)
-    return _setting_value(bundle.presentation, attr)
+    return _setting_value(presentation, attr)
 
 
 def _localized_setting_value(

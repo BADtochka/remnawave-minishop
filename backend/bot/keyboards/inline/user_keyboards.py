@@ -452,11 +452,8 @@ def get_payment_method_keyboard(
     import logging as _kbd_logging
 
     _kbd_logging.info(
-        "payment_method_keyboard build: order=%s | platega_enabled=%s sbp=%s crypto=%s",
+        "payment_method_keyboard build: order=%s",
         settings.payment_methods_order,
-        settings.PLATEGA_ENABLED,
-        settings.PLATEGA_SBP_ENABLED,
-        settings.PLATEGA_CRYPTO_ENABLED,
     )
     from bot.payment_providers import get_provider_spec, provider_telegram_button_text
 

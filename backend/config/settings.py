@@ -38,17 +38,6 @@ class PaymentSettings(BaseModel):
     yookassa_payment_subject: str
     yookassa_autopayments_enabled: bool
     yookassa_autopayments_require_card_binding: bool
-    platega_enabled: bool
-    platega_base_url: str
-    platega_merchant_id: Optional[str]
-    platega_secret: Optional[str]
-    platega_payment_method: int
-    platega_sbp_enabled: bool
-    platega_crypto_enabled: bool
-    platega_sbp_method: int
-    platega_crypto_method: int
-    platega_return_url: Optional[str]
-    platega_failed_url: Optional[str]
 
 
 class EmailSettings(BaseModel):
@@ -182,51 +171,12 @@ class Settings(BaseSettings):
         description="Comma-separated list of reverse proxy IPs or CIDRs trusted to forward X-Forwarded-For.",  # noqa: E501
     )
 
-    PLATEGA_ENABLED: bool = Field(default=False)
-    PLATEGA_BASE_URL: str = Field(default="https://app.platega.io")
-    PLATEGA_MERCHANT_ID: Optional[str] = None
-    PLATEGA_SECRET: Optional[str] = None
-    PLATEGA_PAYMENT_METHOD: int = Field(
-        default=2,
-        description="Legacy Platega payment method ID. Used as fallback for PLATEGA_SBP_METHOD when the new field is unset.",  # noqa: E501
-    )
-    PLATEGA_SBP_ENABLED: bool = Field(
-        default=False,
-        description="Show a separate Platega SBP payment button.",
-    )
-    PLATEGA_CRYPTO_ENABLED: bool = Field(
-        default=False,
-        description="Show a separate Platega crypto payment button.",
-    )
-    PLATEGA_SBP_METHOD: int = Field(
-        default=2,
-        description="Platega method ID for SBP QR (default 2).",
-    )
-    PLATEGA_CRYPTO_METHOD: int = Field(
-        default=13,
-        description="Platega method ID for crypto (default 13).",
-    )
-    PLATEGA_RETURN_URL: Optional[str] = Field(default=None)
-    PLATEGA_FAILED_URL: Optional[str] = Field(default=None)
-
     YOOKASSA_ENABLED: bool = Field(default=True)
     STARS_ENABLED: bool = Field(default=True)
     PAYMENT_METHODS_ORDER: Optional[str] = Field(
         default=None,
         description="Comma-separated list of payment methods to show (e.g., severpay,wata,freekassa,yookassa,platega,stars,cryptopay)",  # noqa: E501
     )
-    PAYMENT_PLATEGA_SBP_WEBAPP_LABEL_RU: Optional[str] = None
-    PAYMENT_PLATEGA_SBP_WEBAPP_LABEL_EN: Optional[str] = None
-    PAYMENT_PLATEGA_SBP_WEBAPP_ICON: Optional[str] = None
-    PAYMENT_PLATEGA_SBP_TELEGRAM_LABEL_RU: Optional[str] = None
-    PAYMENT_PLATEGA_SBP_TELEGRAM_LABEL_EN: Optional[str] = None
-    PAYMENT_PLATEGA_SBP_TELEGRAM_EMOJI: Optional[str] = None
-    PAYMENT_PLATEGA_CRYPTO_WEBAPP_LABEL_RU: Optional[str] = None
-    PAYMENT_PLATEGA_CRYPTO_WEBAPP_LABEL_EN: Optional[str] = None
-    PAYMENT_PLATEGA_CRYPTO_WEBAPP_ICON: Optional[str] = None
-    PAYMENT_PLATEGA_CRYPTO_TELEGRAM_LABEL_RU: Optional[str] = None
-    PAYMENT_PLATEGA_CRYPTO_TELEGRAM_LABEL_EN: Optional[str] = None
-    PAYMENT_PLATEGA_CRYPTO_TELEGRAM_EMOJI: Optional[str] = None
     PAYMENT_YOOKASSA_WEBAPP_LABEL_RU: Optional[str] = None
     PAYMENT_YOOKASSA_WEBAPP_LABEL_EN: Optional[str] = None
     PAYMENT_YOOKASSA_WEBAPP_ICON: Optional[str] = None
@@ -480,17 +430,6 @@ class Settings(BaseSettings):
             yookassa_payment_subject=self.YOOKASSA_PAYMENT_SUBJECT,
             yookassa_autopayments_enabled=self.YOOKASSA_AUTOPAYMENTS_ENABLED,
             yookassa_autopayments_require_card_binding=self.YOOKASSA_AUTOPAYMENTS_REQUIRE_CARD_BINDING,
-            platega_enabled=self.PLATEGA_ENABLED,
-            platega_base_url=self.PLATEGA_BASE_URL,
-            platega_merchant_id=self.PLATEGA_MERCHANT_ID,
-            platega_secret=self.PLATEGA_SECRET,
-            platega_payment_method=self.PLATEGA_PAYMENT_METHOD,
-            platega_sbp_enabled=self.PLATEGA_SBP_ENABLED,
-            platega_crypto_enabled=self.PLATEGA_CRYPTO_ENABLED,
-            platega_sbp_method=self.platega_sbp_method_resolved,
-            platega_crypto_method=self.PLATEGA_CRYPTO_METHOD,
-            platega_return_url=self.PLATEGA_RETURN_URL,
-            platega_failed_url=self.PLATEGA_FAILED_URL,
         )
 
     @computed_field
@@ -630,19 +569,6 @@ class Settings(BaseSettings):
         return None
 
 
-
-    @computed_field
-    @property
-    def platega_webhook_path(self) -> str:
-        return "/webhook/platega"
-
-    @computed_field
-    @property
-    def platega_full_webhook_url(self) -> Optional[str]:
-        base = self.WEBHOOK_BASE_URL
-        if base:
-            return f"{base.rstrip('/')}{self.platega_webhook_path}"
-        return None
 
     # Computed YooKassa receipt fields based on recurring toggle
     @computed_field
@@ -885,14 +811,6 @@ class Settings(BaseSettings):
 
     @computed_field
     @property
-    def platega_sbp_method_resolved(self) -> int:
-        """SBP method ID, falling back to legacy PLATEGA_PAYMENT_METHOD when SBP-specific value is the default."""  # noqa: E501
-        if self.PLATEGA_SBP_METHOD != 2:
-            return self.PLATEGA_SBP_METHOD
-        return self.PLATEGA_PAYMENT_METHOD or 2
-
-    @computed_field
-    @property
     def email_auth_configured(self) -> bool:
         return bool(
             self.SMTP_HOST
@@ -971,8 +889,6 @@ class Settings(BaseSettings):
 
     @field_validator(
         "REQUIRED_CHANNEL_LINK",
-        "PLATEGA_RETURN_URL",
-        "PLATEGA_FAILED_URL",
         "CRYPT4_REDIRECT_URL",
         "PRIVACY_POLICY_URL",
         "USER_AGREEMENT_URL",
@@ -1063,14 +979,6 @@ def get_settings() -> Settings:
                 logging.warning(
                     "WARNING: LKNPD credentials are incomplete. Receipt sending will be disabled."
                 )
-            if _settings_instance.PLATEGA_ENABLED:
-                if (
-                    not _settings_instance.PLATEGA_MERCHANT_ID
-                    or not _settings_instance.PLATEGA_SECRET
-                ):
-                    logging.warning(
-                        "CRITICAL: Platega is enabled but merchant credentials (PLATEGA_MERCHANT_ID/PLATEGA_SECRET) are missing. Platega payments will not work."  # noqa: E501
-                    )
 
         except ValidationError as e:
             logging.critical(f"Pydantic validation error while loading settings: {e}")

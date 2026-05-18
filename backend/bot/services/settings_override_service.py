@@ -72,14 +72,20 @@ def _apply_to_provider_bundle(key: str, value: Any) -> bool:
         get_provider_bundle,
     )
 
+    from bot.payment_providers import get_spec_presentation
+
     owner = find_manifest_owner(key)
     if owner is None:
         return False
     spec, manifest_field = owner
-    bundle = get_provider_bundle(spec.service_key)
-    if bundle is None:
-        return False
-    target = bundle.presentation if manifest_field.target == "presentation" else bundle.config
+    if manifest_field.target == "presentation":
+        target = get_spec_presentation(spec.id)
+        if target is None:
+            bundle = get_provider_bundle(spec.service_key)
+            target = bundle.presentation if bundle else None
+    else:
+        bundle = get_provider_bundle(spec.service_key)
+        target = bundle.config if bundle else None
     if target is None:
         return False
     attr_name = manifest_field.attr or key
@@ -270,7 +276,11 @@ async def update_overrides(
     # default by instantiating a fresh Settings() / provider-config model
     # (cheap; just a few ms) and copying the matching attributes back over.
     if valid_deletes:
-        from bot.payment_providers import find_manifest_owner, get_provider_bundle
+        from bot.payment_providers import (
+            find_manifest_owner,
+            get_provider_bundle,
+            get_spec_presentation,
+        )
 
         try:
             env_only = Settings()
@@ -278,14 +288,14 @@ async def update_overrides(
                 owner = find_manifest_owner(key)
                 if owner is not None:
                     spec, manifest_field = owner
-                    bundle = get_provider_bundle(spec.service_key)
-                    if bundle is None:
-                        continue
-                    target = (
-                        bundle.presentation
-                        if manifest_field.target == "presentation"
-                        else bundle.config
-                    )
+                    if manifest_field.target == "presentation":
+                        target = get_spec_presentation(spec.id)
+                        if target is None:
+                            bundle = get_provider_bundle(spec.service_key)
+                            target = bundle.presentation if bundle else None
+                    else:
+                        bundle = get_provider_bundle(spec.service_key)
+                        target = bundle.config if bundle else None
                     if target is None:
                         continue
                     cls = type(target)

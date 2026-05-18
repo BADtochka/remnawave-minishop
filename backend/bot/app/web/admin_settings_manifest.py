@@ -249,35 +249,6 @@ SETTINGS_MANIFEST: List[SettingField] = [
         subsection="YooKassa",
     ),
     *_payment_presentation_fields("YOOKASSA", "YooKassa", default_icon="CreditCard"),
-    # Platega
-    SettingField("PLATEGA_ENABLED", "bool", "payments", "Включена", subsection="Platega"),
-    SettingField(
-        "PLATEGA_BASE_URL",
-        "url",
-        "payments",
-        "Base URL",
-        placeholder="https://app.platega.io",
-        subsection="Platega",
-    ),
-    SettingField("PLATEGA_MERCHANT_ID", "string", "payments", "Merchant ID", subsection="Platega"),
-    SettingField(
-        "PLATEGA_SECRET", "string", "payments", "Secret", subsection="Platega", secret=True
-    ),
-    SettingField(
-        "PLATEGA_PAYMENT_METHOD", "int", "payments", "Метод оплаты (legacy)", subsection="Platega"
-    ),
-    SettingField("PLATEGA_SBP_ENABLED", "bool", "payments", "SBP-кнопка", subsection="Platega"),
-    SettingField("PLATEGA_SBP_METHOD", "int", "payments", "SBP method ID", subsection="Platega"),
-    SettingField(
-        "PLATEGA_CRYPTO_ENABLED", "bool", "payments", "Crypto-кнопка", subsection="Platega"
-    ),
-    SettingField(
-        "PLATEGA_CRYPTO_METHOD", "int", "payments", "Crypto method ID", subsection="Platega"
-    ),
-    SettingField("PLATEGA_RETURN_URL", "url", "payments", "Return URL", subsection="Platega"),
-    SettingField("PLATEGA_FAILED_URL", "url", "payments", "Failed URL", subsection="Platega"),
-    *_payment_presentation_fields("PLATEGA_SBP", "Platega SBP", default_icon="CreditCard"),
-    *_payment_presentation_fields("PLATEGA_CRYPTO", "Platega Crypto", default_icon="Bitcoin"),
     # ─── Trial ─────────────────────────────────────────────────────
     SettingField("TRIAL_ENABLED", "bool", "trial", "Триал включён"),
     SettingField("TRIAL_DURATION_DAYS", "int", "trial", "Длительность триала (дней)", min=0),

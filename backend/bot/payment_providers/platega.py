@@ -5,6 +5,8 @@ from typing import Any, Dict, Optional, Tuple
 
 from aiogram import Bot, F, Router, types
 from aiohttp import web
+from pydantic import Field, field_validator
+from pydantic_settings import SettingsConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -16,8 +18,11 @@ from db.dal import payment_dal
 
 from .base import (
     PaymentProviderSpec,
+    ProviderEnvConfig,
+    ProviderManifestField,
     ServiceFactoryContext,
     WebAppPaymentContext,
+    provider_env_file,
 )
 from .shared import (
     HttpClientMixin,
@@ -47,12 +52,84 @@ from .shared import (
 _LOG = "platega"
 
 
+class PlategaConfig(ProviderEnvConfig):
+    model_config = SettingsConfigDict(
+        env_file=provider_env_file(),
+        env_file_encoding="utf-8",
+        env_prefix="PLATEGA_",
+        extra="ignore",
+    )
+
+    ENABLED: bool = Field(default=False)
+    BASE_URL: str = Field(default="https://app.platega.io")
+    MERCHANT_ID: Optional[str] = None
+    SECRET: Optional[str] = None
+    PAYMENT_METHOD: int = Field(default=2)
+    SBP_ENABLED: bool = Field(default=False)
+    CRYPTO_ENABLED: bool = Field(default=False)
+    SBP_METHOD: int = Field(default=2)
+    CRYPTO_METHOD: int = Field(default=13)
+    RETURN_URL: Optional[str] = None
+    FAILED_URL: Optional[str] = None
+
+    @field_validator("MERCHANT_ID", "SECRET", "RETURN_URL", "FAILED_URL", mode="before")
+    @classmethod
+    def _strip_optional(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @property
+    def sbp_method_resolved(self) -> int:
+        """Falls back to the legacy ``PAYMENT_METHOD`` for backwards compat."""
+        if self.SBP_METHOD != 2:
+            return self.SBP_METHOD
+        return self.PAYMENT_METHOD or 2
+
+    @property
+    def webhook_path(self) -> str:
+        return "/webhook/platega"
+
+
+class PlategaSbpPresentation(ProviderEnvConfig):
+    model_config = SettingsConfigDict(
+        env_file=provider_env_file(),
+        env_file_encoding="utf-8",
+        env_prefix="PAYMENT_PLATEGA_SBP_",
+        extra="ignore",
+    )
+
+    WEBAPP_LABEL_RU: Optional[str] = None
+    WEBAPP_LABEL_EN: Optional[str] = None
+    WEBAPP_ICON: Optional[str] = None
+    TELEGRAM_LABEL_RU: Optional[str] = None
+    TELEGRAM_LABEL_EN: Optional[str] = None
+    TELEGRAM_EMOJI: Optional[str] = None
+
+
+class PlategaCryptoPresentation(ProviderEnvConfig):
+    model_config = SettingsConfigDict(
+        env_file=provider_env_file(),
+        env_file_encoding="utf-8",
+        env_prefix="PAYMENT_PLATEGA_CRYPTO_",
+        extra="ignore",
+    )
+
+    WEBAPP_LABEL_RU: Optional[str] = None
+    WEBAPP_LABEL_EN: Optional[str] = None
+    WEBAPP_ICON: Optional[str] = None
+    TELEGRAM_LABEL_RU: Optional[str] = None
+    TELEGRAM_LABEL_EN: Optional[str] = None
+    TELEGRAM_EMOJI: Optional[str] = None
+
+
 class PlategaService(HttpClientMixin):
     def __init__(
         self,
         *,
         bot: Bot,
         settings: Settings,
+        config: PlategaConfig,
         i18n: JsonI18n,
         async_session_factory: sessionmaker,
         subscription_service: SubscriptionService,
@@ -61,19 +138,20 @@ class PlategaService(HttpClientMixin):
     ):
         self.bot = bot
         self.settings = settings
+        self.config = config
         self.i18n = i18n
         self.async_session_factory = async_session_factory
         self.subscription_service = subscription_service
         self.referral_service = referral_service
 
-        self.base_url = (settings.PLATEGA_BASE_URL or "https://app.platega.io").rstrip("/")
-        self.merchant_id = settings.PLATEGA_MERCHANT_ID
-        self.secret = settings.PLATEGA_SECRET
-        self.payment_method = settings.PLATEGA_PAYMENT_METHOD
-        self.sbp_method = settings.platega_sbp_method_resolved
-        self.crypto_method = settings.PLATEGA_CRYPTO_METHOD
-        self.return_url = settings.PLATEGA_RETURN_URL or f"https://t.me/{default_return_url}"
-        self.failed_url = settings.PLATEGA_FAILED_URL or self.return_url
+        self.base_url = (config.BASE_URL or "https://app.platega.io").rstrip("/")
+        self.merchant_id = config.MERCHANT_ID
+        self.secret = config.SECRET
+        self.payment_method = config.PAYMENT_METHOD
+        self.sbp_method = config.sbp_method_resolved
+        self.crypto_method = config.CRYPTO_METHOD
+        self.return_url = config.RETURN_URL or f"https://t.me/{default_return_url}"
+        self.failed_url = config.FAILED_URL or self.return_url
 
         self._init_http_client(total_timeout=20)
         self._auth_headers = {
@@ -81,7 +159,7 @@ class PlategaService(HttpClientMixin):
             "X-Secret": self.secret or "",
             "Content-Type": "application/json",
         }
-        self.configured: bool = bool(settings.PLATEGA_ENABLED and self.merchant_id and self.secret)
+        self.configured: bool = bool(config.ENABLED and self.merchant_id and self.secret)
         if not self.configured:
             logging.warning(
                 "PlategaService initialized but not fully configured. Payments disabled."
@@ -89,9 +167,9 @@ class PlategaService(HttpClientMixin):
         else:
             logging.info(
                 "PlategaService configured. SBP button: %s (method=%s), Crypto button: %s (method=%s)",  # noqa: E501
-                "ON" if settings.PLATEGA_SBP_ENABLED else "OFF",
+                "ON" if config.SBP_ENABLED else "OFF",
                 self.sbp_method,
-                "ON" if settings.PLATEGA_CRYPTO_ENABLED else "OFF",
+                "ON" if config.CRYPTO_ENABLED else "OFF",
                 self.crypto_method,
             )
 
@@ -282,18 +360,20 @@ async def platega_webhook_route(request: web.Request) -> web.Response:
 router = Router(name="user_subscription_payments_platega_router")
 
 
-def _resolve_platega_variant(callback_prefix: str, settings: Settings) -> Optional[Tuple[str, int]]:
+def _resolve_platega_variant(
+    callback_prefix: str, config: PlategaConfig
+) -> Optional[Tuple[str, int]]:
     """Map the callback prefix to (variant, payment_method_id) or ``None`` if disabled."""
     if callback_prefix == "pay_platega_crypto":
-        if not settings.PLATEGA_CRYPTO_ENABLED:
+        if not config.CRYPTO_ENABLED:
             return None
-        return "crypto", settings.PLATEGA_CRYPTO_METHOD
+        return "crypto", config.CRYPTO_METHOD
     if callback_prefix == "pay_platega_sbp":
-        if not settings.PLATEGA_SBP_ENABLED:
+        if not config.SBP_ENABLED:
             return None
-        return "sbp", settings.platega_sbp_method_resolved
+        return "sbp", config.sbp_method_resolved
     # Legacy "pay_platega:" callback — keep working as SBP.
-    return "sbp", settings.platega_sbp_method_resolved
+    return "sbp", config.sbp_method_resolved
 
 
 @router.callback_query(
@@ -319,7 +399,7 @@ async def pay_platega_callback_handler(
         return
 
     callback_prefix, _, _ = (callback.data or "").partition(":")
-    variant = _resolve_platega_variant(callback_prefix, settings)
+    variant = _resolve_platega_variant(callback_prefix, platega_service.config) if platega_service else None
     if variant is None:
         await safe_callback_answer(callback)
         return
@@ -402,9 +482,12 @@ async def pay_platega_callback_handler(
 
 
 def create_service(ctx: ServiceFactoryContext) -> PlategaService:
+    bundle = ctx.config_for("platega_service")
+    config = bundle.config if bundle and isinstance(bundle.config, PlategaConfig) else PlategaConfig()
     return PlategaService(
         bot=ctx.bot,
         settings=ctx.settings,
+        config=config,
         i18n=ctx.i18n,
         async_session_factory=ctx.async_session_factory,
         subscription_service=ctx.subscription_service,
@@ -414,18 +497,17 @@ def create_service(ctx: ServiceFactoryContext) -> PlategaService:
 
 
 async def _create_webapp_payment(ctx: WebAppPaymentContext, variant: str) -> web.Response:
-    settings = ctx.request.app["settings"]
     service: PlategaService = ctx.request.app["platega_service"]
     if not service or not service.configured:
         return payment_unavailable()
     if variant == "platega_crypto":
-        if not settings.PLATEGA_CRYPTO_ENABLED:
+        if not service.config.CRYPTO_ENABLED:
             return payment_unavailable()
-        platega_method_id = settings.PLATEGA_CRYPTO_METHOD
+        platega_method_id = service.config.CRYPTO_METHOD
     else:
-        if variant == "platega_sbp" and not settings.PLATEGA_SBP_ENABLED:
+        if variant == "platega_sbp" and not service.config.SBP_ENABLED:
             return payment_unavailable()
-        platega_method_id = settings.platega_sbp_method_resolved
+        platega_method_id = service.config.sbp_method_resolved
 
     try:
         amounts = payment_record_amounts(
@@ -487,6 +569,68 @@ async def create_crypto_webapp_payment(ctx: WebAppPaymentContext) -> web.Respons
     return await _create_webapp_payment(ctx, "platega_crypto")
 
 
+def _platega_presentation_manifest(subsection: str, default_icon: str, prefix: str) -> tuple:
+    return tuple(
+        ProviderManifestField(
+            key=f"PAYMENT_{prefix}_{suffix_key}",
+            type=type_,
+            label=label,
+            description=description,
+            placeholder=placeholder,
+            subsection=subsection,
+            target="presentation",
+            attr=attr,
+        )
+        for suffix_key, type_, label, description, placeholder, attr in (
+            ("WEBAPP_LABEL_RU", "string", "WebApp button text (RU)",
+             "Custom Russian text shown in the Web App payment method button.",
+             "", "WEBAPP_LABEL_RU"),
+            ("WEBAPP_LABEL_EN", "string", "WebApp button text (EN)",
+             "Custom English text shown in the Web App payment method button.",
+             "", "WEBAPP_LABEL_EN"),
+            ("WEBAPP_ICON", "icon", "WebApp button icon",
+             "Lucide icon name rendered inside the Web App payment method button.",
+             default_icon, "WEBAPP_ICON"),
+            ("TELEGRAM_LABEL_RU", "string", "Telegram button text (RU)",
+             "Custom Russian text shown in Telegram bot payment buttons.",
+             "", "TELEGRAM_LABEL_RU"),
+            ("TELEGRAM_LABEL_EN", "string", "Telegram button text (EN)",
+             "Custom English text shown in Telegram bot payment buttons.",
+             "", "TELEGRAM_LABEL_EN"),
+            ("TELEGRAM_EMOJI", "string", "Telegram button emoji",
+             "Emoji prepended to the Telegram bot payment button when customized.",
+             "", "TELEGRAM_EMOJI"),
+        )
+    )
+
+
+_CONFIG_MANIFEST = (
+    ProviderManifestField("PLATEGA_ENABLED", "bool", "Включена",
+                          subsection="Platega", attr="ENABLED"),
+    ProviderManifestField("PLATEGA_BASE_URL", "url", "Base URL",
+                          placeholder="https://app.platega.io",
+                          subsection="Platega", attr="BASE_URL"),
+    ProviderManifestField("PLATEGA_MERCHANT_ID", "string", "Merchant ID",
+                          subsection="Platega", attr="MERCHANT_ID"),
+    ProviderManifestField("PLATEGA_SECRET", "string", "Secret",
+                          subsection="Platega", secret=True, attr="SECRET"),
+    ProviderManifestField("PLATEGA_PAYMENT_METHOD", "int", "Метод оплаты (legacy)",
+                          subsection="Platega", attr="PAYMENT_METHOD"),
+    ProviderManifestField("PLATEGA_SBP_ENABLED", "bool", "SBP-кнопка",
+                          subsection="Platega", attr="SBP_ENABLED"),
+    ProviderManifestField("PLATEGA_SBP_METHOD", "int", "SBP method ID",
+                          subsection="Platega", attr="SBP_METHOD"),
+    ProviderManifestField("PLATEGA_CRYPTO_ENABLED", "bool", "Crypto-кнопка",
+                          subsection="Platega", attr="CRYPTO_ENABLED"),
+    ProviderManifestField("PLATEGA_CRYPTO_METHOD", "int", "Crypto method ID",
+                          subsection="Platega", attr="CRYPTO_METHOD"),
+    ProviderManifestField("PLATEGA_RETURN_URL", "url", "Return URL",
+                          subsection="Platega", attr="RETURN_URL"),
+    ProviderManifestField("PLATEGA_FAILED_URL", "url", "Failed URL",
+                          subsection="Platega", attr="FAILED_URL"),
+)
+
+
 SBP_SPEC = PaymentProviderSpec(
     id="platega_sbp",
     provider_key="platega",
@@ -497,15 +641,20 @@ SBP_SPEC = PaymentProviderSpec(
     telegram_labels={"ru": "Оплата через СБП", "en": "Pay via SBP"},
     telegram_emoji="🏦",
     pending_status="pending_platega",
-    enabled=lambda settings: settings.PLATEGA_ENABLED and settings.PLATEGA_SBP_ENABLED,
+    enabled=lambda config: bool(getattr(config, "ENABLED", False) and getattr(config, "SBP_ENABLED", False)),
     service_key="platega_service",
     callback_prefix="pay_platega_sbp",
     aliases=("platega",),
     router=router,
     create_service=create_service,
-    webhook_path=lambda settings: settings.platega_webhook_path,
+    webhook_path=lambda source: "/webhook/platega",
     webhook_route=platega_webhook_route,
     create_webapp_payment=create_sbp_webapp_payment,
+    config_class=PlategaConfig,
+    presentation_class=PlategaSbpPresentation,
+    manifest_fields=_CONFIG_MANIFEST + _platega_presentation_manifest(
+        "Platega SBP", "CreditCard", "PLATEGA_SBP"
+    ),
 )
 
 CRYPTO_SPEC = PaymentProviderSpec(
@@ -518,10 +667,17 @@ CRYPTO_SPEC = PaymentProviderSpec(
     telegram_labels={"ru": "Оплата криптой", "en": "Pay with crypto"},
     telegram_emoji="🪙",
     pending_status="pending_platega",
-    enabled=lambda settings: settings.PLATEGA_ENABLED and settings.PLATEGA_CRYPTO_ENABLED,
+    # Uses the same PlategaConfig as SBP_SPEC (shared service_key); enable
+    # flag combines the global PLATEGA_ENABLED with the per-button toggle.
+    enabled=lambda config: bool(getattr(config, "ENABLED", False) and getattr(config, "CRYPTO_ENABLED", False)),
     service_key="platega_service",
     callback_prefix="pay_platega_crypto",
     create_webapp_payment=create_crypto_webapp_payment,
+    config_class=PlategaConfig,
+    presentation_class=PlategaCryptoPresentation,
+    manifest_fields=_platega_presentation_manifest(
+        "Platega Crypto", "Bitcoin", "PLATEGA_CRYPTO"
+    ),
 )
 
 SPECS = (SBP_SPEC, CRYPTO_SPEC)
