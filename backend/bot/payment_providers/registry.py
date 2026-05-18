@@ -48,14 +48,24 @@ def get_provider_spec(method: str) -> Optional[PaymentProviderSpec]:
     return None
 
 
-def build_provider_configs() -> Dict[str, ProviderConfigBundle]:
+def build_provider_configs(*, force: bool = False) -> Dict[str, ProviderConfigBundle]:
     """Instantiate per-provider BaseSettings models declared on each SPEC.
 
     Returns a mapping ``service_key`` → ``ProviderConfigBundle(config, presentation)``.
     For SPECs that share a service (Platega SBP + Platega Crypto), only the
     first one's presentation lands in the shared bundle — per-SPEC presentation
     overrides live separately in ``_provider_presentations`` keyed by ``spec.id``.
+
+    Idempotent by default: if bundles already exist in the process-wide cache
+    we return them as-is. Pass ``force=True`` to rebuild from env (used by
+    tests after monkeypatching env vars). The non-force path is critical for
+    runtime: ``load_overrides_from_db`` builds bundles first and then writes
+    DB-persisted overrides into them — a later non-force rebuild from
+    ``build_core_services`` would otherwise wipe those overrides.
     """
+    if _provider_configs and not force:
+        return dict(_provider_configs)
+
     from .base import provider_env_file
 
     env_file = provider_env_file()

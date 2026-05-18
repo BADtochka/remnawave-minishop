@@ -166,7 +166,7 @@ class SettingsTests(unittest.TestCase):
         os.environ["PAYMENT_YOOKASSA_TELEGRAM_LABEL_EN"] = "Bank card"
         os.environ["PAYMENT_YOOKASSA_TELEGRAM_EMOJI"] = "💳"
         try:
-            build_provider_configs()
+            build_provider_configs(force=True)
             presentation = get_spec_presentation("yookassa")
             self.assertIsNotNone(presentation)
             self.assertEqual(presentation.WEBAPP_LABEL_RU, "Карта")

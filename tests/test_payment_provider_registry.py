@@ -204,7 +204,7 @@ def test_payment_method_keyboard_uses_custom_telegram_text_without_changing_call
     monkeypatch.setenv("WATA_ENABLED", "True")
     monkeypatch.setenv("PAYMENT_WATA_TELEGRAM_LABEL_EN", "Wata custom")
     monkeypatch.setenv("PAYMENT_WATA_TELEGRAM_EMOJI", "💸")
-    build_provider_configs()
+    build_provider_configs(force=True)
 
     settings = Settings(
         _env_file=None,

@@ -340,7 +340,7 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             current_provider_configs,
         )
 
-        build_provider_configs()
+        build_provider_configs(force=True)
         configs = current_provider_configs()
         for service_key in ("cryptopay_service", "yookassa_service"):
             bundle = configs.get(service_key)
@@ -377,7 +377,7 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             get_spec_presentation,
         )
 
-        build_provider_configs()
+        build_provider_configs(force=True)
         bundle = get_provider_bundle("yookassa_service")
         if bundle and bundle.config is not None:
             bundle.config.ENABLED = True

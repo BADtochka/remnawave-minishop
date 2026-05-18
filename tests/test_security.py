@@ -398,7 +398,7 @@ class AdminSettingsSecurityTests(unittest.IsolatedAsyncioTestCase):
             get_provider_bundle,
         )
 
-        build_provider_configs()
+        build_provider_configs(force=True)
         bundle = get_provider_bundle("yookassa_service")
         if bundle and bundle.config is not None:
             bundle.config.SECRET_KEY = "super-secret"

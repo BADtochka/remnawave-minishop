@@ -196,7 +196,17 @@ def write_appearance_backup(settings: Settings) -> None:
 
 
 async def load_overrides_from_db(settings: Settings, async_session_factory: sessionmaker) -> int:
-    """Fetch overrides from the DB and apply them to the in-memory settings."""
+    """Fetch overrides from the DB and apply them to the in-memory settings.
+
+    Provider env-configs live on per-provider BaseSettings bundles instead of
+    the central Settings model. Apply needs those bundles to already exist,
+    otherwise provider-owned overrides (e.g. ``HELEKET_ENABLED``) silently
+    drop on the floor. Build them up-front; the call is idempotent so the
+    later ``build_core_services`` invocation reuses these same instances.
+    """
+    from bot.payment_providers import build_provider_configs
+
+    build_provider_configs()
 
     try:
         async with async_session_factory() as session:
