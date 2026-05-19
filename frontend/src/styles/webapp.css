@@ -1291,13 +1291,16 @@ a {
 }
 
 .settings-row-linked-with-action {
-  grid-template-columns: 28px minmax(0, 1fr) max-content;
+  grid-template-columns: 28px minmax(0, 1fr);
+  row-gap: 8px;
 }
 
 .settings-inline-action {
-  justify-self: end;
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  width: 100%;
   min-height: 34px;
-  max-width: 132px;
+  max-width: none;
   padding-left: 10px;
   padding-right: 10px;
   font-size: 11px;
@@ -2335,6 +2338,18 @@ a {
   .settings-links-block .settings-row,
   .settings-links-block .settings-telegram-link-btn {
     min-height: 48px;
+  }
+
+  .settings-row-linked-with-action {
+    grid-template-columns: 28px minmax(0, 1fr) max-content;
+    row-gap: 0;
+  }
+
+  .settings-row-linked-with-action .settings-inline-action {
+    grid-column: auto;
+    justify-self: end;
+    width: auto;
+    max-width: 132px;
   }
 
   .settings-list {
