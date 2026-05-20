@@ -644,12 +644,12 @@ class TariffTrafficWorker:
         for node_uuid in node_uuids:
             stats_cache_key = (node_uuid, start_date, end_date)
             if stats_cache_key not in self._premium_node_stats_tick_cache:
-                self._premium_node_stats_tick_cache[stats_cache_key] = (
-                    await self.panel_service.get_node_users_bandwidth_stats(
-                        node_uuid,
-                        start=start_date,
-                        end=end_date,
-                    )
+                self._premium_node_stats_tick_cache[
+                    stats_cache_key
+                ] = await self.panel_service.get_node_users_bandwidth_stats(
+                    node_uuid,
+                    start=start_date,
+                    end=end_date,
                 )
             stats = self._premium_node_stats_tick_cache.get(stats_cache_key)
             if not stats:

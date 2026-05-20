@@ -70,9 +70,8 @@ def _apply_to_provider_bundle(key: str, value: Any) -> bool:
     from bot.payment_providers import (
         find_manifest_owner,
         get_provider_bundle,
+        get_spec_presentation,
     )
-
-    from bot.payment_providers import get_spec_presentation
 
     owner = find_manifest_owner(key)
     if owner is None:
@@ -213,9 +212,7 @@ async def load_overrides_from_db(settings: Settings, async_session_factory: sess
             overrides = await app_settings_dal.get_all_overrides(session)
             backup_overrides = _read_appearance_backup()
             missing_backup_overrides = {
-                key: value
-                for key, value in backup_overrides.items()
-                if key not in overrides
+                key: value for key, value in backup_overrides.items() if key not in overrides
             }
             if missing_backup_overrides:
                 for key, value in missing_backup_overrides.items():

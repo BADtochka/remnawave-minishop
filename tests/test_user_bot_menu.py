@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from bot.app.web import subscription_webapp
 from bot.handlers.user import referral
+from bot.handlers.user.subscription.core import _with_subscription_purchase_description
 from bot.keyboards.inline.user_keyboards import (
     get_bot_interface_inline_keyboard,
     get_information_links_keyboard,
@@ -100,6 +101,30 @@ class UserBotMenuTests(unittest.TestCase):
         self.assertIn("main_action:bot_interface", self._callback_data(info_markup))
         self.assertIn("set_lang_ru:bot", self._callback_data(language_markup))
         self.assertIn("subscribe_period:1:bot", self._callback_data(subscription_markup))
+
+    def test_subscription_purchase_description_is_prepended_before_period_selection(self):
+        settings = SimpleNamespace(
+            subscription_purchase_description=lambda language: f"Description {language}"
+        )
+
+        self.assertEqual(
+            _with_subscription_purchase_description(
+                "Choose period",
+                settings,
+                "en",
+                include=True,
+            ),
+            "Description en\n\nChoose period",
+        )
+        self.assertEqual(
+            _with_subscription_purchase_description(
+                "Choose traffic",
+                settings,
+                "en",
+                include=False,
+            ),
+            "Choose traffic",
+        )
 
     def test_payment_navigation_context_keeps_bot_menu_source(self):
         settings = SimpleNamespace(

@@ -323,9 +323,7 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
             provider="telegram_stars",
         )
         payload_units = amounts.purchased_gb if amounts.traffic_sale else ctx.months
-        payload = (
-            f"{payment.payment_id}:{format_number_for_payload(payload_units)}:{ctx.sale_mode}"
-        )
+        payload = f"{payment.payment_id}:{format_number_for_payload(payload_units)}:{ctx.sale_mode}"
         prices = [LabeledPrice(label=ctx.description, amount=ctx.stars_price)]
         create_invoice_link = getattr(bot, "create_invoice_link", None)
         if callable(create_invoice_link):
@@ -371,25 +369,64 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
 
 _PRESENTATION_MANIFEST = tuple(
     ProviderManifestField(
-        key=key, type=type_, label=label, description=description,
-        placeholder=placeholder, subsection="Telegram Stars",
-        target="presentation", attr=attr,
+        key=key,
+        type=type_,
+        label=label,
+        description=description,
+        placeholder=placeholder,
+        subsection="Telegram Stars",
+        target="presentation",
+        attr=attr,
     )
     for key, type_, label, description, placeholder, attr in (
-        ("PAYMENT_STARS_WEBAPP_LABEL_RU", "string", "WebApp button text (RU)",
-         "Custom Russian text shown in the Web App payment method button.", "", "WEBAPP_LABEL_RU"),
-        ("PAYMENT_STARS_WEBAPP_LABEL_EN", "string", "WebApp button text (EN)",
-         "Custom English text shown in the Web App payment method button.", "", "WEBAPP_LABEL_EN"),
-        ("PAYMENT_STARS_WEBAPP_ICON", "icon", "WebApp button icon",
-         "Lucide icon name rendered inside the Web App payment method button.",
-         "Sparkles", "WEBAPP_ICON"),
-        ("PAYMENT_STARS_TELEGRAM_LABEL_RU", "string", "Telegram button text (RU)",
-         "Custom Russian text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_RU"),
-        ("PAYMENT_STARS_TELEGRAM_LABEL_EN", "string", "Telegram button text (EN)",
-         "Custom English text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_EN"),
-        ("PAYMENT_STARS_TELEGRAM_EMOJI", "string", "Telegram button emoji",
-         "Emoji prepended to the Telegram bot payment button when customized.",
-         "🌟", "TELEGRAM_EMOJI"),
+        (
+            "PAYMENT_STARS_WEBAPP_LABEL_RU",
+            "string",
+            "WebApp button text (RU)",
+            "Custom Russian text shown in the Web App payment method button.",
+            "",
+            "WEBAPP_LABEL_RU",
+        ),
+        (
+            "PAYMENT_STARS_WEBAPP_LABEL_EN",
+            "string",
+            "WebApp button text (EN)",
+            "Custom English text shown in the Web App payment method button.",
+            "",
+            "WEBAPP_LABEL_EN",
+        ),
+        (
+            "PAYMENT_STARS_WEBAPP_ICON",
+            "icon",
+            "WebApp button icon",
+            "Lucide icon name rendered inside the Web App payment method button.",
+            "Sparkles",
+            "WEBAPP_ICON",
+        ),
+        (
+            "PAYMENT_STARS_TELEGRAM_LABEL_RU",
+            "string",
+            "Telegram button text (RU)",
+            "Custom Russian text shown in Telegram bot payment buttons.",
+            "",
+            "TELEGRAM_LABEL_RU",
+        ),
+        (
+            "PAYMENT_STARS_TELEGRAM_LABEL_EN",
+            "string",
+            "Telegram button text (EN)",
+            "Custom English text shown in Telegram bot payment buttons.",
+            "",
+            "TELEGRAM_LABEL_EN",
+        ),
+        (
+            "PAYMENT_STARS_TELEGRAM_EMOJI",
+            "string",
+            "Telegram button emoji",
+            "Emoji prepended to the Telegram bot payment button when customized.",
+            "🌟",
+            "TELEGRAM_EMOJI",
+        ),
     )
 )
 

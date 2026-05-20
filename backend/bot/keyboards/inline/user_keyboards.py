@@ -293,8 +293,7 @@ def get_subscription_options_keyboard(
                         currency_symbol=currency_symbol_val,
                     )
                     callback_data = (
-                        f"subscribe_period:{months}"
-                        f"{callback_suffix_for_context(callback_context)}"
+                        f"subscribe_period:{months}{callback_suffix_for_context(callback_context)}"
                     )
                 builder.button(text=button_text, callback_data=callback_data)
         builder.adjust(1)
@@ -332,9 +331,7 @@ def get_tariff_catalog_keyboard(
         )
     _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
     builder.row(
-        InlineKeyboardButton(
-            text=_(key="back_to_main_menu_button"), callback_data=back_callback
-        )
+        InlineKeyboardButton(text=_(key="back_to_main_menu_button"), callback_data=back_callback)
     )
     return builder.as_markup()
 
@@ -366,9 +363,7 @@ def get_tariff_periods_keyboard(
                 )
             )
     builder.row(
-        InlineKeyboardButton(
-            text=_(key="back_to_main_menu_button"), callback_data=back_callback
-        )
+        InlineKeyboardButton(text=_(key="back_to_main_menu_button"), callback_data=back_callback)
     )
     return builder.as_markup()
 

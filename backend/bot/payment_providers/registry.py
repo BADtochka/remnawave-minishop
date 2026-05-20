@@ -211,10 +211,7 @@ def resolve_provider_presentation(
         or _localized_default(spec.webapp_labels, lang, spec.webapp_label)
         or spec.label
     )
-    webapp_icon = (
-        _bare_setting_value(settings, spec, "WEBAPP_ICON")
-        or spec.webapp_icon
-    )
+    webapp_icon = _bare_setting_value(settings, spec, "WEBAPP_ICON") or spec.webapp_icon
     telegram_label_override = _localized_setting_value(
         settings,
         spec,
@@ -351,15 +348,9 @@ def manifest_field_default(
         return None
     attr = manifest_field.attr or manifest_field.key
     if attr == "WEBAPP_LABEL_RU":
-        return (
-            _localized_default(spec.webapp_labels, "ru", spec.webapp_label)
-            or spec.label
-        )
+        return _localized_default(spec.webapp_labels, "ru", spec.webapp_label) or spec.label
     if attr == "WEBAPP_LABEL_EN":
-        return (
-            _localized_default(spec.webapp_labels, "en", spec.webapp_label)
-            or spec.label
-        )
+        return _localized_default(spec.webapp_labels, "en", spec.webapp_label) or spec.label
     if attr == "WEBAPP_ICON":
         return spec.webapp_icon
     if attr == "TELEGRAM_LABEL_RU":

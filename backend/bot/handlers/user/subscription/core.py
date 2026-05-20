@@ -94,6 +94,22 @@ def _tariff_purchase_text(tariff, current_lang: str, i18n: JsonI18n, settings: S
     return f"{tariff.name(current_lang)}\n{tariff.description(current_lang)}".strip()
 
 
+def _with_subscription_purchase_description(
+    text: str,
+    settings: Settings,
+    current_lang: str,
+    *,
+    include: bool,
+) -> str:
+    if not include:
+        return text
+    description_resolver = getattr(settings, "subscription_purchase_description", None)
+    description = description_resolver(current_lang) if callable(description_resolver) else ""
+    if not description:
+        return text
+    return f"{description}\n\n{text}"
+
+
 async def display_subscription_options(
     event: Union[types.Message, types.CallbackQuery],
     i18n_data: dict,
@@ -125,6 +141,12 @@ async def display_subscription_options(
         if len(enabled_tariffs) == 1:
             tariff = enabled_tariffs[0]
             text_content = _tariff_purchase_text(tariff, current_lang, i18n, settings)
+            text_content = _with_subscription_purchase_description(
+                text_content,
+                settings,
+                current_lang,
+                include=tariff.billing_model == "period",
+            )
             reply_markup = _tariff_purchase_markup(
                 tariff,
                 current_lang,
@@ -135,6 +157,12 @@ async def display_subscription_options(
             )
         else:
             text_content = get_text("select_subscription_period")
+            text_content = _with_subscription_purchase_description(
+                text_content,
+                settings,
+                current_lang,
+                include=any(tariff.billing_model == "period" for tariff in enabled_tariffs),
+            )
             reply_markup = get_tariff_catalog_keyboard(
                 enabled_tariffs,
                 current_lang,
@@ -173,6 +201,12 @@ async def display_subscription_options(
             get_text("select_traffic_package")
             if traffic_mode
             else get_text("select_subscription_period")
+        )
+        text_content = _with_subscription_purchase_description(
+            text_content,
+            settings,
+            current_lang,
+            include=not traffic_mode,
         )
         reply_markup = get_subscription_options_keyboard(
             options,
@@ -248,6 +282,12 @@ async def select_tariff_callback(
         callback_context=callback_context,
     )
     text = _tariff_purchase_text(tariff, current_lang, i18n, settings)
+    text = _with_subscription_purchase_description(
+        text,
+        settings,
+        current_lang,
+        include=tariff.billing_model == "period",
+    )
     await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
 
@@ -284,9 +324,7 @@ async def select_tariff_period_callback(
         current_lang,
         i18n,
         settings,
-        sale_mode=sale_mode_with_callback_context(
-            f"subscription@{tariff.key}", callback_context
-        ),
+        sale_mode=sale_mode_with_callback_context(f"subscription@{tariff.key}", callback_context),
         back_callback=f"tariff:select:{tariff.key}{callback_suffix_for_context(callback_context)}",
     )
     await callback.message.edit_text(get_text("choose_payment_method"), reply_markup=markup)

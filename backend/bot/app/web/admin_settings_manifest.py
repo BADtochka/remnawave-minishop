@@ -133,6 +133,27 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "Порядок методов оплаты",
         "Через запятую, например: severpay,freekassa,yookassa",
     ),
+    SettingField(
+        "SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED",
+        "bool",
+        "pricing",
+        "Показывать описание подписки",
+        "Текст появится перед выбором срока покупки или продления.",
+    ),
+    SettingField(
+        "SUBSCRIPTION_PURCHASE_DESCRIPTION_RU",
+        "text",
+        "pricing",
+        "Описание подписки (RU)",
+        "Русская версия текста на этапе оплаты.",
+    ),
+    SettingField(
+        "SUBSCRIPTION_PURCHASE_DESCRIPTION_EN",
+        "text",
+        "pricing",
+        "Описание подписки (EN)",
+        "Английская версия текста на этапе оплаты.",
+    ),
     # ─── Payment providers (toggles) ───────────────────────────────
     # Common
     SettingField("STARS_ENABLED", "bool", "payments", "Telegram Stars", subsection="Общие"),
@@ -338,9 +359,7 @@ SETTINGS_MANIFEST: List[SettingField] = [
 ]
 
 
-def _provider_field_to_setting_field(
-    spec: Any, manifest_field: Any
-) -> SettingField:
+def _provider_field_to_setting_field(spec: Any, manifest_field: Any) -> SettingField:
     return SettingField(
         key=manifest_field.key,
         type=manifest_field.type,
@@ -445,9 +464,7 @@ def manifest_payload() -> List[dict]:
     items: List[dict] = []
     for field in aggregated_manifest():
         auto_label_i18n_key = f"admin_settings_field_{field.key.lower()}_label"
-        auto_description_i18n_key = (
-            f"admin_settings_field_{field.key.lower()}_description"
-        )
+        auto_description_i18n_key = f"admin_settings_field_{field.key.lower()}_description"
 
         default_value: Optional[str] = None
         owner = find_manifest_owner(field.key)

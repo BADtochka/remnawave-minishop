@@ -290,9 +290,7 @@ class NotificationService:
         return bool(value)
 
     async def support_admin_email_notifications_enabled(self) -> bool:
-        enabled = bool(
-            getattr(self.settings, SUPPORT_ADMIN_EMAIL_NOTIFICATIONS_KEY, False)
-        )
+        enabled = bool(getattr(self.settings, SUPPORT_ADMIN_EMAIL_NOTIFICATIONS_KEY, False))
         if not self.session_factory:
             return enabled
         try:

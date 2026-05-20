@@ -429,7 +429,11 @@ async def pay_platega_callback_handler(
         return
 
     callback_prefix, _, _ = (callback.data or "").partition(":")
-    variant = _resolve_platega_variant(callback_prefix, platega_service.config) if platega_service else None
+    variant = (
+        _resolve_platega_variant(callback_prefix, platega_service.config)
+        if platega_service
+        else None
+    )
     if variant is None:
         await safe_callback_answer(callback)
         return
@@ -513,7 +517,9 @@ async def pay_platega_callback_handler(
 
 def create_service(ctx: ServiceFactoryContext) -> PlategaService:
     bundle = ctx.config_for("platega_service")
-    config = bundle.config if bundle and isinstance(bundle.config, PlategaConfig) else PlategaConfig()
+    config = (
+        bundle.config if bundle and isinstance(bundle.config, PlategaConfig) else PlategaConfig()
+    )
     return PlategaService(
         bot=ctx.bot,
         settings=ctx.settings,
@@ -613,52 +619,109 @@ def _platega_presentation_manifest(subsection: str, default_icon: str, prefix: s
             attr=attr,
         )
         for suffix_key, type_, label, description, placeholder, attr in (
-            ("WEBAPP_LABEL_RU", "string", "WebApp button text (RU)",
-             "Custom Russian text shown in the Web App payment method button.",
-             "", "WEBAPP_LABEL_RU"),
-            ("WEBAPP_LABEL_EN", "string", "WebApp button text (EN)",
-             "Custom English text shown in the Web App payment method button.",
-             "", "WEBAPP_LABEL_EN"),
-            ("WEBAPP_ICON", "icon", "WebApp button icon",
-             "Lucide icon name rendered inside the Web App payment method button.",
-             default_icon, "WEBAPP_ICON"),
-            ("TELEGRAM_LABEL_RU", "string", "Telegram button text (RU)",
-             "Custom Russian text shown in Telegram bot payment buttons.",
-             "", "TELEGRAM_LABEL_RU"),
-            ("TELEGRAM_LABEL_EN", "string", "Telegram button text (EN)",
-             "Custom English text shown in Telegram bot payment buttons.",
-             "", "TELEGRAM_LABEL_EN"),
-            ("TELEGRAM_EMOJI", "string", "Telegram button emoji",
-             "Emoji prepended to the Telegram bot payment button when customized.",
-             "", "TELEGRAM_EMOJI"),
+            (
+                "WEBAPP_LABEL_RU",
+                "string",
+                "WebApp button text (RU)",
+                "Custom Russian text shown in the Web App payment method button.",
+                "",
+                "WEBAPP_LABEL_RU",
+            ),
+            (
+                "WEBAPP_LABEL_EN",
+                "string",
+                "WebApp button text (EN)",
+                "Custom English text shown in the Web App payment method button.",
+                "",
+                "WEBAPP_LABEL_EN",
+            ),
+            (
+                "WEBAPP_ICON",
+                "icon",
+                "WebApp button icon",
+                "Lucide icon name rendered inside the Web App payment method button.",
+                default_icon,
+                "WEBAPP_ICON",
+            ),
+            (
+                "TELEGRAM_LABEL_RU",
+                "string",
+                "Telegram button text (RU)",
+                "Custom Russian text shown in Telegram bot payment buttons.",
+                "",
+                "TELEGRAM_LABEL_RU",
+            ),
+            (
+                "TELEGRAM_LABEL_EN",
+                "string",
+                "Telegram button text (EN)",
+                "Custom English text shown in Telegram bot payment buttons.",
+                "",
+                "TELEGRAM_LABEL_EN",
+            ),
+            (
+                "TELEGRAM_EMOJI",
+                "string",
+                "Telegram button emoji",
+                "Emoji prepended to the Telegram bot payment button when customized.",
+                "",
+                "TELEGRAM_EMOJI",
+            ),
         )
     )
 
 
 _CONFIG_MANIFEST = (
-    ProviderManifestField("PLATEGA_ENABLED", "bool", "Включена",
-                          subsection="Platega", attr="ENABLED"),
-    ProviderManifestField("PLATEGA_BASE_URL", "url", "Base URL",
-                          placeholder="https://app.platega.io",
-                          subsection="Platega", attr="BASE_URL"),
-    ProviderManifestField("PLATEGA_MERCHANT_ID", "string", "Merchant ID",
-                          subsection="Platega", attr="MERCHANT_ID"),
-    ProviderManifestField("PLATEGA_SECRET", "string", "Secret",
-                          subsection="Platega", secret=True, attr="SECRET"),
-    ProviderManifestField("PLATEGA_PAYMENT_METHOD", "int", "Метод оплаты (legacy)",
-                          subsection="Platega", attr="PAYMENT_METHOD"),
-    ProviderManifestField("PLATEGA_SBP_ENABLED", "bool", "SBP-кнопка",
-                          subsection="Platega", attr="SBP_ENABLED"),
-    ProviderManifestField("PLATEGA_SBP_METHOD", "int", "SBP method ID",
-                          subsection="Platega", attr="SBP_METHOD"),
-    ProviderManifestField("PLATEGA_CRYPTO_ENABLED", "bool", "Crypto-кнопка",
-                          subsection="Platega", attr="CRYPTO_ENABLED"),
-    ProviderManifestField("PLATEGA_CRYPTO_METHOD", "int", "Crypto method ID",
-                          subsection="Platega", attr="CRYPTO_METHOD"),
-    ProviderManifestField("PLATEGA_RETURN_URL", "url", "Return URL",
-                          subsection="Platega", attr="RETURN_URL"),
-    ProviderManifestField("PLATEGA_FAILED_URL", "url", "Failed URL",
-                          subsection="Platega", attr="FAILED_URL"),
+    ProviderManifestField(
+        "PLATEGA_ENABLED", "bool", "Включена", subsection="Platega", attr="ENABLED"
+    ),
+    ProviderManifestField(
+        "PLATEGA_BASE_URL",
+        "url",
+        "Base URL",
+        placeholder="https://app.platega.io",
+        subsection="Platega",
+        attr="BASE_URL",
+    ),
+    ProviderManifestField(
+        "PLATEGA_MERCHANT_ID", "string", "Merchant ID", subsection="Platega", attr="MERCHANT_ID"
+    ),
+    ProviderManifestField(
+        "PLATEGA_SECRET", "string", "Secret", subsection="Platega", secret=True, attr="SECRET"
+    ),
+    ProviderManifestField(
+        "PLATEGA_PAYMENT_METHOD",
+        "int",
+        "Метод оплаты (legacy)",
+        subsection="Platega",
+        attr="PAYMENT_METHOD",
+    ),
+    ProviderManifestField(
+        "PLATEGA_SBP_ENABLED", "bool", "SBP-кнопка", subsection="Platega", attr="SBP_ENABLED"
+    ),
+    ProviderManifestField(
+        "PLATEGA_SBP_METHOD", "int", "SBP method ID", subsection="Platega", attr="SBP_METHOD"
+    ),
+    ProviderManifestField(
+        "PLATEGA_CRYPTO_ENABLED",
+        "bool",
+        "Crypto-кнопка",
+        subsection="Platega",
+        attr="CRYPTO_ENABLED",
+    ),
+    ProviderManifestField(
+        "PLATEGA_CRYPTO_METHOD",
+        "int",
+        "Crypto method ID",
+        subsection="Platega",
+        attr="CRYPTO_METHOD",
+    ),
+    ProviderManifestField(
+        "PLATEGA_RETURN_URL", "url", "Return URL", subsection="Platega", attr="RETURN_URL"
+    ),
+    ProviderManifestField(
+        "PLATEGA_FAILED_URL", "url", "Failed URL", subsection="Platega", attr="FAILED_URL"
+    ),
 )
 
 
@@ -672,7 +735,9 @@ SBP_SPEC = PaymentProviderSpec(
     telegram_labels={"ru": "Оплата через СБП", "en": "Pay via SBP"},
     telegram_emoji="🏦",
     pending_status="pending_platega",
-    enabled=lambda config: bool(getattr(config, "ENABLED", False) and getattr(config, "SBP_ENABLED", False)),
+    enabled=lambda config: bool(
+        getattr(config, "ENABLED", False) and getattr(config, "SBP_ENABLED", False)
+    ),
     service_key="platega_service",
     callback_prefix="pay_platega_sbp",
     aliases=("platega",),
@@ -683,9 +748,8 @@ SBP_SPEC = PaymentProviderSpec(
     create_webapp_payment=create_sbp_webapp_payment,
     config_class=PlategaConfig,
     presentation_class=PlategaSbpPresentation,
-    manifest_fields=_CONFIG_MANIFEST + _platega_presentation_manifest(
-        "Platega SBP", "CreditCard", "PLATEGA_SBP"
-    ),
+    manifest_fields=_CONFIG_MANIFEST
+    + _platega_presentation_manifest("Platega SBP", "CreditCard", "PLATEGA_SBP"),
 )
 
 CRYPTO_SPEC = PaymentProviderSpec(
@@ -700,15 +764,15 @@ CRYPTO_SPEC = PaymentProviderSpec(
     pending_status="pending_platega",
     # Uses the same PlategaConfig as SBP_SPEC (shared service_key); enable
     # flag combines the global PLATEGA_ENABLED with the per-button toggle.
-    enabled=lambda config: bool(getattr(config, "ENABLED", False) and getattr(config, "CRYPTO_ENABLED", False)),
+    enabled=lambda config: bool(
+        getattr(config, "ENABLED", False) and getattr(config, "CRYPTO_ENABLED", False)
+    ),
     service_key="platega_service",
     callback_prefix="pay_platega_crypto",
     create_webapp_payment=create_crypto_webapp_payment,
     config_class=PlategaConfig,
     presentation_class=PlategaCryptoPresentation,
-    manifest_fields=_platega_presentation_manifest(
-        "Platega Crypto", "Bitcoin", "PLATEGA_CRYPTO"
-    ),
+    manifest_fields=_platega_presentation_manifest("Platega Crypto", "Bitcoin", "PLATEGA_CRYPTO"),
 )
 
 SPECS = (SBP_SPEC, CRYPTO_SPEC)

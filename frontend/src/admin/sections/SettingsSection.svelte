@@ -269,6 +269,14 @@
           value={valueFor(field) ?? ""}
           oninput={(e) => settingsStore.markDirty(field.key, e.currentTarget.value)}
         />
+      {:else if field.type === "text"}
+        <textarea
+          class="admin-setting-textarea"
+          rows="4"
+          placeholder={field.placeholder}
+          value={valueFor(field) ?? ""}
+          oninput={(e) => settingsStore.markDirty(field.key, e.currentTarget.value)}
+        ></textarea>
       {:else if field.secret}
         <input
           class="input"

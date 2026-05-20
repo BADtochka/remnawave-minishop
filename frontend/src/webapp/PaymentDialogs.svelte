@@ -64,6 +64,7 @@
   export let setPasswordValue = "";
   export let singleTariffMode = false;
   export let subscription = {};
+  export let subscriptionPurchaseDescription = "";
   export let tariffCatalog = [];
   export let tariffMode = false;
   export let trafficMode = false;
@@ -109,6 +110,13 @@
         : t("wa_tariffs_choose");
     }
     return trafficMode ? t("wa_traffic_packages_choose") : t("wa_subscription_choose_period");
+  }
+
+  function showSubscriptionPurchaseDescription() {
+    if (!subscriptionPurchaseDescription || trafficMode) return false;
+    if (!tariffMode) return true;
+    if (paymentStep === "tariff") return false;
+    return String(selectedTariff?.billing_model || "period").toLowerCase() !== "traffic";
   }
 
   export let closeDeviceDisconnectDialog = () => {};
@@ -184,6 +192,11 @@
         </p>
       {/if}
       {#if selectedTariffPlans.length}
+        {#if showSubscriptionPurchaseDescription()}
+          <div class="subscription-purchase-description">
+            <p>{subscriptionPurchaseDescription}</p>
+          </div>
+        {/if}
         <div class="period-grid period-grid-two-columns">
           {#each selectedTariffPlans as plan}
             <button
@@ -233,6 +246,11 @@
         branch above, so users on legacy mode saw the period grid, payment
         method grid and pay button duplicated.
       -->
+      {#if showSubscriptionPurchaseDescription()}
+        <div class="subscription-purchase-description">
+          <p>{subscriptionPurchaseDescription}</p>
+        </div>
+      {/if}
       <div class="period-grid period-grid-two-columns">
         {#each plans as plan}
           <button

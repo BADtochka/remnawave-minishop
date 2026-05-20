@@ -90,9 +90,7 @@ class YooKassaConfig(ProviderEnvConfig):
     AUTOPAYMENTS_ENABLED: bool = Field(default=False)
     AUTOPAYMENTS_REQUIRE_CARD_BINDING: bool = Field(default=True)
 
-    @field_validator(
-        "SHOP_ID", "SECRET_KEY", "RETURN_URL", "DEFAULT_RECEIPT_EMAIL", mode="before"
-    )
+    @field_validator("SHOP_ID", "SECRET_KEY", "RETURN_URL", "DEFAULT_RECEIPT_EMAIL", mode="before")
     @classmethod
     def _strip_optional(cls, v):
         if isinstance(v, str) and not v.strip():
@@ -147,7 +145,9 @@ class YooKassaService:
         self.config = config or YooKassaConfig()
         self._bot_username_for_default_return = bot_username_for_default_return
         self._configured_return_url_override = configured_return_url
-        self._sdk_configured_for = None  # (shop_id, secret_key) currently loaded into the global SDK
+        self._sdk_configured_for = (
+            None  # (shop_id, secret_key) currently loaded into the global SDK
+        )
 
         if not self.configured:
             if not self.config.ENABLED:
@@ -1214,9 +1214,7 @@ async def _initiate_yk_payment(
         "description": payment_description,
         "subscription_duration_months": int(months) if sale_base == "subscription" else None,
         "sale_mode": sale_base,
-        "tariff_key": sale_mode.split("@", 1)[1].split("|", 1)[0]
-        if "@" in sale_mode
-        else None,
+        "tariff_key": sale_mode.split("@", 1)[1].split("|", 1)[0] if "@" in sale_mode else None,
         "purchased_gb": float(months)
         if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}
         else None,
@@ -2505,7 +2503,9 @@ logger = logging.getLogger(__name__)
 
 def create_service(ctx: ServiceFactoryContext) -> YooKassaService:
     bundle = ctx.config_for("yookassa_service")
-    config = bundle.config if bundle and isinstance(bundle.config, YooKassaConfig) else YooKassaConfig()
+    config = (
+        bundle.config if bundle and isinstance(bundle.config, YooKassaConfig) else YooKassaConfig()
+    )
     return YooKassaService(
         shop_id=config.SHOP_ID,
         secret_key=config.SECRET_KEY,
@@ -2516,12 +2516,7 @@ def create_service(ctx: ServiceFactoryContext) -> YooKassaService:
     )
 
 
-
-
-
-
 async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
-    settings = ctx.request.app["settings"]
     service: YooKassaService = ctx.request.app["yookassa_service"]
     if not service or not service.configured:
         return payment_unavailable()
@@ -2588,49 +2583,116 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
 
 _PRESENTATION_MANIFEST = tuple(
     ProviderManifestField(
-        key=key, type=type_, label=label, description=description,
-        placeholder=placeholder, subsection="YooKassa",
-        target="presentation", attr=attr,
+        key=key,
+        type=type_,
+        label=label,
+        description=description,
+        placeholder=placeholder,
+        subsection="YooKassa",
+        target="presentation",
+        attr=attr,
     )
     for key, type_, label, description, placeholder, attr in (
-        ("PAYMENT_YOOKASSA_WEBAPP_LABEL_RU", "string", "WebApp button text (RU)",
-         "Custom Russian text shown in the Web App payment method button.", "", "WEBAPP_LABEL_RU"),
-        ("PAYMENT_YOOKASSA_WEBAPP_LABEL_EN", "string", "WebApp button text (EN)",
-         "Custom English text shown in the Web App payment method button.", "", "WEBAPP_LABEL_EN"),
-        ("PAYMENT_YOOKASSA_WEBAPP_ICON", "icon", "WebApp button icon",
-         "Lucide icon name rendered inside the Web App payment method button.",
-         "CreditCard", "WEBAPP_ICON"),
-        ("PAYMENT_YOOKASSA_TELEGRAM_LABEL_RU", "string", "Telegram button text (RU)",
-         "Custom Russian text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_RU"),
-        ("PAYMENT_YOOKASSA_TELEGRAM_LABEL_EN", "string", "Telegram button text (EN)",
-         "Custom English text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_EN"),
-        ("PAYMENT_YOOKASSA_TELEGRAM_EMOJI", "string", "Telegram button emoji",
-         "Emoji prepended to the Telegram bot payment button when customized.",
-         "💳", "TELEGRAM_EMOJI"),
+        (
+            "PAYMENT_YOOKASSA_WEBAPP_LABEL_RU",
+            "string",
+            "WebApp button text (RU)",
+            "Custom Russian text shown in the Web App payment method button.",
+            "",
+            "WEBAPP_LABEL_RU",
+        ),
+        (
+            "PAYMENT_YOOKASSA_WEBAPP_LABEL_EN",
+            "string",
+            "WebApp button text (EN)",
+            "Custom English text shown in the Web App payment method button.",
+            "",
+            "WEBAPP_LABEL_EN",
+        ),
+        (
+            "PAYMENT_YOOKASSA_WEBAPP_ICON",
+            "icon",
+            "WebApp button icon",
+            "Lucide icon name rendered inside the Web App payment method button.",
+            "CreditCard",
+            "WEBAPP_ICON",
+        ),
+        (
+            "PAYMENT_YOOKASSA_TELEGRAM_LABEL_RU",
+            "string",
+            "Telegram button text (RU)",
+            "Custom Russian text shown in Telegram bot payment buttons.",
+            "",
+            "TELEGRAM_LABEL_RU",
+        ),
+        (
+            "PAYMENT_YOOKASSA_TELEGRAM_LABEL_EN",
+            "string",
+            "Telegram button text (EN)",
+            "Custom English text shown in Telegram bot payment buttons.",
+            "",
+            "TELEGRAM_LABEL_EN",
+        ),
+        (
+            "PAYMENT_YOOKASSA_TELEGRAM_EMOJI",
+            "string",
+            "Telegram button emoji",
+            "Emoji prepended to the Telegram bot payment button when customized.",
+            "💳",
+            "TELEGRAM_EMOJI",
+        ),
     )
 )
 
 _CONFIG_MANIFEST = (
-    ProviderManifestField("YOOKASSA_ENABLED", "bool", "Включена",
-                          subsection="YooKassa", attr="ENABLED"),
-    ProviderManifestField("YOOKASSA_SHOP_ID", "string", "Shop ID",
-                          subsection="YooKassa", attr="SHOP_ID"),
-    ProviderManifestField("YOOKASSA_SECRET_KEY", "string", "Secret key",
-                          subsection="YooKassa", secret=True, attr="SECRET_KEY"),
-    ProviderManifestField("YOOKASSA_RETURN_URL", "url", "Return URL",
-                          subsection="YooKassa", attr="RETURN_URL"),
-    ProviderManifestField("YOOKASSA_DEFAULT_RECEIPT_EMAIL", "string",
-                          "Email для чека по умолчанию",
-                          subsection="YooKassa", attr="DEFAULT_RECEIPT_EMAIL"),
-    ProviderManifestField("YOOKASSA_VAT_CODE", "int", "VAT code",
-                          description="1..6 в зависимости от системы налогообложения",
-                          subsection="YooKassa", min=1, max=6, attr="VAT_CODE"),
-    ProviderManifestField("YOOKASSA_AUTOPAYMENTS_ENABLED", "bool",
-                          "Автоплатежи (recurring)",
-                          subsection="YooKassa", attr="AUTOPAYMENTS_ENABLED"),
-    ProviderManifestField("YOOKASSA_AUTOPAYMENTS_REQUIRE_CARD_BINDING", "bool",
-                          "Принудительная привязка карты",
-                          subsection="YooKassa", attr="AUTOPAYMENTS_REQUIRE_CARD_BINDING"),
+    ProviderManifestField(
+        "YOOKASSA_ENABLED", "bool", "Включена", subsection="YooKassa", attr="ENABLED"
+    ),
+    ProviderManifestField(
+        "YOOKASSA_SHOP_ID", "string", "Shop ID", subsection="YooKassa", attr="SHOP_ID"
+    ),
+    ProviderManifestField(
+        "YOOKASSA_SECRET_KEY",
+        "string",
+        "Secret key",
+        subsection="YooKassa",
+        secret=True,
+        attr="SECRET_KEY",
+    ),
+    ProviderManifestField(
+        "YOOKASSA_RETURN_URL", "url", "Return URL", subsection="YooKassa", attr="RETURN_URL"
+    ),
+    ProviderManifestField(
+        "YOOKASSA_DEFAULT_RECEIPT_EMAIL",
+        "string",
+        "Email для чека по умолчанию",
+        subsection="YooKassa",
+        attr="DEFAULT_RECEIPT_EMAIL",
+    ),
+    ProviderManifestField(
+        "YOOKASSA_VAT_CODE",
+        "int",
+        "VAT code",
+        description="1..6 в зависимости от системы налогообложения",
+        subsection="YooKassa",
+        min=1,
+        max=6,
+        attr="VAT_CODE",
+    ),
+    ProviderManifestField(
+        "YOOKASSA_AUTOPAYMENTS_ENABLED",
+        "bool",
+        "Автоплатежи (recurring)",
+        subsection="YooKassa",
+        attr="AUTOPAYMENTS_ENABLED",
+    ),
+    ProviderManifestField(
+        "YOOKASSA_AUTOPAYMENTS_REQUIRE_CARD_BINDING",
+        "bool",
+        "Принудительная привязка карты",
+        subsection="YooKassa",
+        attr="AUTOPAYMENTS_REQUIRE_CARD_BINDING",
+    ),
 )
 
 

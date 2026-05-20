@@ -349,10 +349,7 @@ async def pay_crypto_callback_handler(
         await notify_callback_parse_error(callback, translator)
         return
 
-    if (
-        not cryptopay_service
-        or not getattr(cryptopay_service, "configured", False)
-    ):
+    if not cryptopay_service or not getattr(cryptopay_service, "configured", False):
         await notify_service_unavailable(callback, translator)
         return
 
@@ -390,7 +387,11 @@ async def pay_crypto_callback_handler(
 
 def create_service(ctx: ServiceFactoryContext) -> CryptoPayService:
     bundle = ctx.config_for("cryptopay_service")
-    config = bundle.config if bundle and isinstance(bundle.config, CryptoPayConfig) else CryptoPayConfig()
+    config = (
+        bundle.config
+        if bundle and isinstance(bundle.config, CryptoPayConfig)
+        else CryptoPayConfig()
+    )
     return CryptoPayService(
         bot=ctx.bot,
         settings=ctx.settings,
@@ -422,40 +423,99 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
 
 _PRESENTATION_MANIFEST = tuple(
     ProviderManifestField(
-        key=key, type=type_, label=label, description=description,
-        placeholder=placeholder, subsection="CryptoPay",
-        target="presentation", attr=attr,
+        key=key,
+        type=type_,
+        label=label,
+        description=description,
+        placeholder=placeholder,
+        subsection="CryptoPay",
+        target="presentation",
+        attr=attr,
     )
     for key, type_, label, description, placeholder, attr in (
-        ("PAYMENT_CRYPTOPAY_WEBAPP_LABEL_RU", "string", "WebApp button text (RU)",
-         "Custom Russian text shown in the Web App payment method button.", "", "WEBAPP_LABEL_RU"),
-        ("PAYMENT_CRYPTOPAY_WEBAPP_LABEL_EN", "string", "WebApp button text (EN)",
-         "Custom English text shown in the Web App payment method button.", "", "WEBAPP_LABEL_EN"),
-        ("PAYMENT_CRYPTOPAY_WEBAPP_ICON", "icon", "WebApp button icon",
-         "Lucide icon name rendered inside the Web App payment method button.",
-         "Bitcoin", "WEBAPP_ICON"),
-        ("PAYMENT_CRYPTOPAY_TELEGRAM_LABEL_RU", "string", "Telegram button text (RU)",
-         "Custom Russian text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_RU"),
-        ("PAYMENT_CRYPTOPAY_TELEGRAM_LABEL_EN", "string", "Telegram button text (EN)",
-         "Custom English text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_EN"),
-        ("PAYMENT_CRYPTOPAY_TELEGRAM_EMOJI", "string", "Telegram button emoji",
-         "Emoji prepended to the Telegram bot payment button when customized.",
-         "₿", "TELEGRAM_EMOJI"),
+        (
+            "PAYMENT_CRYPTOPAY_WEBAPP_LABEL_RU",
+            "string",
+            "WebApp button text (RU)",
+            "Custom Russian text shown in the Web App payment method button.",
+            "",
+            "WEBAPP_LABEL_RU",
+        ),
+        (
+            "PAYMENT_CRYPTOPAY_WEBAPP_LABEL_EN",
+            "string",
+            "WebApp button text (EN)",
+            "Custom English text shown in the Web App payment method button.",
+            "",
+            "WEBAPP_LABEL_EN",
+        ),
+        (
+            "PAYMENT_CRYPTOPAY_WEBAPP_ICON",
+            "icon",
+            "WebApp button icon",
+            "Lucide icon name rendered inside the Web App payment method button.",
+            "Bitcoin",
+            "WEBAPP_ICON",
+        ),
+        (
+            "PAYMENT_CRYPTOPAY_TELEGRAM_LABEL_RU",
+            "string",
+            "Telegram button text (RU)",
+            "Custom Russian text shown in Telegram bot payment buttons.",
+            "",
+            "TELEGRAM_LABEL_RU",
+        ),
+        (
+            "PAYMENT_CRYPTOPAY_TELEGRAM_LABEL_EN",
+            "string",
+            "Telegram button text (EN)",
+            "Custom English text shown in Telegram bot payment buttons.",
+            "",
+            "TELEGRAM_LABEL_EN",
+        ),
+        (
+            "PAYMENT_CRYPTOPAY_TELEGRAM_EMOJI",
+            "string",
+            "Telegram button emoji",
+            "Emoji prepended to the Telegram bot payment button when customized.",
+            "₿",
+            "TELEGRAM_EMOJI",
+        ),
     )
 )
 
 _CONFIG_MANIFEST = (
-    ProviderManifestField("CRYPTOPAY_ENABLED", "bool", "Включена",
-                          subsection="CryptoPay", attr="ENABLED"),
-    ProviderManifestField("CRYPTOPAY_TOKEN", "string", "Token",
-                          subsection="CryptoPay", secret=True, attr="TOKEN"),
-    ProviderManifestField("CRYPTOPAY_NETWORK", "string", "Network",
-                          placeholder="mainnet", subsection="CryptoPay", attr="NETWORK"),
-    ProviderManifestField("CRYPTOPAY_CURRENCY_TYPE", "string", "Currency type",
-                          description="fiat or crypto.",
-                          placeholder="fiat", subsection="CryptoPay", attr="CURRENCY_TYPE"),
-    ProviderManifestField("CRYPTOPAY_ASSET", "string", "Asset",
-                          placeholder="RUB", subsection="CryptoPay", attr="ASSET"),
+    ProviderManifestField(
+        "CRYPTOPAY_ENABLED", "bool", "Включена", subsection="CryptoPay", attr="ENABLED"
+    ),
+    ProviderManifestField(
+        "CRYPTOPAY_TOKEN", "string", "Token", subsection="CryptoPay", secret=True, attr="TOKEN"
+    ),
+    ProviderManifestField(
+        "CRYPTOPAY_NETWORK",
+        "string",
+        "Network",
+        placeholder="mainnet",
+        subsection="CryptoPay",
+        attr="NETWORK",
+    ),
+    ProviderManifestField(
+        "CRYPTOPAY_CURRENCY_TYPE",
+        "string",
+        "Currency type",
+        description="fiat or crypto.",
+        placeholder="fiat",
+        subsection="CryptoPay",
+        attr="CURRENCY_TYPE",
+    ),
+    ProviderManifestField(
+        "CRYPTOPAY_ASSET",
+        "string",
+        "Asset",
+        placeholder="RUB",
+        subsection="CryptoPay",
+        attr="ASSET",
+    ),
 )
 
 

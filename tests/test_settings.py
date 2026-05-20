@@ -162,6 +162,22 @@ class SettingsTests(unittest.TestCase):
 
         self.assertFalse(settings.SUPPORT_ADMIN_EMAIL_NOTIFICATIONS_ENABLED)
 
+    def test_subscription_purchase_description_is_localized_and_toggleable(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+            SUBSCRIPTION_PURCHASE_DESCRIPTION_RU="Русский текст",
+            SUBSCRIPTION_PURCHASE_DESCRIPTION_EN="English text",
+        )
+
+        self.assertEqual(settings.subscription_purchase_description("ru"), "Русский текст")
+        self.assertEqual(settings.subscription_purchase_description("en"), "English text")
+
+        settings.SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED = False
+        self.assertEqual(settings.subscription_purchase_description("ru"), "")
+
     def test_payment_button_presentation_env_values_are_available(self):
         """Presentation overrides now live on each provider's BaseSettings
         model instead of the central Settings — verify they're loaded from

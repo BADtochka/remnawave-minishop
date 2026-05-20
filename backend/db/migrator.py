@@ -738,8 +738,7 @@ def _migration_0022_add_indexes_for_admin_reports(connection: Connection) -> Non
     )
     connection.execute(
         text(
-            "CREATE INDEX IF NOT EXISTS ix_message_logs_timestamp "
-            "ON message_logs (timestamp DESC)"
+            "CREATE INDEX IF NOT EXISTS ix_message_logs_timestamp ON message_logs (timestamp DESC)"
         )
     )
 

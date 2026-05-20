@@ -669,6 +669,10 @@ export async function mockApi(path, options = {}, context = {}) {
     }
     const language = normalizeLangCode(payload?.language || currentLang);
     DEV_MOCK.data.user.language_code = language;
+    DEV_MOCK.data.settings.subscription_purchase_description =
+      language === "en"
+        ? "By buying or renewing a subscription, you get access to a VPN/proxy service that helps protect your connection and keep your access stable."
+        : "Покупая или продлевая подписку, вы получаете доступ к VPN/прокси-сервису, который помогает защищать ваше соединение и поддерживать стабильный доступ к сети.";
     return { ok: true, language };
   }
   if (path === "/account/email/request" && String(options.method || "").toUpperCase() === "POST") {

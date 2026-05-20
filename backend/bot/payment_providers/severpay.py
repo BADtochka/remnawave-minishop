@@ -453,7 +453,9 @@ async def pay_severpay_callback_handler(
 
 def create_service(ctx: ServiceFactoryContext) -> SeverPayService:
     bundle = ctx.config_for("severpay_service")
-    config = bundle.config if bundle and isinstance(bundle.config, SeverPayConfig) else SeverPayConfig()
+    config = (
+        bundle.config if bundle and isinstance(bundle.config, SeverPayConfig) else SeverPayConfig()
+    )
     return SeverPayService(
         bot=ctx.bot,
         settings=ctx.settings,
@@ -506,42 +508,96 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
 
 _PRESENTATION_MANIFEST = tuple(
     ProviderManifestField(
-        key=key, type=type_, label=label, description=description,
-        placeholder=placeholder, subsection="SeverPay",
-        target="presentation", attr=attr,
+        key=key,
+        type=type_,
+        label=label,
+        description=description,
+        placeholder=placeholder,
+        subsection="SeverPay",
+        target="presentation",
+        attr=attr,
     )
     for key, type_, label, description, placeholder, attr in (
-        ("PAYMENT_SEVERPAY_WEBAPP_LABEL_RU", "string", "WebApp button text (RU)",
-         "Custom Russian text shown in the Web App payment method button.", "", "WEBAPP_LABEL_RU"),
-        ("PAYMENT_SEVERPAY_WEBAPP_LABEL_EN", "string", "WebApp button text (EN)",
-         "Custom English text shown in the Web App payment method button.", "", "WEBAPP_LABEL_EN"),
-        ("PAYMENT_SEVERPAY_WEBAPP_ICON", "icon", "WebApp button icon",
-         "Lucide icon name rendered inside the Web App payment method button.",
-         "CreditCard", "WEBAPP_ICON"),
-        ("PAYMENT_SEVERPAY_TELEGRAM_LABEL_RU", "string", "Telegram button text (RU)",
-         "Custom Russian text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_RU"),
-        ("PAYMENT_SEVERPAY_TELEGRAM_LABEL_EN", "string", "Telegram button text (EN)",
-         "Custom English text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_EN"),
-        ("PAYMENT_SEVERPAY_TELEGRAM_EMOJI", "string", "Telegram button emoji",
-         "Emoji prepended to the Telegram bot payment button when customized.",
-         "💳", "TELEGRAM_EMOJI"),
+        (
+            "PAYMENT_SEVERPAY_WEBAPP_LABEL_RU",
+            "string",
+            "WebApp button text (RU)",
+            "Custom Russian text shown in the Web App payment method button.",
+            "",
+            "WEBAPP_LABEL_RU",
+        ),
+        (
+            "PAYMENT_SEVERPAY_WEBAPP_LABEL_EN",
+            "string",
+            "WebApp button text (EN)",
+            "Custom English text shown in the Web App payment method button.",
+            "",
+            "WEBAPP_LABEL_EN",
+        ),
+        (
+            "PAYMENT_SEVERPAY_WEBAPP_ICON",
+            "icon",
+            "WebApp button icon",
+            "Lucide icon name rendered inside the Web App payment method button.",
+            "CreditCard",
+            "WEBAPP_ICON",
+        ),
+        (
+            "PAYMENT_SEVERPAY_TELEGRAM_LABEL_RU",
+            "string",
+            "Telegram button text (RU)",
+            "Custom Russian text shown in Telegram bot payment buttons.",
+            "",
+            "TELEGRAM_LABEL_RU",
+        ),
+        (
+            "PAYMENT_SEVERPAY_TELEGRAM_LABEL_EN",
+            "string",
+            "Telegram button text (EN)",
+            "Custom English text shown in Telegram bot payment buttons.",
+            "",
+            "TELEGRAM_LABEL_EN",
+        ),
+        (
+            "PAYMENT_SEVERPAY_TELEGRAM_EMOJI",
+            "string",
+            "Telegram button emoji",
+            "Emoji prepended to the Telegram bot payment button when customized.",
+            "💳",
+            "TELEGRAM_EMOJI",
+        ),
     )
 )
 
 _CONFIG_MANIFEST = (
-    ProviderManifestField("SEVERPAY_ENABLED", "bool", "Включена",
-                          subsection="SeverPay", attr="ENABLED"),
+    ProviderManifestField(
+        "SEVERPAY_ENABLED", "bool", "Включена", subsection="SeverPay", attr="ENABLED"
+    ),
     ProviderManifestField("SEVERPAY_MID", "int", "MID", subsection="SeverPay", attr="MID"),
-    ProviderManifestField("SEVERPAY_TOKEN", "string", "Token", subsection="SeverPay",
-                          secret=True, attr="TOKEN"),
-    ProviderManifestField("SEVERPAY_BASE_URL", "url", "Base URL",
-                          placeholder="https://severpay.io/api/merchant",
-                          subsection="SeverPay", attr="BASE_URL"),
-    ProviderManifestField("SEVERPAY_RETURN_URL", "url", "Return URL",
-                          subsection="SeverPay", attr="RETURN_URL"),
-    ProviderManifestField("SEVERPAY_LIFETIME_MINUTES", "int", "Payment link lifetime (minutes)",
-                          description="30..4320; leave empty for the SeverPay default.",
-                          subsection="SeverPay", min=30, max=4320, attr="LIFETIME_MINUTES"),
+    ProviderManifestField(
+        "SEVERPAY_TOKEN", "string", "Token", subsection="SeverPay", secret=True, attr="TOKEN"
+    ),
+    ProviderManifestField(
+        "SEVERPAY_BASE_URL",
+        "url",
+        "Base URL",
+        placeholder="https://severpay.io/api/merchant",
+        subsection="SeverPay",
+        attr="BASE_URL",
+    ),
+    ProviderManifestField(
+        "SEVERPAY_RETURN_URL", "url", "Return URL", subsection="SeverPay", attr="RETURN_URL"
+    ),
+    ProviderManifestField(
+        "SEVERPAY_LIFETIME_MINUTES",
+        "int",
+        "Payment link lifetime (minutes)",
+        description="30..4320; leave empty for the SeverPay default.",
+        subsection="SeverPay",
+        min=30,
+        max=4320,
+        attr="LIFETIME_MINUTES",
+    ),
 )
 
 

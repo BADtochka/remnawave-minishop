@@ -514,7 +514,7 @@ def _support_email(
     footer = _t_html(_resolve_i18n(i18n), lang, "email_footer_auto", brand=brand)
     preview_block = (
         f'<div style="margin:0 0 16px 0;background:{_BG};border:1px solid {_BORDER};'
-        f'border-radius:14px;padding:14px 16px;font-size:14px;line-height:1.55;color:{_TEXT};'
+        f"border-radius:14px;padding:14px 16px;font-size:14px;line-height:1.55;color:{_TEXT};"
         f'white-space:pre-wrap;">{html.escape(body_preview or "")}</div>'
     )
     body_parts = [_info_rows_html(rows), preview_block]

@@ -679,5 +679,3 @@ async def _create_subscription_payment(
         )
 
     return _json_error(400, "payment_unavailable", "Payment method unavailable")
-
-

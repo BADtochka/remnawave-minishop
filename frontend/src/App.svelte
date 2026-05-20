@@ -279,6 +279,9 @@
   $: plans = data?.plans?.length ? data.plans : DEV_MOCK.data.plans;
   $: methods = data?.payment_methods?.length ? data.payment_methods : [];
   $: appSettings = data?.settings || DEV_MOCK.data.settings;
+  $: subscriptionPurchaseDescription = String(
+    appSettings?.subscription_purchase_description || ""
+  ).trim();
   $: trafficMode = Boolean(appSettings?.traffic_mode);
   $: tariffMode = plans.some((plan) => plan?.tariff_key);
   $: tariffCatalog = buildTariffCatalog(plans);
@@ -1321,6 +1324,7 @@
             {selectedTariffPlans}
             {singleTariffMode}
             {subscription}
+            {subscriptionPurchaseDescription}
             {tariffCatalog}
             {tariffMode}
             closeDeviceDisconnectDialog={devicesStore.closeDeviceDisconnectDialog}

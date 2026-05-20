@@ -35,9 +35,7 @@ async def resolve_user_language(
     if db_user is None:
         db_user = await user_dal.get_user_by_id(session, user_id)
     language = (
-        db_user.language_code
-        if db_user and db_user.language_code
-        else settings.DEFAULT_LANGUAGE
+        db_user.language_code if db_user and db_user.language_code else settings.DEFAULT_LANGUAGE
     )
     return db_user, language
 
@@ -256,9 +254,7 @@ async def finalize_successful_payment(
     activation_months = (
         int(float(req.months)) if is_subscription else int(float(req.traffic_amount or req.months))
     )
-    traffic_gb_for_activation = (
-        float(req.traffic_amount or req.months) if is_traffic else None
-    )
+    traffic_gb_for_activation = float(req.traffic_amount or req.months) if is_traffic else None
 
     try:
         activation = await req.subscription_service.activate_subscription(
@@ -308,9 +304,7 @@ async def finalize_successful_payment(
     base_end_date = activation.get("end_date") if activation else None
     final_end_date = base_end_date
     applied_referee_bonus_days = 0
-    applied_promo_bonus_days = (
-        activation.get("applied_promo_bonus_days", 0) if activation else 0
-    )
+    applied_promo_bonus_days = activation.get("applied_promo_bonus_days", 0) if activation else 0
 
     inviter_name: Optional[str] = None
     if referral_bonus and referral_bonus.get("referee_new_end_date"):
@@ -351,9 +345,7 @@ async def finalize_successful_payment(
         log_prefix=req.log_prefix,
     )
 
-    refreshed_payment = await payment_dal.get_payment_by_db_id(
-        req.session, req.payment.payment_id
-    )
+    refreshed_payment = await payment_dal.get_payment_by_db_id(req.session, req.payment.payment_id)
     tariff_key = getattr(refreshed_payment or req.payment, "tariff_key", None)
 
     await notify_admins_payment_received(

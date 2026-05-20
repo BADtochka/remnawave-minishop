@@ -125,11 +125,7 @@ def payment_link_message_text(
         "topup",
         "premium_topup",
     }
-    key = (
-        "payment_link_message_traffic"
-        if traffic_like
-        else "payment_link_message"
-    )
+    key = "payment_link_message_traffic" if traffic_like else "payment_link_message"
     body = translator(
         key,
         months=int(parts.months),

@@ -71,9 +71,7 @@ class FreeKassaConfig(ProviderEnvConfig):
     API_KEY: Optional[str] = None
     PAYMENT_IP: Optional[str] = None
     PAYMENT_METHOD_ID: Optional[int] = None
-    TRUSTED_IPS: str = Field(
-        default="168.119.157.136,168.119.60.227,178.154.197.79,51.250.54.238"
-    )
+    TRUSTED_IPS: str = Field(default="168.119.157.136,168.119.60.227,178.154.197.79,51.250.54.238")
 
     @field_validator("PAYMENT_METHOD_ID", mode="before")
     @classmethod
@@ -85,7 +83,11 @@ class FreeKassaConfig(ProviderEnvConfig):
         return v
 
     @field_validator(
-        "MERCHANT_ID", "FIRST_SECRET", "SECOND_SECRET", "API_KEY", "PAYMENT_IP",
+        "MERCHANT_ID",
+        "FIRST_SECRET",
+        "SECOND_SECRET",
+        "API_KEY",
+        "PAYMENT_IP",
         mode="before",
     )
     @classmethod
@@ -505,8 +507,10 @@ async def pay_fk_callback_handler(
     provider_identifier = first_value(response_data, "orderHash", "orderId")
     lead_text: Optional[str] = None
     if success and location:
-        order_id_display = first_value(response_data, "orderId") or provider_identifier or str(
-            payment_record.payment_id
+        order_id_display = (
+            first_value(response_data, "orderId")
+            or provider_identifier
+            or str(payment_record.payment_id)
         )
         lead_text = translator(
             "free_kassa_order_info",
@@ -532,7 +536,11 @@ async def pay_fk_callback_handler(
 
 def create_service(ctx: ServiceFactoryContext) -> FreeKassaService:
     bundle = ctx.config_for("freekassa_service")
-    config = bundle.config if bundle and isinstance(bundle.config, FreeKassaConfig) else FreeKassaConfig()
+    config = (
+        bundle.config
+        if bundle and isinstance(bundle.config, FreeKassaConfig)
+        else FreeKassaConfig()
+    )
     return FreeKassaService(
         bot=ctx.bot,
         settings=ctx.settings,
@@ -584,51 +592,130 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
 
 _PRESENTATION_MANIFEST = tuple(
     ProviderManifestField(
-        key=key, type=type_, label=label, description=description,
-        placeholder=placeholder, subsection="FreeKassa",
-        target="presentation", attr=attr,
+        key=key,
+        type=type_,
+        label=label,
+        description=description,
+        placeholder=placeholder,
+        subsection="FreeKassa",
+        target="presentation",
+        attr=attr,
     )
     for key, type_, label, description, placeholder, attr in (
-        ("PAYMENT_FREEKASSA_WEBAPP_LABEL_RU", "string", "WebApp button text (RU)",
-         "Custom Russian text shown in the Web App payment method button.", "", "WEBAPP_LABEL_RU"),
-        ("PAYMENT_FREEKASSA_WEBAPP_LABEL_EN", "string", "WebApp button text (EN)",
-         "Custom English text shown in the Web App payment method button.", "", "WEBAPP_LABEL_EN"),
-        ("PAYMENT_FREEKASSA_WEBAPP_ICON", "icon", "WebApp button icon",
-         "Lucide icon name rendered inside the Web App payment method button.",
-         "Smartphone", "WEBAPP_ICON"),
-        ("PAYMENT_FREEKASSA_TELEGRAM_LABEL_RU", "string", "Telegram button text (RU)",
-         "Custom Russian text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_RU"),
-        ("PAYMENT_FREEKASSA_TELEGRAM_LABEL_EN", "string", "Telegram button text (EN)",
-         "Custom English text shown in Telegram bot payment buttons.", "", "TELEGRAM_LABEL_EN"),
-        ("PAYMENT_FREEKASSA_TELEGRAM_EMOJI", "string", "Telegram button emoji",
-         "Emoji prepended to the Telegram bot payment button when customized.",
-         "📱", "TELEGRAM_EMOJI"),
+        (
+            "PAYMENT_FREEKASSA_WEBAPP_LABEL_RU",
+            "string",
+            "WebApp button text (RU)",
+            "Custom Russian text shown in the Web App payment method button.",
+            "",
+            "WEBAPP_LABEL_RU",
+        ),
+        (
+            "PAYMENT_FREEKASSA_WEBAPP_LABEL_EN",
+            "string",
+            "WebApp button text (EN)",
+            "Custom English text shown in the Web App payment method button.",
+            "",
+            "WEBAPP_LABEL_EN",
+        ),
+        (
+            "PAYMENT_FREEKASSA_WEBAPP_ICON",
+            "icon",
+            "WebApp button icon",
+            "Lucide icon name rendered inside the Web App payment method button.",
+            "Smartphone",
+            "WEBAPP_ICON",
+        ),
+        (
+            "PAYMENT_FREEKASSA_TELEGRAM_LABEL_RU",
+            "string",
+            "Telegram button text (RU)",
+            "Custom Russian text shown in Telegram bot payment buttons.",
+            "",
+            "TELEGRAM_LABEL_RU",
+        ),
+        (
+            "PAYMENT_FREEKASSA_TELEGRAM_LABEL_EN",
+            "string",
+            "Telegram button text (EN)",
+            "Custom English text shown in Telegram bot payment buttons.",
+            "",
+            "TELEGRAM_LABEL_EN",
+        ),
+        (
+            "PAYMENT_FREEKASSA_TELEGRAM_EMOJI",
+            "string",
+            "Telegram button emoji",
+            "Emoji prepended to the Telegram bot payment button when customized.",
+            "📱",
+            "TELEGRAM_EMOJI",
+        ),
     )
 )
 
 _CONFIG_MANIFEST = (
-    ProviderManifestField("FREEKASSA_ENABLED", "bool", "Включена",
-                          subsection="FreeKassa", attr="ENABLED"),
-    ProviderManifestField("FREEKASSA_MERCHANT_ID", "string", "Merchant ID",
-                          subsection="FreeKassa", attr="MERCHANT_ID"),
-    ProviderManifestField("FREEKASSA_FIRST_SECRET", "string", "First secret",
-                          subsection="FreeKassa", secret=True, attr="FIRST_SECRET"),
-    ProviderManifestField("FREEKASSA_SECOND_SECRET", "string", "Second secret",
-                          subsection="FreeKassa", secret=True, attr="SECOND_SECRET"),
-    ProviderManifestField("FREEKASSA_API_KEY", "string", "API key",
-                          subsection="FreeKassa", secret=True, attr="API_KEY"),
-    ProviderManifestField("FREEKASSA_PAYMENT_URL", "url", "Payment URL",
-                          placeholder="https://pay.freekassa.ru/",
-                          subsection="FreeKassa", attr="PAYMENT_URL"),
-    ProviderManifestField("FREEKASSA_PAYMENT_METHOD_ID", "int", "Payment method ID",
-                          description="See https://merchant.freekassa.net/settings/currencies",
-                          subsection="FreeKassa", attr="PAYMENT_METHOD_ID"),
-    ProviderManifestField("FREEKASSA_PAYMENT_IP", "string", "Server IP",
-                          description="Public IP address reported to FreeKassa.",
-                          subsection="FreeKassa", attr="PAYMENT_IP"),
-    ProviderManifestField("FREEKASSA_TRUSTED_IPS", "string", "Trusted IPs",
-                          description="Comma-separated IP addresses accepted for FreeKassa webhooks.",
-                          subsection="FreeKassa", attr="TRUSTED_IPS"),
+    ProviderManifestField(
+        "FREEKASSA_ENABLED", "bool", "Включена", subsection="FreeKassa", attr="ENABLED"
+    ),
+    ProviderManifestField(
+        "FREEKASSA_MERCHANT_ID", "string", "Merchant ID", subsection="FreeKassa", attr="MERCHANT_ID"
+    ),
+    ProviderManifestField(
+        "FREEKASSA_FIRST_SECRET",
+        "string",
+        "First secret",
+        subsection="FreeKassa",
+        secret=True,
+        attr="FIRST_SECRET",
+    ),
+    ProviderManifestField(
+        "FREEKASSA_SECOND_SECRET",
+        "string",
+        "Second secret",
+        subsection="FreeKassa",
+        secret=True,
+        attr="SECOND_SECRET",
+    ),
+    ProviderManifestField(
+        "FREEKASSA_API_KEY",
+        "string",
+        "API key",
+        subsection="FreeKassa",
+        secret=True,
+        attr="API_KEY",
+    ),
+    ProviderManifestField(
+        "FREEKASSA_PAYMENT_URL",
+        "url",
+        "Payment URL",
+        placeholder="https://pay.freekassa.ru/",
+        subsection="FreeKassa",
+        attr="PAYMENT_URL",
+    ),
+    ProviderManifestField(
+        "FREEKASSA_PAYMENT_METHOD_ID",
+        "int",
+        "Payment method ID",
+        description="See https://merchant.freekassa.net/settings/currencies",
+        subsection="FreeKassa",
+        attr="PAYMENT_METHOD_ID",
+    ),
+    ProviderManifestField(
+        "FREEKASSA_PAYMENT_IP",
+        "string",
+        "Server IP",
+        description="Public IP address reported to FreeKassa.",
+        subsection="FreeKassa",
+        attr="PAYMENT_IP",
+    ),
+    ProviderManifestField(
+        "FREEKASSA_TRUSTED_IPS",
+        "string",
+        "Trusted IPs",
+        description="Comma-separated IP addresses accepted for FreeKassa webhooks.",
+        subsection="FreeKassa",
+        attr="TRUSTED_IPS",
+    ),
 )
 
 

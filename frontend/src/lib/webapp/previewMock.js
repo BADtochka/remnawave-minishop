@@ -222,6 +222,8 @@ export const DEV_MOCK = {
       trial_duration_days: 5,
       trial_traffic_limit_gb: 10,
       trial_traffic_strategy: "NO_RESET",
+      subscription_purchase_description:
+        "Покупая или продлевая подписку, вы получаете доступ к VPN/прокси-сервису, который помогает защищать ваше соединение и поддерживать стабильный доступ к сети.",
       email_auth_enabled: true,
     },
   },

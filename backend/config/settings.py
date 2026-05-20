@@ -12,6 +12,15 @@ from config.webapp_themes_config import (
     resolved_webapp_themes_catalog,
 )
 
+DEFAULT_SUBSCRIPTION_PURCHASE_DESCRIPTION_RU = (
+    "Покупая или продлевая подписку, вы получаете доступ к VPN/прокси-сервису, "
+    "который помогает защищать ваше соединение и поддерживать стабильный доступ к сети."
+)
+DEFAULT_SUBSCRIPTION_PURCHASE_DESCRIPTION_EN = (
+    "By buying or renewing a subscription, you get access to a VPN/proxy service "
+    "that helps protect your connection and keep your access stable."
+)
+
 
 def _split_csv(value: Optional[str]) -> List[str]:
     if not value:
@@ -146,6 +155,18 @@ class Settings(BaseSettings):
     PAYMENT_METHODS_ORDER: Optional[str] = Field(
         default=None,
         description="Comma-separated list of payment methods to show (e.g., severpay,wata,freekassa,yookassa,platega,stars,cryptopay)",  # noqa: E501
+    )
+    SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED: bool = Field(
+        default=True,
+        description="Show a localized description of the subscription before users choose a purchase/renewal period.",  # noqa: E501
+    )
+    SUBSCRIPTION_PURCHASE_DESCRIPTION_RU: str = Field(
+        default=DEFAULT_SUBSCRIPTION_PURCHASE_DESCRIPTION_RU,
+        description="Russian subscription description shown before purchase/renewal options.",
+    )
+    SUBSCRIPTION_PURCHASE_DESCRIPTION_EN: str = Field(
+        default=DEFAULT_SUBSCRIPTION_PURCHASE_DESCRIPTION_EN,
+        description="English subscription description shown before purchase/renewal options.",
     )
 
     MONTH_1_ENABLED: bool = Field(default=True, alias="1_MONTH_ENABLED")
@@ -771,6 +792,22 @@ class Settings(BaseSettings):
             if sid not in methods:
                 methods.append(sid)
         return methods or default_order
+
+    def subscription_purchase_description(self, language: Optional[str] = None) -> str:
+        if not self.SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED:
+            return ""
+        lang = (language or self.DEFAULT_LANGUAGE or "ru").split("-")[0].lower()
+        primary = (
+            self.SUBSCRIPTION_PURCHASE_DESCRIPTION_EN
+            if lang == "en"
+            else self.SUBSCRIPTION_PURCHASE_DESCRIPTION_RU
+        )
+        fallback = (
+            self.SUBSCRIPTION_PURCHASE_DESCRIPTION_RU
+            if lang == "en"
+            else self.SUBSCRIPTION_PURCHASE_DESCRIPTION_EN
+        )
+        return (primary or fallback or "").strip()
 
     @computed_field
     @property

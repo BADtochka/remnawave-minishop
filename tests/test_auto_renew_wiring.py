@@ -33,9 +33,7 @@ class _FakeYooKassaService:
     def __init__(self, configured: bool = True, response: Optional[Dict[str, Any]] = None) -> None:
         self.configured = configured
         self.calls: List[Dict[str, Any]] = []
-        self._response = response if response is not None else {
-            "id": "pay-1", "status": "pending"
-        }
+        self._response = response if response is not None else {"id": "pay-1", "status": "pending"}
 
     async def create_payment(self, **kwargs):
         self.calls.append(kwargs)

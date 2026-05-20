@@ -36,9 +36,7 @@ async def lookup_payment_by_order_or_provider_id(
     if payment_db_id is not None:
         payment = await payment_dal.get_payment_by_db_id(session, payment_db_id)
     if not payment and provider_payment_id:
-        payment = await payment_dal.get_payment_by_provider_payment_id(
-            session, provider_payment_id
-        )
+        payment = await payment_dal.get_payment_by_provider_payment_id(session, provider_payment_id)
     return payment
 
 
@@ -54,9 +52,7 @@ async def notify_user_payment_failed(
     """Send the localized ``payment_failed`` text to the user; never raises."""
     db_user = payment.user or await user_dal.get_user_by_id(session, payment.user_id)
     language = (
-        db_user.language_code
-        if db_user and db_user.language_code
-        else settings.DEFAULT_LANGUAGE
+        db_user.language_code if db_user and db_user.language_code else settings.DEFAULT_LANGUAGE
     )
     translator = make_translator(i18n, language)
     try:

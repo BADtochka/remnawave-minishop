@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, List, Mapping, Optional, Sequence, Type
+from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence, Type
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -65,7 +65,9 @@ class ProviderManifestField:
     choices: Optional[Sequence[tuple[str, str]]] = None
     subsection: Optional[str] = None
     target: str = "config"  # "config" or "presentation" — which bundle slot it writes to
-    attr: Optional[str] = None  # attribute name on the target model; defaults to key without env_prefix
+    attr: Optional[str] = (
+        None  # attribute name on the target model; defaults to key without env_prefix
+    )
 
 
 @dataclass(frozen=True)

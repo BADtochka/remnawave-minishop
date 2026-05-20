@@ -49,6 +49,8 @@ nano .env
 | Переменная | Назначение |
 | --- | --- |
 | `PAYMENT_METHODS_ORDER` | Порядок кнопок оплаты через запятую: `severpay`, `wata`, `freekassa`, `platega`, `yookassa`, `stars`, `cryptopay`. |
+| `SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED` | Показывать описание подписки перед выбором срока покупки или продления в Telegram и Web App. |
+| `SUBSCRIPTION_PURCHASE_DESCRIPTION_RU` / `SUBSCRIPTION_PURCHASE_DESCRIPTION_EN` | Текст описания подписки для русской и английской локалей; эти же значения можно переопределить в админке. |
 | `PAYMENT_<METHOD>_WEBAPP_LABEL_RU` / `PAYMENT_<METHOD>_WEBAPP_LABEL_EN` / `PAYMENT_<METHOD>_WEBAPP_ICON` | Необязательная мультиязычная кастомизация текста и lucide-иконки кнопки оплаты в Web App. |
 | `PAYMENT_<METHOD>_TELEGRAM_LABEL_RU` / `PAYMENT_<METHOD>_TELEGRAM_LABEL_EN` / `PAYMENT_<METHOD>_TELEGRAM_EMOJI` | Необязательная мультиязычная кастомизация текста и эмодзи кнопки оплаты в Telegram-боте. |
 | `YOOKASSA_ENABLED` | Включает YooKassa. |

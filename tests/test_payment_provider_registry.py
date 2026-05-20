@@ -97,11 +97,7 @@ def test_yookassa_provider_keeps_autorenew_entrypoints_local():
 
 
 def test_every_payment_method_has_registry_driven_webapp_creator():
-    missing = [
-        spec.id
-        for spec in iter_provider_specs()
-        if spec.create_webapp_payment is None
-    ]
+    missing = [spec.id for spec in iter_provider_specs() if spec.create_webapp_payment is None]
 
     assert missing == []
 
@@ -192,10 +188,7 @@ def test_provider_presentation_ignores_cross_language_override():
 
     settings = SimpleNamespace(PAYMENT_YOOKASSA_WEBAPP_LABEL_RU="Карта")
 
-    assert (
-        resolve_provider_presentation(spec, settings, language="en").webapp_label
-        == "Bank card"
-    )
+    assert resolve_provider_presentation(spec, settings, language="en").webapp_label == "Bank card"
 
 
 def test_payment_method_keyboard_uses_custom_telegram_text_without_changing_callback(monkeypatch):
@@ -255,12 +248,15 @@ def test_provider_callbacks_are_built_from_specs():
         )
         == "pay_stars:1:42:subscription"
     )
-    assert stars.callback_data(
-        value="1",
-        rub_price=150,
-        stars_price=None,
-        sale_mode="subscription",
-    ) is None
+    assert (
+        stars.callback_data(
+            value="1",
+            rub_price=150,
+            stars_price=None,
+            sale_mode="subscription",
+        )
+        is None
+    )
 
 
 def test_provider_visibility_uses_service_configuration():

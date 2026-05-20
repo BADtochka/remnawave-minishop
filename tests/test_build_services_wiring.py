@@ -29,16 +29,22 @@ from config.settings import Settings
 # Strip all provider env so per-provider BaseSettings models don't pick up
 # real credentials from the local .env file during tests.
 _PROVIDER_ENV_PREFIXES = (
-    "FREEKASSA_", "PLATEGA_", "SEVERPAY_", "WATA_", "HELEKET_",
-    "CRYPTOPAY_", "YOOKASSA_", "STARS_",
+    "FREEKASSA_",
+    "PLATEGA_",
+    "SEVERPAY_",
+    "WATA_",
+    "HELEKET_",
+    "CRYPTOPAY_",
+    "YOOKASSA_",
+    "STARS_",
 )
 
 
 def _clean_env() -> dict[str, str]:
     return {
-        k: v for k, v in os.environ.items()
-        if not any(k.startswith(p) for p in _PROVIDER_ENV_PREFIXES)
-        and not k.startswith("PAYMENT_")
+        k: v
+        for k, v in os.environ.items()
+        if not any(k.startswith(p) for p in _PROVIDER_ENV_PREFIXES) and not k.startswith("PAYMENT_")
     }
 
 
@@ -116,9 +122,7 @@ class BuildServicesWiringTests(unittest.TestCase):
         panel_webhook = services["panel_webhook_service"]
         subscription = services["subscription_service"]
         self.assertIsInstance(panel_webhook, PanelWebhookService)
-        self.assertIs(
-            getattr(panel_webhook, "subscription_service", None), subscription
-        )
+        self.assertIs(getattr(panel_webhook, "subscription_service", None), subscription)
 
     def test_factory_returns_every_documented_service(self):
         """Guards against silently dropping a service from the bundle. The

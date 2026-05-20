@@ -403,9 +403,7 @@ class SupportTicket(Base):
         passive_deletes=True,
     )
 
-    __table_args__ = (
-        Index("ix_support_tickets_status_last_msg", "status", "last_message_at"),
-    )
+    __table_args__ = (Index("ix_support_tickets_status_last_msg", "status", "last_message_at"),)
 
 
 class SupportTicketMessage(Base):
