@@ -1,5 +1,5 @@
 from db.migrator import MIGRATIONS
-from db.models import SupportTicket, SupportTicketMessage
+from db.models import SupportTicket, SupportTicketMessage, User
 
 
 def test_support_migration_is_registered_after_existing_revisions():
@@ -11,6 +11,10 @@ def test_support_migration_is_registered_after_existing_revisions():
     assert ids.index("0025_add_support_notification_timestamps") > ids.index(
         "0024_add_support_tickets"
     )
+    assert "0026_add_lifetime_traffic_synced_at" in ids
+    assert ids.index("0026_add_lifetime_traffic_synced_at") > ids.index(
+        "0025_add_support_notification_timestamps"
+    )
 
 
 def test_support_models_expose_expected_tables():
@@ -21,3 +25,7 @@ def test_support_models_expose_expected_tables():
     assert "ix_support_tickets_status_last_msg" in {
         index.name for index in SupportTicket.__table__.indexes
     }
+
+
+def test_user_model_tracks_lifetime_traffic_sync_timestamp():
+    assert "lifetime_used_traffic_synced_at" in User.__table__.columns

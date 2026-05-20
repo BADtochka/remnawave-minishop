@@ -55,6 +55,56 @@ def _datetime_matches(current: Optional[datetime], desired: datetime) -> bool:
     return abs(delta.total_seconds()) < 1
 
 
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _should_update_lifetime_used_traffic(
+    existing_user,
+    lifetime_used: int,
+    *,
+    now: datetime,
+    settings: Settings,
+    is_duplicate_panel_identity: bool = False,
+) -> bool:
+    if is_duplicate_panel_identity:
+        return False
+
+    current_value = existing_user.lifetime_used_traffic_bytes
+    if current_value == lifetime_used:
+        return False
+    if current_value is None:
+        return True
+
+    try:
+        min_delta_bytes = max(
+            0,
+            int(getattr(settings, "PANEL_SYNC_LIFETIME_TRAFFIC_MIN_DELTA_BYTES", 0) or 0),
+        )
+    except (TypeError, ValueError):
+        min_delta_bytes = 0
+    if min_delta_bytes and abs(int(lifetime_used) - int(current_value or 0)) >= min_delta_bytes:
+        return True
+
+    try:
+        min_interval_seconds = max(
+            0,
+            int(getattr(settings, "PANEL_SYNC_LIFETIME_TRAFFIC_MIN_INTERVAL_SECONDS", 0) or 0),
+        )
+    except (TypeError, ValueError):
+        min_interval_seconds = 0
+    if min_interval_seconds <= 0:
+        return True
+
+    last_synced_at = getattr(existing_user, "lifetime_used_traffic_synced_at", None)
+    if not last_synced_at:
+        return True
+
+    return (_as_utc(now) - _as_utc(last_synced_at)).total_seconds() >= min_interval_seconds
+
+
 def _subscription_update_delta(
     subscription: Subscription, desired: dict[str, Any]
 ) -> dict[str, Any]:
@@ -469,6 +519,7 @@ async def _perform_sync_impl(
 
                 # Get the actual user_id for subscription operations
                 actual_user_id = existing_user.user_id
+                is_duplicate_panel_identity = False
 
                 # Update panel UUID if different
                 if existing_user.panel_user_uuid != panel_uuid:
@@ -480,6 +531,7 @@ async def _perform_sync_impl(
                         in panel_uuids_by_telegram_id.get(telegram_id_from_panel, set())
                     )
                     if linked_uuid_still_present:
+                        is_duplicate_panel_identity = True
                         logging.warning(
                             "Sync: duplicate panel users share telegramId %s; keeping local panel UUID %s and skipping duplicate panel UUID %s.",  # noqa: E501
                             telegram_id_from_panel,
@@ -492,32 +544,40 @@ async def _perform_sync_impl(
                         users_uuid_updated += 1
                         users_by_panel_uuid[panel_uuid] = existing_user
                         logging.info(f"Updated panel UUID for user {actual_user_id}: {panel_uuid}")
-                existing_user, email_was_bound = await _bind_panel_email_to_user(
-                    session,
-                    existing_user=existing_user,
-                    email_from_panel=email_from_panel,
-                    panel_uuid=panel_uuid,
-                )
-                if email_was_bound:
-                    user_was_updated = True
-                    if email_from_panel:
-                        users_by_email[email_from_panel] = existing_user
-                if telegram_id_from_panel and existing_user.telegram_id != telegram_id_from_panel:
-                    existing_user.telegram_id = telegram_id_from_panel
-                    user_was_updated = True
-                    users_by_telegram_id[telegram_id_from_panel] = existing_user
+                if not is_duplicate_panel_identity:
+                    existing_user, email_was_bound = await _bind_panel_email_to_user(
+                        session,
+                        existing_user=existing_user,
+                        email_from_panel=email_from_panel,
+                        panel_uuid=panel_uuid,
+                    )
+                    if email_was_bound:
+                        user_was_updated = True
+                        if email_from_panel:
+                            users_by_email[email_from_panel] = existing_user
+                    if (
+                        telegram_id_from_panel
+                        and existing_user.telegram_id != telegram_id_from_panel
+                    ):
+                        existing_user.telegram_id = telegram_id_from_panel
+                        user_was_updated = True
+                        users_by_telegram_id[telegram_id_from_panel] = existing_user
 
                 lifetime_used = _extract_lifetime_used_traffic_bytes(panel_user_dict)
-                if (
-                    lifetime_used is not None
-                    and existing_user.lifetime_used_traffic_bytes != lifetime_used
+                if lifetime_used is not None and _should_update_lifetime_used_traffic(
+                    existing_user,
+                    lifetime_used,
+                    now=datetime.now(timezone.utc),
+                    settings=settings,
+                    is_duplicate_panel_identity=is_duplicate_panel_identity,
                 ):
                     existing_user.lifetime_used_traffic_bytes = lifetime_used
+                    existing_user.lifetime_used_traffic_synced_at = datetime.now(timezone.utc)
                     user_was_updated = True
 
                 # Ensure panel description contains Telegram fields
                 try:
-                    if panel_uuid and existing_user:
+                    if panel_uuid and existing_user and not is_duplicate_panel_identity:
                         description_text = "\n".join(
                             line
                             for line in [

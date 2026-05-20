@@ -404,6 +404,10 @@ async def merge_users(
         target.lifetime_used_traffic_bytes = (
             target.lifetime_used_traffic_bytes or 0
         ) + source.lifetime_used_traffic_bytes
+        source_synced_at = getattr(source, "lifetime_used_traffic_synced_at", None)
+        target_synced_at = getattr(target, "lifetime_used_traffic_synced_at", None)
+        if source_synced_at and (not target_synced_at or source_synced_at > target_synced_at):
+            target.lifetime_used_traffic_synced_at = source_synced_at
     if not target.referred_by_id and source.referred_by_id != target_user_id:
         target.referred_by_id = source.referred_by_id
     if target.referred_by_id == source_user_id:

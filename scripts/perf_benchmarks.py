@@ -32,7 +32,7 @@ from bot.utils.ttl_cache import AsyncTTLCache  # noqa: E402
 DEFAULT_USER_SIZES = (200, 500, 1000, 5000, 10000)
 
 
-def estimated_panel_user_pages(users: int, page_size: int = 100) -> int:
+def estimated_panel_user_pages(users: int, page_size: int = 1000) -> int:
     if users <= 0:
         return 1
     # get_all_panel_users stops on a short/empty page, so exact page multiples
@@ -113,7 +113,7 @@ async def bench_panel_user_prefetch(users: int) -> dict:
         "service_calls": panel.calls,
         "matched": len(by_uuid or {}),
         "legacy_user_get_calls": users,
-        "estimated_bulk_http_pages_at_100": estimated_panel_user_pages(users),
+        "estimated_bulk_http_pages": estimated_panel_user_pages(users),
     }
 
 
@@ -171,6 +171,7 @@ async def bench_panel_user_cache(users: int) -> dict:
         PANEL_USER_CACHE_TTL_SECONDS=60,
         PANEL_DEVICES_CACHE_TTL_SECONDS=60,
         PANEL_ALL_USERS_CACHE_TTL_SECONDS=60,
+        PANEL_ALL_USERS_PAGE_SIZE=1000,
         REDIS_URL=None,
         REDIS_KEY_PREFIX="bench",
     )
@@ -202,6 +203,7 @@ async def bench_panel_all_users_cache(users: int) -> dict:
         PANEL_USER_CACHE_TTL_SECONDS=60,
         PANEL_DEVICES_CACHE_TTL_SECONDS=60,
         PANEL_ALL_USERS_CACHE_TTL_SECONDS=60,
+        PANEL_ALL_USERS_PAGE_SIZE=1000,
         REDIS_URL=None,
         REDIS_KEY_PREFIX="bench",
     )
@@ -243,6 +245,7 @@ async def bench_panel_devices_cache(users: int) -> dict:
         PANEL_USER_CACHE_TTL_SECONDS=60,
         PANEL_DEVICES_CACHE_TTL_SECONDS=60,
         PANEL_ALL_USERS_CACHE_TTL_SECONDS=60,
+        PANEL_ALL_USERS_PAGE_SIZE=1000,
         REDIS_URL=None,
         REDIS_KEY_PREFIX="bench",
     )
@@ -444,7 +447,7 @@ def _print_table(results: dict[str, dict]) -> None:
         )
         print(
             f"{users:>5} | "
-            f"{data['panel_user_bulk_prefetch']['estimated_bulk_http_pages_at_100']:>14} | "
+            f"{data['panel_user_bulk_prefetch']['estimated_bulk_http_pages']:>14} | "
             f"{data['premium_usage_1_node']['seconds']:>15.6f} | "
             f"{data['premium_usage_1_node']['panel_calls']:>19} | "
             f"{sync_optimized_reads:>17} | "

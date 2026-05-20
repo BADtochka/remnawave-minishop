@@ -42,6 +42,7 @@ class User(Base):
     referral_code = Column(String(16), nullable=True, unique=True, index=True)
     referred_by_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=True)
     lifetime_used_traffic_bytes = Column(BigInteger, nullable=True)
+    lifetime_used_traffic_synced_at = Column(DateTime(timezone=True), nullable=True)
     channel_subscription_verified = Column(Boolean, nullable=True)
     channel_subscription_checked_at = Column(DateTime(timezone=True), nullable=True)
     channel_subscription_verified_for = Column(BigInteger, nullable=True)

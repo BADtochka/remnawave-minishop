@@ -106,6 +106,25 @@ class PanelApiServiceLoggingTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(get_calls, 2)
 
+    async def test_get_all_panel_users_falls_back_to_100_when_large_page_fails(self):
+        service = self._make_service()
+        requested_sizes = []
+
+        async def fake_request(method, endpoint, **kwargs):
+            params = kwargs.get("params") or {}
+            size = params.get("size")
+            requested_sizes.append(size)
+            if size == 1000:
+                return {"error": True, "status_code": 400}
+            return {"response": {"users": [{"uuid": "user-uuid"}]}}
+
+        service._request = AsyncMock(side_effect=fake_request)
+
+        users = await service.get_all_panel_users()
+
+        self.assertEqual(users, [{"uuid": "user-uuid"}])
+        self.assertEqual(requested_sizes, [1000, 100])
+
 
 if __name__ == "__main__":
     unittest.main()

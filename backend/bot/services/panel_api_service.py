@@ -242,20 +242,54 @@ class PanelApiService:
             )
             return {"error": True, "status_code": -4, "message": f"Unexpected error: {str(e)}"}
 
+    def _resolve_all_users_page_size(self, page_size: Optional[int] = None) -> int:
+        raw_value = (
+            page_size
+            if page_size is not None
+            else getattr(self.settings, "PANEL_ALL_USERS_PAGE_SIZE", 1000)
+        )
+        try:
+            value = int(raw_value or 1000)
+        except (TypeError, ValueError):
+            value = 1000
+        return min(1000, max(1, value))
+
     async def get_all_panel_users(
-        self, page_size: int = 100, log_responses: bool = False
+        self, page_size: Optional[int] = None, log_responses: bool = False
     ) -> Optional[List[Dict[str, Any]]]:
-        if log_responses or page_size != 100 or self._all_users_cache.ttl_seconds <= 0:
+        resolved_page_size = self._resolve_all_users_page_size(page_size)
+        if log_responses or self._all_users_cache.ttl_seconds <= 0:
             return await self._get_all_panel_users_uncached(
-                page_size=page_size, log_responses=log_responses
+                page_size=resolved_page_size, log_responses=log_responses
             )
         return await self._all_users_cache.get_or_load(
-            f"page_size:{page_size}",
-            lambda: self._get_all_panel_users_uncached(page_size=page_size, log_responses=False),
+            f"page_size:{resolved_page_size}",
+            lambda: self._get_all_panel_users_uncached(
+                page_size=resolved_page_size, log_responses=False
+            ),
         )
 
     async def _get_all_panel_users_uncached(
-        self, page_size: int = 100, log_responses: bool = False
+        self, page_size: Optional[int] = None, log_responses: bool = False
+    ) -> Optional[List[Dict[str, Any]]]:
+        resolved_page_size = self._resolve_all_users_page_size(page_size)
+        users = await self._fetch_all_panel_users_pages(
+            page_size=resolved_page_size,
+            log_responses=log_responses,
+        )
+        if users is None and resolved_page_size != 100:
+            logging.warning(
+                "Panel API users fetch failed with page size %s; retrying with page size 100.",
+                resolved_page_size,
+            )
+            users = await self._fetch_all_panel_users_pages(
+                page_size=100,
+                log_responses=log_responses,
+            )
+        return users
+
+    async def _fetch_all_panel_users_pages(
+        self, page_size: int, log_responses: bool = False
     ) -> Optional[List[Dict[str, Any]]]:
         all_users = []
         start_offset = 0

@@ -873,6 +873,15 @@ def _migration_0025_add_support_notification_timestamps(connection: Connection) 
             )
 
 
+def _migration_0026_add_lifetime_traffic_synced_at(connection: Connection) -> None:
+    inspector = inspect(connection)
+    columns: Set[str] = {col["name"] for col in inspector.get_columns("users")}
+    if "lifetime_used_traffic_synced_at" not in columns:
+        connection.execute(
+            text("ALTER TABLE users ADD COLUMN lifetime_used_traffic_synced_at TIMESTAMPTZ")
+        )
+
+
 MIGRATIONS: List[Migration] = [
     Migration(
         id="0001_add_channel_subscription_fields",
@@ -1009,6 +1018,11 @@ MIGRATIONS: List[Migration] = [
         id="0025_add_support_notification_timestamps",
         description="Track support ticket admin notification cooldown timestamps",
         upgrade=_migration_0025_add_support_notification_timestamps,
+    ),
+    Migration(
+        id="0026_add_lifetime_traffic_synced_at",
+        description="Track when lifetime traffic usage was last synced from panel",
+        upgrade=_migration_0026_add_lifetime_traffic_synced_at,
     ),
 ]
 
