@@ -619,6 +619,7 @@ def public_theme_payload(theme: WebappTheme, primary_accent: str) -> Dict[str, o
         "enabled": bool(theme.enabled),
         "use_primary_accent": bool(theme.use_primary_accent),
         "use_in_admin": bool(theme.use_in_admin),
+        "assets_version": int(theme.assets_version or 1),
         "tokens": tokens.model_dump(mode="json", exclude_none=True),
     }
     if theme.css_file:

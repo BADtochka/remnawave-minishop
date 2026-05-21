@@ -94,7 +94,10 @@ async def theme_css_asset_route(request: web.Request) -> web.Response:
     except ValueError:
         raise web.HTTPNotFound(text="theme_css_not_found") from None
 
-    cache_control = "no-cache"
+    query = getattr(request, "query", {}) or {}
+    cache_control = (
+        "public, max-age=31536000, immutable" if query.get("v") else "no-cache"
+    )
     try:
         stat = path.stat()
         if stat.st_size > WEBAPP_THEME_CSS_MAX_BYTES:
@@ -1498,7 +1501,14 @@ def _theme_css_href_for_html(theme: Any) -> str:
         return ""
     themed_path = "/".join([key, *parts])
     encoded = "/".join(quote(part, safe="") for part in themed_path.split("/"))
-    return f"/webapp-theme-css/{encoded}" if encoded else ""
+    href = f"/webapp-theme-css/{encoded}" if encoded else ""
+    try:
+        version = int(getattr(theme, "assets_version", 0) or 0)
+    except (TypeError, ValueError):
+        version = 0
+    if href and version > 0:
+        href = f"{href}?v={quote(str(version), safe='')}"
+    return href
 
 
 def _initial_theme_for_request(request: web.Request, catalog: Any) -> Any:

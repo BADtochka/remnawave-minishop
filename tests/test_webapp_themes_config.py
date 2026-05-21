@@ -273,6 +273,7 @@ class WebappThemesConfigTests(unittest.TestCase):
         win95 = next(theme for theme in payload["themes"] if theme["key"] == "windows95")
 
         self.assertEqual(light["css_file"], "style.css")
+        self.assertEqual(light["assets_version"], cfg.theme_by_key("light").assets_version)
         self.assertEqual(light["tokens"]["accent"], "#abc123")
         self.assertEqual(dark["tokens"]["accent"], "#abc123")
         self.assertFalse(win95["use_primary_accent"])

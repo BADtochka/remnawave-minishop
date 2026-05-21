@@ -16,7 +16,7 @@ from bot.app.web import subscription_webapp
 from bot.app.web.admin_api_impl import themes as admin_themes
 from bot.app.web.webapp import assets as webapp_assets
 from config.settings import Settings
-from config.webapp_themes_config import builtin_webapp_themes_config
+from config.webapp_themes_config import WebappThemesConfig, builtin_webapp_themes_config
 
 
 class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
@@ -281,10 +281,50 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
 
         markup = subscription_webapp._initial_theme_head_markup(request, theme, "#123456")
 
-        self.assertIn("/webapp-theme-css/light/style.css", markup)
+        self.assertIn("/webapp-theme-css/light/style.css?v=", markup)
         self.assertIn('nonce="nonce-value"', markup)
         self.assertIn("--accent:#123456", markup)
         self.assertIn("color-scheme:light", markup)
+
+    def test_theme_asset_version_bumps_for_saved_default_css_theme(self):
+        previous = WebappThemesConfig(
+            default_theme="dark",
+            themes=[
+                {
+                    "key": "dark",
+                    "default": True,
+                    "tokens": {"color_scheme": "dark"},
+                },
+                {
+                    "key": "custom",
+                    "default": False,
+                    "css_file": "style.css",
+                    "assets_version": 3,
+                    "tokens": {"color_scheme": "dark"},
+                },
+            ],
+        )
+        updated = WebappThemesConfig(
+            default_theme="custom",
+            themes=[
+                {
+                    "key": "dark",
+                    "default": False,
+                    "tokens": {"color_scheme": "dark"},
+                },
+                {
+                    "key": "custom",
+                    "default": True,
+                    "css_file": "style.css",
+                    "assets_version": 3,
+                    "tokens": {"color_scheme": "dark"},
+                },
+            ],
+        )
+
+        bumped = admin_themes._bump_theme_asset_versions(updated, previous)
+
+        self.assertEqual(bumped.theme_by_key("custom").assets_version, 4)
 
     def test_animated_emoji_asset_path_uses_same_origin_route(self):
         self.assertEqual(
@@ -587,6 +627,30 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.headers["Cache-Control"], "no-cache")
             self.assertIn("ETag", response.headers)
             self.assertIn("--bg: red", response.text)
+
+    async def test_theme_css_asset_route_uses_immutable_cache_when_versioned(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            themes_dir = Path(tmpdir)
+            (themes_dir / "custom").mkdir()
+            (themes_dir / "custom" / "theme.css").write_text(
+                ".theme-key-custom { --bg: red; }", encoding="utf-8"
+            )
+            request = SimpleNamespace(
+                app={
+                    "settings": SimpleNamespace(
+                        WEBAPP_ENABLED=True,
+                        WEBAPP_THEMES_DIR=str(themes_dir),
+                    )
+                },
+                match_info={"path": "custom/theme.css"},
+                query={"v": "2"},
+            )
+
+            response = await subscription_webapp.theme_css_asset_route(request)
+
+            self.assertEqual(
+                response.headers["Cache-Control"], "public, max-age=31536000, immutable"
+            )
 
     async def test_theme_css_asset_route_returns_not_modified_for_matching_etag(self):
         with tempfile.TemporaryDirectory() as tmpdir:
