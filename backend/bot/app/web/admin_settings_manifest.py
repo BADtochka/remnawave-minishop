@@ -8,6 +8,7 @@ the API, even by an admin.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, List, Optional, Tuple
 
@@ -28,6 +29,7 @@ class SettingField:
     subsection: Optional[str] = None  # group label inside a section
     i18n_label_key: Optional[str] = None
     i18n_description_key: Optional[str] = None
+    i18n_subsection_key: Optional[str] = None
 
 
 SETTINGS_MANIFEST: List[SettingField] = [
@@ -72,9 +74,58 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "Ссылка на канал",
         "Имя пользователя или invite-link.",
     ),
+    SettingField(
+        "PANEL_API_URL",
+        "url",
+        "general",
+        "URL API Remnawave",
+        "Например, https://panel.example.com/api.",
+        subsection="Remnawave",
+    ),
+    SettingField(
+        "PANEL_API_KEY",
+        "string",
+        "general",
+        "API-ключ Remnawave",
+        "Секретный ключ API панели.",
+        secret=True,
+        subsection="Remnawave",
+    ),
+    SettingField(
+        "PANEL_WEBHOOK_SECRET",
+        "string",
+        "general",
+        "Секрет вебхуков Remnawave",
+        "Используется для проверки входящих вебхуков панели.",
+        secret=True,
+        subsection="Remnawave",
+    ),
+    SettingField(
+        "USER_SQUAD_UUIDS",
+        "string",
+        "general",
+        "Internal Squads по умолчанию",
+        "UUID через запятую для legacy-режима без JSON-каталога тарифов.",
+        subsection="Remnawave",
+    ),
+    SettingField(
+        "USER_EXTERNAL_SQUAD_UUID",
+        "string",
+        "general",
+        "External Squad по умолчанию",
+        "Необязательный UUID External Squad для новых пользователей.",
+        subsection="Remnawave",
+    ),
     # ─── Web app appearance ────────────────────────────────────────
     SettingField(
         "WEBAPP_TITLE", "string", "appearance", "Название Web App", placeholder="Моя подписка"
+    ),
+    SettingField(
+        "SUBSCRIPTION_MINI_APP_URL",
+        "url",
+        "appearance",
+        "Публичный URL Mini App",
+        "Например, https://app.example.com/.",
     ),
     SettingField(
         "WEBAPP_PRIMARY_COLOR", "color", "appearance", "Основной цвет", placeholder="#00fe7a"
@@ -131,7 +182,7 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "string",
         "pricing",
         "Порядок методов оплаты",
-        "Через запятую, например: severpay,freekassa,yookassa",
+        "Через запятую, например: severpay,freekassa,yookassa,heleket",
     ),
     SettingField(
         "SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED",
@@ -156,14 +207,14 @@ SETTINGS_MANIFEST: List[SettingField] = [
     ),
     # ─── Payment providers (toggles) ───────────────────────────────
     # Common
-    SettingField("STARS_ENABLED", "bool", "payments", "Telegram Stars", subsection="Общие"),
+    SettingField("STARS_ENABLED", "bool", "payments", "Telegram Stars", subsection="common"),
     SettingField(
         "PAYMENT_METHODS_ORDER",
         "string",
         "payments",
         "Порядок методов оплаты",
-        "Через запятую: severpay,freekassa,yookassa,platega,stars,cryptopay",
-        subsection="Общие",
+        "Через запятую: severpay,freekassa,yookassa,platega,stars,cryptopay,heleket",
+        subsection="common",
     ),
     # ─── Trial ─────────────────────────────────────────────────────
     SettingField("TRIAL_ENABLED", "bool", "trial", "Триал включён"),
@@ -373,6 +424,9 @@ def _provider_field_to_setting_field(spec: Any, manifest_field: Any) -> SettingF
         max=manifest_field.max,
         choices=tuple(manifest_field.choices) if manifest_field.choices else None,
         subsection=manifest_field.subsection,
+        i18n_label_key=getattr(manifest_field, "i18n_label_key", None),
+        i18n_description_key=getattr(manifest_field, "i18n_description_key", None),
+        i18n_subsection_key=getattr(manifest_field, "i18n_subsection_key", None),
     )
 
 
@@ -439,6 +493,11 @@ def coerce_value(field: SettingField, raw: Any) -> Any:
     return str(raw)
 
 
+def _i18n_slug(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+    return slug or "default"
+
+
 def manifest_payload() -> List[dict]:
     """Serialize the manifest for the admin UI.
 
@@ -465,6 +524,11 @@ def manifest_payload() -> List[dict]:
     for field in aggregated_manifest():
         auto_label_i18n_key = f"admin_settings_field_{field.key.lower()}_label"
         auto_description_i18n_key = f"admin_settings_field_{field.key.lower()}_description"
+        auto_subsection_i18n_key = (
+            f"admin_settings_subsection_{_i18n_slug(field.subsection)}"
+            if field.subsection
+            else None
+        )
 
         default_value: Optional[str] = None
         owner = find_manifest_owner(field.key)
@@ -487,6 +551,10 @@ def manifest_payload() -> List[dict]:
             "i18n_label_key": field.i18n_label_key or auto_label_i18n_key,
             "i18n_description_key": field.i18n_description_key
             or (auto_description_i18n_key if field.description else None),
+            "i18n_subsection_key": field.i18n_subsection_key or auto_subsection_i18n_key,
+            "i18n_placeholder_key": (
+                f"admin_settings_field_{field.key.lower()}_placeholder" if placeholder else None
+            ),
             "placeholder": placeholder,
             "optional": field.optional,
             "secret": field.secret,
@@ -494,6 +562,15 @@ def manifest_payload() -> List[dict]:
         if default_value is not None:
             item["default"] = default_value
         if field.choices:
-            item["choices"] = [{"value": v, "label": lbl} for v, lbl in field.choices]
+            item["choices"] = [
+                {
+                    "value": v,
+                    "label": lbl,
+                    "i18n_label_key": (
+                        f"admin_settings_field_{field.key.lower()}_choice_{_i18n_slug(str(v))}"
+                    ),
+                }
+                for v, lbl in field.choices
+            ]
         items.append(item)
     return items

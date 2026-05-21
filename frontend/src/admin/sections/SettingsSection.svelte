@@ -80,9 +80,9 @@
   }
 
   function secretPlaceholder(field) {
-    if (settingsDirty[field.key]?.deleted) return field.placeholder || "••••••••";
+    if (settingsDirty[field.key]?.deleted) return fieldPlaceholderText(field) || "********";
     if (field.has_value) return at("settings_secret_configured", {}, "Secret is set");
-    return field.placeholder || at("settings_secret_empty", {}, "Not set");
+    return fieldPlaceholderText(field) || at("settings_secret_empty", {}, "Not set");
   }
 
   function iconComponent(name) {
@@ -127,29 +127,45 @@
     const groups = new Map();
     for (const field of section.fields || []) {
       const key = field.subsection || "_root";
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(field);
+      if (!groups.has(key)) {
+        groups.set(key, { fields: [], i18nLabelKey: field.i18n_subsection_key || null });
+      }
+      const group = groups.get(key);
+      group.fields.push(field);
+      if (!group.i18nLabelKey && field.i18n_subsection_key) {
+        group.i18nLabelKey = field.i18n_subsection_key;
+      }
     }
-    return Array.from(groups.entries()).map(([id, fields]) => ({
+    return Array.from(groups.entries()).map(([id, group]) => ({
       id,
       label: id === "_root" ? null : id,
-      fields,
+      i18nLabelKey: group.i18nLabelKey,
+      fields: group.fields,
     }));
+  }
+
+  function adminLocaleKey(key) {
+    const raw = String(key || "");
+    return raw.startsWith("admin_") ? raw.slice("admin_".length) : raw;
+  }
+
+  function adminText(key, params = {}, fallback = "") {
+    return key ? at(adminLocaleKey(key), params, fallback) : fallback;
   }
 
   function sectionTitle(id) {
     const map = {
-      general: at("admin_settings_section_general", {}, "Общие"),
-      appearance: at("admin_settings_section_appearance", {}, "Внешний вид"),
-      pricing: at("admin_settings_section_pricing", {}, "Тарифы и цены"),
-      payments: at("admin_settings_section_payments", {}, "Платёжные системы"),
-      trial: at("admin_settings_section_trial", {}, "Триал"),
-      referral: at("admin_settings_section_referral", {}, "Реферальная программа"),
-      notifications: at("admin_settings_section_notifications", {}, "Уведомления"),
-      support: at("admin_settings_section_support", {}, "Поддержка"),
-      devices: at("admin_settings_section_devices", {}, "Устройства"),
+      general: "Общие",
+      appearance: "Внешний вид",
+      pricing: "Тарифы и цены",
+      payments: "Платёжные системы",
+      trial: "Триал",
+      referral: "Реферальная программа",
+      notifications: "Уведомления",
+      support: "Поддержка",
+      devices: "Устройства",
     };
-    return map[id] || id;
+    return adminText(`settings_section_${id}`, {}, map[id] || id);
   }
 
   function englishFieldLabelFallback(key, originalLabel) {
@@ -173,7 +189,33 @@
       .toLowerCase()
       .startsWith("en");
     const fallback = isEnglish ? englishFieldLabelFallback(field.key, field.label) : field.label;
-    return field.i18n_label_key ? at(field.i18n_label_key, {}, fallback) : fallback;
+    return field.i18n_label_key ? adminText(field.i18n_label_key, {}, fallback) : fallback;
+  }
+
+  function fieldDescriptionText(field) {
+    if (!field.description) return "";
+    return field.i18n_description_key
+      ? adminText(field.i18n_description_key, {}, field.description)
+      : field.description;
+  }
+
+  function fieldPlaceholderText(field) {
+    const fallback = field.placeholder || "";
+    return field.i18n_placeholder_key ? adminText(field.i18n_placeholder_key, {}, fallback) : fallback;
+  }
+
+  function subsectionTitle(group) {
+    if (!group?.label) return "";
+    return group.i18nLabelKey ? adminText(group.i18nLabelKey, {}, group.label) : group.label;
+  }
+
+  function choiceItems(field) {
+    return (field.choices || []).map((choice) => ({
+      ...choice,
+      label: choice.i18n_label_key
+        ? adminText(choice.i18n_label_key, {}, choice.label)
+        : choice.label,
+    }));
   }
 </script>
 
@@ -191,12 +233,8 @@
         {/if}
       </strong>
       <code>{field.key}</code>
-      {#if field.description}
-        <small
-          >{field.i18n_description_key
-            ? at(field.i18n_description_key, {}, field.description)
-            : field.description}</small
-        >
+      {#if fieldDescriptionText(field)}
+        <small>{fieldDescriptionText(field)}</small>
       {/if}
     </div>
     <div class="admin-setting-control">
@@ -255,9 +293,9 @@
         <AdminSelect
           class="admin-setting-select"
           value={valueFor(field) || ""}
-          items={field.choices}
+          items={choiceItems(field)}
           ariaLabel={fieldLabelText(field)}
-          placeholder={field.placeholder || fieldLabelText(field)}
+          placeholder={fieldPlaceholderText(field) || fieldLabelText(field)}
           onValueChange={(value) => settingsStore.markDirty(field.key, value)}
         />
       {:else if field.type === "int" || field.type === "float"}
@@ -265,7 +303,7 @@
           class="input"
           type="number"
           step={field.type === "float" ? "0.1" : "1"}
-          placeholder={field.placeholder}
+          placeholder={fieldPlaceholderText(field)}
           value={valueFor(field) ?? ""}
           oninput={(e) => settingsStore.markDirty(field.key, e.currentTarget.value)}
         />
@@ -273,7 +311,7 @@
         <textarea
           class="admin-setting-textarea"
           rows="4"
-          placeholder={field.placeholder}
+          placeholder={fieldPlaceholderText(field)}
           value={valueFor(field) ?? ""}
           oninput={(e) => settingsStore.markDirty(field.key, e.currentTarget.value)}
         ></textarea>
@@ -298,7 +336,7 @@
         <input
           class="input"
           type="text"
-          placeholder={field.placeholder}
+          placeholder={fieldPlaceholderText(field)}
           value={valueFor(field) ?? ""}
           oninput={(e) => settingsStore.markDirty(field.key, e.currentTarget.value)}
         />
@@ -402,7 +440,7 @@
                   <Accordion.Item value={group.id} class="admin-settings-subsection">
                     <Accordion.Header class="admin-accordion-header">
                       <Accordion.Trigger class="admin-settings-subsection-trigger">
-                        <strong>{group.label}</strong>
+                        <strong>{subsectionTitle(group)}</strong>
                         <span class="admin-settings-subsection-meta">
                           {at(
                             "settings_fields_count",
