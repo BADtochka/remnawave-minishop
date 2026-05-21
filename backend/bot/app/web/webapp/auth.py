@@ -1,5 +1,6 @@
 # ruff: noqa: F401,F403,F405,I001
 from ._runtime import *  # noqa: F403,F405
+from .common import _invalidate_webapp_user_caches
 
 
 def _resolve_telegram_bot_id(bot_token: str) -> Optional[int]:
@@ -386,6 +387,7 @@ async def telegram_oauth_callback_route(request: web.Request) -> web.Response:
             logger.exception("Telegram OAuth callback failed")
             raise redirect(redirect_path, "failed")
 
+    await _invalidate_webapp_user_caches(settings, final_user_id, include_devices=True)
     token = create_webapp_session_token(settings, int(final_user_id))
     response = web.HTTPFound(_telegram_oauth_redirect_url(redirect_path, status="success"))
     _clear_telegram_oauth_state_cookie(response)
@@ -480,6 +482,7 @@ async def auth_token_route(request: web.Request) -> web.Response:
             logger.exception("WebApp auth failed")
             return _json_error(500, "auth_failed", "Auth failed")
 
+    await _invalidate_webapp_user_caches(settings, authenticated_user_id, include_devices=True)
     token = create_webapp_session_token(settings, int(authenticated_user_id))
     return _build_webapp_auth_response(settings, {"ok": True}, token=token)
 
@@ -694,6 +697,7 @@ async def email_auth_verify_route(request: web.Request) -> web.Response:
             logger.exception("Email WebApp auth failed")
             return _json_error(500, "auth_failed", "Auth failed")
 
+    await _invalidate_webapp_user_caches(settings, int(db_user.user_id), include_devices=True)
     if created_user:
         try:
             from bot.services.notification_service import NotificationService
@@ -801,6 +805,7 @@ async def email_auth_magic_route(request: web.Request) -> web.Response:
             logger.exception("Email magic-link auth failed")
             return _json_error(500, "auth_failed", "Auth failed")
 
+    await _invalidate_webapp_user_caches(settings, int(db_user.user_id), include_devices=True)
     if created_user and verified_email:
         try:
             from bot.services.notification_service import NotificationService

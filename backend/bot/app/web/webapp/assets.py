@@ -820,25 +820,30 @@ async def _enforce_webapp_rate_limit(
         or "unknown"
     )
     key = f"{action}:{ip_address}:{int(user_id)}"
-    redis = await get_redis(settings)
-    if redis is not None:
-        redis_rate_key = redis_key(settings, "rate-limit", "webapp", key)
-        current = await redis.incr(redis_rate_key)
-        if current == 1:
-            await redis.expire(redis_rate_key, settings.WEBAPP_RATE_LIMIT_TTL_SECONDS)
-        if current > settings.WEBAPP_RATE_LIMIT_MAX_REQUESTS:
-            ttl = await redis.ttl(redis_rate_key)
-            retry_after = max(1, int(ttl if ttl and ttl > 0 else WEBAPP_RATE_LIMIT_WINDOW_SECONDS))
-            return web.json_response(
-                {
-                    "ok": False,
-                    "error": "rate_limited",
-                    "retry_after": retry_after,
-                },
-                status=429,
-                headers={"Retry-After": str(retry_after)},
-            )
-        return None
+    try:
+        redis = await get_redis(settings)
+        if redis is not None:
+            redis_rate_key = redis_key(settings, "rate-limit", "webapp", key)
+            current = await redis.incr(redis_rate_key)
+            if current == 1:
+                await redis.expire(redis_rate_key, settings.WEBAPP_RATE_LIMIT_TTL_SECONDS)
+            if current > settings.WEBAPP_RATE_LIMIT_MAX_REQUESTS:
+                ttl = await redis.ttl(redis_rate_key)
+                retry_after = max(
+                    1, int(ttl if ttl and ttl > 0 else WEBAPP_RATE_LIMIT_WINDOW_SECONDS)
+                )
+                return web.json_response(
+                    {
+                        "ok": False,
+                        "error": "rate_limited",
+                        "retry_after": retry_after,
+                    },
+                    status=429,
+                    headers={"Retry-After": str(retry_after)},
+                )
+            return None
+    except Exception as exc:
+        logger.warning("Redis webapp rate limiter unavailable; using local fallback: %s", exc)
 
     buckets: Dict[str, deque[float]] = request.app["webapp_rate_limit_buckets"]
     lock: asyncio.Lock = request.app["webapp_rate_limit_lock"]

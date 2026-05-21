@@ -1,6 +1,7 @@
 # ruff: noqa: F401,F403,F405,I001
 from ._runtime import *  # noqa: F403,F405
 from .auth import _hash_email_password
+from .common import _invalidate_webapp_user_caches
 
 
 async def account_email_request_route(request: web.Request) -> web.Response:
@@ -174,6 +175,7 @@ async def account_email_verify_route(request: web.Request) -> web.Response:
             logger.exception("Email account link failed")
             return _json_error(500, "link_failed", "Link failed")
 
+    await _invalidate_webapp_user_caches(settings, user_id, final_user_id, include_devices=True)
     if should_notify_email_linked:
         try:
             from bot.services.notification_service import NotificationService
@@ -276,7 +278,7 @@ async def account_password_confirm_route(request: web.Request) -> web.Response:
             logger.exception("Email password setup failed")
             return _json_error(500, "password_setup_failed", "Password setup failed")
 
-    await cache_delete(settings, redis_key(settings, "cache", "webapp", "me", user_id))
+    await _invalidate_webapp_user_caches(settings, user_id)
     return web.json_response({"ok": True, "password_auth_enabled": True})
 
 
@@ -396,6 +398,7 @@ async def account_telegram_link_route(request: web.Request) -> web.Response:
             logger.exception("Telegram account link failed")
             return _json_error(500, "link_failed", "Link failed")
 
+    await _invalidate_webapp_user_caches(settings, user_id, final_user_id, include_devices=True)
     if should_notify_telegram_linked and final_telegram_id:
         try:
             from bot.services.notification_service import NotificationService
@@ -488,6 +491,7 @@ async def account_language_route(request: web.Request) -> web.Response:
             await session.flush()
         await session.commit()
 
+    await _invalidate_webapp_user_caches(settings, user_id)
     return web.json_response({"ok": True, "language": language})
 
 

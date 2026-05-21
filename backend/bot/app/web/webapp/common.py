@@ -17,6 +17,30 @@ def _json_error(status: int, code: str, message: str) -> web.Response:
     )
 
 
+async def _invalidate_webapp_user_caches(
+    settings: Settings,
+    *user_ids: Optional[int],
+    include_devices: bool = False,
+) -> None:
+    keys: List[str] = []
+    seen: set[int] = set()
+    for raw_user_id in user_ids:
+        if raw_user_id is None:
+            continue
+        try:
+            user_id = int(raw_user_id)
+        except (TypeError, ValueError):
+            continue
+        if user_id in seen:
+            continue
+        seen.add(user_id)
+        keys.append(redis_key(settings, "cache", "webapp", "me", user_id))
+        if include_devices:
+            keys.append(redis_key(settings, "cache", "webapp", "devices", user_id))
+    if keys:
+        await cache_delete(settings, *keys)
+
+
 def _validation_error_response(exc: ValidationError) -> web.Response:
     for error in exc.errors():
         loc = error.get("loc") or ()

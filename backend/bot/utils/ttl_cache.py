@@ -83,3 +83,20 @@ class AsyncTTLCache:
             self._data.clear()
             return
         self._data.pop(key, None)
+
+    async def invalidate_remote(self, key: Optional[str] = None) -> None:
+        self.invalidate(key)
+        if self.settings is None or not self.namespace:
+            return
+        try:
+            from bot.infra.redis import cache_delete, cache_delete_pattern, redis_key
+
+            if key is None:
+                pattern = redis_key(self.settings, "cache", self.namespace, "*")
+                await cache_delete_pattern(self.settings, pattern)
+                return
+            await cache_delete(
+                self.settings, redis_key(self.settings, "cache", self.namespace, key)
+            )
+        except Exception:
+            return

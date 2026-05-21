@@ -1,4 +1,5 @@
 import asyncio
+import time
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -38,6 +39,39 @@ class AsyncTTLCacheSingleflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(values, [{"ok": True}] * 100)
         self.assertEqual(loader_calls, 1)
         self.assertEqual(set_calls, 1)
+
+
+class AsyncTTLCacheInvalidationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_invalidate_remote_deletes_single_redis_key(self):
+        settings = SimpleNamespace(REDIS_URL="redis://example", REDIS_KEY_PREFIX="test")
+        cache = AsyncTTLCache(ttl_seconds=60, settings=settings, namespace="bench")
+        cache._data["same"] = (time.monotonic() + 60, {"ok": True})
+        deleted = []
+
+        async def fake_delete(_settings, *keys):
+            deleted.extend(keys)
+
+        with patch("bot.infra.redis.cache_delete", new=fake_delete):
+            await cache.invalidate_remote("same")
+
+        self.assertIsNone(cache.get_fresh("same"))
+        self.assertEqual(deleted, ["test:cache:bench:same"])
+
+    async def test_invalidate_remote_deletes_namespace_pattern(self):
+        settings = SimpleNamespace(REDIS_URL="redis://example", REDIS_KEY_PREFIX="test")
+        cache = AsyncTTLCache(ttl_seconds=60, settings=settings, namespace="bench")
+        cache._data["same"] = (time.monotonic() + 60, {"ok": True})
+        patterns = []
+
+        async def fake_delete_pattern(_settings, pattern):
+            patterns.append(pattern)
+            return 1
+
+        with patch("bot.infra.redis.cache_delete_pattern", new=fake_delete_pattern):
+            await cache.invalidate_remote()
+
+        self.assertIsNone(cache.get_fresh("same"))
+        self.assertEqual(patterns, ["test:cache:bench:*"])
 
 
 class Crypt4LinkCacheTests(unittest.IsolatedAsyncioTestCase):
