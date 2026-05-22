@@ -14,7 +14,7 @@
     Share2,
     Smartphone,
   } from "$components/ui/icons.js";
-  import { AttentionDot } from "$components/ui/index.js";
+  import { AttentionDot, Spinner } from "$components/ui/index.js";
   import { Select } from "$components/ui/primitives.js";
   import Button from "$components/ui/button.svelte";
   import Card from "$components/ui/card.svelte";
@@ -335,9 +335,14 @@
   </div>
 
   {#if guideState?.loading && !guideState?.loaded}
-    <Card class="install-empty">
-      <p>{t("wa_install_loading", {}, "Loading instructions...")}</p>
-    </Card>
+    <div
+      class="install-loading"
+      role="status"
+      aria-label={t("wa_install_loading", {}, "Loading instructions...")}
+    >
+      <Spinner size="lg" />
+      <span>{t("wa_install_loading", {}, "Loading instructions...")}</span>
+    </div>
   {:else if !guideState?.enabled || !config || !platforms.length}
     <Card class="install-empty">
       <p>{t("wa_install_unavailable", {}, "Instructions are unavailable.")}</p>
@@ -551,6 +556,22 @@
   :global(.install-empty) {
     display: grid;
     gap: 14px;
+  }
+
+  .install-loading {
+    display: grid;
+    min-height: min(360px, 48dvh);
+    place-items: center;
+    align-content: center;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+    animation: install-loader-enter 0.16s ease-out both;
+  }
+
+  .install-loading :global(.ui-spinner) {
+    color: var(--accent);
   }
 
   .install-selector-block {
@@ -1045,6 +1066,18 @@
     100% {
       filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0));
       transform: scale(1);
+    }
+  }
+
+  @keyframes install-loader-enter {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 </style>
