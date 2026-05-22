@@ -339,10 +339,20 @@ async def telegram_oauth_callback_route(request: web.Request) -> web.Response:
     redirect_path = "/settings" if purpose == "link" else "/"
     async_session_factory: sessionmaker = request.app["async_session_factory"]
     final_user_id: Optional[int] = None
+    source_user_id_for_cache: Optional[int] = None
+    linked_user_for_panel: Optional[User] = None
+    link_source_panel_uuid: Optional[str] = None
+    link_final_panel_uuid: Optional[str] = None
+    link_merge_notice: Optional[Dict[str, Any]] = None
     async with async_session_factory() as session:
         try:
             if purpose == "link":
                 current_user_id = int(state.get("user_id") or 0)
+                source_user_id_for_cache = current_user_id
+                current_user_before_link = await user_dal.get_user_by_id(session, current_user_id)
+                link_source_panel_uuid = (
+                    current_user_before_link.panel_user_uuid if current_user_before_link else None
+                )
                 db_user = await _link_telegram_to_user(
                     request,
                     session,
@@ -350,6 +360,16 @@ async def telegram_oauth_callback_route(request: web.Request) -> web.Response:
                     telegram_user=telegram_user,
                     settings=settings,
                 )
+                if int(db_user.user_id) != current_user_id:
+                    link_final_panel_uuid = db_user.panel_user_uuid
+                    link_merge_notice = await _build_account_merge_notice(
+                        session,
+                        merged_user=db_user,
+                        source_user_id=current_user_id,
+                        source_panel_uuid=link_source_panel_uuid,
+                        settings=settings,
+                    )
+                linked_user_for_panel = db_user
             else:
                 db_user = await _ensure_user_from_telegram(
                     session,
@@ -388,6 +408,25 @@ async def telegram_oauth_callback_route(request: web.Request) -> web.Response:
             raise redirect(redirect_path, "failed")
 
     await _invalidate_webapp_user_caches(settings, final_user_id, include_devices=True)
+    if source_user_id_for_cache and source_user_id_for_cache != final_user_id:
+        await _invalidate_webapp_user_caches(
+            settings,
+            source_user_id_for_cache,
+            final_user_id,
+            include_devices=True,
+        )
+
+    if purpose == "link" and link_merge_notice and linked_user_for_panel:
+        merge_end_date_raw = link_merge_notice.get("final_end_date")
+        merge_end_date = datetime.fromisoformat(merge_end_date_raw) if merge_end_date_raw else None
+        await _sync_merged_panel_identity_for_user(
+            request,
+            linked_user_for_panel,
+            source_panel_uuid=link_source_panel_uuid,
+            final_panel_uuid=link_final_panel_uuid,
+            expire_at=merge_end_date,
+        )
+
     token = create_webapp_session_token(settings, int(final_user_id))
     response = web.HTTPFound(_telegram_oauth_redirect_url(redirect_path, status="success"))
     _clear_telegram_oauth_state_cookie(response)
@@ -974,6 +1013,14 @@ def _panel_description_for_user(user: User) -> str:
     return "\n".join(line for line in lines if line).strip()
 
 
+def _telegram_photo_url_value(telegram_user: Dict[str, Any]) -> Optional[str]:
+    raw_value = telegram_user.get("photo_url")
+    if not raw_value:
+        return None
+    value = str(raw_value).strip()
+    return value or None
+
+
 async def _sync_panel_identity_for_user(
     request: web.Request,
     user: User,
@@ -1011,6 +1058,53 @@ async def _sync_panel_identity_for_user(
             exc,
         )
         return False
+
+
+async def _delete_merged_source_panel_user(
+    request: web.Request,
+    *,
+    source_panel_uuid: Optional[str],
+    final_panel_uuid: Optional[str],
+) -> bool:
+    if not source_panel_uuid or not final_panel_uuid or source_panel_uuid == final_panel_uuid:
+        return True
+
+    subscription_service: SubscriptionService = request.app.get("subscription_service")
+    if not subscription_service or not subscription_service.panel_service:
+        return False
+
+    try:
+        return bool(
+            await subscription_service.panel_service.delete_user_from_panel(
+                source_panel_uuid,
+                log_response=False,
+            )
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to delete merged source panel user %s: %s",
+            source_panel_uuid,
+            exc,
+        )
+        return False
+
+
+async def _sync_merged_panel_identity_for_user(
+    request: web.Request,
+    user: User,
+    *,
+    source_panel_uuid: Optional[str],
+    final_panel_uuid: Optional[str],
+    expire_at: Optional[datetime] = None,
+) -> bool:
+    # Remnawave keeps email/telegramId unique. Remove the losing panel identity
+    # before patching the surviving one so merged accounts can accept both IDs.
+    await _delete_merged_source_panel_user(
+        request,
+        source_panel_uuid=source_panel_uuid,
+        final_panel_uuid=final_panel_uuid or user.panel_user_uuid,
+    )
+    return await _sync_panel_identity_for_user(request, user, expire_at=expire_at)
 
 
 async def _build_account_merge_notice(
@@ -1102,7 +1196,6 @@ async def _link_telegram_to_user(
         )
         _apply_telegram_profile_to_user(merged_user, telegram_user, settings)
         await session.flush()
-        await _sync_panel_identity_for_user(request, merged_user)
         return merged_user
 
     if not existing_telegram_user and int(current_user.user_id) < 0:
@@ -1134,7 +1227,6 @@ async def _link_telegram_to_user(
         )
         _apply_telegram_profile_to_user(merged_user, telegram_user, settings)
         await session.flush()
-        await _sync_panel_identity_for_user(request, merged_user)
         return merged_user
 
     if current_user.telegram_id and int(current_user.telegram_id) != telegram_id:
