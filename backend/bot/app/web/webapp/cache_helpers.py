@@ -2,11 +2,29 @@ from __future__ import annotations
 
 from typing import Any, Awaitable, Callable, Optional
 
-from bot.infra.redis import cache_delete, redis_key
+from bot.infra.redis import cache_delete, cache_delete_pattern, redis_key
 from bot.utils.ttl_cache import AsyncTTLCache
 from config.settings import Settings
 
 _WEBAPP_USER_PAYLOAD_CACHES: dict[tuple[int, str, int], AsyncTTLCache] = {}
+
+
+def reset_webapp_settings_cache(app: Any) -> None:
+    cache = app.get("webapp_settings_cache") if hasattr(app, "get") else None
+    if isinstance(cache, dict):
+        cache["ts"] = 0.0
+        cache["data"] = {}
+
+
+def reset_subscription_guides_cache(app: Any) -> None:
+    cache = app.get("subscription_guides_config_cache") if hasattr(app, "get") else None
+    if isinstance(cache, dict):
+        cache["fingerprint"] = None
+        cache["status"] = None
+
+
+def _payload_namespaces(include_devices: bool = False) -> tuple[str, ...]:
+    return ("me", "devices") if include_devices else ("me",)
 
 
 def _webapp_user_payload_cache(
@@ -55,6 +73,19 @@ def invalidate_local_webapp_user_payload(
             cache.invalidate(key)
 
 
+def invalidate_all_local_webapp_user_payloads(
+    settings: Settings,
+    *,
+    include_devices: bool = False,
+) -> None:
+    namespaces = set(_payload_namespaces(include_devices))
+    for (settings_id, cache_namespace, _ttl), cache in tuple(
+        _WEBAPP_USER_PAYLOAD_CACHES.items()
+    ):
+        if settings_id == id(settings) and cache_namespace in namespaces:
+            cache.invalidate()
+
+
 async def invalidate_webapp_user_caches(
     settings: Settings,
     *user_ids: Optional[int],
@@ -79,3 +110,17 @@ async def invalidate_webapp_user_caches(
             invalidate_local_webapp_user_payload(settings, "devices", user_id)
     if keys:
         await cache_delete(settings, *keys)
+
+
+async def invalidate_all_webapp_user_payloads(
+    settings: Settings,
+    *,
+    include_devices: bool = False,
+) -> None:
+    invalidate_all_local_webapp_user_payloads(settings, include_devices=include_devices)
+    for namespace in _payload_namespaces(include_devices):
+        try:
+            pattern = redis_key(settings, "cache", "webapp", namespace, "*")
+            await cache_delete_pattern(settings, pattern)
+        except Exception:
+            continue

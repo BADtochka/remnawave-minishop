@@ -604,6 +604,13 @@ export async function mockApi(path, options = {}, context = {}) {
   }
   if (cleanPath === "/support/unread") return { ok: true, unread: 1 };
   if (path === "/me") return clone(DEV_MOCK.data);
+  if (path === "/subscription-guides") return clone(DEV_MOCK.data.subscription_guides);
+  if (cleanPath.startsWith("/subscription-guides/public/")) {
+    return {
+      ...clone(DEV_MOCK.data.subscription_guides),
+      subscription: clone(DEV_MOCK.data.subscription),
+    };
+  }
   if (path === "/auth/email/request") return { ok: true };
   if (path === "/auth/email/verify" || path === "/auth/email/magic") {
     return { ok: true, csrf_token: "local-preview-csrf" };

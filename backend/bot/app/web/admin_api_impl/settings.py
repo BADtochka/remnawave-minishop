@@ -1,5 +1,11 @@
 # ruff: noqa: F401,F403,F405,I001
 from ._runtime import *  # noqa: F403,F405
+from .webapp_runtime import refresh_webapp_runtime_after_settings_change
+
+from config.subscription_guides_config import (
+    SubscriptionGuidesConfigError,
+    subscription_guides_admin_config_json,
+)
 
 
 async def admin_settings_get_route(request: web.Request) -> web.Response:
@@ -26,12 +32,25 @@ async def admin_settings_get_route(request: web.Request) -> web.Response:
         override = overrides_by_key.get(key)
         value = current_value(settings, key)
         is_secret = bool(field.get("secret"))
+        overridden = bool(override)
+        source = None
+        read_error = None
+        if key == "SUBSCRIPTION_PAGE_CONFIG_JSON":
+            try:
+                value, source = subscription_guides_admin_config_json(settings)
+                overridden = source == "admin_json"
+            except SubscriptionGuidesConfigError as exc:
+                read_error = str(exc)
         response_field = {
             **field,
             "value": "" if is_secret else value,
-            "overridden": bool(override),
+            "overridden": overridden,
             "updated_at": override.get("updated_at") if override else None,
         }
+        if source:
+            response_field["source"] = source
+        if read_error:
+            response_field["read_error"] = read_error
         if is_secret:
             response_field["has_value"] = bool(value)
         sections[section_id]["fields"].append(response_field)
@@ -51,6 +70,12 @@ async def admin_settings_patch_route(request: web.Request) -> web.Response:
         return _error(400, "invalid_updates")
     if not isinstance(deletes, list):
         return _error(400, "invalid_deletes")
+    if "SUBSCRIPTION_PAGE_CONFIG_JSON" in updates and not str(
+        updates.get("SUBSCRIPTION_PAGE_CONFIG_JSON") or ""
+    ).strip():
+        updates = dict(updates)
+        updates.pop("SUBSCRIPTION_PAGE_CONFIG_JSON", None)
+        deletes = [*deletes, "SUBSCRIPTION_PAGE_CONFIG_JSON"]
 
     result = await update_overrides(
         settings,
@@ -65,26 +90,6 @@ async def admin_settings_patch_route(request: web.Request) -> web.Response:
             status=400,
         )
 
-    # Bust the public webapp settings cache so users see new values immediately.
-    cache = request.app.get("webapp_settings_cache")
-    if isinstance(cache, dict):
-        cache["ts"] = 0.0
-        cache["data"] = {}
-    if (
-        "WEBAPP_LOGO_URL" in updates
-        or "WEBAPP_LOGO_URL" in deletes
-        or "WEBAPP_LOGO_USE_EMOJI" in updates
-        or "WEBAPP_LOGO_USE_EMOJI" in deletes
-        or "WEBAPP_FAVICON_URL" in updates
-        or "WEBAPP_FAVICON_URL" in deletes
-        or "WEBAPP_FAVICON_USE_CUSTOM" in updates
-        or "WEBAPP_FAVICON_USE_CUSTOM" in deletes
-        or "WEBAPP_LOGO_FAVICON_URL" in updates
-        or "WEBAPP_LOGO_FAVICON_URL" in deletes
-    ):
-        request.app["webapp_logo_cache"] = None
-        from bot.app.web.admin_api_impl.themes import prune_unused_appearance_assets
-
-        prune_unused_appearance_assets(settings)
+    await refresh_webapp_runtime_after_settings_change(request, updates=updates, deletes=deletes)
 
     return _ok({"applied": result.get("applied", 0), "reverted": result.get("reverted", 0)})

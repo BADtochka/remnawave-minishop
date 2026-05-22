@@ -3,6 +3,7 @@
   import { createAuthStore } from "./lib/webapp/stores/authStore.js";
   import { createBillingStore } from "./lib/webapp/stores/billingStore.js";
   import { createDevicesStore } from "./lib/webapp/stores/devicesStore.js";
+  import { createInstallGuidesStore } from "./lib/webapp/stores/installGuidesStore.js";
   import { createSupportStore } from "./lib/webapp/stores/supportStore.js";
   import { createAccountStore } from "./lib/webapp/stores/accountStore.js";
   import { Tooltip } from "$components/ui/primitives.js";
@@ -15,6 +16,7 @@
   import TariffDialogs from "./webapp/TariffDialogs.svelte";
   import DevicesScreen from "./webapp/screens/DevicesScreen.svelte";
   import HomeScreen from "./webapp/screens/HomeScreen.svelte";
+  import InstallGuideScreen from "./webapp/screens/InstallGuideScreen.svelte";
   import InviteScreen from "./webapp/screens/InviteScreen.svelte";
   import SettingsScreen from "./webapp/screens/SettingsScreen.svelte";
   import SupportScreen from "./webapp/screens/SupportScreen.svelte";
@@ -71,6 +73,7 @@
     adminSectionFromPath,
     adminUserIdFromPath,
     normalizeSection,
+    publicInstallShortUuidFromPath,
     sectionFromPath,
     supportTicketIdFromPath,
     syncSectionPath,
@@ -99,6 +102,8 @@
   let activeTab = "home";
   let screen = "home";
   let data = isPreviewBoard ? structuredCloneSafe(DEV_MOCK.data) : null;
+  let publicInstallSubscription = null;
+  let publicInstallShortUuid = "";
   let trialBusy = false;
   let promoCode = "";
   let promoBusy = false;
@@ -182,6 +187,7 @@
   });
   const devicesStore = createDevicesStore({ api, t, showToast });
   const supportStore = createSupportStore({ api, t, showToast });
+  const installGuidesStore = createInstallGuidesStore({ api, t, showToast });
   const accountStore = createAccountStore({
     api,
     publicApi,
@@ -207,6 +213,7 @@
   setContext("billingStore", billingStore);
   setContext("devicesStore", devicesStore);
   setContext("supportStore", supportStore);
+  setContext("installGuidesStore", installGuidesStore);
   setContext("accountStore", accountStore);
 
   $: ({
@@ -300,6 +307,7 @@
     : plans;
   $: devicesEnabled = Boolean(appSettings?.my_devices_enabled);
   $: supportEnabled = Boolean(appSettings?.support_tickets_enabled ?? true);
+  $: installGuidesEnabled = Boolean(appSettings?.subscription_guides_enabled);
   $: supportStore.setActive(Boolean(mode === "app" && screen === "support" && supportEnabled));
   $: subscription = data?.subscription || DEV_MOCK.data.subscription;
   $: hasActiveTariffSubscription = Boolean(
@@ -476,12 +484,27 @@
     }
   }
 
+  function canUseInstallGuides(settings = appSettings, sub = subscription) {
+    const enabled =
+      settings === appSettings ? installGuidesEnabled : Boolean(settings?.subscription_guides_enabled);
+    return Boolean(enabled && sub?.active);
+  }
+
   onMount(() => {
     if (isPreviewBoard) return;
     const onAnyPointerDown = () => {
       if (mode === "login") loginEmailTooltipOpen = false;
     };
     const onPopState = () => {
+      const publicShortUuid = publicInstallShortUuidFromPath(window.location.pathname);
+      if (publicShortUuid) {
+        void loadPublicInstall(publicShortUuid);
+        return;
+      }
+      if (mode === "publicInstall") {
+        void boot();
+        return;
+      }
       const section = sectionFromPath(window.location.pathname);
       if (mode === "login") {
         setPasswordLoginMode(isPasswordLoginPath(), true);
@@ -508,14 +531,17 @@
             ? "home"
             : section === "support" && !supportEnabled
               ? "home"
-              : section;
-        activeTab = nextSection;
+              : section === "install" && !canUseInstallGuides()
+                ? "home"
+                : section;
+        activeTab = nextSection === "install" ? "home" : nextSection;
         screen = nextSection;
         if (nextSection === "devices") devicesStore.loadDevices(devicesEnabled);
         if (nextSection === "support") {
           supportStore.loadList();
           supportStore.startPolling({ includeList: true });
         }
+        if (nextSection === "install") installGuidesStore.load(true);
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -741,6 +767,11 @@
   }
 
   async function boot() {
+    const shareShortUuid = publicInstallShortUuidFromPath(window.location.pathname);
+    if (!MOCK && shareShortUuid) {
+      await loadPublicInstall(shareShortUuid);
+      return;
+    }
     await runWebappBoot({
       MOCK,
       setMode: (next) => {
@@ -831,6 +862,12 @@
     if (section === "support" && payload.settings?.support_tickets_enabled === false) {
       section = "home";
     }
+    if (
+      section === "install" &&
+      !(payload.settings?.subscription_guides_enabled && payload.subscription?.active)
+    ) {
+      section = "home";
+    }
     const initialAdminSection =
       section === "admin" ? adminSectionFromPath(window.location.pathname) : null;
     if (section === "admin" && payload.user?.is_admin) {
@@ -846,7 +883,7 @@
     }
     const initialSupportTicketId =
       section === "support" ? supportTicketIdFromPath(window.location.pathname) : null;
-    activeTab = section === "admin" ? "settings" : section;
+    activeTab = section === "admin" ? "settings" : section === "install" ? "home" : section;
     screen = section;
     mode = "app";
     if (payload.settings?.support_tickets_enabled !== false) {
@@ -871,6 +908,9 @@
     }
     if (section === "devices" && payload.settings?.my_devices_enabled) {
       await devicesStore.loadDevices(true);
+    }
+    if (section === "install") {
+      await installGuidesStore.load(true);
     }
     if (section === "support") {
       if (initialSupportTicketId)
@@ -910,6 +950,20 @@
         stripTopupQueryFromUrl();
       }
     }
+  }
+
+  async function loadPublicInstall(shortUuid) {
+    mode = "publicInstall";
+    screen = "install";
+    activeTab = "home";
+    publicInstallShortUuid = shortUuid;
+    publicInstallSubscription = {
+      panel_short_uuid: shortUuid,
+      share_url:
+        typeof window !== "undefined" ? `${window.location.origin}/install/share/${shortUuid}` : "",
+    };
+    const response = await installGuidesStore.loadPublic(shortUuid, true);
+    publicInstallSubscription = response?.subscription || publicInstallSubscription;
   }
 
   function showLogin() {
@@ -974,6 +1028,14 @@
       return;
     }
     openExternalLink(url);
+  }
+
+  function openInstallOrConnect() {
+    if (canUseInstallGuides()) {
+      goInstall();
+      return;
+    }
+    openConnectLink();
   }
 
   async function copyText(value, success = t("wa_copied")) {
@@ -1055,6 +1117,18 @@
     activeTab = "home";
     screen = "home";
     syncSectionPath("home");
+  }
+
+  function goInstall() {
+    if (!canUseInstallGuides()) {
+      openConnectLink();
+      return;
+    }
+    billingStore.closePaymentModal();
+    activeTab = "home";
+    screen = "install";
+    syncSectionPath("install");
+    installGuidesStore.load(true);
   }
 
   function goInvite() {
@@ -1193,6 +1267,7 @@
 
   async function handleAdminPersistedSaved(options = {}) {
     invalidateWebappTariffOptionCaches(billingStore);
+    installGuidesStore.reset();
     try {
       await loadData();
     } catch {
@@ -1241,6 +1316,25 @@
           <div class="loader">
             <BrandMark {brand} size="md" />
             <div>{t("wa_loading")}</div>
+          </div>
+        {:else if mode === "publicInstall"}
+          <div class="public-install-shell">
+            <a class="public-install-brand" href="/" aria-label={brandTitle}>
+              <BrandMark {brand} />
+              <strong>{brandTitle}</strong>
+            </a>
+            <InstallGuideScreen
+              {currentLang}
+              telegramPlatform={tg?.platform || ""}
+              user={{}}
+              subscription={publicInstallSubscription || { panel_short_uuid: publicInstallShortUuid }}
+              {goHome}
+              {openConnectLink}
+              {openExternalLink}
+              {copyText}
+              {t}
+              publicMode
+            />
           </div>
         {:else if mode === "login"}
           <AuthScreen
@@ -1330,12 +1424,24 @@
                 {trafficMode}
                 {trialBusy}
                 {activateTrial}
-                {openConnectLink}
+                openConnectLink={openInstallOrConnect}
                 {openPaymentModal}
                 {openRegularTopupModal}
                 {openPremiumTopupModal}
                 {openTariffChangeModal}
                 {primaryPayActionLabel}
+                {t}
+              />
+            {:else if screen === "install"}
+              <InstallGuideScreen
+                {currentLang}
+                telegramPlatform={tg?.platform || ""}
+                {user}
+                {subscription}
+                {goHome}
+                {openConnectLink}
+                {openExternalLink}
+                {copyText}
                 {t}
               />
             {:else if screen === "invite"}

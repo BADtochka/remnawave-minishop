@@ -6,6 +6,7 @@ export function normalizeSection(value) {
     .toLowerCase();
   if (
     section === "invite" ||
+    section === "install" ||
     section === "devices" ||
     section === "support" ||
     section === "settings" ||
@@ -26,6 +27,12 @@ export function sectionFromPath(pathname) {
   if (normalizedPath === "/support" || normalizedPath.startsWith("/support/")) return "support";
   const section = normalizedPath.startsWith("/") ? normalizedPath.slice(1) : normalizedPath;
   return normalizeSection(section);
+}
+
+export function publicInstallShortUuidFromPath(pathname) {
+  const normalized = String(pathname || "").trim().replace(/\/+$/, "");
+  const match = normalized.match(/^\/install\/share\/([A-Za-z0-9_-]{8,128})$/);
+  return match ? match[1] : "";
 }
 
 export function adminSectionFromPath(pathname) {
