@@ -426,6 +426,15 @@ async def telegram_oauth_callback_route(request: web.Request) -> web.Response:
             final_panel_uuid=link_final_panel_uuid,
             expire_at=merge_end_date,
         )
+        await _notify_account_merged(
+            request,
+            settings,
+            merge_notice=link_merge_notice,
+            email=linked_user_for_panel.email,
+            telegram_id=_telegram_id_for_user(linked_user_for_panel),
+            username=linked_user_for_panel.username,
+            first_name=linked_user_for_panel.first_name,
+        )
 
     token = create_webapp_session_token(settings, int(final_user_id))
     response = web.HTTPFound(_telegram_oauth_redirect_url(redirect_path, status="success"))
@@ -1146,6 +1155,42 @@ async def _build_account_merge_notice(
         "final_end_date": final_end_date.isoformat() if final_end_date else None,
         "final_end_date_text": _format_webapp_datetime(final_end_date),
     }
+
+
+async def _notify_account_merged(
+    request: web.Request,
+    settings: Settings,
+    *,
+    merge_notice: Optional[Dict[str, Any]],
+    email: Optional[str],
+    telegram_id: Optional[int],
+    username: Optional[str],
+    first_name: Optional[str],
+) -> None:
+    if not merge_notice:
+        return
+    try:
+        from bot.services.notification_service import NotificationService
+
+        bot: Bot = request.app["bot"]
+        notification_service = NotificationService(
+            bot,
+            settings,
+            request.app.get("i18n"),
+        )
+        await notification_service.notify_account_merged(
+            primary_user_id=int(merge_notice.get("primary_user_id") or 0),
+            removed_user_id=int(merge_notice.get("removed_user_id") or 0),
+            email=email,
+            telegram_id=telegram_id,
+            username=username,
+            first_name=first_name,
+            final_end_date_text=str(merge_notice.get("final_end_date_text") or ""),
+            primary_panel_user_uuid=merge_notice.get("primary_panel_user_uuid"),
+            removed_panel_user_uuid=merge_notice.get("removed_panel_user_uuid"),
+        )
+    except Exception:
+        logger.exception("Failed to send account merged notification")
 
 
 def _apply_telegram_profile_to_user(

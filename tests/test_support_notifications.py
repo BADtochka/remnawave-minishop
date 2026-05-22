@@ -364,3 +364,51 @@ def test_support_user_reply_can_send_email_without_telegram_channels():
 
     assert channels == []
     assert emails[0]["ticket_id"] == 7
+
+
+def test_account_merge_notification_goes_to_log_channel():
+    messages = []
+
+    class I18n:
+        def gettext(self, _language, key, **kwargs):
+            if key == "log_open_profile_link":
+                return "Open profile"
+            assert key == "log_account_merged"
+            return (
+                f"merged primary={kwargs['primary_user_id']} "
+                f"removed={kwargs['removed_user_id']} "
+                f"email={kwargs['email']} end={kwargs['final_end_date']}"
+            )
+
+    service = NotificationService(
+        bot=SimpleNamespace(),
+        settings=_settings(LOG_CHAT_ID=-100123, DEFAULT_LANGUAGE="en"),
+        i18n=I18n(),
+    )
+
+    async def send_to_log_channel(message, thread_id=None, reply_markup=None):
+        messages.append((message, thread_id, reply_markup))
+
+    service._send_to_log_channel = send_to_log_channel
+
+    asyncio.run(
+        service.notify_account_merged(
+            primary_user_id=42,
+            removed_user_id=-100,
+            email="paid@example.com",
+            telegram_id=100200300,
+            username="alice",
+            first_name="Alice",
+            final_end_date_text="2026-06-21 10:00",
+            primary_panel_user_uuid="panel-telegram",
+            removed_panel_user_uuid="panel-email",
+        )
+    )
+
+    assert len(messages) == 1
+    message, thread_id, reply_markup = messages[0]
+    assert "primary=42" in message
+    assert "removed=-100" in message
+    assert "paid@example.com" in message
+    assert thread_id is None
+    assert reply_markup.inline_keyboard[0][0].url == "tg://user?id=100200300"

@@ -363,6 +363,7 @@
   "log_new_email_user_registration": "📧 <b>New User (email)</b>\n\n🆔 ID: <code>{user_id}</code>\n📧 Email: <code>{email}</code>{referral_text}\n📅 Time: {timestamp}",
   "log_account_email_linked": "📧 <b>Email linked</b>\n\n🆔 User ID: <code>{user_id}</code>\n📨 Telegram ID: <code>{telegram_id}</code>\n👤 User: {user_display}\n📧 Email: <code>{email}</code>\n🕐 Time: {timestamp}",
   "log_account_telegram_linked": "📨 <b>Telegram linked</b>\n\n🆔 User ID: <code>{user_id}</code>\n📨 Telegram ID: <code>{telegram_id}</code>\n👤 User: {user_display}\n📧 Email: <code>{email}</code>\n🕐 Time: {timestamp}",
+  "log_account_merged": "🔗 <b>Accounts merged</b>\n\n🆔 Kept user ID: <code>{primary_user_id}</code>\n🗑 Removed user ID: <code>{removed_user_id}</code>\n📨 Telegram ID: <code>{telegram_id}</code>\n👤 User: {user_display}\n📧 Email: <code>{email}</code>\n⏰ New end date: <b>{final_end_date}</b>\n📋 Kept panel UUID: <code>{primary_panel_user_uuid}</code>\n📋 Removed panel UUID: <code>{removed_panel_user_uuid}</code>\n🕐 Time: {timestamp}",
   "log_payment_received": "{provider_emoji} <b>Payment Received</b>\n\n👤 User: {user_display}\n💰 Amount: <b>{amount} {currency}</b>\n📅 Period: <b>{months} mo.</b>\n🏦 Provider: {payment_provider}\n🕐 Time: {timestamp}",
   "log_payment_received_traffic": "{provider_emoji} <b>Payment Received (traffic top-up)</b>\n\n👤 User: {user_display}\n💰 Amount: <b>{amount} {currency}</b>\n🗂 {traffic_summary}\n{tariff_line}🏦 Provider: {payment_provider}\n🕐 Time: {timestamp}",
   "log_payment_traffic_purchase_line": "<b>{gb} GB</b> · {kind}",

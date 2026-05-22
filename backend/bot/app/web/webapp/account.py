@@ -2,7 +2,11 @@
 from ._runtime import *  # noqa: F403,F405
 
 from bot.app.web.webapp.cache_helpers import webapp_cached_user_payload
-from .auth import _hash_email_password, _sync_merged_panel_identity_for_user
+from .auth import (
+    _hash_email_password,
+    _notify_account_merged,
+    _sync_merged_panel_identity_for_user,
+)
 from .common import _invalidate_webapp_user_caches
 
 
@@ -164,6 +168,16 @@ async def account_email_verify_route(request: web.Request) -> web.Response:
             return _json_error(500, "link_failed", "Link failed")
 
     await _invalidate_webapp_user_caches(settings, user_id, final_user_id, include_devices=True)
+    if merge_notice:
+        await _notify_account_merged(
+            request,
+            settings,
+            merge_notice=merge_notice,
+            email=final_email,
+            telegram_id=final_telegram_id,
+            username=final_username,
+            first_name=final_first_name,
+        )
     if should_notify_email_linked:
         try:
             from bot.services.notification_service import NotificationService
@@ -372,6 +386,16 @@ async def account_telegram_link_route(request: web.Request) -> web.Response:
             return _json_error(500, "link_failed", "Link failed")
 
     await _invalidate_webapp_user_caches(settings, user_id, final_user_id, include_devices=True)
+    if merge_notice:
+        await _notify_account_merged(
+            request,
+            settings,
+            merge_notice=merge_notice,
+            email=final_email,
+            telegram_id=final_telegram_id,
+            username=final_username,
+            first_name=final_first_name,
+        )
     if should_notify_telegram_linked and final_telegram_id:
         try:
             from bot.services.notification_service import NotificationService

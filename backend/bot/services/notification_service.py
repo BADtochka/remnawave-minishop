@@ -690,6 +690,51 @@ class NotificationService:
         profile_keyboard = self._build_profile_keyboard(_, telegram_id)
         await self._send_to_log_channel(message, reply_markup=profile_keyboard)
 
+    async def notify_account_merged(
+        self,
+        *,
+        primary_user_id: int,
+        removed_user_id: int,
+        email: Optional[str],
+        telegram_id: Optional[int],
+        username: Optional[str] = None,
+        first_name: Optional[str] = None,
+        final_end_date_text: Optional[str] = None,
+        primary_panel_user_uuid: Optional[str] = None,
+        removed_panel_user_uuid: Optional[str] = None,
+    ):
+        """Send notification when duplicate email/Telegram accounts are merged."""
+        if not self.settings.LOG_NEW_USERS:
+            return
+
+        admin_lang = self.settings.DEFAULT_LANGUAGE
+        _ = lambda k, **kw: self.i18n.gettext(admin_lang, k, **kw) if self.i18n else k
+
+        display_user_id = int(telegram_id or primary_user_id)
+        user_display = self._format_user_display(
+            user_id=display_user_id,
+            username=username,
+            first_name=first_name,
+        )
+
+        message = _(
+            "log_account_merged",
+            primary_user_id=primary_user_id,
+            removed_user_id=removed_user_id,
+            telegram_id=telegram_id or "",
+            user_display=user_display,
+            email=hd.quote(email or ""),
+            final_end_date=hd.quote(final_end_date_text or ""),
+            primary_panel_user_uuid=hd.quote(primary_panel_user_uuid or ""),
+            removed_panel_user_uuid=hd.quote(removed_panel_user_uuid or ""),
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+        profile_keyboard = (
+            self._build_profile_keyboard(_, int(telegram_id)) if telegram_id else None
+        )
+        await self._send_to_log_channel(message, reply_markup=profile_keyboard)
+
     def _format_traffic_gb_admin(self, traffic_gb: float) -> str:
         value = float(traffic_gb)
         if value.is_integer():
