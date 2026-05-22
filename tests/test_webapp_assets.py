@@ -488,7 +488,7 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
                     "subscription_webapp.min.22222222.js",
                 )
 
-    def test_resolve_webapp_admin_asset_names_prefer_latest_minified_builds(self):
+    def test_resolve_webapp_admin_asset_names_use_stable_runtime_builds(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             asset_dir = Path(tmpdir)
             (asset_dir / "subscription_webapp_admin.js").write_text(
@@ -513,11 +513,11 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             with patch.object(webapp_assets, "ASSET_DIR", asset_dir):
                 self.assertEqual(
                     subscription_webapp._resolve_webapp_admin_js_asset_name(),
-                    "subscription_webapp_admin.min.22222222.js",
+                    "subscription_webapp_admin.js",
                 )
                 self.assertEqual(
                     subscription_webapp._resolve_webapp_admin_css_asset_name(),
-                    "subscription_webapp_admin.22222222.css",
+                    "subscription_webapp_admin.css",
                 )
 
     async def test_js_asset_route_sets_immutable_cache_control_for_minified_asset(self):

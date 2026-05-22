@@ -635,7 +635,10 @@
       link.rel = "stylesheet";
       link.href = href;
       link.onload = () => resolve();
-      link.onerror = () => reject(new Error(`stylesheet_load_failed:${href}`));
+      link.onerror = () => {
+        link.remove();
+        reject(new Error(`stylesheet_load_failed:${href}`));
+      };
       document.head.appendChild(link);
     });
   }
@@ -648,9 +651,32 @@
       script.src = src;
       script.async = true;
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error(`script_load_failed:${src}`));
+      script.onerror = () => {
+        script.remove();
+        reject(new Error(`script_load_failed:${src}`));
+      };
       document.head.appendChild(script);
     });
+  }
+
+  async function appendStylesheetWithFallback(id, href, fallbackName) {
+    const fallbackHref = resolveWebappAssetPath("", fallbackName);
+    try {
+      await appendStylesheetOnce(id, href);
+    } catch (error) {
+      if (!fallbackHref || href === fallbackHref) throw error;
+      await appendStylesheetOnce(id, fallbackHref);
+    }
+  }
+
+  async function appendScriptWithFallback(id, src, fallbackName) {
+    const fallbackSrc = resolveWebappAssetPath("", fallbackName);
+    try {
+      await appendScriptOnce(id, src);
+    } catch (error) {
+      if (!fallbackSrc || src === fallbackSrc) throw error;
+      await appendScriptOnce(id, fallbackSrc);
+    }
   }
 
   function readAdminBundleApi() {
@@ -672,8 +698,16 @@
     adminBundlePromise = (async () => {
       const cssHref = resolveWebappAssetPath(CFG.adminCssAsset, "subscription_webapp_admin.css");
       const jsSrc = resolveWebappAssetPath(CFG.adminJsAsset, "subscription_webapp_admin.js");
-      await appendStylesheetOnce("subscription-webapp-admin-css", cssHref);
-      await appendScriptOnce("subscription-webapp-admin-js", jsSrc);
+      await appendStylesheetWithFallback(
+        "subscription-webapp-admin-css",
+        cssHref,
+        "subscription_webapp_admin.css",
+      );
+      await appendScriptWithFallback(
+        "subscription-webapp-admin-js",
+        jsSrc,
+        "subscription_webapp_admin.js",
+      );
       const loaded = readAdminBundleApi();
       if (!loaded) throw new Error("admin_bundle_missing_mount");
       adminBundleApi = loaded;
