@@ -397,6 +397,7 @@
   $: telegramOAuthClientId = Number(CFG.telegramOAuthClientId || telegramLoginBotId || 0);
   $: telegramMiniAppInitData = tg?.initData || readTelegramMiniAppInitDataFromLocation();
   $: telegramMiniAppAuthAvailable = Boolean(telegramMiniAppInitData);
+  $: telegramMiniAppContext = hasTelegramLaunchParams();
   $: telegramLoginUnavailable =
     !telegramMiniAppAuthAvailable && !telegramOAuthClientId && telegramSdkStatus !== "loading";
   $: telegramLoginChecking =
@@ -1407,6 +1408,7 @@
                 {user}
                 {userAgreementUrl}
                 {userLanguage}
+                showLogout={!telegramMiniAppContext}
                 linkTelegramAccount={accountStore.linkTelegramAccount}
                 logout={accountStore.logout}
                 {openAdminPanel}

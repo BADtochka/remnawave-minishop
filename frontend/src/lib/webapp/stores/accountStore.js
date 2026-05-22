@@ -362,6 +362,7 @@ export function createAccountStore({
   }
 
   async function logout() {
+    if (telegramSdk.hasLaunchParams()) return;
     markManualLogout();
     clearToken();
     try {

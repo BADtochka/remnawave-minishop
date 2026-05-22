@@ -34,6 +34,7 @@
   export let user = {};
   export let userAgreementUrl = "";
   export let userLanguage = "";
+  export let showLogout = true;
 
   export let linkTelegramAccount = () => {};
   export let logout = () => {};
@@ -187,10 +188,12 @@
         <ArrowRight size={17} />
       </button>
     {/if}
-    <button class="settings-row settings-row-logout" type="button" onclick={logout}>
-      <UserRound size={21} />
-      <span><strong>{t("wa_logout")}</strong><small>{t("wa_end_session")}</small></span>
-      <ArrowRight size={17} />
-    </button>
+    {#if showLogout}
+      <button class="settings-row settings-row-logout" type="button" onclick={logout}>
+        <UserRound size={21} />
+        <span><strong>{t("wa_logout")}</strong><small>{t("wa_end_session")}</small></span>
+        <ArrowRight size={17} />
+      </button>
+    {/if}
   </div>
 </main>

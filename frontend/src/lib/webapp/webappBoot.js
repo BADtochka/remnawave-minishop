@@ -61,11 +61,6 @@ export async function runWebappBoot({
     );
   }
 
-  if (isManuallyLoggedOut()) {
-    showLogin();
-    return;
-  }
-
   const widgetAuthData = readTelegramLoginWidgetAuthData();
   if (widgetAuthData && (await finalizeTelegramAuth(widgetAuthData, "auth_data"))) return;
 
@@ -76,6 +71,11 @@ export async function runWebappBoot({
     } catch (_error) {
       void _error;
     }
+  }
+
+  if (isManuallyLoggedOut()) {
+    showLogin();
+    return;
   }
 
   if (getToken() || getCsrfToken()) {
