@@ -15,6 +15,7 @@ from PIL import Image
 from bot.app.web import subscription_webapp
 from bot.app.web.admin_api_impl import themes as admin_themes
 from bot.app.web.webapp import assets as webapp_assets
+from bot.app.web.webapp import cache_helpers
 from config.settings import Settings
 from config.webapp_themes_config import WebappThemesConfig, builtin_webapp_themes_config
 
@@ -448,6 +449,58 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             methods,
             [{"id": "yookassa", "name": "Bank card", "icon": "WalletCards"}],
         )
+
+    def test_serialize_payment_methods_includes_wata_from_provider_config(self):
+        from bot.payment_providers import build_provider_configs, get_provider_bundle
+
+        build_provider_configs(force=True)
+        bundle = get_provider_bundle("wata_service")
+        self.assertIsNotNone(bundle)
+        bundle.config.ENABLED = True
+        bundle.config.API_TOKEN = "wata-token"
+
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+            TARIFFS_CONFIG_PATH="missing-tariffs.json",
+            PAYMENT_METHODS_ORDER="wata",
+            STARS_ENABLED=False,
+        )
+        app = {"wata_service": SimpleNamespace(configured=True)}
+
+        methods = subscription_webapp._serialize_payment_methods(settings, app, "en")
+
+        self.assertEqual(methods, [{"id": "wata", "name": "Wata", "icon": "WalletCards"}])
+
+    async def test_invalidate_all_webapp_user_caches_clears_cached_me_payload(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+            REDIS_URL=None,
+        )
+        calls = 0
+
+        async def loader():
+            nonlocal calls
+            calls += 1
+            return {"payment_methods": [{"id": f"method-{calls}"}]}
+
+        first = await cache_helpers.webapp_cached_user_payload(settings, "me", 42, 60, loader)
+        second = await cache_helpers.webapp_cached_user_payload(settings, "me", 42, 60, loader)
+
+        self.assertEqual(first, {"payment_methods": [{"id": "method-1"}]})
+        self.assertEqual(second, first)
+        self.assertEqual(calls, 1)
+
+        await cache_helpers.invalidate_all_webapp_user_caches(settings)
+        third = await cache_helpers.webapp_cached_user_payload(settings, "me", 42, 60, loader)
+
+        self.assertEqual(third, {"payment_methods": [{"id": "method-2"}]})
+        self.assertEqual(calls, 2)
 
     def test_serialize_plans_includes_stars_only_subscription_options(self):
         settings = Settings(

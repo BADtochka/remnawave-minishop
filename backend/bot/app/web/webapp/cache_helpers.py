@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Awaitable, Callable, Optional
 
-from bot.infra.redis import cache_delete, redis_key
+from bot.infra.redis import cache_delete, cache_delete_pattern, redis_key
 from bot.utils.ttl_cache import AsyncTTLCache
 from config.settings import Settings
 
@@ -55,6 +55,20 @@ def invalidate_local_webapp_user_payload(
             cache.invalidate(key)
 
 
+def invalidate_all_local_webapp_user_payloads(
+    settings: Settings,
+    namespace: Optional[str] = None,
+) -> None:
+    for (settings_id, cache_namespace, _ttl), cache in tuple(
+        _WEBAPP_USER_PAYLOAD_CACHES.items()
+    ):
+        if settings_id != id(settings):
+            continue
+        if namespace is not None and cache_namespace != namespace:
+            continue
+        cache.invalidate()
+
+
 async def invalidate_webapp_user_caches(
     settings: Settings,
     *user_ids: Optional[int],
@@ -79,3 +93,23 @@ async def invalidate_webapp_user_caches(
             invalidate_local_webapp_user_payload(settings, "devices", user_id)
     if keys:
         await cache_delete(settings, *keys)
+
+
+async def invalidate_all_webapp_user_caches(
+    settings: Settings,
+    *,
+    include_devices: bool = False,
+) -> None:
+    namespaces = ["me"]
+    if include_devices:
+        namespaces.append("devices")
+
+    for namespace in namespaces:
+        invalidate_all_local_webapp_user_payloads(settings, namespace)
+        try:
+            await cache_delete_pattern(
+                settings,
+                redis_key(settings, "cache", "webapp", namespace, "*"),
+            )
+        except Exception:
+            continue

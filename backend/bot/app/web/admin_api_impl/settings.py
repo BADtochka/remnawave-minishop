@@ -79,6 +79,12 @@ async def admin_settings_patch_route(request: web.Request) -> web.Response:
     if isinstance(cache, dict):
         cache["ts"] = 0.0
         cache["data"] = {}
+    try:
+        from bot.app.web.webapp.cache_helpers import invalidate_all_webapp_user_caches
+
+        await invalidate_all_webapp_user_caches(settings, include_devices=True)
+    except Exception:
+        logger.exception("Failed to invalidate WebApp user payload caches after settings update")
     if (
         "WEBAPP_LOGO_URL" in updates
         or "WEBAPP_LOGO_URL" in deletes
