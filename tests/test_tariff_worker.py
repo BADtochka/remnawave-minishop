@@ -1,3 +1,4 @@
+import asyncio
 import json
 import tempfile
 import unittest
@@ -617,3 +618,107 @@ class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNone(result)
         panel_service.get_all_panel_users.assert_not_awaited()
+
+    async def test_missing_panel_subscription_repairs_to_user_panel_uuid(self):
+        panel_service = AsyncMock(spec=PanelApiService)
+        worker = TariffTrafficWorker(
+            settings=SimpleNamespace(),
+            session_factory=SimpleNamespace(),
+            panel_service=panel_service,
+            subscription_service=SimpleNamespace(),
+        )
+        sub = SimpleNamespace(
+            subscription_id=10,
+            user_id=123,
+            panel_user_uuid="old-panel",
+            is_active=True,
+            status_from_panel="ACTIVE",
+            skip_notifications=False,
+        )
+        panel_user = {"uuid": "new-panel", "username": "tg_123"}
+
+        with patch(
+            "bot.services.tariff_worker.user_dal.get_user_by_id",
+            new=AsyncMock(return_value=SimpleNamespace(panel_user_uuid="new-panel")),
+        ):
+            result = await worker._repair_missing_panel_user_for_subscription(
+                AsyncMock(),
+                sub,
+                panel_users_by_uuid={"new-panel": panel_user},
+                semaphore=asyncio.Semaphore(1),
+                confirmed_missing=True,
+            )
+
+        self.assertEqual(result, panel_user)
+        self.assertEqual(sub.panel_user_uuid, "new-panel")
+        self.assertTrue(sub.is_active)
+        panel_service.get_user_by_uuid.assert_not_awaited()
+
+    async def test_missing_panel_subscription_deactivates_when_bulk_prefetch_confirms_absent(self):
+        panel_service = AsyncMock(spec=PanelApiService)
+        worker = TariffTrafficWorker(
+            settings=SimpleNamespace(),
+            session_factory=SimpleNamespace(),
+            panel_service=panel_service,
+            subscription_service=SimpleNamespace(),
+        )
+        sub = SimpleNamespace(
+            subscription_id=11,
+            user_id=123,
+            panel_user_uuid="missing-panel",
+            is_active=True,
+            status_from_panel="ACTIVE",
+            skip_notifications=False,
+        )
+
+        with patch(
+            "bot.services.tariff_worker.user_dal.get_user_by_id",
+            new=AsyncMock(return_value=SimpleNamespace(panel_user_uuid="missing-panel")),
+        ):
+            result = await worker._repair_missing_panel_user_for_subscription(
+                AsyncMock(),
+                sub,
+                panel_users_by_uuid={},
+                semaphore=asyncio.Semaphore(1),
+                confirmed_missing=True,
+            )
+
+        self.assertEqual(result, {})
+        self.assertFalse(sub.is_active)
+        self.assertTrue(sub.skip_notifications)
+        self.assertEqual(sub.status_from_panel, "PANEL_USER_NOT_FOUND")
+
+    async def test_missing_panel_subscription_only_skips_when_absence_is_not_confirmed(self):
+        panel_service = AsyncMock(spec=PanelApiService)
+        panel_service.get_user_by_uuid = AsyncMock(return_value=None)
+        worker = TariffTrafficWorker(
+            settings=SimpleNamespace(),
+            session_factory=SimpleNamespace(),
+            panel_service=panel_service,
+            subscription_service=SimpleNamespace(),
+        )
+        sub = SimpleNamespace(
+            subscription_id=12,
+            user_id=123,
+            panel_user_uuid="missing-panel",
+            is_active=True,
+            status_from_panel="ACTIVE",
+            skip_notifications=False,
+        )
+
+        with patch(
+            "bot.services.tariff_worker.user_dal.get_user_by_id",
+            new=AsyncMock(return_value=SimpleNamespace(panel_user_uuid="missing-panel")),
+        ):
+            result = await worker._repair_missing_panel_user_for_subscription(
+                AsyncMock(),
+                sub,
+                panel_users_by_uuid=None,
+                semaphore=asyncio.Semaphore(1),
+                confirmed_missing=False,
+            )
+
+        self.assertEqual(result, {})
+        self.assertTrue(sub.is_active)
+        self.assertFalse(sub.skip_notifications)
+        self.assertEqual(sub.status_from_panel, "ACTIVE")

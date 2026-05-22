@@ -155,6 +155,13 @@ class TariffTrafficWorker:
                 cached_panel_user = panel_users_by_uuid.get(str(sub.panel_user_uuid))
                 if cached_panel_user is not None:
                     return cached_panel_user
+                return await self._repair_missing_panel_user_for_subscription(
+                    session,
+                    sub,
+                    panel_users_by_uuid=panel_users_by_uuid,
+                    semaphore=semaphore,
+                    confirmed_missing=True,
+                )
 
             async with semaphore:
                 try:
@@ -167,12 +174,22 @@ class TariffTrafficWorker:
                         sub.panel_user_uuid,
                     )
                     return {}
-            return data or {}
+            if data:
+                return data
+            return await self._repair_missing_panel_user_for_subscription(
+                session,
+                sub,
+                panel_users_by_uuid=None,
+                semaphore=semaphore,
+                confirmed_missing=False,
+            )
 
         for chunk_start in range(0, len(subs), TARIFF_WORKER_BATCH_SIZE):
             chunk = subs[chunk_start : chunk_start + TARIFF_WORKER_BATCH_SIZE]
             panel_payloads = await asyncio.gather(*(_fetch_panel(s) for s in chunk))
             for sub, panel_data in zip(chunk, panel_payloads):
+                if not panel_data:
+                    continue
                 try:
                     tariff = self.settings.tariffs_config.require(sub.tariff_key)
                 except Exception:
@@ -254,6 +271,69 @@ class TariffTrafficWorker:
             len(subs),
         )
         return by_uuid
+
+    async def _repair_missing_panel_user_for_subscription(
+        self,
+        session: AsyncSession,
+        sub: Subscription,
+        *,
+        panel_users_by_uuid: Optional[dict[str, dict]],
+        semaphore: asyncio.Semaphore,
+        confirmed_missing: bool,
+    ) -> dict:
+        current_uuid = str(getattr(sub, "panel_user_uuid", "") or "").strip()
+        try:
+            user_id = int(sub.user_id)
+        except (TypeError, ValueError):
+            user_id = 0
+        db_user = await user_dal.get_user_by_id(session, user_id) if user_id else None
+        canonical_uuid = str(getattr(db_user, "panel_user_uuid", "") or "").strip()
+
+        if canonical_uuid and canonical_uuid != current_uuid:
+            panel_user = None
+            if panel_users_by_uuid is not None:
+                panel_user = panel_users_by_uuid.get(canonical_uuid)
+            else:
+                async with semaphore:
+                    try:
+                        panel_user = await self.panel_service.get_user_by_uuid(
+                            canonical_uuid,
+                            log_response=False,
+                        )
+                    except Exception:
+                        logging.exception(
+                            "TariffTrafficWorker: failed to fetch canonical panel user %s",
+                            canonical_uuid,
+                        )
+                        panel_user = None
+            if panel_user:
+                logging.warning(
+                    "TariffTrafficWorker: repaired subscription %s panel UUID %s -> %s",
+                    sub.subscription_id,
+                    current_uuid,
+                    canonical_uuid,
+                )
+                sub.panel_user_uuid = canonical_uuid
+                return panel_user
+
+        if confirmed_missing:
+            sub.is_active = False
+            sub.skip_notifications = True
+            sub.status_from_panel = "PANEL_USER_NOT_FOUND"
+            logging.warning(
+                "TariffTrafficWorker: deactivated subscription %s because panel user %s "
+                "is missing",
+                sub.subscription_id,
+                current_uuid,
+            )
+        else:
+            logging.warning(
+                "TariffTrafficWorker: skipping subscription %s because panel user %s "
+                "could not be fetched",
+                sub.subscription_id,
+                current_uuid,
+            )
+        return {}
 
     async def _ensure_period_reset_strategy(
         self,
