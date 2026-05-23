@@ -41,7 +41,7 @@ class SettingsTests(unittest.TestCase):
         )
 
         self.assertTrue(settings.SUBSCRIPTION_GUIDES_ENABLED)
-        self.assertFalse(settings.SUBSCRIPTION_GUIDES_BOT_MENU_ENABLED)
+        self.assertTrue(settings.SUBSCRIPTION_GUIDES_BOT_MENU_ENABLED)
         self.assertTrue(settings.SUBSCRIPTION_PAGE_CONFIG_PANEL_ENABLED)
         self.assertFalse(settings.SUBSCRIPTION_PAGE_CONFIG_JSON_OVERRIDE_ENABLED)
         self.assertEqual(

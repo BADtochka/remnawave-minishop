@@ -328,7 +328,7 @@ class Settings(BaseSettings):
         description="Show embedded install instructions inside the subscription Mini App.",
     )
     SUBSCRIPTION_GUIDES_BOT_MENU_ENABLED: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Open Mini App install guides from Telegram bot connect buttons and show public "
             "install guide share links."
@@ -336,7 +336,9 @@ class Settings(BaseSettings):
     )
     SUBSCRIPTION_PAGE_CONFIG_PANEL_ENABLED: bool = Field(
         default=True,
-        description="Use Remnawave Panel Subscription Page config for embedded guides when available.",
+        description=(
+            "Use Remnawave Panel Subscription Page config for embedded guides when available."
+        ),
     )
     SUBSCRIPTION_PAGE_CONFIG_JSON_OVERRIDE_ENABLED: bool = Field(
         default=False,
