@@ -7,6 +7,7 @@
     EyeOff,
     FileText,
     Search,
+    TriangleAlert,
     X,
   } from "$components/ui/icons.js";
   import * as UiIcons from "$components/ui/icons.js";
@@ -338,6 +339,25 @@
   </div>
 {/snippet}
 
+{#snippet renderLegacyTariffsWarning()}
+  <div class="admin-settings-warning" role="status">
+    <TriangleAlert size={16} aria-hidden="true" />
+    <div class="admin-settings-warning-copy">
+      <strong>{at("settings_legacy_tariffs_warning_title", {}, "Legacy tariffs")}</strong>
+      <p>
+        {at(
+          "settings_legacy_tariffs_warning_body",
+          {},
+          "These settings are ignored when tariffs are configured in the dedicated Tariffs section."
+        )}
+      </p>
+    </div>
+    <a class="admin-settings-warning-link" href="/admin/tariffs">
+      {at("settings_legacy_tariffs_warning_link", {}, "Open Tariffs")}
+    </a>
+  </div>
+{/snippet}
+
 {#snippet renderField(field)}
   {@const revealed = isSecretRevealed(field.key)}
   <div class="admin-setting" class:is-overridden={isOverridden(field)}>
@@ -573,6 +593,9 @@
           {@const rootGroup = groups.find((g) => !g.label)}
           {@const labelGroups = groups.filter((g) => g.label)}
           <div class="admin-settings-fields">
+            {#if section.id === "pricing"}
+              {@render renderLegacyTariffsWarning()}
+            {/if}
             {#if rootGroup}
               {#if rootGroup.webhook}
                 {@render renderWebhookHint(rootGroup.webhook)}
