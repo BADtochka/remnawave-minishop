@@ -57,6 +57,10 @@ class HwidDeviceMixin:
             )
             return {
                 "subscription_id": sub.subscription_id,
+                "end_date": sub.end_date,
+                "is_active": True,
+                "panel_user_uuid": db_user.panel_user_uuid,
+                "panel_short_uuid": getattr(sub, "panel_subscription_uuid", None),
                 "hwid_device_limit": 0,
                 "extra_hwid_devices": int(sub.extra_hwid_devices or 0),
                 "purchased_hwid_devices": 0,
@@ -102,6 +106,10 @@ class HwidDeviceMixin:
             )
             return None
 
+        final_subscription_url = updated_panel.get("subscriptionUrl")
+        final_panel_short_uuid = updated_panel.get(
+            "shortUuid", getattr(updated_sub, "panel_subscription_uuid", None)
+        )
         await tariff_dal.create_hwid_device_purchase(
             session,
             subscription_id=updated_sub.subscription_id,
@@ -110,6 +118,11 @@ class HwidDeviceMixin:
         )
         return {
             "subscription_id": updated_sub.subscription_id,
+            "end_date": updated_sub.end_date,
+            "is_active": True,
+            "panel_user_uuid": db_user.panel_user_uuid,
+            "panel_short_uuid": final_panel_short_uuid,
+            "subscription_url": final_subscription_url,
             "hwid_device_limit": effective_hwid_limit,
             "extra_hwid_devices": new_extra_devices,
             "purchased_hwid_devices": purchased_devices,

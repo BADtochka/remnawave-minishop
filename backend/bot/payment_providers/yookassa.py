@@ -414,6 +414,51 @@ YOOKASSA_WEBHOOK_ALLOWED_IPS = [
     "77.75.154.128/25",
     "2a02:5180::/32",
 ]
+HWID_DEVICE_SALE_BASES = {"hwid_device", "hwid_devices"}
+
+
+def _is_hwid_device_sale_base(sale_mode_base: str) -> bool:
+    return sale_mode_base in HWID_DEVICE_SALE_BASES
+
+
+def _metadata_value_present(value: Optional[Any]) -> bool:
+    return value is not None and str(value).strip() != ""
+
+
+def _resolve_yookassa_activation_amounts(
+    *,
+    sale_mode_base: str,
+    subscription_months_raw: Optional[Any],
+    traffic_gb_raw: Optional[Any],
+    hwid_devices_raw: Optional[Any],
+) -> tuple[float, float, int, int, Optional[float]]:
+    subscription_months = float(subscription_months_raw or 0)
+    traffic_amount_gb = (
+        float(traffic_gb_raw) if _metadata_value_present(traffic_gb_raw) else subscription_months
+    )
+    hwid_devices_count = (
+        int(float(hwid_devices_raw))
+        if _metadata_value_present(hwid_devices_raw)
+        else (int(subscription_months) if _is_hwid_device_sale_base(sale_mode_base) else 0)
+    )
+
+    if sale_mode_base == "subscription":
+        months_for_activation = int(subscription_months)
+    elif _is_hwid_device_sale_base(sale_mode_base):
+        months_for_activation = hwid_devices_count
+    else:
+        months_for_activation = int(traffic_amount_gb)
+
+    traffic_gb_for_activation = (
+        traffic_amount_gb if is_traffic_sale_base(sale_mode_base) else None
+    )
+    return (
+        subscription_months,
+        traffic_amount_gb,
+        hwid_devices_count,
+        months_for_activation,
+        traffic_gb_for_activation,
+    )
 
 
 async def process_successful_payment(
@@ -431,6 +476,7 @@ async def process_successful_payment(
     user_id_str = metadata.get("user_id")
     subscription_months_str = metadata.get("subscription_months")
     traffic_gb_str = metadata.get("traffic_gb")
+    hwid_devices_str = metadata.get("hwid_devices")
     sale_mode = metadata.get("sale_mode") or (
         "traffic" if settings.traffic_sale_mode else "subscription"
     )
@@ -443,7 +489,11 @@ async def process_successful_payment(
     # we will create/ensure a payment record idempotently using provider payment id.
     if (
         not user_id_str
-        or (not subscription_months_str and not traffic_gb_str)
+        or not (
+            _metadata_value_present(subscription_months_str)
+            or _metadata_value_present(traffic_gb_str)
+            or _metadata_value_present(hwid_devices_str)
+        )
         or (not payment_db_id_str and not auto_renew_subscription_id_str)
     ):
         logging.error(
@@ -454,8 +504,18 @@ async def process_successful_payment(
     db_user = None
     try:
         user_id = int(user_id_str)
-        subscription_months = float(subscription_months_str or 0)
-        traffic_amount_gb = float(traffic_gb_str) if traffic_gb_str else subscription_months
+        (
+            subscription_months,
+            traffic_amount_gb,
+            hwid_devices_count,
+            months_for_activation,
+            traffic_gb_for_activation,
+        ) = _resolve_yookassa_activation_amounts(
+            sale_mode_base=sale_mode_base,
+            subscription_months_raw=subscription_months_str,
+            traffic_gb_raw=traffic_gb_str,
+            hwid_devices_raw=hwid_devices_str,
+        )
         payment_db_id = (
             int(payment_db_id_str) if payment_db_id_str and payment_db_id_str.isdigit() else None
         )
@@ -472,6 +532,21 @@ async def process_successful_payment(
         months_for_record = int(subscription_months) if sale_mode_base == "subscription" else 0
         payment_value = float(amount_data.get("value", 0.0))
         yk_payment_id_from_hook = payment_info_from_webhook.get("id")
+
+        if _is_hwid_device_sale_base(sale_mode_base) and hwid_devices_count <= 0:
+            logging.error(
+                "YooKassa HWID payment %s has invalid device count in metadata: %s",
+                yk_payment_id_from_hook,
+                metadata,
+            )
+            if payment_db_id is not None:
+                await payment_dal.update_payment_status_by_db_id(
+                    session,
+                    payment_db_id,
+                    "failed_metadata_error",
+                    yk_payment_id_from_hook,
+                )
+            return
 
         payment_record = None
         # If this is an auto-renewal (no payment_db_id in metadata), ensure a payment record exists
@@ -617,9 +692,6 @@ async def process_successful_payment(
                     logging.exception("Failed to persist multi-card YooKassa method from webhook")
         except Exception:
             logging.exception("Failed to persist YooKassa payment method from webhook")
-        months_for_activation = (
-            int(subscription_months) if sale_mode_base == "subscription" else int(traffic_amount_gb)
-        )
         activation_details = await subscription_service.activate_subscription(
             session,
             user_id,
@@ -629,12 +701,12 @@ async def process_successful_payment(
             promo_code_id_from_payment=promo_code_id,
             provider="yookassa",
             sale_mode=sale_mode,
-            traffic_gb=traffic_amount_gb
-            if sale_mode_base in {"traffic", "traffic_package", "topup", "premium_topup"}
-            else None,
+            traffic_gb=traffic_gb_for_activation,
         )
 
-        if not activation_details or not activation_details.get("end_date"):
+        if not activation_details or (
+            sale_mode_base == "subscription" and not activation_details.get("end_date")
+        ):
             logging.error(
                 f"Failed to activate subscription for user {user_id} after payment {yk_payment_id_from_hook}"  # noqa: E501
             )
@@ -652,7 +724,7 @@ async def process_successful_payment(
             )
             raise Exception(f"DB Error: Could not update payment record {payment_db_id}")
 
-        base_subscription_end_date = activation_details["end_date"]
+        base_subscription_end_date = activation_details.get("end_date")
         final_end_date_for_user = base_subscription_end_date
         applied_promo_bonus_days = activation_details.get("applied_promo_bonus_days", 0)
 
@@ -687,6 +759,11 @@ async def process_successful_payment(
             if not receipt_item_name:
                 if is_traffic_sale_base(sale_mode_base):
                     receipt_item_name = settings.LKNPD_RECEIPT_NAME_TRAFFIC.format(gb=traffic_label)
+                elif _is_hwid_device_sale_base(sale_mode_base):
+                    receipt_item_name = _(
+                        "payment_description_hwid_devices",
+                        count=hwid_devices_count,
+                    )
                 else:
                     receipt_item_name = settings.LKNPD_RECEIPT_NAME_SUBSCRIPTION.format(
                         months=int(subscription_months)
@@ -716,7 +793,11 @@ async def process_successful_payment(
                 end_date=final_end_date_for_user.strftime("%Y-%m-%d"),
             )
             include_keyboard = False
-        elif not final_end_date_for_user and not is_traffic_sale_base(sale_mode_base):
+        elif (
+            sale_mode_base == "subscription"
+            and not final_end_date_for_user
+            and not is_traffic_sale_base(sale_mode_base)
+        ):
             logging.error(
                 f"Critical error: final_end_date_for_user is None for user {user_id} after successful payment logic."  # noqa: E501
             )
@@ -733,7 +814,11 @@ async def process_successful_payment(
                     months=(
                         traffic_label
                         if is_traffic_sale_base(sale_mode_base)
-                        else int(subscription_months)
+                        else (
+                            hwid_devices_count
+                            if _is_hwid_device_sale_base(sale_mode_base)
+                            else int(subscription_months)
+                        )
                     ),
                     base_end_date=base_subscription_end_date,
                     final_end_date=final_end_date_for_user,
@@ -1272,6 +1357,8 @@ async def _initiate_yk_payment(
     }
     if sale_base in {"traffic", "traffic_package", "topup", "premium_topup"}:
         yookassa_metadata["traffic_gb"] = str(months)
+    if sale_base in HWID_DEVICE_SALE_BASES:
+        yookassa_metadata["hwid_devices"] = str(months)
     if payment_method_id:
         yookassa_metadata["used_saved_payment_method_id"] = payment_method_id
 

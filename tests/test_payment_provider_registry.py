@@ -21,6 +21,7 @@ from bot.payment_providers.shared import (
     sale_mode_is_traffic,
     sale_mode_tariff_key,
 )
+from bot.payment_providers.yookassa import _resolve_yookassa_activation_amounts
 from config.settings import Settings
 
 _LEGACY_PROVIDER_FILES = [
@@ -291,3 +292,24 @@ def test_common_sale_mode_helpers_cover_provider_payment_records():
     assert hwid.purchased_hwid_devices == 3
     assert hwid.tariff_key == "vip"
     assert hwid.hwid_devices_sale
+
+
+def test_yookassa_hwid_webapp_metadata_uses_device_count_for_activation():
+    (
+        subscription_months,
+        traffic_amount_gb,
+        hwid_devices_count,
+        months_for_activation,
+        traffic_gb_for_activation,
+    ) = _resolve_yookassa_activation_amounts(
+        sale_mode_base="hwid_devices",
+        subscription_months_raw="0",
+        traffic_gb_raw=None,
+        hwid_devices_raw="3",
+    )
+
+    assert subscription_months == 0
+    assert traffic_amount_gb == 0
+    assert hwid_devices_count == 3
+    assert months_for_activation == 3
+    assert traffic_gb_for_activation is None

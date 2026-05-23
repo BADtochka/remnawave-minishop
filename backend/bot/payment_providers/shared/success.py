@@ -22,6 +22,7 @@ from db.models import Payment, User
 from .common import Translator, format_human_units, make_translator, sale_mode_base
 
 _TRAFFIC_MODES = {"traffic", "traffic_package", "topup", "premium_topup"}
+_HWID_DEVICE_MODES = {"hwid_device", "hwid_devices"}
 
 
 def is_traffic_sale_base(sale_base: str) -> bool:
@@ -101,6 +102,12 @@ def build_success_message(payload: SuccessMessage) -> str:
             "payment_successful_traffic_full",
             traffic_gb=format_human_units(payload.months),
             end_date=end_text,
+            config_link=payload.config_link_text,
+        )
+    if base in _HWID_DEVICE_MODES:
+        return _(
+            "payment_successful_hwid_devices_full",
+            count=format_human_units(payload.months),
             config_link=payload.config_link_text,
         )
     if payload.applied_referee_bonus_days and payload.final_end_date:
