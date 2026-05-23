@@ -168,6 +168,16 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "Open install instructions inside the Web App instead of an external connect page.",
     ),
     SettingField(
+        "SUBSCRIPTION_GUIDES_BOT_MENU_ENABLED",
+        "bool",
+        "subscription_guides",
+        "Open install guides from bot",
+        (
+            "Use the Telegram Mini App install screen for bot connect buttons and show "
+            "public install guide links."
+        ),
+    ),
+    SettingField(
         "SUBSCRIPTION_PAGE_CONFIG_PANEL_ENABLED",
         "bool",
         "subscription_guides",
