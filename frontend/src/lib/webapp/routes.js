@@ -30,7 +30,9 @@ export function sectionFromPath(pathname) {
 }
 
 export function publicInstallTokenFromPath(pathname) {
-  const normalized = String(pathname || "").trim().replace(/\/+$/, "");
+  const normalized = String(pathname || "")
+    .trim()
+    .replace(/\/+$/, "");
   const match = normalized.match(/^\/s\/([a-f0-9]{32})$/i);
   return match ? match[1].toLowerCase() : "";
 }

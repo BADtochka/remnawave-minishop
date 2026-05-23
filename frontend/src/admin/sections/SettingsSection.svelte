@@ -285,7 +285,9 @@
 
   function fieldPlaceholderText(field) {
     const fallback = field.placeholder || "";
-    return field.i18n_placeholder_key ? adminText(field.i18n_placeholder_key, {}, fallback) : fallback;
+    return field.i18n_placeholder_key
+      ? adminText(field.i18n_placeholder_key, {}, fallback)
+      : fallback;
   }
 
   function subsectionTitle(group) {

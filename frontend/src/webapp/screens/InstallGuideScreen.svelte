@@ -79,7 +79,11 @@
   $: if (platforms.length && !selectedPlatformKey) {
     selectedPlatformKey = detectedPlatformKey || platforms[0].key;
   }
-  $: if (selectedPlatformKey && platforms.length && !platforms.some((p) => p.key === selectedPlatformKey)) {
+  $: if (
+    selectedPlatformKey &&
+    platforms.length &&
+    !platforms.some((p) => p.key === selectedPlatformKey)
+  ) {
     selectedPlatformKey = platforms[0].key;
   }
   $: selectedPlatform =
@@ -92,7 +96,10 @@
   $: selectedApp = apps[selectedAppIndex] || apps[0] || null;
   $: guideSubscription = guideState?.subscription || subscription || {};
   $: finalSubscriptionLink =
-    guideSubscription?.config_link || guideSubscription?.connect_url || subscription?.config_link || "";
+    guideSubscription?.config_link ||
+    guideSubscription?.connect_url ||
+    subscription?.config_link ||
+    "";
   $: shareUrl = guideSubscription?.share_url || subscription?.install_share_url || "";
   $: if (finalSubscriptionLink !== lastQrValue) {
     lastQrValue = finalSubscriptionLink;
@@ -102,7 +109,9 @@
   function localized(value, fallback = "") {
     if (typeof value === "string") return value;
     if (!value || typeof value !== "object") return fallback;
-    const lang = String(currentLang || "ru").split("-")[0].toLowerCase();
+    const lang = String(currentLang || "ru")
+      .split("-")[0]
+      .toLowerCase();
     return (
       value[lang] ||
       value.ru ||
@@ -153,7 +162,8 @@
     if (userAgentDataPlatform.includes("linux")) candidates.push("linux");
 
     if (ua.includes("apple tv")) candidates.push("appleTV");
-    if (ua.includes("android") && /\btv\b|aft|bravia|shield/i.test(ua)) candidates.push("androidTV");
+    if (ua.includes("android") && /\btv\b|aft|bravia|shield/i.test(ua))
+      candidates.push("androidTV");
     if (/iphone|ipad|ipod/.test(ua)) candidates.push("ios");
     if (ua.includes("android")) candidates.push("android");
     if (ua.includes("windows")) candidates.push("windows");
@@ -182,7 +192,9 @@
   }
 
   function isUnsafeUrl(value) {
-    const url = String(value || "").trim().toLowerCase();
+    const url = String(value || "")
+      .trim()
+      .toLowerCase();
     return !url || hasControlChars(url) || /^(javascript|data|vbscript):/.test(url);
   }
 
@@ -276,57 +288,71 @@
       </Button>
     {/if}
     <div>
-      <h1>{localized(config?.baseTranslations?.installationGuideHeader, t("wa_install_title", {}, "Install"))}</h1>
+      <h1>
+        {localized(
+          config?.baseTranslations?.installationGuideHeader,
+          t("wa_install_title", {}, "Install")
+        )}
+      </h1>
       <p>{t("wa_install_subtitle", {}, "Choose your platform and app.")}</p>
     </div>
     {#if guideState?.enabled && config && platforms.length}
       <div class="install-platform-topbar">
-      <Select.Root
-        type="single"
-        value={selectedPlatformKey}
-        items={platformOptions}
-        onValueChange={selectPlatform}
-      >
-        <Select.Trigger
-          class="install-platform-trigger"
-          aria-label={t("wa_install_platform", {}, "Platform")}
+        <Select.Root
+          type="single"
+          value={selectedPlatformKey}
+          items={platformOptions}
+          onValueChange={selectPlatform}
         >
-          <span class="install-platform-trigger-main">
-            {#if selectedPlatform}
-              {@const SelectedFallbackIcon = platformFallbackIcon(selectedPlatform.key)}
-              {#if iconSvg(selectedPlatform.svgIconKey)}
-                <span class="install-svg" aria-hidden="true">{@html iconSvg(selectedPlatform.svgIconKey)}</span>
-              {:else}
-                <svelte:component this={SelectedFallbackIcon} size={19} />
+          <Select.Trigger
+            class="install-platform-trigger"
+            aria-label={t("wa_install_platform", {}, "Platform")}
+          >
+            <span class="install-platform-trigger-main">
+              {#if selectedPlatform}
+                {@const SelectedFallbackIcon = platformFallbackIcon(selectedPlatform.key)}
+                {#if iconSvg(selectedPlatform.svgIconKey)}
+                  <span class="install-svg" aria-hidden="true"
+                    >{@html iconSvg(selectedPlatform.svgIconKey)}</span
+                  >
+                {:else}
+                  <svelte:component this={SelectedFallbackIcon} size={19} />
+                {/if}
               {/if}
-            {/if}
-            <span>{selectedPlatformLabel}</span>
-          </span>
-          <ChevronsUpDown size={16} />
-        </Select.Trigger>
-        <Select.Content class="install-platform-content" side="bottom" align="start" sideOffset={6}>
-          <Select.Viewport class="install-platform-viewport">
-            {#each platforms as platform}
-              {@const PlatformFallbackIcon = platformFallbackIcon(platform.key)}
-              <Select.Item
-                value={platform.key}
-                label={localized(platform.displayName, platform.key)}
-                class="install-platform-item"
-              >
-                <span class="install-platform-item-main">
-                  {#if iconSvg(platform.svgIconKey)}
-                    <span class="install-svg" aria-hidden="true">{@html iconSvg(platform.svgIconKey)}</span>
-                  {:else}
-                    <svelte:component this={PlatformFallbackIcon} size={18} />
-                  {/if}
-                  <span>{localized(platform.displayName, platform.key)}</span>
-                </span>
-                <Check size={15} class="install-platform-item-check" />
-              </Select.Item>
-            {/each}
-          </Select.Viewport>
-        </Select.Content>
-      </Select.Root>
+              <span>{selectedPlatformLabel}</span>
+            </span>
+            <ChevronsUpDown size={16} />
+          </Select.Trigger>
+          <Select.Content
+            class="install-platform-content"
+            side="bottom"
+            align="start"
+            sideOffset={6}
+          >
+            <Select.Viewport class="install-platform-viewport">
+              {#each platforms as platform}
+                {@const PlatformFallbackIcon = platformFallbackIcon(platform.key)}
+                <Select.Item
+                  value={platform.key}
+                  label={localized(platform.displayName, platform.key)}
+                  class="install-platform-item"
+                >
+                  <span class="install-platform-item-main">
+                    {#if iconSvg(platform.svgIconKey)}
+                      <span class="install-svg" aria-hidden="true"
+                        >{@html iconSvg(platform.svgIconKey)}</span
+                      >
+                    {:else}
+                      <svelte:component this={PlatformFallbackIcon} size={18} />
+                    {/if}
+                    <span>{localized(platform.displayName, platform.key)}</span>
+                  </span>
+                  <Check size={15} class="install-platform-item-check" />
+                </Select.Item>
+              {/each}
+            </Select.Viewport>
+          </Select.Content>
+        </Select.Root>
       </div>
     {/if}
   </div>
@@ -349,7 +375,6 @@
       </Button>
     </Card>
   {:else}
-
     {#key selectedPlatformKey}
       {#if apps.length > 1}
         <section
@@ -384,7 +409,8 @@
                   <AttentionDot class="install-feature-star" />
                 {/if}
                 {#if iconSvg(app.svgIconKey)}
-                  <span class="install-svg" aria-hidden="true">{@html iconSvg(app.svgIconKey)}</span>
+                  <span class="install-svg" aria-hidden="true">{@html iconSvg(app.svgIconKey)}</span
+                  >
                 {/if}
                 <span>{app.name}</span>
               </button>
@@ -412,7 +438,11 @@
               }}
             >
               <Card class="install-step">
-                <div class="install-step-icon" style={iconColorStyle(block.svgIconColor)} aria-hidden="true">
+                <div
+                  class="install-step-icon"
+                  style={iconColorStyle(block.svgIconColor)}
+                  aria-hidden="true"
+                >
                   {#if iconSvg(block.svgIconKey)}
                     {@html iconSvg(block.svgIconKey)}
                   {:else}
@@ -446,11 +476,7 @@
         </section>
       {/key}
       {#if finalSubscriptionLink && !publicMode}
-        <div
-          class="install-qr-divider"
-          aria-hidden="true"
-          in:fade={{ duration: 180 }}
-        >
+        <div class="install-qr-divider" aria-hidden="true" in:fade={{ duration: 180 }}>
           <svg viewBox="0 0 240 18" preserveAspectRatio="none">
             <path
               d="M0 9 Q 4 2 8 9 T 16 9 T 24 9 T 32 9 T 40 9 T 48 9 T 56 9 T 64 9 T 72 9 T 80 9 T 88 9 T 96 9 T 104 9 T 112 9 T 120 9 T 128 9 T 136 9 T 144 9 T 152 9 T 160 9 T 168 9 T 176 9 T 184 9 T 192 9 T 200 9 T 208 9 T 216 9 T 224 9 T 232 9 T 240 9"
@@ -468,12 +494,17 @@
               </div>
               <div class="install-subscription-heading">
                 <h2>{t("wa_install_subscription_link", {}, "Subscription link")}</h2>
-                <p>{t("wa_install_subscription_link_hint", {}, "Scan the QR code or copy the link.")}</p>
+                <p>
+                  {t("wa_install_subscription_link_hint", {}, "Scan the QR code or copy the link.")}
+                </p>
               </div>
             </div>
             <div class="install-subscription-body">
               {#if qrDataUrl}
-                <div class="install-qr-wrap" in:scale={{ start: 0.96, duration: 180, easing: cubicOut }}>
+                <div
+                  class="install-qr-wrap"
+                  in:scale={{ start: 0.96, duration: 180, easing: cubicOut }}
+                >
                   <img src={qrDataUrl} alt={t("wa_install_qr_alt", {}, "Subscription QR code")} />
                 </div>
               {/if}

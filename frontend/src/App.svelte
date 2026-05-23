@@ -487,7 +487,9 @@
 
   function canUseInstallGuides(settings = appSettings, sub = subscription) {
     const enabled =
-      settings === appSettings ? installGuidesEnabled : Boolean(settings?.subscription_guides_enabled);
+      settings === appSettings
+        ? installGuidesEnabled
+        : Boolean(settings?.subscription_guides_enabled);
     return Boolean(enabled && sub?.active);
   }
 
@@ -727,12 +729,12 @@
       await appendStylesheetWithFallback(
         "subscription-webapp-admin-css",
         cssHref,
-        "subscription_webapp_admin.css",
+        "subscription_webapp_admin.css"
       );
       await appendScriptWithFallback(
         "subscription-webapp-admin-js",
         jsSrc,
-        "subscription_webapp_admin.js",
+        "subscription_webapp_admin.js"
       );
       const loaded = readAdminBundleApi();
       if (!loaded) throw new Error("admin_bundle_missing_mount");
@@ -1408,7 +1410,9 @@
               {currentLang}
               telegramPlatform={tg?.platform || ""}
               user={{}}
-              subscription={publicInstallSubscription || { install_share_token: publicInstallToken }}
+              subscription={publicInstallSubscription || {
+                install_share_token: publicInstallToken,
+              }}
               {goHome}
               openConnectLink={openPublicConnectLink}
               {openExternalLink}
