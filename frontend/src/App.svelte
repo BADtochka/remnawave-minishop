@@ -14,6 +14,7 @@
   import AuthScreen from "./webapp/auth/AuthScreen.svelte";
   import PaymentDialogs from "./webapp/PaymentDialogs.svelte";
   import TariffDialogs from "./webapp/TariffDialogs.svelte";
+  import AppLaunchScreen from "./webapp/screens/AppLaunchScreen.svelte";
   import DevicesScreen from "./webapp/screens/DevicesScreen.svelte";
   import HomeScreen from "./webapp/screens/HomeScreen.svelte";
   import InstallGuideScreen from "./webapp/screens/InstallGuideScreen.svelte";
@@ -508,18 +509,17 @@
     return appLaunchTarget;
   }
 
-  function openAppLaunchTarget() {
-    const target = refreshAppLaunchTarget();
-    if (!target) return;
+  function openAppLaunchTarget(nextTarget = "") {
+    const target = String(nextTarget || refreshAppLaunchTarget() || "").trim();
+    if (!target) return false;
+    appLaunchTarget = target;
     openUrlWithHiddenAnchor(target);
+    return true;
   }
 
   onMount(() => {
     if (isPreviewBoard) return;
-    if (isAppLaunchRoute) {
-      window.setTimeout(openAppLaunchTarget, 80);
-      return;
-    }
+    if (isAppLaunchRoute) return;
     const onAnyPointerDown = () => {
       if (mode === "login") loginEmailTooltipOpen = false;
     };
@@ -1094,7 +1094,7 @@
 
     const isTelegramMiniApp = hasTelegramLaunchParams();
     const currentTg = tg || telegramSdk.refresh();
-    const gatewayUrl = isTelegramMiniApp ? buildExternalAppLaunchUrl(raw) : "";
+    const gatewayUrl = isTelegramMiniApp ? buildExternalAppLaunchUrl(raw, null, currentLang) : "";
     if (gatewayUrl) {
       if (currentTg?.openLink) {
         try {
@@ -1427,39 +1427,13 @@
             <div>{t("wa_loading")}</div>
           </div>
         {:else if mode === "appLaunch"}
-          <div class="app-launch-shell">
-            <main class="app-launch-panel">
-              <div class="app-launch-brand" aria-hidden="true">
-                <BrandMark {brand} size="md" />
-              </div>
-              {#if appLaunchTarget}
-                <h1>{t("wa_app_launch_title", {}, "Opening app")}</h1>
-                <p>
-                  {t(
-                    "wa_app_launch_hint",
-                    {},
-                    "If the app did not open automatically, tap the button below."
-                  )}
-                </p>
-                <a
-                  class="app-launch-button"
-                  href={appLaunchTarget}
-                  rel="noreferrer"
-                  onclick={(event) => {
-                    event.preventDefault();
-                    openAppLaunchTarget();
-                  }}
-                >
-                  {t("wa_app_launch_button", {}, "Open app")}
-                </a>
-              {:else}
-                <h1>{t("wa_app_launch_unavailable_title", {}, "App link unavailable")}</h1>
-                <p>
-                  {t("wa_app_launch_unavailable_hint", {}, "Return to Telegram and try again.")}
-                </p>
-              {/if}
-            </main>
-          </div>
+          <AppLaunchScreen
+            {brand}
+            {appLaunchTarget}
+            {refreshAppLaunchTarget}
+            {openAppLaunchTarget}
+            {t}
+          />
         {:else if mode === "publicInstall"}
           <div class="public-install-shell">
             <a class="public-install-brand" href="/" aria-label={brandTitle}>

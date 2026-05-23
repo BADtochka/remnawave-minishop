@@ -2,7 +2,6 @@ import { mount } from "svelte";
 
 import App from "./App.svelte";
 import "./styles.css";
-import { isExternalAppLaunchPath } from "./lib/webapp/appLinks.js";
 
 async function loadBootstrap() {
   if (document.getElementById("webapp-config")) return;
@@ -29,10 +28,9 @@ async function loadBootstrap() {
 }
 
 const target = document.getElementById("app");
-const skipBootstrap = isExternalAppLaunchPath(window.location.pathname);
 
 if (target) {
-  (skipBootstrap ? Promise.resolve() : loadBootstrap()).finally(() => {
+  loadBootstrap().finally(() => {
     target.replaceChildren();
     mount(App, { target });
   });

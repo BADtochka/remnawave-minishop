@@ -59,6 +59,7 @@ logger = logging.getLogger(__name__)
 
 TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "subscription_webapp.html"
 ASSET_DIR = TEMPLATE_PATH.parent
+APP_DEEPLINK_TEMPLATE_PATH = ASSET_DIR / "open_app_gateway.html"
 APP_ROOT = Path(__file__).resolve().parents[5]
 WEBAPP_LOGO_PROXY_PATH = "/webapp-logo"
 WEBAPP_LOGO_CACHE_DIR = APP_ROOT / "data" / "webapp-logo"

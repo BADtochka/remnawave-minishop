@@ -33,7 +33,7 @@ export function readExternalAppLaunchTarget(locationRef = null) {
   return target;
 }
 
-export function buildExternalAppLaunchUrl(value, locationRef = null) {
+export function buildExternalAppLaunchUrl(value, locationRef = null, language = "") {
   const target = String(value || "").trim();
   if (isUnsafeAppUrl(target) || isHttpUrl(target)) return "";
 
@@ -41,6 +41,12 @@ export function buildExternalAppLaunchUrl(value, locationRef = null) {
   if (!ref?.href) return "";
 
   const url = new URL("/open-app", ref.href);
+  const lang = String(language || "")
+    .trim()
+    .toLowerCase();
+  if (/^[a-z]{2}(?:-[a-z0-9]{2,8})?$/.test(lang)) {
+    url.searchParams.set("lang", lang);
+  }
   url.hash = new URLSearchParams({ url: target }).toString();
   return url.href;
 }

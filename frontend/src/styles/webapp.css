@@ -53,57 +53,6 @@ a {
   line-height: 1.2;
 }
 
-.app-launch-shell {
-  display: grid;
-  min-height: 100dvh;
-  place-items: center;
-  padding: max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
-    max(24px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
-  box-sizing: border-box;
-}
-
-.app-launch-panel {
-  display: grid;
-  width: min(100%, 420px);
-  gap: 14px;
-  justify-items: center;
-  text-align: center;
-}
-
-.app-launch-brand {
-  margin-bottom: 4px;
-}
-
-.app-launch-panel h1 {
-  margin: 0;
-  color: var(--text);
-  font-size: 24px;
-  line-height: 1.18;
-}
-
-.app-launch-panel p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.55;
-}
-
-.app-launch-button {
-  display: inline-flex;
-  width: 100%;
-  min-height: 48px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-contrast);
-  padding: 0 18px;
-  box-sizing: border-box;
-  font-size: 15px;
-  font-weight: 850;
-  text-decoration: none;
-}
-
 .loader {
   display: grid;
   min-height: 100dvh;

@@ -35,14 +35,17 @@ def test_logout_handler_is_noop_inside_telegram_mini_app():
     assert guard_pos < mark_logout_pos
 
 
-def test_open_app_route_skips_bootstrap_and_auth_flow():
+def test_open_app_route_uses_fallback_screen_without_auth_flow():
     main_source = _read("frontend/src/main.js")
     app_source = _read("frontend/src/App.svelte")
+    screen_source = _read("frontend/src/webapp/screens/AppLaunchScreen.svelte")
 
-    assert "skipBootstrap = isExternalAppLaunchPath(window.location.pathname)" in main_source
+    assert "loadBootstrap().finally" in main_source
+    assert "AppLaunchScreen" in app_source
     assert 'mode = isAppLaunchRoute ? "appLaunch"' in app_source
+    assert "window.close()" in screen_source
 
-    launch_guard_pos = app_source.index("if (isAppLaunchRoute) {")
+    launch_guard_pos = app_source.index("if (isAppLaunchRoute) return;")
     boot_pos = app_source.index("boot();", launch_guard_pos)
 
     assert launch_guard_pos < boot_pos
