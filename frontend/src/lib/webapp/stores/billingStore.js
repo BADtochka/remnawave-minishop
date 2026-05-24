@@ -6,6 +6,7 @@ export function createBillingStore({
   t,
   showToast,
   openExternalLink,
+  onSubscriptionActivationPending = null,
   onSubscriptionActivated = null,
   tg,
 }) {
@@ -68,7 +69,21 @@ export function createBillingStore({
       successContext.initialSubscriptionPayment &&
       typeof onSubscriptionActivated === "function"
     ) {
-      await onSubscriptionActivated();
+      await onSubscriptionActivated({ source: "payment", ...successContext });
+    }
+  }
+
+  function rememberSubscriptionActivationPending(successContext = {}) {
+    if (
+      !successContext.initialSubscriptionPayment ||
+      typeof onSubscriptionActivationPending !== "function"
+    ) {
+      return;
+    }
+    try {
+      onSubscriptionActivationPending({ source: "payment", ...successContext });
+    } catch (_error) {
+      void _error;
     }
   }
 
@@ -264,6 +279,7 @@ export function createBillingStore({
       if (!response.ok) throw response;
       showToast(t("wa_payment_created"));
       const successContext = paymentSuccessContext(s, response);
+      rememberSubscriptionActivationPending(successContext);
       if (response.action === "open_invoice") {
         if (!response.payment_url) throw response;
         openTelegramInvoice(response.payment_url, successContext);

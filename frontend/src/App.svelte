@@ -67,6 +67,15 @@
 
   /** Used-traffic percent from which top-up modals and CTAs unlock in the web app home screen */
   const TRAFFIC_TOPUP_UNLOCK_PERCENT = 80;
+  const ACTIVATION_HANDOFF_STORAGE_KEY = "rw_webapp_activation_handoff_v1";
+  const ACTIVATION_HANDOFF_TTL_MS = 48 * 60 * 60 * 1000;
+  const ACTIVATION_PENDING_WATCH_INTERVAL_MS = 2000;
+  const ACTIVATION_PENDING_WATCH_MAX_ATTEMPTS = 45;
+  const ACTIVATION_RESUME_CHECK_COOLDOWN_MS = 1500;
+  import {
+    activationPaymentFailed,
+    createActivationHandoff,
+  } from "./lib/webapp/activationHandoff.js";
   import { buildGravatarUrl } from "./lib/webapp/gravatar.js";
   import { createBillingActions } from "./lib/webapp/billingActions.js";
   import { invalidateWebappTariffOptionCaches } from "./lib/webapp/billingOptionCache.js";
@@ -126,6 +135,11 @@
   let trialActivationError = "";
   let activationSuccessDialogOpen = false;
   let activationSuccessUseInstallGuides = false;
+  let activationPendingWatchTimer = null;
+  let activationPendingWatchAttempts = 0;
+  let activationPendingWatchBusy = false;
+  let activationResumeRefreshBusy = false;
+  let activationResumeLastCheckAt = 0;
   let promoCode = "";
   let promoBusy = false;
   let promoStatus = "";
@@ -187,6 +201,10 @@
     api: (path, options) => apiClient.api(path, options),
     t: (...args) => t(...args),
   });
+  const activationHandoff = createActivationHandoff({
+    storageKey: ACTIVATION_HANDOFF_STORAGE_KEY,
+    ttlMs: ACTIVATION_HANDOFF_TTL_MS,
+  });
 
   const authStore = createAuthStore({
     publicApi,
@@ -204,6 +222,7 @@
     t,
     showToast,
     openExternalLink,
+    onSubscriptionActivationPending: rememberActivationPending,
     onSubscriptionActivated: handleSubscriptionActivated,
     tg,
   });
@@ -515,6 +534,165 @@
     return Boolean(enabled && sub?.active);
   }
 
+  function hasPendingActivationHandoff(payload = data) {
+    return activationHandoff.hasPending(payload);
+  }
+
+  function rememberActivationPending(context = {}) {
+    activationHandoff.rememberPending(context, data);
+  }
+
+  function clearPendingActivationHandoff() {
+    activationHandoff.clearPending();
+  }
+
+  async function maybeShowActivationSuccessDialog(context = {}) {
+    if (activationSuccessDialogOpen) return false;
+    await tick();
+    const payload = context.payload || data;
+    const subscriptionKey = activationHandoff.subscriptionKey(payload);
+    if (!subscriptionKey) return false;
+    const state = activationHandoff.read();
+    const pending = state.pending;
+    if (activationHandoff.isAcknowledged(subscriptionKey, state)) {
+      if (pending && activationHandoff.pendingMatchesUser(pending, payload)) {
+        activationHandoff.write({ ...state, pending: null });
+      }
+      return false;
+    }
+    if (
+      !context.force &&
+      (!pending ||
+        !activationHandoff.isPendingFresh(pending) ||
+        !activationHandoff.pendingMatchesUser(pending, payload))
+    ) {
+      return false;
+    }
+    activationHandoff.acknowledge(subscriptionKey, context, payload, state);
+    stopPendingActivationWatch();
+    navigateToActivationTarget({ replace: true });
+    activationSuccessDialogOpen = true;
+    return true;
+  }
+
+  function stopPendingActivationWatch() {
+    if (activationPendingWatchTimer) {
+      window.clearTimeout(activationPendingWatchTimer);
+      activationPendingWatchTimer = null;
+    }
+    activationPendingWatchAttempts = 0;
+    activationPendingWatchBusy = false;
+  }
+
+  function schedulePendingActivationWatch() {
+    if (activationPendingWatchTimer || !hasPendingActivationHandoff()) return;
+    activationPendingWatchTimer = window.setTimeout(() => {
+      activationPendingWatchTimer = null;
+      void checkPendingActivationWatch();
+    }, ACTIVATION_PENDING_WATCH_INTERVAL_MS);
+  }
+
+  function startPendingActivationWatch() {
+    if (
+      mode !== "app" ||
+      !hasPendingActivationHandoff() ||
+      activationSuccessDialogOpen ||
+      screen === "admin"
+    ) {
+      stopPendingActivationWatch();
+      return;
+    }
+    if (activationPendingWatchTimer || activationPendingWatchBusy) return;
+    schedulePendingActivationWatch();
+  }
+
+  async function checkPendingActivationWatch() {
+    if (activationPendingWatchBusy) return;
+    if (
+      mode !== "app" ||
+      !hasPendingActivationHandoff() ||
+      activationSuccessDialogOpen ||
+      screen === "admin"
+    ) {
+      stopPendingActivationWatch();
+      return;
+    }
+    if (activationPendingWatchAttempts >= ACTIVATION_PENDING_WATCH_MAX_ATTEMPTS) {
+      stopPendingActivationWatch();
+      return;
+    }
+
+    const state = activationHandoff.read();
+    const pending = state.pending;
+    activationPendingWatchAttempts += 1;
+    activationPendingWatchBusy = true;
+    try {
+      let shouldRefreshProfile = !pending?.paymentId;
+      if (pending?.paymentId && billing.fetchPaymentStatus) {
+        const paymentStatus = await billing.fetchPaymentStatus(pending.paymentId);
+        if (paymentStatus?.paid || paymentStatus?.status === "succeeded") {
+          shouldRefreshProfile = true;
+        } else if (activationPaymentFailed(paymentStatus)) {
+          clearPendingActivationHandoff();
+          stopPendingActivationWatch();
+          return;
+        }
+      }
+      if (shouldRefreshProfile) {
+        await loadData();
+        const shown = await maybeShowActivationSuccessDialog({
+          source: "watch",
+          paymentId: pending?.paymentId,
+        });
+        if (shown || !hasPendingActivationHandoff()) {
+          stopPendingActivationWatch();
+          return;
+        }
+      }
+    } catch (_error) {
+      void _error;
+    } finally {
+      activationPendingWatchBusy = false;
+    }
+    schedulePendingActivationWatch();
+  }
+
+  function canRefreshPendingActivationOnResume() {
+    return Boolean(
+      mode === "app" &&
+      screen !== "admin" &&
+      !activationSuccessDialogOpen &&
+      !paymentModalOpen &&
+      !topupModalOpen &&
+      !deviceTopupModalOpen &&
+      !changeModalOpen &&
+      !changeConfirmOpen &&
+      hasPendingActivationHandoff()
+    );
+  }
+
+  async function refreshPendingActivationOnResume() {
+    if (!canRefreshPendingActivationOnResume()) return;
+    const now = Date.now();
+    if (
+      activationResumeRefreshBusy ||
+      now - activationResumeLastCheckAt < ACTIVATION_RESUME_CHECK_COOLDOWN_MS
+    ) {
+      return;
+    }
+    activationResumeLastCheckAt = now;
+    activationResumeRefreshBusy = true;
+    try {
+      await loadData();
+      const shown = await maybeShowActivationSuccessDialog({ source: "resume" });
+      if (!shown) startPendingActivationWatch();
+    } catch (_error) {
+      void _error;
+    } finally {
+      activationResumeRefreshBusy = false;
+    }
+  }
+
   function refreshAppLaunchTarget() {
     appLaunchTarget = readExternalAppLaunchTarget();
     return appLaunchTarget;
@@ -533,6 +711,13 @@
     if (isAppLaunchRoute) return;
     const onAnyPointerDown = () => {
       if (mode === "login") loginEmailTooltipOpen = false;
+    };
+    const onActivationResume = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      void refreshPendingActivationOnResume();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") onActivationResume();
     };
     const onPopState = () => {
       const shareToken = publicInstallTokenFromPath(window.location.pathname);
@@ -585,15 +770,22 @@
     };
     window.addEventListener("popstate", onPopState);
     window.addEventListener("pointerdown", onAnyPointerDown);
+    window.addEventListener("focus", onActivationResume);
+    window.addEventListener("pageshow", onActivationResume);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     boot();
     return () => {
       window.removeEventListener("popstate", onPopState);
       window.removeEventListener("pointerdown", onAnyPointerDown);
+      window.removeEventListener("focus", onActivationResume);
+      window.removeEventListener("pageshow", onActivationResume);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       authStore.stopTelegramLoginWatchdog();
       authStore.clearCooldownTimer();
       accountStore.clearLinkEmailResendTimer();
       accountStore.clearSetPasswordResendTimer();
       supportStore.closePolling();
+      stopPendingActivationWatch();
       clearLanguageClickGuard();
       syncBodyScrollLock(false);
       destroyAdminMount();
@@ -877,6 +1069,10 @@
       getToken: () => token,
       getCsrfToken: () => csrfToken,
     });
+    if (mode === "app" && screen !== "admin") {
+      const shown = await maybeShowActivationSuccessDialog({ source: "boot" });
+      if (!shown) startPendingActivationWatch();
+    }
   }
 
   function stripTopupQueryFromUrl() {
@@ -1206,16 +1402,10 @@
     syncSectionPath("home", replace);
   }
 
-  async function showActivationSuccessDialog() {
-    await tick();
-    navigateToActivationTarget({ replace: true });
-    activationSuccessDialogOpen = true;
-  }
-
-  async function handleSubscriptionActivated() {
+  async function handleSubscriptionActivated(context = {}) {
     await tick();
     if (!subscription?.active) return;
-    await showActivationSuccessDialog();
+    await maybeShowActivationSuccessDialog({ ...context, force: true, source: "payment" });
   }
 
   function closeActivationSuccessDialog() {
@@ -1290,7 +1480,7 @@
       trialActivationResult = response;
       showToast(t("wa_trial_activated"));
       await loadData();
-      await showActivationSuccessDialog();
+      await maybeShowActivationSuccessDialog({ source: "trial", force: true });
     } catch (error) {
       const message = error?.message || t("wa_trial_activation_failed");
       trialActivationError = message;
