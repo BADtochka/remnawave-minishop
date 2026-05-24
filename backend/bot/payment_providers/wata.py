@@ -55,6 +55,7 @@ from .shared import (
 
 router = Router(name="user_subscription_payments_wata_router")
 _LOG = "wata"
+_WATA_IN_PROGRESS_STATUSES = {"created", "pending"}
 
 
 class WataConfig(ProviderEnvConfig):
@@ -287,12 +288,15 @@ class WataService(HttpClientMixin):
             return web.Response(status=400, text="bad_request")
 
         transaction_id = str(payload.get("transactionId") or "").strip()
+        payment_link_id = str(
+            payload.get("paymentLinkId") or payload.get("id") or ""
+        ).strip()
         status = str(payload.get("transactionStatus") or "").strip().lower()
         order_id_raw = payload.get("orderId")
         amount_raw = payload.get("amount")
         currency = payload.get("currency") or self.settings.DEFAULT_CURRENCY_SYMBOL or "RUB"
 
-        if not status or not (transaction_id or order_id_raw):
+        if not status or not (transaction_id or order_id_raw or payment_link_id):
             logging.error("Wata webhook: missing transaction status or ids: %s", payload)
             return web.Response(status=400, text="missing_fields")
 
@@ -302,18 +306,46 @@ class WataService(HttpClientMixin):
                 order_id_raw=order_id_raw,
                 provider_payment_id=transaction_id or None,
             )
+            if not payment and payment_link_id:
+                payment = await lookup_payment_by_order_or_provider_id(
+                    session,
+                    provider_payment_id=payment_link_id,
+                )
             if not payment:
                 logging.error(
-                    "Wata webhook: payment not found (order_id=%s, transaction_id=%s)",
+                    "Wata webhook: payment not found "
+                    "(order_id=%s, transaction_id=%s, payment_link_id=%s)",
                     order_id_raw,
                     transaction_id,
+                    payment_link_id,
                 )
                 return web.Response(status=404, text="payment_not_found")
 
-            if payment.status == "succeeded" and status == "paid":
+            if payment.status == "succeeded":
                 return web.Response(text="ok")
 
-            resolved_transaction_id = transaction_id or str(payment.payment_id)
+            resolved_transaction_id = transaction_id or payment_link_id or str(payment.payment_id)
+
+            if status in _WATA_IN_PROGRESS_STATUSES:
+                if transaction_id and payment.provider_payment_id != transaction_id:
+                    try:
+                        await payment_dal.update_provider_payment_and_status(
+                            session,
+                            payment.payment_id,
+                            transaction_id,
+                            payment.status,
+                        )
+                        await session.commit()
+                    except Exception:
+                        await session.rollback()
+                        logging.exception(
+                            "Wata webhook: failed to persist transaction id %s "
+                            "for payment %s.",
+                            transaction_id,
+                            payment.payment_id,
+                        )
+                        return web.Response(status=500, text="processing_error")
+                return web.Response(text="ok")
 
             if status == "paid":
                 if amount_raw is not None:
@@ -409,7 +441,7 @@ class WataService(HttpClientMixin):
                 status,
                 transaction_id,
             )
-            return web.Response(status=202, text="status_ignored")
+            return web.Response(text="status_ignored")
 
 
 @router.callback_query(F.data.startswith("pay_wata:"))
