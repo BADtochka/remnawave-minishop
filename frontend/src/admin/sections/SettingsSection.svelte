@@ -38,6 +38,19 @@
   let copiedWebhookKey = "";
   let copiedWebhookTimer = null;
 
+  const PLATEGA_SBP_KEYS = new Set(["PLATEGA_SBP_ENABLED", "PLATEGA_SBP_METHOD"]);
+  const PLATEGA_CRYPTO_KEYS = new Set(["PLATEGA_CRYPTO_ENABLED", "PLATEGA_CRYPTO_METHOD"]);
+  const PLATEGA_LEGACY_KEYS = new Set(["PLATEGA_PAYMENT_METHOD"]);
+  const LEGACY_TARIFF_TRAFFIC_KEYS = new Set(["TRAFFIC_PACKAGES", "STARS_TRAFFIC_PACKAGES"]);
+  const SEMANTIC_FIELD_GROUP_ORDER = {
+    platega_common: 1,
+    platega_sbp: 2,
+    platega_crypto: 3,
+    platega_legacy: 4,
+    legacy_tariff_periods: 1,
+    legacy_tariff_traffic: 2,
+  };
+
   $: settingsAllOpen =
     visibleSettingsSections.length > 0 &&
     settingsOpenSections.length === visibleSettingsSections.length;
@@ -220,6 +233,108 @@
     }));
   }
 
+  function fieldGroupMeta(
+    id,
+    titleKey,
+    titleFallback,
+    descriptionKey = "",
+    descriptionFallback = ""
+  ) {
+    return { id, titleKey, titleFallback, descriptionKey, descriptionFallback };
+  }
+
+  function plategaSemanticGroup(field) {
+    const key = String(field?.key || "");
+    if (PLATEGA_SBP_KEYS.has(key) || key.startsWith("PAYMENT_PLATEGA_SBP_")) {
+      return fieldGroupMeta(
+        "platega_sbp",
+        "settings_group_platega_sbp",
+        "SBP/card button",
+        "settings_group_platega_sbp_hint",
+        "Visibility, method ID, and labels for the SBP/card payment button."
+      );
+    }
+    if (PLATEGA_CRYPTO_KEYS.has(key) || key.startsWith("PAYMENT_PLATEGA_CRYPTO_")) {
+      return fieldGroupMeta(
+        "platega_crypto",
+        "settings_group_platega_crypto",
+        "Crypto button",
+        "settings_group_platega_crypto_hint",
+        "Visibility, method ID, and labels for the crypto payment button."
+      );
+    }
+    if (PLATEGA_LEGACY_KEYS.has(key)) {
+      return fieldGroupMeta(
+        "platega_legacy",
+        "settings_group_platega_legacy",
+        "Legacy compatibility",
+        "settings_group_platega_legacy_hint",
+        "Fallback method for old Platega callbacks and deployments."
+      );
+    }
+    return fieldGroupMeta(
+      "platega_common",
+      "settings_group_platega_common",
+      "Common settings",
+      "settings_group_platega_common_hint",
+      "Shared merchant credentials, redirects, and API endpoint."
+    );
+  }
+
+  function legacyTariffSemanticGroup(field) {
+    const key = String(field?.key || "");
+    if (LEGACY_TARIFF_TRAFFIC_KEYS.has(key)) {
+      return fieldGroupMeta(
+        "legacy_tariff_traffic",
+        "settings_group_legacy_tariff_traffic",
+        "Legacy traffic packages",
+        "settings_group_legacy_tariff_traffic_hint",
+        "Packages used only when the JSON tariff catalog is not configured."
+      );
+    }
+    return fieldGroupMeta(
+      "legacy_tariff_periods",
+      "settings_group_legacy_tariff_periods",
+      "Legacy subscription periods",
+      "settings_group_legacy_tariff_periods_hint",
+      "Month toggles and prices used only by the old remnawave-tg-shop mode."
+    );
+  }
+
+  function semanticFieldGroup(section, group, field) {
+    if (section?.id === "payments" && group?.id === "Platega") {
+      return plategaSemanticGroup(field);
+    }
+    if (section?.id === "pricing") {
+      return legacyTariffSemanticGroup(field);
+    }
+    return null;
+  }
+
+  function semanticFieldGroups(section, group) {
+    const fields = group?.fields || [];
+    const result = new Map();
+    for (const field of fields) {
+      const meta = semanticFieldGroup(section, group, field) || fieldGroupMeta("_default", "", "");
+      if (!result.has(meta.id)) {
+        result.set(meta.id, { ...meta, fields: [] });
+      }
+      result.get(meta.id).fields.push(field);
+    }
+    return Array.from(result.values()).sort(
+      (a, b) =>
+        (SEMANTIC_FIELD_GROUP_ORDER[a.id] || 999) - (SEMANTIC_FIELD_GROUP_ORDER[b.id] || 999)
+    );
+  }
+
+  function fieldGroupTitle(group) {
+    return group.titleKey ? at(group.titleKey, {}, group.titleFallback) : "";
+  }
+
+  function fieldGroupDescription(group) {
+    return group.descriptionKey ? at(group.descriptionKey, {}, group.descriptionFallback) : "";
+  }
+
   function adminLocaleKey(key) {
     const raw = String(key || "");
     return raw.startsWith("admin_") ? raw.slice("admin_".length) : raw;
@@ -356,6 +471,35 @@
       {at("settings_legacy_tariffs_warning_link", {}, "Open Tariffs")}
     </a>
   </div>
+{/snippet}
+
+{#snippet renderGroupedFields(section, group)}
+  {@const fieldGroups = semanticFieldGroups(section, group)}
+  {#if fieldGroups.length === 1 && !fieldGroups[0].titleKey}
+    {#each fieldGroups[0].fields as field}
+      {@render renderField(field)}
+    {/each}
+  {:else}
+    <div class="admin-settings-field-groups">
+      {#each fieldGroups as fieldGroup}
+        <section class="admin-settings-field-group">
+          {#if fieldGroup.titleKey}
+            <header class="admin-settings-field-group-head">
+              <strong>{fieldGroupTitle(fieldGroup)}</strong>
+              {#if fieldGroupDescription(fieldGroup)}
+                <small>{fieldGroupDescription(fieldGroup)}</small>
+              {/if}
+            </header>
+          {/if}
+          <div class="admin-settings-field-group-body">
+            {#each fieldGroup.fields as field}
+              {@render renderField(field)}
+            {/each}
+          </div>
+        </section>
+      {/each}
+    </div>
+  {/if}
 {/snippet}
 
 {#snippet renderField(field)}
@@ -600,9 +744,7 @@
               {#if rootGroup.webhook}
                 {@render renderWebhookHint(rootGroup.webhook)}
               {/if}
-              {#each rootGroup.fields as field}
-                {@render renderField(field)}
-              {/each}
+              {@render renderGroupedFields(section, rootGroup)}
             {/if}
             {#if labelGroups.length}
               <Accordion.Root
@@ -646,9 +788,7 @@
                         {#if group.webhook}
                           {@render renderWebhookHint(group.webhook)}
                         {/if}
-                        {#each group.fields as field}
-                          {@render renderField(field)}
-                        {/each}
+                        {@render renderGroupedFields(section, group)}
                       </div>
                     </Accordion.Content>
                   </Accordion.Item>

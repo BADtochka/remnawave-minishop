@@ -1823,7 +1823,6 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--admin-text);
-  text-transform: capitalize;
   word-break: break-word;
   min-width: 0;
 }
@@ -1851,8 +1850,43 @@
   overflow: hidden;
 }
 
+.admin-accordion-content[data-state="open"] {
+  animation: admin-accordion-open 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .admin-accordion-content[data-state="closed"] {
-  display: none;
+  animation: admin-accordion-close 110ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes admin-accordion-open {
+  from {
+    height: 0;
+    opacity: 0.72;
+  }
+
+  to {
+    height: var(--bits-accordion-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes admin-accordion-close {
+  from {
+    height: var(--bits-accordion-content-height);
+    opacity: 1;
+  }
+
+  to {
+    height: 0;
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-accordion-content[data-state="open"],
+  .admin-accordion-content[data-state="closed"] {
+    animation: none;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1994,6 +2028,50 @@
 
 .admin-settings-warning-link:hover {
   text-decoration: underline;
+}
+
+.admin-settings-field-groups {
+  display: grid;
+  gap: 10px;
+  padding: 12px 18px 18px;
+}
+
+.admin-settings-field-group {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--admin-border) 88%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--admin-bg) 52%, transparent);
+}
+
+.admin-settings-field-group-head {
+  display: grid;
+  gap: 3px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--admin-border);
+  background: color-mix(in srgb, var(--admin-surface-2) 56%, transparent);
+}
+
+.admin-settings-field-group-head strong {
+  color: var(--admin-text);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.admin-settings-field-group-head small {
+  color: var(--admin-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.admin-settings-field-group-body .admin-setting {
+  padding-inline: 14px;
+}
+
+.admin-settings-field-group-body .admin-setting:last-child {
+  border-bottom: 0;
 }
 
 .admin-setting:last-child {
@@ -2762,6 +2840,14 @@
     justify-self: start;
   }
 
+  .admin-settings-field-groups {
+    padding: 10px 14px 14px;
+  }
+
+  .admin-settings-field-group-body .admin-setting {
+    padding-inline: 12px;
+  }
+
   .admin-card-head {
     padding: 12px 14px;
   }
@@ -3489,8 +3575,7 @@
   font-size: 12px;
   font-weight: 700;
   color: var(--admin-text);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   min-width: 0;
 }
 
