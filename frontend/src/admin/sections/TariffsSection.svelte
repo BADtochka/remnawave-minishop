@@ -31,6 +31,10 @@
     "TRIAL_TRAFFIC_STRATEGY",
     "TRIAL_SQUAD_UUIDS",
   ];
+  const TRIAL_SWITCH_KEYS = ["TRIAL_ENABLED"];
+  const TRIAL_GENERAL_KEYS = ["TRIAL_DURATION_DAYS", "TRIAL_TRAFFIC_LIMIT_GB"];
+  const TRIAL_RESET_KEYS = ["TRIAL_TRAFFIC_STRATEGY"];
+  const TRIAL_SQUAD_KEYS = ["TRIAL_SQUAD_UUIDS"];
   const LEGACY_PERIODS = [
     ["1", "MONTH_1_ENABLED", "RUB_PRICE_1_MONTH", "STARS_PRICE_1_MONTH"],
     ["3", "MONTH_3_ENABLED", "RUB_PRICE_3_MONTHS", "STARS_PRICE_3_MONTHS"],
@@ -76,6 +80,7 @@
   }));
 
   let selectedTrialSquad = "";
+  let trialSquadSelectKey = 0;
   let tariffSettingsOpen = [];
 
   function tariffName(tariff) {
@@ -122,6 +127,18 @@
     settingsStore.markDirty(key, value);
   }
 
+  function isSettingDirty(key) {
+    return Boolean(settingsDirty[key]);
+  }
+
+  function dirtyCount(keys) {
+    return (keys || []).filter((key) => isSettingDirty(key)).length;
+  }
+
+  function resetSetting(key) {
+    settingsStore.clearDirty(key);
+  }
+
   function csvList(key) {
     return String(valueForKey(key) || "")
       .split(",")
@@ -139,8 +156,17 @@
   function addTrialSquad(uuid) {
     const next = String(uuid || "").trim();
     if (!next) return;
-    setCsvList("TRIAL_SQUAD_UUIDS", [...csvList("TRIAL_SQUAD_UUIDS"), next]);
+    const current = csvList("TRIAL_SQUAD_UUIDS");
+    if (!current.includes(next)) {
+      setCsvList("TRIAL_SQUAD_UUIDS", [...current, next]);
+    }
     selectedTrialSquad = "";
+  }
+
+  function handleTrialSquadSelect(uuid) {
+    addTrialSquad(uuid);
+    selectedTrialSquad = "";
+    trialSquadSelectKey += 1;
   }
 
   function removeTrialSquad(uuid) {
@@ -225,96 +251,323 @@
         {/if}
       </div>
     </header>
-    <div class="admin-card-body">
-      <div class="admin-form admin-tariff-settings-form">
-        <div class="admin-form-row admin-form-row-3">
-          <label class="admin-field-label admin-field-label-compact">
-            <span>{at("tariffs_trial_enabled", {}, "Trial enabled")}</span>
-            <div class="admin-setting-switch">
-              <Switch.Root
-                checked={boolValue("TRIAL_ENABLED")}
-                onCheckedChange={(checked) => setSetting("TRIAL_ENABLED", checked)}
-                class="admin-switch-root"
-              >
-                <Switch.Thumb class="admin-switch-thumb" />
-              </Switch.Root>
-              <small
-                >{boolValue("TRIAL_ENABLED")
-                  ? at("enabled", {}, "Enabled")
-                  : at("disabled", {}, "Disabled")}</small
-              >
+    <div class="admin-card-body admin-trial-settings-body">
+      <div class="admin-settings-field-groups admin-trial-settings-groups">
+        <section class="admin-settings-field-group" class:is-dirty={dirtyCount(TRIAL_SWITCH_KEYS)}>
+          <header class="admin-settings-field-group-head">
+            <div class="admin-settings-field-group-head-copy">
+              <strong>{at("tariffs_trial_group_switch", {}, "Доступ")}</strong>
+              <small>
+                {at(
+                  "tariffs_trial_group_switch_hint",
+                  {},
+                  "Включает или выключает выдачу пробного периода пользователям."
+                )}
+              </small>
             </div>
-          </label>
-          <label class="admin-field-label admin-field-label-compact">
-            <span>{at("tariffs_trial_days", {}, "Duration, days")}</span>
-            <input
-              class="input"
-              type="number"
-              min="0"
-              step="1"
-              value={valueForKey("TRIAL_DURATION_DAYS")}
-              oninput={(event) => setSetting("TRIAL_DURATION_DAYS", event.currentTarget.value)}
-            />
-          </label>
-          <label class="admin-field-label admin-field-label-compact">
-            <span>{at("tariffs_trial_traffic", {}, "Traffic limit, GB")}</span>
-            <input
-              class="input"
-              type="number"
-              min="0"
-              step="0.1"
-              value={valueForKey("TRIAL_TRAFFIC_LIMIT_GB")}
-              oninput={(event) => setSetting("TRIAL_TRAFFIC_LIMIT_GB", event.currentTarget.value)}
-            />
-          </label>
-        </div>
-        <div class="admin-form-row admin-form-row-2">
-          <label class="admin-field-label admin-field-label-compact">
-            <span>{at("tariffs_trial_strategy", {}, "Traffic reset strategy")}</span>
-            <AdminSelect
-              class="admin-setting-select"
-              value={String(valueForKey("TRIAL_TRAFFIC_STRATEGY") || "NO_RESET")}
-              items={TRAFFIC_STRATEGY_OPTIONS}
-              ariaLabel={at("tariffs_trial_strategy", {}, "Traffic reset strategy")}
-              onValueChange={(value) => setSetting("TRIAL_TRAFFIC_STRATEGY", value)}
-            />
-          </label>
-          <label class="admin-field-label admin-field-label-compact">
-            <span>{at("tariffs_trial_squads", {}, "Trial Internal Squads")}</span>
-            <small>
-              {at(
-                "tariffs_trial_squads_hint",
-                {},
-                "These squads are applied when trial is activated. Empty value falls back to USER_SQUAD_UUIDS."
-              )}
-            </small>
-            <AdminSelect
-              bind:value={selectedTrialSquad}
-              items={panelSquadOptions}
-              disabled={panelSquadsLoading || !panelSquadOptions.length}
-              placeholder={panelSquadsLoading
-                ? at("loading", {}, "Loading...")
-                : at("tariffs_trial_add_squad", {}, "Add squad from panel")}
-              ariaLabel={at("tariffs_trial_add_squad", {}, "Add squad from panel")}
-              onValueChange={addTrialSquad}
-            />
-            <input
-              class="input"
-              type="text"
-              placeholder={valueForKey("USER_SQUAD_UUIDS") || "uuid-a,uuid-b"}
-              value={valueForKey("TRIAL_SQUAD_UUIDS")}
-              oninput={(event) => setSetting("TRIAL_SQUAD_UUIDS", event.currentTarget.value)}
-            />
-            <div class="admin-chip-list">
-              {#each csvList("TRIAL_SQUAD_UUIDS") as uuid}
-                <button type="button" class="admin-chip" onclick={() => removeTrialSquad(uuid)}>
-                  {trialSquadLabel(uuid)}
-                  <X size={12} />
-                </button>
-              {/each}
+            {#if dirtyCount(TRIAL_SWITCH_KEYS)}
+              <AdminBadge variant="warning">
+                {at(
+                  "settings_dirty_count",
+                  { count: dirtyCount(TRIAL_SWITCH_KEYS) },
+                  `Изменений: ${dirtyCount(TRIAL_SWITCH_KEYS)}`
+                )}
+              </AdminBadge>
+            {/if}
+          </header>
+          <div class="admin-settings-field-group-body">
+            <div
+              class="admin-setting admin-trial-setting-row"
+              class:is-dirty={isSettingDirty("TRIAL_ENABLED")}
+            >
+              <div class="admin-setting-meta">
+                <strong>
+                  {at("tariffs_trial_enabled", {}, "Триал включён")}
+                  {#if isSettingDirty("TRIAL_ENABLED")}
+                    <AdminBadge variant="warning"
+                      >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                    >
+                  {/if}
+                </strong>
+                <code>TRIAL_ENABLED</code>
+              </div>
+              <div class="admin-setting-control">
+                <div class="admin-setting-switch">
+                  <Switch.Root
+                    checked={boolValue("TRIAL_ENABLED")}
+                    onCheckedChange={(checked) => setSetting("TRIAL_ENABLED", checked)}
+                    class="admin-switch-root"
+                  >
+                    <Switch.Thumb class="admin-switch-thumb" />
+                  </Switch.Root>
+                  <span
+                    >{boolValue("TRIAL_ENABLED")
+                      ? at("enabled", {}, "Включено")
+                      : at("disabled", {}, "Выключено")}</span
+                  >
+                </div>
+                {#if isSettingDirty("TRIAL_ENABLED")}
+                  <AdminButton
+                    size="sm"
+                    variant="ghost"
+                    onclick={() => resetSetting("TRIAL_ENABLED")}
+                  >
+                    <X size={12} />
+                    {at("reset", {}, "Сбросить")}
+                  </AdminButton>
+                {/if}
+              </div>
             </div>
-          </label>
-        </div>
+          </div>
+        </section>
+
+        <section class="admin-settings-field-group" class:is-dirty={dirtyCount(TRIAL_GENERAL_KEYS)}>
+          <header class="admin-settings-field-group-head">
+            <div class="admin-settings-field-group-head-copy">
+              <strong>{at("tariffs_trial_group_general", {}, "Общие настройки")}</strong>
+              <small>
+                {at(
+                  "tariffs_trial_group_general_hint",
+                  {},
+                  "Длительность пробного доступа и объём трафика, который получает пользователь."
+                )}
+              </small>
+            </div>
+            {#if dirtyCount(TRIAL_GENERAL_KEYS)}
+              <AdminBadge variant="warning">
+                {at(
+                  "settings_dirty_count",
+                  { count: dirtyCount(TRIAL_GENERAL_KEYS) },
+                  `Изменений: ${dirtyCount(TRIAL_GENERAL_KEYS)}`
+                )}
+              </AdminBadge>
+            {/if}
+          </header>
+          <div class="admin-settings-field-group-body">
+            <div
+              class="admin-setting admin-trial-setting-row"
+              class:is-dirty={isSettingDirty("TRIAL_DURATION_DAYS")}
+            >
+              <div class="admin-setting-meta">
+                <strong>
+                  {at("tariffs_trial_days", {}, "Длительность, дней")}
+                  {#if isSettingDirty("TRIAL_DURATION_DAYS")}
+                    <AdminBadge variant="warning"
+                      >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                    >
+                  {/if}
+                </strong>
+                <code>TRIAL_DURATION_DAYS</code>
+              </div>
+              <div class="admin-setting-control">
+                <input
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={valueForKey("TRIAL_DURATION_DAYS")}
+                  oninput={(event) => setSetting("TRIAL_DURATION_DAYS", event.currentTarget.value)}
+                />
+                {#if isSettingDirty("TRIAL_DURATION_DAYS")}
+                  <AdminButton
+                    size="sm"
+                    variant="ghost"
+                    onclick={() => resetSetting("TRIAL_DURATION_DAYS")}
+                  >
+                    <X size={12} />
+                    {at("reset", {}, "Сбросить")}
+                  </AdminButton>
+                {/if}
+              </div>
+            </div>
+            <div
+              class="admin-setting admin-trial-setting-row"
+              class:is-dirty={isSettingDirty("TRIAL_TRAFFIC_LIMIT_GB")}
+            >
+              <div class="admin-setting-meta">
+                <strong>
+                  {at("tariffs_trial_traffic", {}, "Лимит трафика, GB")}
+                  {#if isSettingDirty("TRIAL_TRAFFIC_LIMIT_GB")}
+                    <AdminBadge variant="warning"
+                      >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                    >
+                  {/if}
+                </strong>
+                <code>TRIAL_TRAFFIC_LIMIT_GB</code>
+              </div>
+              <div class="admin-setting-control">
+                <input
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={valueForKey("TRIAL_TRAFFIC_LIMIT_GB")}
+                  oninput={(event) =>
+                    setSetting("TRIAL_TRAFFIC_LIMIT_GB", event.currentTarget.value)}
+                />
+                {#if isSettingDirty("TRIAL_TRAFFIC_LIMIT_GB")}
+                  <AdminButton
+                    size="sm"
+                    variant="ghost"
+                    onclick={() => resetSetting("TRIAL_TRAFFIC_LIMIT_GB")}
+                  >
+                    <X size={12} />
+                    {at("reset", {}, "Сбросить")}
+                  </AdminButton>
+                {/if}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="admin-settings-field-group" class:is-dirty={dirtyCount(TRIAL_RESET_KEYS)}>
+          <header class="admin-settings-field-group-head">
+            <div class="admin-settings-field-group-head-copy">
+              <strong>{at("tariffs_trial_group_reset", {}, "Сброс трафика")}</strong>
+              <small>
+                {at(
+                  "tariffs_trial_group_reset_hint",
+                  {},
+                  "Стратегия, по которой Remnawave обновляет лимит трафика для пробного периода."
+                )}
+              </small>
+            </div>
+            {#if dirtyCount(TRIAL_RESET_KEYS)}
+              <AdminBadge variant="warning">
+                {at(
+                  "settings_dirty_count",
+                  { count: dirtyCount(TRIAL_RESET_KEYS) },
+                  `Изменений: ${dirtyCount(TRIAL_RESET_KEYS)}`
+                )}
+              </AdminBadge>
+            {/if}
+          </header>
+          <div class="admin-settings-field-group-body">
+            <div
+              class="admin-setting admin-trial-setting-row"
+              class:is-dirty={isSettingDirty("TRIAL_TRAFFIC_STRATEGY")}
+            >
+              <div class="admin-setting-meta">
+                <strong>
+                  {at("tariffs_trial_strategy", {}, "Стратегия сброса трафика")}
+                  {#if isSettingDirty("TRIAL_TRAFFIC_STRATEGY")}
+                    <AdminBadge variant="warning"
+                      >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                    >
+                  {/if}
+                </strong>
+                <code>TRIAL_TRAFFIC_STRATEGY</code>
+              </div>
+              <div class="admin-setting-control">
+                <AdminSelect
+                  class="admin-setting-select"
+                  value={String(valueForKey("TRIAL_TRAFFIC_STRATEGY") || "NO_RESET")}
+                  items={TRAFFIC_STRATEGY_OPTIONS}
+                  ariaLabel={at("tariffs_trial_strategy", {}, "Стратегия сброса трафика")}
+                  onValueChange={(value) => setSetting("TRIAL_TRAFFIC_STRATEGY", value)}
+                />
+                {#if isSettingDirty("TRIAL_TRAFFIC_STRATEGY")}
+                  <AdminButton
+                    size="sm"
+                    variant="ghost"
+                    onclick={() => resetSetting("TRIAL_TRAFFIC_STRATEGY")}
+                  >
+                    <X size={12} />
+                    {at("reset", {}, "Сбросить")}
+                  </AdminButton>
+                {/if}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="admin-settings-field-group" class:is-dirty={dirtyCount(TRIAL_SQUAD_KEYS)}>
+          <header class="admin-settings-field-group-head">
+            <div class="admin-settings-field-group-head-copy">
+              <strong>{at("tariffs_trial_group_squads", {}, "Сквады")}</strong>
+              <small>
+                {at(
+                  "tariffs_trial_group_squads_hint",
+                  {},
+                  "Сквады, которые будут назначены пользователю при активации триала."
+                )}
+              </small>
+            </div>
+            {#if dirtyCount(TRIAL_SQUAD_KEYS)}
+              <AdminBadge variant="warning">
+                {at(
+                  "settings_dirty_count",
+                  { count: dirtyCount(TRIAL_SQUAD_KEYS) },
+                  `Изменений: ${dirtyCount(TRIAL_SQUAD_KEYS)}`
+                )}
+              </AdminBadge>
+            {/if}
+          </header>
+          <div class="admin-settings-field-group-body">
+            <div
+              class="admin-setting admin-trial-setting-row"
+              class:is-dirty={isSettingDirty("TRIAL_SQUAD_UUIDS")}
+            >
+              <div class="admin-setting-meta">
+                <strong>
+                  {at("tariffs_trial_squads", {}, "Internal Squads для триала")}
+                  {#if isSettingDirty("TRIAL_SQUAD_UUIDS")}
+                    <AdminBadge variant="warning"
+                      >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                    >
+                  {/if}
+                </strong>
+                <code>TRIAL_SQUAD_UUIDS</code>
+                <small>
+                  {at(
+                    "tariffs_trial_squads_hint",
+                    {},
+                    "Эти сквады применяются при активации триала. Если поле пустое, используются USER_SQUAD_UUIDS."
+                  )}
+                </small>
+              </div>
+              <div class="admin-setting-control admin-trial-squad-control">
+                {#key trialSquadSelectKey}
+                  <AdminSelect
+                    value={selectedTrialSquad}
+                    items={panelSquadOptions}
+                    disabled={panelSquadsLoading || !panelSquadOptions.length}
+                    placeholder={panelSquadsLoading
+                      ? at("loading", {}, "Загрузка...")
+                      : at("tariffs_trial_add_squad", {}, "Добавить сквад из панели")}
+                    ariaLabel={at("tariffs_trial_add_squad", {}, "Добавить сквад из панели")}
+                    onValueChange={handleTrialSquadSelect}
+                  />
+                {/key}
+                <input
+                  class="input"
+                  type="text"
+                  placeholder={valueForKey("USER_SQUAD_UUIDS") || "uuid-a,uuid-b"}
+                  value={valueForKey("TRIAL_SQUAD_UUIDS")}
+                  oninput={(event) => setSetting("TRIAL_SQUAD_UUIDS", event.currentTarget.value)}
+                />
+                {#if isSettingDirty("TRIAL_SQUAD_UUIDS")}
+                  <AdminButton
+                    size="sm"
+                    variant="ghost"
+                    onclick={() => resetSetting("TRIAL_SQUAD_UUIDS")}
+                  >
+                    <X size={12} />
+                    {at("reset", {}, "Сбросить")}
+                  </AdminButton>
+                {/if}
+                <div class="admin-chip-list">
+                  {#each csvList("TRIAL_SQUAD_UUIDS") as uuid}
+                    <button type="button" class="admin-chip" onclick={() => removeTrialSquad(uuid)}>
+                      {trialSquadLabel(uuid)}
+                      <X size={12} />
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   </article>

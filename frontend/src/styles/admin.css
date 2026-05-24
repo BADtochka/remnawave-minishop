@@ -2045,6 +2045,10 @@
   background: color-mix(in srgb, var(--admin-bg) 52%, transparent);
 }
 
+.admin-settings-field-group.is-dirty {
+  border-color: color-mix(in srgb, var(--warning-border) 74%, var(--admin-border));
+}
+
 .admin-settings-field-group-head {
   display: grid;
   gap: 3px;
@@ -2080,6 +2084,10 @@
 
 .admin-setting.is-overridden {
   background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.admin-setting.is-dirty {
+  background: color-mix(in srgb, var(--warning) 7%, transparent);
 }
 
 .admin-setting-meta {
@@ -2820,6 +2828,38 @@
 
 .admin-tariff-settings-form {
   gap: 14px;
+}
+
+.admin-trial-settings-body .admin-settings-field-groups {
+  padding: 0;
+}
+
+.admin-trial-settings-groups .admin-settings-field-group-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.admin-settings-field-group-head-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-trial-setting-row .input,
+.admin-trial-setting-row .admin-select-trigger {
+  width: 100%;
+}
+
+.admin-trial-squad-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.admin-trial-squad-control .admin-select-trigger,
+.admin-trial-squad-control .admin-chip-list {
+  grid-column: 1 / -1;
 }
 
 .admin-tariff-settings-save-row {
