@@ -340,9 +340,7 @@ def _build_install_share_link(
             base = configured_base.rstrip("/")
     else:
         host = (
-            request.headers.get("X-Forwarded-Host")
-            or request.headers.get("Host")
-            or request.host
+            request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or request.host
         )
         proto = request.headers.get("X-Forwarded-Proto") or request.scheme or "https"
         base = f"{proto}://{host}"

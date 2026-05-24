@@ -288,9 +288,7 @@ class WataService(HttpClientMixin):
             return web.Response(status=400, text="bad_request")
 
         transaction_id = str(payload.get("transactionId") or "").strip()
-        payment_link_id = str(
-            payload.get("paymentLinkId") or payload.get("id") or ""
-        ).strip()
+        payment_link_id = str(payload.get("paymentLinkId") or payload.get("id") or "").strip()
         status = str(payload.get("transactionStatus") or "").strip().lower()
         order_id_raw = payload.get("orderId")
         amount_raw = payload.get("amount")
@@ -339,8 +337,7 @@ class WataService(HttpClientMixin):
                     except Exception:
                         await session.rollback()
                         logging.exception(
-                            "Wata webhook: failed to persist transaction id %s "
-                            "for payment %s.",
+                            "Wata webhook: failed to persist transaction id %s for payment %s.",
                             transaction_id,
                             payment.payment_id,
                         )

@@ -396,7 +396,10 @@ class WebappThemesConfigTests(unittest.TestCase):
             self.assertIn("New webapp surfaces: support, purchase info, password login", css)
             self.assertIn("Install guide theme surfaces", css)
             self.assertIn(
-                ".theme-key-windows95 .support-list-card {\n    grid-template-rows: auto auto minmax(0, 1fr);",
+                (
+                    ".theme-key-windows95 .support-list-card {\n"
+                    "    grid-template-rows: auto auto minmax(0, 1fr);"
+                ),
                 css,
             )
             self.assertIn(".theme-key-windows95 .traffic-top strong", css)

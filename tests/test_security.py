@@ -761,9 +761,7 @@ class AdminSettingsSecurityTests(unittest.IsolatedAsyncioTestCase):
 
         payload = json.loads(response.text)
         fields = {
-            field["key"]: field
-            for section in payload["sections"]
-            for field in section["fields"]
+            field["key"]: field for section in payload["sections"] for field in section["fields"]
         }
 
         self.assertEqual(

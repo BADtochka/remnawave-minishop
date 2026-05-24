@@ -86,8 +86,7 @@ async def _load_devices_payload(
             "max_devices": max_devices,
             "max_devices_label": _format_devices_limit(max_devices),
             "devices": [
-                _serialize_device(device, index)
-                for index, device in enumerate(devices, start=1)
+                _serialize_device(device, index) for index, device in enumerate(devices, start=1)
             ],
         },
     }

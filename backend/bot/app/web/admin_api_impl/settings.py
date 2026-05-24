@@ -79,9 +79,10 @@ async def admin_settings_patch_route(request: web.Request) -> web.Response:
         return _error(400, "invalid_updates")
     if not isinstance(deletes, list):
         return _error(400, "invalid_deletes")
-    if "SUBSCRIPTION_PAGE_CONFIG_JSON" in updates and not str(
-        updates.get("SUBSCRIPTION_PAGE_CONFIG_JSON") or ""
-    ).strip():
+    if (
+        "SUBSCRIPTION_PAGE_CONFIG_JSON" in updates
+        and not str(updates.get("SUBSCRIPTION_PAGE_CONFIG_JSON") or "").strip()
+    ):
         updates = dict(updates)
         updates.pop("SUBSCRIPTION_PAGE_CONFIG_JSON", None)
         deletes = [*deletes, "SUBSCRIPTION_PAGE_CONFIG_JSON"]

@@ -35,8 +35,7 @@ def test_telegram_startup_network_error_retries_until_success_without_traceback(
     assert calls == ["try", "try", "try"]
     assert "Telegram network error while registering mini app menu button" in caplog.text
     assert (
-        "Telegram step succeeded while registering mini app menu button on attempt 3"
-        in caplog.text
+        "Telegram step succeeded while registering mini app menu button on attempt 3" in caplog.text
     )
     assert "api.telegram.org" in caplog.text
     assert "Temporary failure in name resolution" in caplog.text

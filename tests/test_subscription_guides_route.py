@@ -68,7 +68,7 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
                     "uuid": default_uuid,
                     "config": json.loads(default_subscription_guides_config_text()),
                 }
-            )
+            ),
         )
         request = self._request(self._settings(), panel_service)
 
@@ -113,7 +113,7 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
                     "uuid": default_uuid,
                     "config": json.loads(default_subscription_guides_config_text()),
                 }
-            )
+            ),
         )
         request = self._request(
             self._settings(SUBSCRIPTION_PAGE_CONFIG_JSON=json.dumps(admin_config)),

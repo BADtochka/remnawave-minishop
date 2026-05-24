@@ -98,9 +98,12 @@ async def ensure_install_share_token(
             await session.flush()
             if result.rowcount:
                 await session.refresh(subscription)
-                return normalize_install_share_token(
-                    getattr(subscription, "install_share_token", None)
-                ) or token
+                return (
+                    normalize_install_share_token(
+                        getattr(subscription, "install_share_token", None)
+                    )
+                    or token
+                )
 
             await session.refresh(subscription)
             raw_existing = str(getattr(subscription, "install_share_token", "") or "").strip()

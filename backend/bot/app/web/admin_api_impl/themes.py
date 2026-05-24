@@ -66,11 +66,9 @@ def _bump_theme_asset_versions(
         previous_theme = previous_by_key.get(key)
         previous_version = int(getattr(previous_theme, "assets_version", 0) or 0)
         current_version = int(theme.get("assets_version") or 1)
-        theme_changed = (
-            previous_theme is None
-            or _theme_payload_for_version_compare(theme)
-            != _theme_payload_for_version_compare(previous_theme)
-        )
+        theme_changed = previous_theme is None or _theme_payload_for_version_compare(
+            theme
+        ) != _theme_payload_for_version_compare(previous_theme)
         if theme_changed or (default_changed and key == config.default_theme):
             theme["assets_version"] = max(previous_version + 1, current_version, 1)
         elif previous_version > current_version:

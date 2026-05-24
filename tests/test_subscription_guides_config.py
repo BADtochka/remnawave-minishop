@@ -163,9 +163,7 @@ def test_unsafe_svg_is_rejected():
 
 def test_unsafe_external_link_is_rejected():
     config = _config()
-    config["platforms"]["ios"]["apps"][0]["blocks"][0]["buttons"][0][
-        "link"
-    ] = "javascript:alert(1)"
+    config["platforms"]["ios"]["apps"][0]["blocks"][0]["buttons"][0]["link"] = "javascript:alert(1)"
 
     with pytest.raises(SubscriptionGuidesConfigError, match="unsafe URL scheme"):
         validate_subscription_guides_config(config)
@@ -173,9 +171,9 @@ def test_unsafe_external_link_is_rejected():
 
 def test_external_custom_scheme_is_allowed_for_multiapp_compatibility():
     config = _config()
-    config["platforms"]["ios"]["apps"][0]["blocks"][0]["buttons"][0][
-        "link"
-    ] = "streisand://import/demo"
+    config["platforms"]["ios"]["apps"][0]["blocks"][0]["buttons"][0]["link"] = (
+        "streisand://import/demo"
+    )
 
     validated = validate_subscription_guides_config(config)
 

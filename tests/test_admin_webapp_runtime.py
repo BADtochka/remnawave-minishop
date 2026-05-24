@@ -53,9 +53,7 @@ class AdminWebappRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 "invalidate_all_webapp_user_payloads",
                 AsyncMock(),
             ),
-            patch(
-                "bot.app.web.admin_api_impl.themes.prune_unused_appearance_assets"
-            ) as prune_mock,
+            patch("bot.app.web.admin_api_impl.themes.prune_unused_appearance_assets") as prune_mock,
         ):
             await webapp_runtime.refresh_webapp_runtime_after_settings_change(
                 request,

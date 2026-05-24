@@ -452,9 +452,7 @@ def _resolve_yookassa_activation_amounts(
     else:
         months_for_activation = int(traffic_amount_gb)
 
-    traffic_gb_for_activation = (
-        traffic_amount_gb if is_traffic_sale_base(sale_mode_base) else None
-    )
+    traffic_gb_for_activation = traffic_amount_gb if is_traffic_sale_base(sale_mode_base) else None
     return (
         subscription_months,
         traffic_amount_gb,

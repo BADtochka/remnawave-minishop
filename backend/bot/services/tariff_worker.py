@@ -321,8 +321,7 @@ class TariffTrafficWorker:
             sub.skip_notifications = True
             sub.status_from_panel = "PANEL_USER_NOT_FOUND"
             logging.warning(
-                "TariffTrafficWorker: deactivated subscription %s because panel user %s "
-                "is missing",
+                "TariffTrafficWorker: deactivated subscription %s because panel user %s is missing",
                 sub.subscription_id,
                 current_uuid,
             )

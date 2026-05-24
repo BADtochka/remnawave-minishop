@@ -66,9 +66,7 @@ def invalidate_local_webapp_user_payload(
     user_id: int,
 ) -> None:
     key = str(int(user_id))
-    for (settings_id, cache_namespace, _ttl), cache in tuple(
-        _WEBAPP_USER_PAYLOAD_CACHES.items()
-    ):
+    for (settings_id, cache_namespace, _ttl), cache in tuple(_WEBAPP_USER_PAYLOAD_CACHES.items()):
         if settings_id == id(settings) and cache_namespace == namespace:
             cache.invalidate(key)
 
@@ -86,9 +84,7 @@ def invalidate_all_local_webapp_user_payloads(
     else:
         namespaces = None
 
-    for (settings_id, cache_namespace, _ttl), cache in tuple(
-        _WEBAPP_USER_PAYLOAD_CACHES.items()
-    ):
+    for (settings_id, cache_namespace, _ttl), cache in tuple(_WEBAPP_USER_PAYLOAD_CACHES.items()):
         if settings_id != id(settings):
             continue
         if namespaces is not None and cache_namespace not in namespaces:

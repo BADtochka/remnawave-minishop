@@ -95,9 +95,7 @@ async def theme_css_asset_route(request: web.Request) -> web.Response:
         raise web.HTTPNotFound(text="theme_css_not_found") from None
 
     query = getattr(request, "query", {}) or {}
-    cache_control = (
-        "public, max-age=31536000, immutable" if query.get("v") else "no-cache"
-    )
+    cache_control = "public, max-age=31536000, immutable" if query.get("v") else "no-cache"
     try:
         stat = path.stat()
         if stat.st_size > WEBAPP_THEME_CSS_MAX_BYTES:

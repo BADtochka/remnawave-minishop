@@ -211,7 +211,7 @@ SETTINGS_MANIFEST: List[SettingField] = [
             "Optional admin JSON override. It is applied only when the JSON override "
             "switch is enabled."
         ),
-        placeholder="{\n  \"version\": \"1\"\n}",
+        placeholder='{\n  "version": "1"\n}',
     ),
     # ─── Subscription periods & pricing ────────────────────────────
     SettingField("MONTH_1_ENABLED", "bool", "pricing", "Тариф 1 месяц"),

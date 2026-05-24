@@ -156,6 +156,7 @@ async def on_startup_configured(dispatcher: Dispatcher):
         raise SystemExit("WEBHOOK_BASE_URL is required. Polling mode is disabled.")
 
     if settings.SUBSCRIPTION_MINI_APP_URL:
+
         async def _configure_mini_app_menu() -> None:
             menu_text = i18n_instance.gettext(
                 settings.DEFAULT_LANGUAGE,
@@ -169,6 +170,7 @@ async def on_startup_configured(dispatcher: Dispatcher):
             )
             await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
             logging.info("STARTUP: Mini app domain registered and default menu button restored.")
+
         await _run_telegram_startup_step(
             "registering mini app menu button",
             _configure_mini_app_menu,
@@ -186,6 +188,7 @@ async def on_startup_configured(dispatcher: Dispatcher):
             )
         await bot.set_my_commands(bot_commands)
         logging.info("STARTUP: bot command descriptions set.")
+
     await _run_telegram_startup_step(
         "setting bot commands",
         _configure_bot_commands,

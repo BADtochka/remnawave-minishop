@@ -952,9 +952,7 @@ async def _perform_sync_impl(
                             duplicate_panel_user=panel_user_dict,
                             settings=settings,
                             subscriptions_by_panel_uuid=subscriptions_by_panel_uuid,
-                            active_subscriptions_by_user_panel=(
-                                active_subscriptions_by_user_panel
-                            ),
+                            active_subscriptions_by_user_panel=(active_subscriptions_by_user_panel),
                         )
                         subscriptions_created += int(merge_result["subscriptions_created"])
                         subscriptions_updated += int(merge_result["subscriptions_updated"])
