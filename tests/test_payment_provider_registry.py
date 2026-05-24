@@ -189,7 +189,7 @@ def test_provider_presentation_ignores_cross_language_override():
 
     settings = SimpleNamespace(PAYMENT_YOOKASSA_WEBAPP_LABEL_RU="Карта")
 
-    assert resolve_provider_presentation(spec, settings, language="en").webapp_label == "Bank card"
+    assert resolve_provider_presentation(spec, settings, language="en").webapp_label == "YooKassa"
 
 
 def test_payment_method_keyboard_uses_custom_telegram_text_without_changing_callback(monkeypatch):

@@ -767,6 +767,14 @@ export async function mockApi(path, options = {}, context = {}) {
       payment_id: 10001,
     };
   }
+  if (/^\/payments\/\d+$/.test(path) && String(options.method || "GET").toUpperCase() === "GET") {
+    return {
+      ok: true,
+      payment_id: Number(path.split("/").pop()),
+      status: "pending_yookassa",
+      paid: false,
+    };
+  }
   if (path === "/tariffs/change" && String(options.method || "").toUpperCase() === "POST") {
     return { ok: true, tariff_key: "business" };
   }

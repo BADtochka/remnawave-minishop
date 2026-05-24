@@ -258,6 +258,9 @@ class YooKassaService:
             if save_payment_method:
                 # Ask YooKassa to save method for off-session charges
                 builder.set_save_payment_method(True)
+            elif not payment_method_id:
+                # Keep the Smart Payment form unrestricted for one-off payments.
+                builder.set_save_payment_method(False)
             if payment_method_id:
                 # Use a previously saved payment method for merchant-initiated payments
                 builder.set_payment_method_id(payment_method_id)
@@ -2659,10 +2662,7 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
             description=ctx.description,
             metadata=metadata,
             receipt_email=service.config.DEFAULT_RECEIPT_EMAIL,
-            save_payment_method=bool(
-                service.config.autopayments_active
-                and service.config.AUTOPAYMENTS_REQUIRE_CARD_BINDING
-            ),
+            save_payment_method=False,
         )
         payment_url = response.get("confirmation_url") if response else None
         if not payment_url:
@@ -2802,8 +2802,8 @@ SPEC = PaymentProviderSpec(
     id="yookassa",
     provider_key="yookassa",
     label="YooKassa",
-    webapp_label="Банковская карта",
-    webapp_labels={"ru": "Банковская карта", "en": "Bank card"},
+    webapp_label="ЮKassa",
+    webapp_labels={"ru": "ЮKassa", "en": "YooKassa"},
     webapp_icon="CreditCard",
     telegram_labels={"ru": "ЮKassa", "en": "YooKassa"},
     telegram_emoji="💳",

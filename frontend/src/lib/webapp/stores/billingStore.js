@@ -24,6 +24,11 @@ export function createBillingStore({ billing, loadData, t, showToast, openExtern
   });
 
   let topupOptionsRequestId = 0;
+  let paymentPollToken = 0;
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 
   function openPaymentModal(
     tariffMode,
@@ -175,6 +180,38 @@ export function createBillingStore({ billing, loadData, t, showToast, openExtern
     openExternalLink(url);
   }
 
+  function startPaymentStatusPolling(paymentId) {
+    if (!paymentId || !billing.fetchPaymentStatus) return;
+    const token = ++paymentPollToken;
+    void (async () => {
+      for (let attempt = 0; attempt < 45 && token === paymentPollToken; attempt += 1) {
+        await sleep(attempt === 0 ? 1500 : 2000);
+        if (token !== paymentPollToken) return;
+        try {
+          const status = await billing.fetchPaymentStatus(paymentId);
+          if (!status?.ok) continue;
+          if (status.paid || status.status === "succeeded") {
+            showToast(t("wa_payment_success", {}, "Payment successful"));
+            await loadData();
+            return;
+          }
+          const normalized = String(status.status || "").toLowerCase();
+          if (
+            normalized === "failed" ||
+            normalized === "canceled" ||
+            normalized === "cancelled" ||
+            normalized.startsWith("failed_")
+          ) {
+            showToast(t("wa_payment_create_failed"));
+            return;
+          }
+        } catch (_error) {
+          void _error;
+        }
+      }
+    })();
+  }
+
   async function createPayment() {
     const s = get(state);
     if (!s.selectedPlan || !s.selectedMethod || s.payBusy) return;
@@ -195,6 +232,7 @@ export function createBillingStore({ billing, loadData, t, showToast, openExtern
         if (!response.payment_url) throw response;
         openExternalLink(response.payment_url);
       }
+      startPaymentStatusPolling(response.payment_id);
       state.update((s) => ({ ...s, paymentModalOpen: false }));
     } catch (error) {
       showToast(error?.message || t("wa_payment_create_failed"));
@@ -244,6 +282,7 @@ export function createBillingStore({ billing, loadData, t, showToast, openExtern
       if (!response.ok || !response.payment_url) throw response;
       showToast(t("wa_payment_created"));
       openExternalLink(response.payment_url);
+      startPaymentStatusPolling(response.payment_id);
       state.update((s) => ({ ...s, topupModalOpen: false }));
     } catch (error) {
       showToast(error?.message || t("wa_payment_create_failed"));
@@ -321,6 +360,7 @@ export function createBillingStore({ billing, loadData, t, showToast, openExtern
       if (!response.ok || !response.payment_url) throw response;
       showToast(t("wa_payment_created"));
       openExternalLink(response.payment_url);
+      startPaymentStatusPolling(response.payment_id);
       state.update((s) => ({ ...s, changeConfirmOpen: false, changeModalOpen: false }));
     } catch (error) {
       showToast(error?.message || t("wa_payment_create_failed"));
@@ -364,6 +404,7 @@ export function createBillingStore({ billing, loadData, t, showToast, openExtern
       if (!response.ok || !response.payment_url) throw response;
       showToast(t("wa_payment_created"));
       openExternalLink(response.payment_url);
+      startPaymentStatusPolling(response.payment_id);
       state.update((s) => ({ ...s, deviceTopupModalOpen: false }));
     } catch (error) {
       showToast(error?.message || t("wa_payment_create_failed"));

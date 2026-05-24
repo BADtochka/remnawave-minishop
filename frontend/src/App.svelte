@@ -1080,7 +1080,7 @@
   function openExternalLink(url) {
     if (!url) return;
     if (tg?.openLink) {
-      tg.openLink(url);
+      tg.openLink(url, { try_instant_view: false });
       return;
     }
     window.location.assign(url);

@@ -15,6 +15,10 @@ export function createBillingActions({ api }) {
     return api("/payments", { method: "POST", body: JSON.stringify(body) });
   }
 
+  async function fetchPaymentStatus(paymentId) {
+    return api(`/payments/${encodeURIComponent(paymentId)}`);
+  }
+
   async function postTariffChange(body) {
     return api("/tariffs/change", { method: "POST", body: JSON.stringify(body) });
   }
@@ -79,6 +83,7 @@ export function createBillingActions({ api }) {
     fetchDeviceTopupOptions,
     fetchTariffChangeOptions,
     postPayment,
+    fetchPaymentStatus,
     postTariffChange,
     postTariffChangePayment,
     planPaymentBody,
