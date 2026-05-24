@@ -22,6 +22,7 @@
   import SettingsScreen from "./webapp/screens/SettingsScreen.svelte";
   import SupportScreen from "./webapp/screens/SupportScreen.svelte";
   import SupportTicketScreen from "./webapp/screens/SupportTicketScreen.svelte";
+  import TrialActivationScreen from "./webapp/screens/TrialActivationScreen.svelte";
 
   import {
     LANGUAGE_FLAGS,
@@ -118,6 +119,8 @@
   let publicInstallSubscription = null;
   let publicInstallToken = "";
   let trialBusy = false;
+  let trialActivationResult = null;
+  let trialActivationError = "";
   let promoCode = "";
   let promoBusy = false;
   let promoStatus = "";
@@ -564,7 +567,7 @@
               : section === "install" && !canUseInstallGuides()
                 ? "home"
                 : section;
-        activeTab = nextSection === "install" ? "home" : nextSection;
+        activeTab = nextSection === "install" || nextSection === "trial" ? "home" : nextSection;
         screen = nextSection;
         if (nextSection === "devices") devicesStore.loadDevices(devicesEnabled);
         if (nextSection === "support") {
@@ -949,7 +952,12 @@
     }
     const initialSupportTicketId =
       section === "support" ? supportTicketIdFromPath(window.location.pathname) : null;
-    activeTab = section === "admin" ? "settings" : section === "install" ? "home" : section;
+    activeTab =
+      section === "admin"
+        ? "settings"
+        : section === "install" || section === "trial"
+          ? "home"
+          : section;
     screen = section;
     mode = "app";
     if (payload.settings?.support_tickets_enabled !== false) {
@@ -1151,6 +1159,19 @@
     openConnectLink();
   }
 
+  function openTrialInstallOrConnect() {
+    if (canUseInstallGuides()) {
+      goInstall();
+      return;
+    }
+    const url = trialActivationResult?.connect_url || trialActivationResult?.config_link;
+    if (url) {
+      openExternalLink(url);
+      return;
+    }
+    openConnectLink();
+  }
+
   async function copyText(value, success = t("wa_copied")) {
     if (!value) {
       showToast(t("wa_unavailable"));
@@ -1199,19 +1220,30 @@
     }
   }
 
-  async function activateTrial() {
+  async function activateTrial(options = {}) {
     if (trialBusy) return;
+    const stayOnTrial = Boolean(options?.stayOnTrial);
     trialBusy = true;
+    trialActivationResult = null;
+    trialActivationError = "";
     try {
       const response = await api("/trial/activate", {
         method: "POST",
         body: JSON.stringify({}),
       });
       if (!response.ok) throw response;
+      trialActivationResult = response;
       showToast(t("wa_trial_activated"));
       await loadData();
+      if (stayOnTrial) {
+        activeTab = "home";
+        screen = "trial";
+        syncSectionPath("trial", true);
+      }
     } catch (error) {
-      showToast(error?.message || t("wa_trial_activation_failed"));
+      const message = error?.message || t("wa_trial_activation_failed");
+      trialActivationError = message;
+      showToast(message);
     } finally {
       trialBusy = false;
     }
@@ -1567,6 +1599,20 @@
                 {openExternalLink}
                 {openAppLink}
                 {copyText}
+                {t}
+              />
+            {:else if screen === "trial"}
+              <TrialActivationScreen
+                {appSettings}
+                {brand}
+                {brandTitle}
+                {subscription}
+                {trialBusy}
+                trialResult={trialActivationResult}
+                trialError={trialActivationError}
+                {activateTrial}
+                openInstallOrConnect={openTrialInstallOrConnect}
+                {goHome}
                 {t}
               />
             {:else if screen === "invite"}

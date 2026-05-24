@@ -48,6 +48,11 @@ def subscription_mini_app_install_url(settings: Settings) -> Optional[str]:
     return subscription_mini_app_path_url(settings, "/install")
 
 
+def subscription_mini_app_trial_url(settings: Settings) -> Optional[str]:
+    """Return the trial activation URL inside the Mini App."""
+    return subscription_mini_app_path_url(settings, "/trial")
+
+
 def subscription_public_install_url(settings: Settings, share_token: str) -> Optional[str]:
     """Return the public install guide URL for a normalized share token."""
     token = normalize_install_share_token(share_token)

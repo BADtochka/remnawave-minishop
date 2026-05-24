@@ -5,6 +5,7 @@ from bot.utils.mini_app_url import (
     subscription_mini_app_install_url,
     subscription_mini_app_path_url,
     subscription_mini_app_topup_url,
+    subscription_mini_app_trial_url,
     subscription_public_install_url,
 )
 from config.settings import Settings
@@ -61,6 +62,10 @@ class MiniAppUrlTests(unittest.TestCase):
         self.assertEqual(
             subscription_mini_app_install_url(s),
             "https://app.example.com/webapp/install",
+        )
+        self.assertEqual(
+            subscription_mini_app_trial_url(s),
+            "https://app.example.com/webapp/trial",
         )
 
     def test_subscription_public_install_url_uses_origin(self):

@@ -390,6 +390,15 @@ export async function mockApi(path, options = {}, context = {}) {
       },
     };
   }
+  if (path === "/admin/panel/internal-squads") {
+    return {
+      ok: true,
+      squads: [
+        { uuid: "db786ee8-816b-4760-80aa-1fc7a3669ff2", name: "Base RU" },
+        { uuid: "2f2f6e0a-1f2d-4e80-a33b-0ebf3a409012", name: "Trial warmup" },
+      ],
+    };
+  }
   if (path === "/admin/themes") {
     if (String(options.method || "GET").toUpperCase() === "PUT") {
       try {
@@ -522,6 +531,75 @@ export async function mockApi(path, options = {}, context = {}) {
               label: "Logo favicon URL",
               value: DEV_MOCK.config.faviconUrl || "",
             },
+          ],
+        },
+        {
+          id: "pricing",
+          order: 11,
+          fields: [
+            {
+              key: "TRIAL_ENABLED",
+              type: "bool",
+              section: "pricing",
+              subsection: "trial",
+              label: "Триал включён",
+              value: true,
+            },
+            {
+              key: "TRIAL_DURATION_DAYS",
+              type: "int",
+              section: "pricing",
+              subsection: "trial",
+              label: "Длительность триала (дней)",
+              value: 3,
+            },
+            {
+              key: "TRIAL_TRAFFIC_LIMIT_GB",
+              type: "float",
+              section: "pricing",
+              subsection: "trial",
+              label: "Лимит трафика триала (ГБ)",
+              value: 5,
+            },
+            {
+              key: "TRIAL_TRAFFIC_STRATEGY",
+              type: "string",
+              section: "pricing",
+              subsection: "trial",
+              label: "Стратегия сброса трафика триала",
+              value: "NO_RESET",
+            },
+            {
+              key: "TRIAL_SQUAD_UUIDS",
+              type: "string",
+              section: "pricing",
+              subsection: "trial",
+              label: "Internal Squads для триала",
+              value: "2f2f6e0a-1f2d-4e80-a33b-0ebf3a409012",
+            },
+            ...[
+              ["MONTH_1_ENABLED", "bool", true],
+              ["RUB_PRICE_1_MONTH", "float", 150],
+              ["STARS_PRICE_1_MONTH", "int", 0],
+              ["MONTH_3_ENABLED", "bool", true],
+              ["RUB_PRICE_3_MONTHS", "float", 400],
+              ["STARS_PRICE_3_MONTHS", "int", 0],
+              ["MONTH_6_ENABLED", "bool", false],
+              ["RUB_PRICE_6_MONTHS", "float", 750],
+              ["STARS_PRICE_6_MONTHS", "int", 0],
+              ["MONTH_12_ENABLED", "bool", false],
+              ["RUB_PRICE_12_MONTHS", "float", 1200],
+              ["STARS_PRICE_12_MONTHS", "int", 0],
+              ["TRAFFIC_PACKAGES", "string", "10:99,50:399"],
+              ["STARS_TRAFFIC_PACKAGES", "string", ""],
+            ].map(([key, type, value]) => ({
+              key,
+              type,
+              section: "pricing",
+              subsection: "legacy_tariffs",
+              label: key,
+              value,
+            })),
           ],
         },
       ],
@@ -713,13 +791,26 @@ export async function mockApi(path, options = {}, context = {}) {
       remaining_text: "5 д. 0 ч.",
       end_date_text: "05.05.2026 12:00",
       days_left: 5,
+      config_link: "https://sub.example.com/sub/trial-preview-token",
+      connect_url: "https://sub.example.com/connect/trial-preview-token",
+      panel_short_uuid: "trial-preview-token",
+      install_share_token: "8f559061460e8fede78ef18dce887236",
+      install_share_url: "https://app.example.com/s/8f559061460e8fede78ef18dce887236",
       traffic_limit: "10 GB",
       traffic_limit_bytes: 10737418240,
       traffic_used: "0 B",
       traffic_used_bytes: 0,
     };
     DEV_MOCK.data.settings.trial_available = false;
-    return { ok: true, activated: true, end_date_text: "05.05.2026 12:00" };
+    return {
+      ok: true,
+      activated: true,
+      days: 5,
+      end_date_text: "05.05.2026 12:00",
+      traffic_gb: 10,
+      config_link: "https://sub.example.com/sub/trial-preview-token",
+      connect_url: "https://sub.example.com/connect/trial-preview-token",
+    };
   }
   if (path === "/auth/logout") return { ok: true };
   if (path === "/account/language" && String(options.method || "").toUpperCase() === "POST") {

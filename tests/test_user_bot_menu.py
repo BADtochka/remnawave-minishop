@@ -67,6 +67,46 @@ class UserBotMenuTests(unittest.TestCase):
         self.assertIn("main_action:bot_interface", callbacks)
         self.assertIn("main_action:info", callbacks)
 
+    def test_main_menu_shows_trial_button_as_mini_app_deeplink_when_available(self):
+        markup = get_main_menu_inline_keyboard(
+            "en",
+            self.i18n,
+            self.settings,
+            show_trial_button=True,
+        )
+
+        trial_button = markup.inline_keyboard[0][0]
+
+        self.assertEqual(trial_button.text, self.i18n.gettext("en", "menu_activate_trial_button"))
+        self.assertIsNone(trial_button.callback_data)
+        self.assertEqual(trial_button.web_app.url, "https://app.example.com/trial")
+
+    def test_main_menu_trial_button_falls_back_to_bot_callback_without_mini_app(self):
+        self.settings.SUBSCRIPTION_MINI_APP_URL = ""
+        markup = get_main_menu_inline_keyboard(
+            "en",
+            self.i18n,
+            self.settings,
+            show_trial_button=True,
+        )
+
+        trial_button = markup.inline_keyboard[0][0]
+
+        self.assertEqual(trial_button.callback_data, "main_action:request_trial")
+        self.assertIsNone(trial_button.web_app)
+
+    def test_bot_interface_trial_button_uses_mini_app_deeplink_when_available(self):
+        markup = get_bot_interface_inline_keyboard(
+            "en",
+            self.i18n,
+            self.settings,
+            show_trial_button=True,
+        )
+
+        trial_button = markup.inline_keyboard[0][0]
+
+        self.assertEqual(trial_button.web_app.url, "https://app.example.com/trial")
+
     def test_bot_interface_buttons_return_to_bot_interface(self):
         markup = get_bot_interface_inline_keyboard("en", self.i18n, self.settings)
 

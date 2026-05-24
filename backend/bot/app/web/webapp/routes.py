@@ -7,6 +7,7 @@ def setup_subscription_webapp_routes(app: web.Application) -> None:
     app.router.add_get("/login/password", index_route)
     app.router.add_get("/home", index_route)
     app.router.add_get("/install", index_route)
+    app.router.add_get("/trial", index_route)
     app.router.add_get("/open-app", app_deeplink_route)
     app.router.add_get(r"/s/{share_token:[a-f0-9]{32}}", index_route)
     app.router.add_get("/invite", index_route)

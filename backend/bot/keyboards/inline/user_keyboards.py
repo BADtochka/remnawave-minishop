@@ -4,6 +4,7 @@ from aiogram.types import InlineKeyboardMarkup, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 
 from bot.utils.install_links import bot_install_guide_url
+from bot.utils.mini_app_url import subscription_mini_app_trial_url
 from config.settings import Settings
 
 BOT_MENU_CONTEXT = "bot"
@@ -82,11 +83,28 @@ def payment_options_back_callback(sale_mode: str = "subscription") -> str:
     return subscription_options_callback(context)
 
 
+def _trial_activation_button(lang: str, i18n_instance, settings: Settings) -> InlineKeyboardButton:
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+    if settings.SUBSCRIPTION_MINI_APP_URL:
+        trial_url = subscription_mini_app_trial_url(settings) or settings.SUBSCRIPTION_MINI_APP_URL
+        return InlineKeyboardButton(
+            text=_(key="menu_activate_trial_button"),
+            web_app=WebAppInfo(url=trial_url),
+        )
+    return InlineKeyboardButton(
+        text=_(key="menu_activate_trial_button"),
+        callback_data="main_action:request_trial",
+    )
+
+
 def get_main_menu_inline_keyboard(
     lang: str, i18n_instance, settings: Settings, show_trial_button: bool = False
 ) -> InlineKeyboardMarkup:
     _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
     builder = InlineKeyboardBuilder()
+
+    if show_trial_button and settings.TRIAL_ENABLED:
+        builder.row(_trial_activation_button(lang, i18n_instance, settings))
 
     if settings.SUBSCRIPTION_MINI_APP_URL:
         builder.row(
@@ -130,11 +148,7 @@ def get_bot_interface_inline_keyboard(
     builder = InlineKeyboardBuilder()
 
     if show_trial_button and settings.TRIAL_ENABLED:
-        builder.row(
-            InlineKeyboardButton(
-                text=_(key="menu_activate_trial_button"), callback_data="main_action:request_trial"
-            )
-        )
+        builder.row(_trial_activation_button(lang, i18n_instance, settings))
 
     if settings.SUBSCRIPTION_MINI_APP_URL:
         builder.row(

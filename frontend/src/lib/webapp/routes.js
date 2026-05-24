@@ -7,6 +7,7 @@ export function normalizeSection(value) {
   if (
     section === "invite" ||
     section === "install" ||
+    section === "trial" ||
     section === "devices" ||
     section === "support" ||
     section === "settings" ||
