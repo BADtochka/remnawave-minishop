@@ -39,6 +39,7 @@
   --surface-sheen-soft: transparent;
   --surface-hover: rgba(0, 0, 128, 0.14);
   --surface-muted: #c0c0c0;
+  --surface-subtle: #dfdfdf;
   --surface-subtle-border: #808080;
   --overlay-scrim: rgba(0, 0, 0, 0.35);
   --nav-bg: #c0c0c0;
@@ -668,11 +669,28 @@ body:has(.theme-key-windows95) .install-platform-item[data-selected] svg {
 
 /* ---------- New webapp surfaces: support, purchase info, password login ---------- */
 
+.theme-key-windows95 .trial-offer-card,
+.theme-key-windows95 .trial-activation-card,
+.theme-key-windows95 .activation-success-dialog,
 .theme-key-windows95 .subscription-purchase-description,
 .theme-key-windows95 .support-create-panel,
 .theme-key-windows95 .ticket-composer,
 .theme-key-windows95 .support-message-scroll {
   background: #c0c0c0;
+}
+
+.theme-key-windows95 .trial-card-facts span,
+.theme-key-windows95 .trial-activation-facts div {
+  border: 2px solid;
+  border-color: #404040 #ffffff #ffffff #404040;
+  background: #dfdfdf;
+  box-shadow:
+    inset 1px 1px 0 #808080,
+    inset -1px -1px 0 #ffffff;
+}
+
+.theme-key-windows95 .dialog-title-icon {
+  color: var(--accent);
 }
 
 .theme-key-windows95 .support-heading-icon,

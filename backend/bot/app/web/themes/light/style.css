@@ -33,6 +33,7 @@
   --surface-sheen-soft: rgba(15, 23, 42, 0.012);
   --surface-hover: rgba(15, 23, 42, 0.045);
   --surface-muted: rgba(15, 23, 42, 0.035);
+  --surface-subtle: rgba(15, 23, 42, 0.025);
   --surface-subtle-border: rgba(15, 23, 42, 0.1);
   --overlay-scrim: rgba(15, 23, 42, 0.34);
   --nav-bg: rgba(255, 255, 255, 0.88);
@@ -107,6 +108,26 @@
 .theme-key-light .settings-links-block {
   position: relative;
   z-index: 1;
+}
+
+/* New user-facing activation surfaces */
+.theme-key-light .trial-offer-card,
+.theme-key-light .trial-activation-card,
+.theme-key-light .activation-success-dialog {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.theme-key-light .trial-card-head > svg,
+.theme-key-light .dialog-title-icon {
+  color: color-mix(in srgb, var(--accent) 54%, #000000);
+}
+
+.theme-key-light .trial-card-facts span,
+.theme-key-light .trial-activation-facts div {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(15, 23, 42, 0.025);
 }
 
 /* Slightly stronger axis/grid contrast for the revenue chart on a light surface */

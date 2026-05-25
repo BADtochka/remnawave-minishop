@@ -45,6 +45,7 @@
   --surface-sheen-soft: transparent;
   --surface-hover: rgba(255, 255, 255, 0.08);
   --surface-muted: #0a0a0a;
+  --surface-subtle: #000000;
   --surface-subtle-border: #ffffff;
   --overlay-scrim: rgba(0, 0, 0, 0.85);
   --nav-bg: #000000;
@@ -119,6 +120,8 @@
 /* ---------- Panels / cards ---------- */
 
 .theme-key-ascii .card,
+.theme-key-ascii .trial-card-facts span,
+.theme-key-ascii .trial-activation-facts div,
 .theme-key-ascii .period-card,
 .theme-key-ascii .method-card,
 .theme-key-ascii .settings-row,
@@ -317,10 +320,20 @@
 
 /* ---------- New webapp surfaces: support, purchase info, password login ---------- */
 
+.theme-key-ascii .trial-offer-card,
+.theme-key-ascii .trial-card-facts span,
+.theme-key-ascii .trial-activation-card,
+.theme-key-ascii .trial-activation-facts div,
+.theme-key-ascii .activation-success-dialog,
 .theme-key-ascii .subscription-purchase-description,
 .theme-key-ascii .support-create-panel,
 .theme-key-ascii .ticket-composer {
   background: #000000;
+}
+
+.theme-key-ascii .trial-card-head > svg,
+.theme-key-ascii .dialog-title-icon {
+  color: #ffffff;
 }
 
 .theme-key-ascii .support-heading-icon,
@@ -1063,6 +1076,7 @@ body:has(.theme-key-ascii) .install-platform-item[data-selected] svg {
 .theme-key-ascii :is(
   .card, .dialog-card, .toast,
   .btn, .input,
+  .trial-card-facts span, .trial-activation-facts div,
   .period-card, .method-card, .settings-row, .option-row,
   .tariff-selected-card, .tariff-action-card, .tariff-warning-card,
   .topup-carryover-note, .subscription-purchase-description,

@@ -46,6 +46,7 @@
   --surface-sheen-soft: rgba(255, 255, 255, 0.018);
   --surface-hover: rgba(255, 255, 255, 0.04);
   --surface-muted: rgba(255, 255, 255, 0.035);
+  --surface-subtle: rgba(255, 255, 255, 0.03);
   --surface-subtle-border: rgba(255, 255, 255, 0.1);
   --overlay-scrim: rgba(0, 0, 0, 0.56);
   --nav-bg: rgba(7, 12, 17, 0.88);
