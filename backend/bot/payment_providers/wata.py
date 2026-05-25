@@ -48,15 +48,20 @@ from .shared import (
     notify_user_payment_failed,
     parse_payment_callback,
     payment_failed,
+    payment_link_response,
+    payment_record_amounts,
     payment_unavailable,
     post_json_request,
     render_link_or_fail,
+    render_payment_link,
     safe_callback_answer,
+    sale_mode_base,
 )
 
 router = Router(name="user_subscription_payments_wata_router")
 _LOG = "wata"
 _WATA_IN_PROGRESS_STATUSES = {"created", "pending"}
+_WATA_LINK_OPENED_STATUSES = {"opened", "open"}
 
 
 def _wata_success_status(status: int, _body: Any) -> bool:
@@ -229,7 +234,9 @@ class WataService(HttpClientMixin):
             return False, {"message": "service_not_configured"}
 
         session = await self._get_session()
-        expires_at = datetime.now(timezone.utc) + timedelta(days=self.payment_link_ttl_days)
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=self.payment_link_ttl_days)).replace(
+            microsecond=0
+        )
         body: Dict[str, Any] = {
             "amount": float(format_decimal_amount(amount)),
             "currency": (currency or self.settings.DEFAULT_CURRENCY_SYMBOL or "RUB").upper(),
@@ -237,7 +244,7 @@ class WataService(HttpClientMixin):
             "orderId": str(payment_db_id),
             "successRedirectUrl": self.return_url,
             "failRedirectUrl": self.failed_url,
-            "expirationDateTime": expires_at.isoformat().replace("+00:00", "Z"),
+            "expirationDateTime": expires_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         return await post_json_request(
             session,
@@ -294,6 +301,47 @@ class WataService(HttpClientMixin):
             f"{self.base_url}/links/{payment_link_id}",
             log_prefix="Wata get_payment_link",
         )
+
+    async def try_reuse_pending_link(self, payment: Any) -> Optional[str]:
+        """Return the existing payment link URL if it's still usable; else None.
+
+        Used to avoid creating duplicate Wata links each time a user re-clicks
+        the pay button. Repeated abandoned links inflate Wata's anti-fraud
+        signals and can cause downstream bank-side rejections during the
+        bank-selection step.
+        """
+        if not self.configured:
+            return None
+        provider_payment_id = str(getattr(payment, "provider_payment_id", "") or "").strip()
+        if not provider_payment_id:
+            return None
+
+        success, data = await self.get_payment_link(provider_payment_id)
+        if not success or not isinstance(data, dict):
+            return None
+
+        status = _normalized_wata_status(data) or str(data.get("status") or "").strip().lower()
+        if status and status not in _WATA_LINK_OPENED_STATUSES:
+            return None
+
+        expiration_raw = data.get("expirationDateTime") or data.get("expiration_date_time")
+        if expiration_raw:
+            try:
+                iso_value = str(expiration_raw).strip()
+                if iso_value.endswith("Z"):
+                    iso_value = iso_value[:-1] + "+00:00"
+                exp_dt = datetime.fromisoformat(iso_value)
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                if exp_dt <= datetime.now(timezone.utc):
+                    return None
+            except (TypeError, ValueError):
+                logging.warning(
+                    "Wata try_reuse_pending_link: unparseable expirationDateTime %r",
+                    expiration_raw,
+                )
+
+        return first_value(data, "url", "paymentUrl", "payment_url")
 
     async def get_transaction(self, transaction_id: str) -> Tuple[bool, Dict[str, Any]]:
         return await self._get_json(
@@ -709,6 +757,41 @@ async def pay_wata_callback_handler(
 
     currency_code = settings.DEFAULT_CURRENCY_SYMBOL or "RUB"
     payment_description = describe_payment(translator, parts)
+
+    reuse_amounts = payment_record_amounts(months=parts.months, sale_mode=parts.sale_mode)
+    months_for_lookup = (
+        reuse_amounts.months
+        if sale_mode_base(parts.sale_mode) == "subscription"
+        else None
+    )
+    reusable_payment = await payment_dal.find_recent_pending_provider_payment(
+        session,
+        user_id=callback.from_user.id,
+        provider="wata",
+        pending_status="pending_wata",
+        amount=parts.price,
+        sale_mode=parts.sale_mode,
+        months=months_for_lookup,
+        purchased_gb=reuse_amounts.purchased_gb,
+        purchased_hwid_devices=reuse_amounts.purchased_hwid_devices,
+        tariff_key=reuse_amounts.tariff_key,
+        since_minutes=wata_service.payment_link_ttl_days * 24 * 60,
+    )
+    if reusable_payment is not None:
+        reusable_url = await wata_service.try_reuse_pending_link(reusable_payment)
+        if reusable_url:
+            await safe_callback_answer(callback)
+            await render_payment_link(
+                callback,
+                translator=translator,
+                current_lang=current_lang,
+                i18n=i18n,
+                parts=parts,
+                payment_url=reusable_url,
+                log_prefix=_LOG,
+            )
+            return
+
     record_payload = build_payment_record_payload(
         user_id=callback.from_user.id,
         amount=parts.price,
@@ -761,6 +844,47 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
         return payment_unavailable()
 
     currency = settings.DEFAULT_CURRENCY_SYMBOL or "RUB"
+
+    reuse_amounts = payment_record_amounts(
+        months=ctx.months,
+        sale_mode=ctx.sale_mode,
+        traffic_gb=ctx.traffic_gb,
+    )
+    months_for_lookup = (
+        reuse_amounts.months
+        if sale_mode_base(ctx.sale_mode) == "subscription"
+        else None
+    )
+    try:
+        reusable_payment = await payment_dal.find_recent_pending_provider_payment(
+            ctx.session,
+            user_id=ctx.user_id,
+            provider="wata",
+            pending_status="pending_wata",
+            amount=ctx.price,
+            sale_mode=ctx.sale_mode,
+            months=months_for_lookup,
+            purchased_gb=reuse_amounts.purchased_gb,
+            purchased_hwid_devices=reuse_amounts.purchased_hwid_devices,
+            tariff_key=reuse_amounts.tariff_key,
+            since_minutes=service.payment_link_ttl_days * 24 * 60,
+        )
+    except Exception:
+        logging.exception("Wata WebApp: lookup of reusable payment failed")
+        reusable_payment = None
+
+    if reusable_payment is not None:
+        try:
+            reusable_url = await service.try_reuse_pending_link(reusable_payment)
+        except Exception:
+            logging.exception("Wata WebApp: failed to verify reusable link")
+            reusable_url = None
+        if reusable_url:
+            return payment_link_response(
+                payment_url=reusable_url,
+                payment_id=reusable_payment.payment_id,
+            )
+
     try:
         payment = await create_webapp_payment_record(
             ctx,

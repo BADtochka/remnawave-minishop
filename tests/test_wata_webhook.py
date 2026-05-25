@@ -268,3 +268,113 @@ def test_wata_refresh_finds_paid_transaction_by_order_id_and_finalizes(monkeypat
     assert updates == [(465, "tx-paid", "succeeded")]
     assert finalized == [(465, "wata", "wata")]
     assert session.commits == 1
+
+
+def test_try_reuse_pending_link_returns_url_for_opened_link():
+    service = _service(_FakeSession())
+    payment = _payment(provider_payment_id="link-id")
+
+    future_iso = "2099-01-01T00:00:00Z"
+
+    async def fake_get_payment_link(payment_link_id):
+        assert payment_link_id == "link-id"
+        return True, {
+            "id": "link-id",
+            "status": "Opened",
+            "url": "https://wata.pro/p/link-id",
+            "expirationDateTime": future_iso,
+        }
+
+    service.get_payment_link = fake_get_payment_link
+
+    url = asyncio.run(service.try_reuse_pending_link(payment))
+    assert url == "https://wata.pro/p/link-id"
+
+
+def test_try_reuse_pending_link_returns_none_for_closed_link():
+    service = _service(_FakeSession())
+    payment = _payment(provider_payment_id="link-id")
+
+    async def fake_get_payment_link(payment_link_id):
+        return True, {
+            "id": "link-id",
+            "status": "Closed",
+            "url": "https://wata.pro/p/link-id",
+            "expirationDateTime": "2099-01-01T00:00:00Z",
+        }
+
+    service.get_payment_link = fake_get_payment_link
+
+    url = asyncio.run(service.try_reuse_pending_link(payment))
+    assert url is None
+
+
+def test_try_reuse_pending_link_returns_none_for_expired_link():
+    service = _service(_FakeSession())
+    payment = _payment(provider_payment_id="link-id")
+
+    async def fake_get_payment_link(payment_link_id):
+        return True, {
+            "id": "link-id",
+            "status": "Opened",
+            "url": "https://wata.pro/p/link-id",
+            "expirationDateTime": "2000-01-01T00:00:00Z",
+        }
+
+    service.get_payment_link = fake_get_payment_link
+
+    url = asyncio.run(service.try_reuse_pending_link(payment))
+    assert url is None
+
+
+def test_try_reuse_pending_link_returns_none_when_no_provider_payment_id():
+    service = _service(_FakeSession())
+    payment = _payment(provider_payment_id=None)
+
+    async def fake_get_payment_link(payment_link_id):
+        raise AssertionError("get_payment_link must not be called without provider id")
+
+    service.get_payment_link = fake_get_payment_link
+
+    url = asyncio.run(service.try_reuse_pending_link(payment))
+    assert url is None
+
+
+def test_try_reuse_pending_link_returns_none_when_get_fails():
+    service = _service(_FakeSession())
+    payment = _payment(provider_payment_id="link-id")
+
+    async def fake_get_payment_link(payment_link_id):
+        return False, {"status": 429, "message": "rate_limited"}
+
+    service.get_payment_link = fake_get_payment_link
+
+    url = asyncio.run(service.try_reuse_pending_link(payment))
+    assert url is None
+
+
+def test_create_payment_link_uses_clean_iso_expiration_without_microseconds(monkeypatch):
+    captured = {}
+
+    async def fake_post_json_request(session, url, *, body, headers, log_prefix, is_success):
+        captured["body"] = body
+        return True, {"id": "link-1", "url": "https://wata.pro/p/link-1"}
+
+    monkeypatch.setattr(wata, "post_json_request", fake_post_json_request)
+
+    service = _service(_FakeSession())
+
+    success, _ = asyncio.run(
+        service.create_payment_link(
+            payment_db_id=465,
+            amount=199.5,
+            currency="RUB",
+            description="Оплата подписки на 1 мес.",
+        )
+    )
+    assert success is True
+
+    expiration = captured["body"]["expirationDateTime"]
+    assert expiration.endswith("Z"), expiration
+    assert "." not in expiration, expiration
+    assert "+" not in expiration, expiration

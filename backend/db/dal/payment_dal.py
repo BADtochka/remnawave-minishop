@@ -86,6 +86,66 @@ async def get_payment_by_db_id(session: AsyncSession, payment_db_id: int) -> Opt
     return result.scalar_one_or_none()
 
 
+async def find_recent_pending_provider_payment(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    provider: str,
+    pending_status: str,
+    amount: float,
+    sale_mode: Optional[str],
+    months: Optional[int],
+    purchased_gb: Optional[float],
+    purchased_hwid_devices: Optional[int],
+    tariff_key: Optional[str] = None,
+    since_minutes: int = 60,
+) -> Optional[Payment]:
+    """Return the most recent pending payment matching the given tariff parameters.
+
+    Used to reuse an existing provider payment link instead of creating a new one
+    on repeated user clicks. Only payments with a populated ``provider_payment_id``
+    are returned — without it, there's no link to reuse.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=max(1, since_minutes))
+
+    conditions = [
+        Payment.user_id == user_id,
+        Payment.provider == provider,
+        Payment.status == pending_status,
+        Payment.provider_payment_id.isnot(None),
+        Payment.created_at >= cutoff,
+        func.abs(Payment.amount - float(amount)) < 0.01,
+    ]
+    if sale_mode is not None:
+        conditions.append(Payment.sale_mode == sale_mode)
+    if tariff_key is not None:
+        conditions.append(Payment.tariff_key == tariff_key)
+    if months is not None:
+        conditions.append(Payment.subscription_duration_months == months)
+    else:
+        conditions.append(Payment.subscription_duration_months.is_(None))
+    if purchased_gb is not None:
+        conditions.append(func.abs(Payment.purchased_gb - float(purchased_gb)) < 0.0001)
+    else:
+        conditions.append(Payment.purchased_gb.is_(None))
+    if purchased_hwid_devices is not None:
+        conditions.append(Payment.purchased_hwid_devices == purchased_hwid_devices)
+    else:
+        conditions.append(Payment.purchased_hwid_devices.is_(None))
+
+    stmt = (
+        select(Payment)
+        .where(and_(*conditions))
+        .options(joinedload(Payment.user), joinedload(Payment.promo_code_used))
+        .order_by(Payment.created_at.desc())
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
 async def update_payment_status_by_db_id(
     session: AsyncSession, payment_db_id: int, new_status: str, yk_payment_id: Optional[str] = None
 ) -> Optional[Payment]:
