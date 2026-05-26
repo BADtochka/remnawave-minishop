@@ -13,14 +13,16 @@ export default defineConfig({
       plugins: [
         starlightThemeNova({
           nav: [
-            { label: 'Главная', href: '/' },
             { label: 'Установка', href: '/getting-started/setup/' },
-            { label: 'Платежи', href: '/features/payments/' },
             { label: 'GitHub', href: 'https://github.com/3252a8/remnawave-minishop' },
+            { label: 'Telegram', href: 'https://t.me/remnawave_minishop' }
           ],
         }),
       ],
       customCss: ['./src/styles/custom.css'],
+      components: {
+        Header: './src/components/Header.astro',
+      },
       lastUpdated: false,
       locales: {
         root: {
@@ -56,18 +58,16 @@ export default defineConfig({
         {
           label: 'Начало',
           items: [
-            { label: 'Главная', link: '/' },
             { label: 'Обзор', slug: 'getting-started/overview' },
             { label: 'Установка', slug: 'getting-started/setup' },
-            { label: 'Архитектура', slug: 'reference/architecture' },
-            { label: 'Развертывание', slug: 'reference/deployment' },
+            { label: 'Развертывание', slug: 'getting-started/deployment' },
+            { label: 'Настройка окружения', slug: 'getting-started/configuration' },
           ],
         },
         {
           label: 'Конфигурация',
           items: [
-            { label: 'Переменные', slug: 'configuration/env-vars' },
-            { label: 'Настройка окружения', slug: 'reference/configuration' },
+            { label: 'Переменные окружения', slug: 'configuration/env-vars' },
             { label: 'Безопасность', slug: 'configuration/security' },
           ],
         },
@@ -85,13 +85,6 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Администрирование',
-          items: [
-            { label: 'Пользователи', slug: 'administration/users' },
-            { label: 'Обслуживание', slug: 'administration/maintenance' },
-          ],
-        },
-        {
           label: 'Миграции',
           items: [
             { label: 'Обзор миграций', slug: 'migrations' },
@@ -99,10 +92,12 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Устранение неполадок',
+          label: 'Справка',
           items: [
             { label: 'Проблемы', slug: 'troubleshooting/issues' },
             { label: 'Логи', slug: 'troubleshooting/logs' },
+            { label: 'Обслуживание', slug: 'troubleshooting/maintenance' },
+            { label: 'Архитектура', slug: 'reference/architecture' },
           ],
         },
       ],

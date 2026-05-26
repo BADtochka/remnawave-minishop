@@ -33,15 +33,14 @@ Remnawave Minishop - Telegram-бот и Web App (Mini App) для продажи
 ## Документация
 
 - [Входная страница документации](docs/index.md) - маршрут по установке, настройке, платежам, админке и диагностике.
-- [Развертывание](docs/deployment.md) - Docker Compose, Caddy, Nginx, Pangolin/Newt и запуск без обратного прокси.
-- [Настройка окружения](docs/configuration.md) - bootstrap `.env` и рекомендуемая настройка через Web App админку.
+- [Развертывание](docs/getting-started/deployment.md) - Docker Compose, Caddy, Nginx, Pangolin/Newt и запуск без обратного прокси.
+- [Настройка окружения](docs/getting-started/configuration.md) - bootstrap `.env` и рекомендуемая настройка через Web App админку.
 - [Переменные `.env`](docs/configuration/env-vars.md) - полный справочник всех env-ключей по разделам.
 - [Тарифы](docs/features/tariffs.md) - каталог тарифов, модели на срок и по трафику, обычные и premium-докупки, premium-сквады, смена тарифа, HWID-лимиты и обработка трафика.
 - [Админ-панель](docs/features/admin-panel.md) - права доступа, настройки, редактор тарифов, premium-сквады и сохранение JSON-каталога.
 - [Веб-приложение / Mini App](docs/features/web-app.md) - отдельный порт, домен, Telegram OAuth, вход по email, инструкции установки и реферальные ссылки.
 - [Поддержка пользователей / тикеты](docs/features/support.md) - тикеты в Mini App, входящий список админки, уведомления, лимиты и внешняя ссылка поддержки.
 - [Темы Web App](docs/features/webapp-themes.md) - кастомные темы, настройка внешнего вида, логотипы, CSS/ассеты и пайплайн создания новой темы.
-- [Развертывание](docs/deployment.md) - Docker Compose, обратный прокси, Nginx, Caddy, вебхуки, запуск из образа и обновление версии (`IMAGE_TAG`).
 - [Миграции](docs/migrations/index.md) - готовые сценарии переноса с других ботов; сейчас описан `remnawave-tg-shop`.
 - [Миграция с remnawave-tg-shop](docs/migrations/remnawave-tg-shop.md) - готовый сценарий для legacy-стека.
 
@@ -123,7 +122,7 @@ docker compose up -d
 IMAGE_TAG=3.1.0 docker compose up -d
 ```
 
-Для продакшен-запуска удобнее брать готовые папки из [`deploy/examples`](deploy/examples), а читать каноничные инструкции в [docs/deployment.md](docs/deployment.md). Предпочтительный вариант для обычного публичного сервера - Caddy: он сам выпускает и продлевает HTTPS-сертификаты. В папках рядом с compose лежат только конфиги и короткие ссылки на документацию.
+Для продакшен-запуска удобнее брать готовые папки из [`deploy/examples`](deploy/examples), а читать каноничные инструкции в [docs/getting-started/deployment.md](docs/getting-started/deployment.md). Предпочтительный вариант для обычного публичного сервера - Caddy: он сам выпускает и продлевает HTTPS-сертификаты. В папках рядом с compose лежат только конфиги и короткие ссылки на документацию.
 
 Имена образов для релизов:
 

@@ -10,17 +10,9 @@ Remnawave Minishop состоит из Telegram-бота, backend API, worker-п
 - **PostgreSQL** - пользователи, платежи, настройки, поддержка, промокоды и служебные данные.
 - **Redis** - FSM, кеши, rate limit, очередь вебхуков и distributed locks.
 
-## Сценарии
-
-- пользователь открывает Mini App, видит подписку и оплачивает тариф;
-- платежный провайдер отправляет webhook в backend;
-- worker применяет фоновые задачи и синхронизацию;
-- Remnawave Panel хранит пользователя, подписку и ссылку подключения;
-- администратор управляет тарифами, поддержкой, пользователями и настройками через админку.
-
 ## Куда идти дальше
 
 - [Установка](setup.md) - базовый запуск через Compose.
-- [Развертывание](../deployment.md) - Docker Compose, Caddy, Nginx, Pangolin/Newt и запуск без обратного прокси.
+- [Развертывание](deployment.md) - Docker Compose, Caddy, Nginx, Pangolin/Newt и запуск без обратного прокси.
 - [Архитектура](../architecture.md) - структура каталогов и сервисов.
 - [Mini App](../features/web-app.md) - публичный frontend, Telegram OAuth и инструкции установки.

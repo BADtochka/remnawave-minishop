@@ -118,7 +118,7 @@ https://app.domain.com/auth/telegram/callback
 
 Для Brevo обычно подходит порт `587` с STARTTLS. Если основной порт недоступен, приложение пробует порты из `SMTP_FALLBACK_PORTS`; порт `465` используется через SSL.
 
-Полный список переменных, обязательные поля для включения входа по email и типичные ошибки подключения описаны в разделе **SMTP и вход по email** в [configuration.md](../configuration.md).
+Полный список переменных, обязательные поля для включения входа по email и типичные ошибки подключения описаны в разделе **SMTP и вход по email** в [configuration.md](../getting-started/configuration.md).
 
 ## Проксирование
 
@@ -131,12 +131,12 @@ https://app.domain.com/auth/telegram/callback
 WebApp API на `backend:8081`, поэтому внешний обратный прокси обычно не должен отправлять эти пути в
 `backend:8081` напрямую.
 
-Готовые варианты описаны в разделе [Развертывание](../deployment.md#готовые-папки-запуска):
+Готовые варианты описаны в разделе [Развертывание](../getting-started/deployment.md#готовые-папки-запуска):
 
-- [Caddy](../deployment.md#caddy-рекомендуемый-вариант) - автоматический HTTPS;
-- [Nginx](../deployment.md#nginx) - сертификаты в соседней папке `ssl/`;
-- [Pangolin/Newt](../deployment.md#pangolin--newt) - публикация без входящих портов на сервере приложения;
-- [без обратного прокси](../deployment.md#без-обратного-прокси) - прямая публикация портов для проверки или внешней TLS-платформы.
+- [Caddy](../getting-started/deployment.md#caddy-рекомендуемый-вариант) - автоматический HTTPS;
+- [Nginx](../getting-started/deployment.md#nginx) - сертификаты в соседней папке `ssl/`;
+- [Pangolin/Newt](../getting-started/deployment.md#pangolin--newt) - публикация без входящих портов на сервере приложения;
+- [без обратного прокси](../getting-started/deployment.md#без-обратного-прокси) - прямая публикация портов для проверки или внешней TLS-платформы.
 
 В default `docker-compose.yml` наружу публикуются `frontend` и webhook/backend port, а внутри Docker
 network сервисы доступны друг другу по service DNS names:

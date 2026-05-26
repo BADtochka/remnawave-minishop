@@ -101,4 +101,4 @@ docker compose up -d
 docker compose logs -f backend worker frontend
 ```
 
-См. также [проблемы](issues.md) и [развертывание](../deployment.md).
+См. также [проблемы](issues.md) и [развертывание](../getting-started/deployment.md).

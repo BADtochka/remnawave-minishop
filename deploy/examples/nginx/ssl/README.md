@@ -1,6 +1,6 @@
 # TLS certificates
 
-Каноничная инструкция по Nginx: [docs/deployment.md](../../../../docs/deployment.md#nginx).
+Каноничная инструкция по Nginx: [docs/getting-started/deployment.md](../../../../docs/getting-started/deployment.md#nginx).
 
 Кладите сертификаты в подпапки, совпадающие с `WEBHOOK_HOST` и `MINIAPP_HOST`:
 

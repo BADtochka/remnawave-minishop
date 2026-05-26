@@ -7,7 +7,7 @@
 
 Админка сохраняет overrides в базе данных и применяет их поверх `.env`. Это удобно для платежей, внешнего вида, поддержки, уведомлений, legacy-цен и большинства пользовательских параметров. Тарифы редактируются отдельно в разделе **Система -> Тарифы** и сохраняются в JSON-файл `TARIFFS_CONFIG_PATH`.
 
-Полный справочник всех переменных вынесен в [configuration/env-vars.md](configuration/env-vars.md).
+Полный справочник всех переменных вынесен в [configuration/env-vars.md](../configuration/env-vars.md).
 
 ## Минимальный `.env`
 
@@ -102,9 +102,9 @@ docker compose exec backend sh -lc 'id; touch /app/data/themes/test && rm /app/d
 
 ## Дополнительные разделы
 
-- [configuration/env-vars.md](configuration/env-vars.md) - полный справочник переменных `.env`.
-- [features/admin-panel.md](features/admin-panel.md) - как устроены overrides и allowlist настроек.
-- [features/tariffs.md](features/tariffs.md) - JSON-каталог тарифов и редактор тарифов.
-- [Веб-приложение / Mini App](features/web-app.md) - домен Mini App, Telegram OAuth и вход по email.
-- [Поддержка пользователей / тикеты](features/support.md) - тикеты поддержки и уведомления.
+- [configuration/env-vars.md](../configuration/env-vars.md) - полный справочник переменных `.env`.
+- [features/admin-panel.md](../features/admin-panel.md) - как устроены overrides и allowlist настроек.
+- [features/tariffs.md](../features/tariffs.md) - JSON-каталог тарифов и редактор тарифов.
+- [Веб-приложение / Mini App](../features/web-app.md) - домен Mini App, Telegram OAuth и вход по email.
+- [Поддержка пользователей / тикеты](../features/support.md) - тикеты поддержки и уведомления.
 - [Развертывание](deployment.md) - Docker Compose, обратный прокси, Caddy/Nginx и обновления.

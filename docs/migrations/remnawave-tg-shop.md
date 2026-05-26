@@ -131,7 +131,7 @@ docker compose \
 | — | `REDIS_URL=redis://redis:6379/0` | Обязательна для воркера, очередей и rate-limit. По умолчанию в compose-файлах уже задана. |
 | — | `WEBAPP_SESSION_SECRET`, `WEBAPP_ENABLED`, `WEBAPP_SERVER_PORT`, `WEBAPP_THEMES_DIR`, `TARIFFS_CONFIG_PATH` | Новые настройки Web App / тарифного каталога. Безопасные дефолты есть в `.env.example`. |
 
-Полный референс — [docs/configuration.md](../configuration.md). Скрипт миграции
+Полный референс — [docs/getting-started/configuration.md](../getting-started/configuration.md). Скрипт миграции
 эти переменные **не правит** автоматически (только `POSTGRES_HOST`), потому
 что у каждой инсталляции свой шаблон `.env` с кастомными значениями. Лучше
 сравнить свой `.env` с `.env.example` глазами один раз, чем получить
@@ -361,7 +361,7 @@ server {
 ```
 
 Полные примеры (Caddy, Nginx, Newt/Pangolin и запуск без обратного прокси) — в
-[docs/deployment.md](../deployment.md) и [docs/features/web-app.md](../features/web-app.md). Если раньше прокси указывал на
+[docs/getting-started/deployment.md](../getting-started/deployment.md) и [docs/features/web-app.md](../features/web-app.md). Если раньше прокси указывал на
 `remnawave-tg-shop:8000` напрямую, после миграции нужно либо переключиться на
 `backend:8080` / `frontend:80`, либо использовать готовый Caddy/Nginx/Newt
 пример, который уже знает правильную маршрутизацию.
