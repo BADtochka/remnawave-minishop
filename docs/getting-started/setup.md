@@ -37,6 +37,11 @@ docker compose up -d
 - [Pangolin/Newt](deployment.md#pangolin--newt) - если нельзя открывать входящие порты на сервере приложения;
 - [без обратного прокси](deployment.md#без-обратного-прокси) - для локальной проверки или внешнего TLS-терминатора.
 
+## Настройки для веб апп
+
+- [Настройка Telegram бота](../features/web-app.md#telegram-авторизация) - Telegram OAuth и Telegram Mini App.
+- [Настройка SMTP](../features/web-app.md#вход-по-email) - Вход и регистрация по email.
+
 ## После первого входа
 
 1. Откройте админку через Mini App.
