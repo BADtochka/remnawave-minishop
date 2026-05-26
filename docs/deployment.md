@@ -1,7 +1,7 @@
 # Развертывание
 
 Документ описывает продакшен-запуск после разделения проекта на `backend`, `frontend` и `worker`.
-Перед стартом заполните минимальный `.env` по [configuration.md](configuration.md). Полный справочник переменных лежит в [env-vars.md](env-vars.md); после первого входа большинство продуктовых настроек удобнее менять через Web App админку.
+Перед стартом заполните минимальный `.env` по [configuration.md](configuration.md). Полный справочник переменных лежит в [configuration/env-vars.md](configuration/env-vars.md); после первого входа большинство продуктовых настроек удобнее менять через Web App админку.
 
 ## Быстрый старт
 
@@ -27,16 +27,16 @@ docker compose logs -f backend worker frontend
 
 ## Готовые папки запуска
 
-Для production удобнее использовать не корневой compose, а отдельные примеры в
-[`deploy/examples`](../deploy/examples). В каждой папке лежат свой `docker-compose.yml`,
-`.env.example`, README и нужный конфиг рядом:
+Для production удобнее использовать не корневой compose, а отдельные примеры из
+[Deploy examples](deploy-examples/index.md). В каждой папке лежат свой `docker-compose.yml`,
+`.env.example` и нужный конфиг рядом, а подробные инструкции хранятся в `docs/`:
 
 | Папка | Назначение | Запуск |
 | --- | --- | --- |
-| [`deploy/examples/caddy`](../deploy/examples/caddy) | Caddy с автоматическим HTTPS. | `cp .env.example .env`, заполнить `.env`, `docker compose up -d`. |
-| [`deploy/examples/nginx`](../deploy/examples/nginx) | Nginx в Docker-сети приложения, TLS-сертификаты кладутся в `ssl/`. | `cp .env.example .env`, заполнить `.env`, положить сертификаты, `docker compose up -d`. |
-| [`deploy/examples/newt`](../deploy/examples/newt) | Pangolin/Newt без входящих портов на сервере приложения. | `cp .env.example .env`, заполнить Newt credentials, создать ресурсы в Pangolin, `docker compose up -d`. |
-| [`deploy/examples/no-proxy`](../deploy/examples/no-proxy) | Прямая публикация портов backend/frontend. | `cp .env.example .env`, заполнить публичные URL и порты, `docker compose up -d`. |
+| [Caddy](deploy-examples/caddy.md) | Caddy с автоматическим HTTPS. | `cp .env.example .env`, заполнить `.env`, `docker compose up -d`. |
+| [Nginx](deploy-examples/nginx.md) | Nginx в Docker-сети приложения, TLS-сертификаты кладутся в `ssl/`. | `cp .env.example .env`, заполнить `.env`, положить сертификаты, `docker compose up -d`. |
+| [Pangolin/Newt](deploy-examples/newt.md) | Pangolin/Newt без входящих портов на сервере приложения. | `cp .env.example .env`, заполнить Newt credentials, создать ресурсы в Pangolin, `docker compose up -d`. |
+| [No proxy](deploy-examples/no-proxy.md) | Прямая публикация портов backend/frontend. | `cp .env.example .env`, заполнить публичные URL и порты, `docker compose up -d`. |
 
 Пример для Caddy:
 
@@ -84,7 +84,7 @@ docker compose logs migrate
 - `redis`: Redis 7 для FSM, кеша, rate-limit, очередей и locks.
 
 В production-примерах внешний доступ добавляют `caddy`, `nginx`, `newt` или прямые `ports` в
-соответствующей папке из [`deploy/examples`](../deploy/examples).
+соответствующем варианте из [Deploy examples](deploy-examples/index.md).
 
 ## Логи и проверка
 
@@ -246,9 +246,9 @@ docker compose up -d backend worker
 
 Готовые reverse-proxy примеры лежат в:
 
-- [`deploy/examples/caddy`](../deploy/examples/caddy) - Caddy, автоматический HTTPS;
-- [`deploy/examples/nginx`](../deploy/examples/nginx) - Nginx, сертификаты кладутся рядом в `ssl/`;
-- [`deploy/examples/newt`](../deploy/examples/newt) - Newt/Pangolin, без входящих портов на сервере приложения.
+- [Caddy](deploy-examples/caddy.md) - автоматический HTTPS;
+- [Nginx](deploy-examples/nginx.md) - сертификаты кладутся рядом в `ssl/`;
+- [Newt/Pangolin](deploy-examples/newt.md) - без входящих портов на сервере приложения.
 
 Во всех вариантах схема одинаковая:
 
@@ -274,7 +274,7 @@ app.example.com {
 
 ## Newt
 
-Для Newt используйте [`deploy/examples/newt`](../deploy/examples/newt). В compose уже есть сервис
+Для Newt используйте [Pangolin / Newt](deploy-examples/newt.md). В compose уже есть сервис
 `newt`, а в `.env.example` - поля `PANGOLIN_ENDPOINT`, `NEWT_ID` и `NEWT_SECRET`.
 
 В Pangolin создайте два HTTP-ресурса для этого Newt site:

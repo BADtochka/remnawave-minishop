@@ -1,4 +1,4 @@
-"""Pin facts that ``docs/migration-to-minishop.md`` and
+"""Pin facts that ``docs/migrations/remnawave-tg-shop.md`` and
 ``scripts/migrate_to_minishop.sh`` rely on.
 
 Both documents are written for a user upgrading from ``remnawave-tg-shop``
@@ -18,7 +18,7 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DOC_PATH = REPO_ROOT / "docs" / "migration-to-minishop.md"
+DOC_PATH = REPO_ROOT / "docs" / "migrations" / "remnawave-tg-shop.md"
 SCRIPT_PATH = REPO_ROOT / "scripts" / "migrate_to_minishop.sh"
 COMPOSE_FILES = (
     REPO_ROOT / "docker-compose.yml",
@@ -64,14 +64,14 @@ class MigrationDocumentationFactsTests(unittest.TestCase):
         missing = sorted(name for name in EXPECTED_CONTAINER_NAMES if name not in self.doc)
         self.assertFalse(
             missing,
-            f"migration-to-minishop.md is missing container names from current compose: {missing}",
+            f"migrations/remnawave-tg-shop.md is missing container names from current compose: {missing}",
         )
 
     def test_doc_lists_every_volume_in_current_compose(self):
         missing = sorted(name for name in EXPECTED_VOLUME_NAMES if name not in self.doc)
         self.assertFalse(
             missing,
-            f"migration-to-minishop.md is missing volume names from current compose: {missing}",
+            f"migrations/remnawave-tg-shop.md is missing volume names from current compose: {missing}",
         )
 
     def test_doc_warns_about_renamed_telegram_webhook_secret(self):
@@ -234,7 +234,7 @@ class DocComposeFileReferencesTests(unittest.TestCase):
                 self.assertIn(relpath, doc)
                 self.assertTrue(
                     (REPO_ROOT / relpath).is_file(),
-                    f"{relpath} is referenced in migration-to-minishop.md but missing on disk",
+                    f"{relpath} is referenced in migrations/remnawave-tg-shop.md but missing on disk",
                 )
 
     def test_doc_references_migrator_module_path(self):

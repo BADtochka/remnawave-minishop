@@ -1,5 +1,9 @@
 # Миграция с `remnawave-tg-shop` (≤ v2.7.0) на `remnawave-minishop` (v3.4+)
 
+Эта страница - готовый сценарий для legacy-стека `remnawave-tg-shop`. Это единственная миграция с другого бота, которая сейчас описана в документации. Для других Telegram-ботов, самописных панелей и ручных таблиц готового сценария пока нет: их нельзя переносить по этой инструкции без отдельного анализа схемы БД, тарифов, платежей и связи с Remnawave Panel.
+
+Автоматический скрипт ниже рассчитан именно на родственный стек `remnawave-tg-shop`, где структура БД и Docker volumes известны заранее. Для других ботов нужен отдельный адаптер экспорта/импорта.
+
 ## Короткий путь без смены ветки и сборки
 
 Если вы используете только готовые Docker-образы и не собираете проект
@@ -127,7 +131,7 @@ docker compose \
 | — | `REDIS_URL=redis://redis:6379/0` | Обязательна для воркера, очередей и rate-limit. По умолчанию в compose-файлах уже задана. |
 | — | `WEBAPP_SESSION_SECRET`, `WEBAPP_ENABLED`, `WEBAPP_SERVER_PORT`, `WEBAPP_THEMES_DIR`, `TARIFFS_CONFIG_PATH` | Новые настройки Web App / тарифного каталога. Безопасные дефолты есть в `.env.example`. |
 
-Полный референс — [docs/configuration.md](configuration.md). Скрипт миграции
+Полный референс — [docs/configuration.md](../configuration.md). Скрипт миграции
 эти переменные **не правит** автоматически (только `POSTGRES_HOST`), потому
 что у каждой инсталляции свой шаблон `.env` с кастомными значениями. Лучше
 сравнить свой `.env` с `.env.example` глазами один раз, чем получить
@@ -357,8 +361,8 @@ server {
 ```
 
 Полные примеры (Caddy, Nginx, Newt/Pangolin и запуск без reverse proxy) — в
-[docs/deployment.md](deployment.md), [docs/webapp.md](webapp.md) и папке
-[`deploy/examples`](../deploy/examples). Если раньше прокси указывал на
+[docs/deployment.md](../deployment.md), [docs/features/web-app.md](../features/web-app.md) и
+[Deploy examples](../deploy-examples/index.md). Если раньше прокси указывал на
 `remnawave-tg-shop:8000` напрямую, после миграции нужно либо переключиться на
 `backend:8080` / `frontend:80`, либо использовать готовый Caddy/Nginx/Newt
 пример, который уже знает правильную маршрутизацию.

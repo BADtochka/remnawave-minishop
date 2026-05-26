@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
-  <title id="title">Remnawave Minishop</title>
-  <desc id="desc">Abstract layered wave mark.</desc>
-  <rect width="96" height="96" rx="22" fill="#0f172a"/>
-  <path d="M19 59c11 0 14-20 28-20 11 0 14 11 24 11 4 0 7-1 10-3v13c-3 2-7 3-11 3-13 0-16-11-25-11-10 0-14 20-26 20V59Z" fill="#2dd4bf"/>
-  <path d="M18 39c12 0 15-18 29-18 10 0 13 9 23 9 4 0 8-1 11-4v13c-3 2-7 3-12 3-13 0-16-9-24-9-10 0-14 18-27 18V39Z" fill="#f59e0b"/>
-</svg>

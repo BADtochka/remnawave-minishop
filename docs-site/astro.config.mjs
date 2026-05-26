@@ -6,23 +6,20 @@ export default defineConfig({
   site: 'https://minishop.minidoc.cc',
   integrations: [
     starlight({
-      title: 'Remnawave Minishop',
+      title: 'minishop',
+      favicon: '/favicon.png',
       description:
         'Документация по настройке, развертыванию и эксплуатации Remnawave Minishop.',
       plugins: [
         starlightThemeNova({
           nav: [
-            { label: 'Запуск', href: '/reference/deployment/' },
-            { label: 'Настройка', href: '/reference/configuration/' },
+            { label: 'Главная', href: '/' },
+            { label: 'Установка', href: '/getting-started/setup/' },
+            { label: 'Платежи', href: '/features/payments/' },
             { label: 'GitLab', href: 'https://gitlab.com/3252a8/remnawave-minshop' },
           ],
         }),
       ],
-      favicon: '/favicon.svg',
-      logo: {
-        src: './src/assets/logo.svg',
-        alt: 'Remnawave Minishop',
-      },
       customCss: ['./src/styles/custom.css'],
       lastUpdated: false,
       locales: {
@@ -33,10 +30,18 @@ export default defineConfig({
       },
       head: [
         {
+          tag: 'link',
+          attrs: {
+            rel: 'icon',
+            href: '/favicon.webp',
+            type: 'image/webp',
+          },
+        },
+        {
           tag: 'meta',
           attrs: {
             name: 'theme-color',
-            content: '#0f766e',
+            content: '#00fe7a',
           },
         },
         {
@@ -49,32 +54,83 @@ export default defineConfig({
       ],
       sidebar: [
         {
-          label: 'Обзор',
-          link: '/',
+          label: 'Начало',
+          items: [
+            { label: 'Главная', link: '/' },
+            { label: 'Обзор', slug: 'getting-started/overview' },
+            { label: 'Установка', slug: 'getting-started/setup' },
+            { label: 'Deploy examples', slug: 'deploy-examples' },
+          ],
         },
         {
-          label: 'Запуск',
+          label: 'Варианты деплоя',
           items: [
+            { label: 'Caddy', slug: 'deploy-examples/caddy' },
+            { label: 'Nginx', slug: 'deploy-examples/nginx' },
+            { label: 'Pangolin / Newt', slug: 'deploy-examples/newt' },
+            { label: 'Без reverse proxy', slug: 'deploy-examples/no-proxy' },
+          ],
+        },
+        {
+          label: 'Конфигурация',
+          items: [
+            { label: 'Переменные', slug: 'configuration/env-vars' },
             { label: 'Настройка окружения', slug: 'reference/configuration' },
-            { label: 'Переменные .env', slug: 'reference/env-vars' },
-            { label: 'Развертывание', slug: 'reference/deployment' },
-            { label: 'Миграция', slug: 'reference/migration-to-minishop' },
+            { label: 'Безопасность', slug: 'configuration/security' },
           ],
         },
         {
-          label: 'Web App',
+          label: 'Возможности',
           items: [
-            { label: 'Mini App', slug: 'reference/webapp' },
-            { label: 'Темы и внешний вид', slug: 'reference/webapp-themes' },
-            { label: 'Админ-панель', slug: 'reference/admin' },
-            { label: 'Поддержка', slug: 'reference/support' },
+            { label: 'Основные', slug: 'features/core' },
+            { label: 'Платежи', slug: 'features/payments' },
+            { label: 'Подписки', slug: 'features/subscriptions' },
+            { label: 'Тарифы', slug: 'features/tariffs' },
+            { label: 'Mini App', slug: 'features/web-app' },
+            { label: 'Темы Web App', slug: 'features/webapp-themes' },
+            { label: 'Админ-панель', slug: 'features/admin-panel' },
+            { label: 'Поддержка', slug: 'features/support' },
           ],
         },
         {
-          label: 'Продукт',
+          label: 'Платежные системы',
           items: [
-            { label: 'Тарифы', slug: 'reference/tariffs' },
+            { label: 'YooKassa', slug: 'payments/yookassa' },
+            { label: 'FreeKassa', slug: 'payments/freekassa' },
+            { label: 'Platega', slug: 'payments/platega' },
+            { label: 'SeverPay', slug: 'payments/severpay' },
+            { label: 'Wata', slug: 'payments/wata' },
+            { label: 'CryptoPay', slug: 'payments/cryptopay' },
+            { label: 'Heleket', slug: 'payments/heleket' },
+            { label: 'Telegram Stars', slug: 'payments/telegram-stars' },
+          ],
+        },
+        {
+          label: 'Администрирование',
+          items: [
+            { label: 'Пользователи', slug: 'administration/users' },
+            { label: 'Обслуживание', slug: 'administration/maintenance' },
+          ],
+        },
+        {
+          label: 'Миграции',
+          items: [
+            { label: 'Обзор миграций', slug: 'migrations' },
+            { label: 'remnawave-tg-shop', slug: 'migrations/remnawave-tg-shop' },
+          ],
+        },
+        {
+          label: 'Устранение неполадок',
+          items: [
+            { label: 'Проблемы', slug: 'troubleshooting/issues' },
+            { label: 'Логи', slug: 'troubleshooting/logs' },
+          ],
+        },
+        {
+          label: 'Справочник',
+          items: [
             { label: 'Архитектура', slug: 'reference/architecture' },
+            { label: 'Развертывание', slug: 'reference/deployment' },
           ],
         },
       ],

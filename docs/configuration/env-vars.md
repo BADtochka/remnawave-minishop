@@ -368,7 +368,7 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 
 ## Поддержка
 
-Подробный сценарий описан в [support.md](support.md).
+Подробный сценарий описан в [features/support.md](../features/support.md).
 
 | Переменная | Назначение |
 | --- | --- |

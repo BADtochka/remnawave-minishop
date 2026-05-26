@@ -1,0 +1,32 @@
+# Remnawave Minishop
+
+Remnawave Minishop - Telegram-бот и Mini App для продажи и управления подписками Remnawave. Документация помогает развернуть стек, настроить платежи, тарифы, админку, поддержку и публичный личный кабинет.
+
+> Проект работает вместе с Remnawave Panel: панель хранит пользователей и подписки, а Minishop отвечает за Telegram, платежи, Mini App, тарифы и операционную админку.
+
+## Быстрый старт
+
+- [Обзор](getting-started/overview.md) - архитектура, сервисы и основные сценарии.
+- [Установка](getting-started/setup.md) - путь от `.env` до первого запуска.
+- [Deploy examples](deploy-examples/index.md) - Caddy, Nginx, Pangolin/Newt и no-proxy варианты.
+- [Настройка платежей](features/payments.md) - включение провайдеров и проверка вебхуков.
+- [Безопасность](configuration/security.md) - секреты, доступы и публичные URL.
+- [Админ-панель](features/admin-panel.md) - пользователи, настройки, рассылки, поддержка и тарифы.
+- [Миграции](migrations/index.md) - готовые сценарии переноса с других ботов.
+- [Устранение неполадок](troubleshooting/issues.md) - быстрые проверки для частых проблем.
+
+## Ключевые возможности
+
+- **Продажа подписок** - period- и traffic-тарифы, докупки трафика, HWID-устройства, premium-сквады и Telegram Stars.
+- **Жизненный цикл пользователей** - регистрация, пробный период, продление, синхронизация с панелью и предупреждения по трафику.
+- **Mini App** - личный кабинет, инструкции установки, Telegram OAuth, email-вход и публичные referral-ссылки.
+- **Операционные инструменты** - админка, тикеты поддержки, промокоды, рассылки, логи и настройки поверх `.env`.
+
+## Справочник
+
+- [Переменные окружения](configuration/env-vars.md)
+- [Развертывание](deployment.md)
+- [Тарифы](features/tariffs.md)
+- [Темы Web App](features/webapp-themes.md)
+- [Миграции](migrations/index.md)
+- [Миграция с remnawave-tg-shop](migrations/remnawave-tg-shop.md)

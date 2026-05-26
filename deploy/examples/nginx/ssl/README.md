@@ -1,8 +1,8 @@
-# TLS-сертификаты для Nginx
+# TLS certificates
 
-Положите сюда сертификаты для доменов из `.env`.
+Каноничная инструкция по Nginx: [docs/deploy-examples/nginx.md](../../../../docs/deploy-examples/nginx.md).
 
-Пример структуры:
+Кладите сертификаты в подпапки, совпадающие с `WEBHOOK_HOST` и `MINIAPP_HOST`:
 
 ```text
 ssl/
@@ -13,6 +13,3 @@ ssl/
     fullchain.pem
     privkey.pem
 ```
-
-Если используете wildcard-сертификат, можно положить одинаковые `fullchain.pem` и `privkey.pem` в обе папки.
-

@@ -1,33 +1,12 @@
-# Готовые варианты запуска
+# Deploy examples
 
-В этой папке лежат самодостаточные compose-примеры. Каждый вариант запускается из своей директории обычной командой:
+Каноничная документация по вариантам запуска живет в [docs/deploy-examples/index.md](../../docs/deploy-examples/index.md).
 
-```bash
-cp .env.example .env
-nano .env
-docker compose up -d
-```
+Эта папка хранит только рабочие compose-примеры и конфиги. Подробное описание не дублируется здесь, чтобы сайт документации и навигация из README использовали один источник.
 
-После старта полезно проверить:
-
-```bash
-docker compose ps
-docker compose logs -f backend worker frontend
-```
-
-## Какой вариант выбрать
-
-| Папка | Когда использовать | Что править |
-| --- | --- | --- |
-| [`caddy`](caddy) | Нужен самый простой публичный HTTPS с автоматическими сертификатами Let's Encrypt. | `.env`; при нестандартной схеме можно поправить `Caddyfile`. |
-| [`nginx`](nginx) | Уже используете Nginx и готовы положить TLS-сертификаты рядом с примером. | `.env`, `nginx.conf.template`, файлы в `ssl/`. |
-| [`newt`](newt) | Публикуете сервисы через Pangolin/Newt без входящих портов на сервере приложения. | `.env` и ресурсы в панели Pangolin. |
-| [`no-proxy`](no-proxy) | Нужно напрямую открыть порты backend/frontend или проверить стек без reverse proxy. | `.env`. |
-
-Для всех вариантов нужны два публичных URL:
-
-- webhook/backend URL для Telegram, платежных систем и Remnawave webhooks;
-- Mini App/frontend URL для Telegram Mini App и Web App.
-
-Обычно это два домена, например `webhooks.example.com` и `app.example.com`.
-
+| Папка | Документация |
+| --- | --- |
+| `caddy` | [Caddy](../../docs/deploy-examples/caddy.md) |
+| `nginx` | [Nginx](../../docs/deploy-examples/nginx.md) |
+| `newt` | [Pangolin / Newt](../../docs/deploy-examples/newt.md) |
+| `no-proxy` | [No proxy](../../docs/deploy-examples/no-proxy.md) |
