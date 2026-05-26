@@ -149,6 +149,30 @@ IMAGE_TAG=3.2.0 scripts/docker-push-images.sh
 `scripts/docker-push-images.ps1`. Если публикуете образы в другой registry, namespace или с другим
 префиксом имени, переопределите `IMAGE_NAMESPACE`, `IMAGE_REGISTRY` или `IMAGE_PREFIX`.
 
+Для Docker Hub аккаунта `3252a8` есть отдельный скрипт, который сразу собирает и публикует все три
+образа:
+
+```bash
+docker login
+IMAGE_TAG=3.2.0 bash scripts/dockerhub-build-push-images.sh
+```
+
+PowerShell-вариант:
+
+```powershell
+$env:IMAGE_TAG = "3.2.0"
+docker login
+powershell -ExecutionPolicy Bypass -File .\scripts\dockerhub-build-push-images.ps1
+```
+
+По умолчанию он публикует:
+
+```text
+docker.io/3252a8/remnawave-minishop-backend:<tag>
+docker.io/3252a8/remnawave-minishop-worker:<tag>
+docker.io/3252a8/remnawave-minishop-frontend:<tag>
+```
+
 Если PowerShell блокирует локальные скрипты ошибкой `PSSecurityException` / Execution Policy,
 запустите те же скрипты с обходом политики только для текущего процесса:
 
