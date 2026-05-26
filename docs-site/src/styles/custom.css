@@ -12,6 +12,16 @@
     color: #00fe7a;
   }
 
+  :root[data-theme='light'] .site-title,
+  :root[data-theme='light'] .site-title span {
+    color: #007a3d;
+  }
+
+  :root[data-theme='light'] .site-title:hover,
+  :root[data-theme='light'] .site-title:hover span {
+    color: #006f36;
+  }
+
   .minishop-header-link {
     column-gap: 0.625rem;
   }
