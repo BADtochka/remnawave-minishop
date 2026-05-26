@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightThemeNova from 'starlight-theme-nova';
 
 export default defineConfig({
   site: 'https://minishop.minidoc.cc',
@@ -8,6 +9,15 @@ export default defineConfig({
       title: 'Remnawave Minishop',
       description:
         'Документация по настройке, развертыванию и эксплуатации Remnawave Minishop.',
+      plugins: [
+        starlightThemeNova({
+          nav: [
+            { label: 'Запуск', href: '/reference/deployment/' },
+            { label: 'Настройка', href: '/reference/configuration/' },
+            { label: 'GitLab', href: 'https://gitlab.com/3252a8/remnawave-minshop' },
+          ],
+        }),
+      ],
       favicon: '/favicon.svg',
       logo: {
         src: './src/assets/logo.svg',
