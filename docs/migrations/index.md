@@ -6,7 +6,7 @@
 
 | Источник | Поддерживаемый случай | Инструкция |
 | --- | --- | --- |
-| `remnawave-tg-shop` `v2.7.0` и близкие версии | Переезд старого stack/volume PostgreSQL на split-архитектуру Minishop `v3.4+`, обновление `.env`, запуск `migrate`, проверка reverse proxy | [Миграция с remnawave-tg-shop](remnawave-tg-shop.md) |
+| `remnawave-tg-shop` `v2.7.0` и близкие версии | Переезд старого stack/volume PostgreSQL на split-архитектуру Minishop `v3.4+`, обновление `.env`, запуск `migrate`, проверка обратного прокси | [Миграция с remnawave-tg-shop](remnawave-tg-shop.md) |
 
 ## Что покрывает текущая миграция
 
@@ -18,7 +18,7 @@
 - обновление переменных окружения, которые изменились после `v2.7.0`;
 - запуск one-shot сервиса `migrate`;
 - переход с одного upstream `remnawave-tg-shop:8000` на `backend:8080` и `frontend:80`;
-- запуск через корневой compose или готовые deploy examples.
+- запуск через корневой compose или готовые примеры Docker Compose.
 
 ## Что пока не описано
 

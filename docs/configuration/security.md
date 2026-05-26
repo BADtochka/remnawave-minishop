@@ -5,7 +5,7 @@
 ## Секреты
 
 - `WEBAPP_SESSION_SECRET` должен быть постоянным между рестартами, иначе Web App-сессии станут невалидными.
-- `WEBHOOK_SECRET_TOKEN` защищает Telegram webhook.
+- `WEBHOOK_SECRET_TOKEN` защищает вебхук Telegram.
 - `PANEL_WEBHOOK_SECRET` проверяет входящие события Remnawave Panel.
 - Платежные токены и webhook-секреты храните в `.env` или настройках админки с учетом доступа к серверу.
 
@@ -23,15 +23,15 @@ openssl rand -hex 32
 
 ## Публичные URL
 
-- `WEBHOOK_BASE_URL` должен вести на backend webhook server.
-- `SUBSCRIPTION_MINI_APP_URL` должен вести на frontend/Mini App.
+- `WEBHOOK_BASE_URL` должен вести на backend-сервер вебхуков.
+- `SUBSCRIPTION_MINI_APP_URL` должен вести на frontend/Mini App-домен.
 - Не добавляйте `/api`, `/auth` или webhook-пути в `SUBSCRIPTION_MINI_APP_URL`.
 
 ## Дополнительно
 
 - Используйте HTTPS на всех публичных доменах.
 - Ограничивайте доступ к серверу и `.env`.
-- Следите за логами платежных вебхуков и panel webhooks.
+- Следите за логами платежных вебхуков и вебхуков панели.
 - После ротации секретов перезапускайте соответствующие сервисы и проверяйте вебхуки.
 
 См. также [переменные окружения](env-vars.md) и [развертывание](../deployment.md).

@@ -1,28 +1,152 @@
 # Платежи
 
-Платежные методы включаются настройками и отображаются пользователю как кнопки оплаты в Mini App и Telegram-сценариях.
-
-## Поддерживаемые провайдеры
-
-- [YooKassa](../payments/yookassa.md)
-- [FreeKassa](../payments/freekassa.md)
-- [Platega](../payments/platega.md)
-- [SeverPay](../payments/severpay.md)
-- [Wata](../payments/wata.md)
-- [CryptoPay](../payments/cryptopay.md)
-- [Heleket](../payments/heleket.md)
-- [Telegram Stars](../payments/telegram-stars.md)
+Платежные методы включаются настройками и отображаются пользователю как кнопки оплаты в Mini App и Telegram-сценариях. Настройки можно задавать через `.env` или через админку, если параметр есть в allowlist настроек.
 
 ## Типовой порядок настройки
 
 1. Включите нужный провайдер в админке или через `.env`.
-2. Заполните публичные параметры и секреты.
-3. Настройте webhook URL у провайдера, если это требуется.
-4. Проверьте порядок и подписи кнопок оплаты.
-5. Выполните тестовый платеж и проверьте логи backend.
+2. Заполните публичные параметры, секреты и URL возврата.
+3. Настройте URL вебхука у провайдера, если это требуется.
+4. Проверьте порядок методов в `PAYMENT_METHODS_ORDER`.
+5. Проверьте подписи и иконки кнопок оплаты.
+6. Выполните тестовый платеж и проверьте логи `backend`.
 
-## Где смотреть параметры
+Общие ссылки:
 
 - [Справочник `.env`](../configuration/env-vars.md) содержит все ключи провайдеров.
 - [Админ-панель](admin-panel.md) описывает UI-настройки платежей.
-- [Тарифы](tariffs.md) описывают цены, Stars и сценарии покупки.
+- [Тарифы](tariffs.md) описывают цены, Telegram Stars и сценарии покупки.
+- [Логи](../troubleshooting/logs.md) помогают проверить webhook и создание платежных ссылок.
+
+## YooKassa
+
+YooKassa используется для рублевых оплат и может участвовать в сценариях автопродления period-подписок.
+
+Что настроить:
+
+- включение провайдера: `YOOKASSA_ENABLED`;
+- идентификаторы и секреты магазина;
+- URL вебхука на backend-домен;
+- отображение кнопки оплаты и порядок платежных методов.
+
+Справочник переменных: [YooKassa](../configuration/env-vars.md#yookassa).
+
+## FreeKassa
+
+FreeKassa подключается как отдельный платежный метод и обрабатывает входящие webhook-события через `backend`.
+
+Что настроить:
+
+- включение провайдера: `FREEKASSA_ENABLED`;
+- ID магазина, API/secret-ключи и настройки подписи;
+- список доверенных IP, если используется;
+- публичный URL вебхука на `WEBHOOK_BASE_URL`.
+
+Справочник переменных: [FreeKassa](../configuration/env-vars.md#freekassa).
+
+## Platega
+
+Platega подключается как отдельный платежный провайдер, но внутри Minishop может дать несколько кнопок: основную устаревшую кнопку, СБП/карту и крипто-кнопку. Общие параметры мерчанта задаются один раз, а ID методов оплаты и подписи кнопок настраиваются отдельно.
+
+Что включить:
+
+- `PLATEGA_ENABLED` - общий флаг провайдера;
+- `PLATEGA_SBP_ENABLED` - отдельная кнопка СБП/карта;
+- `PLATEGA_CRYPTO_ENABLED` - отдельная crypto-кнопка Platega;
+- `PLATEGA_PAYMENT_METHOD` - устаревший/резервный ID метода оплаты для старых callback-запросов и старых установок.
+
+Что настроить:
+
+1. Укажите `PLATEGA_BASE_URL`, `PLATEGA_MERCHANT_ID` и `PLATEGA_SECRET`.
+2. Заполните `PLATEGA_SBP_METHOD` и/или `PLATEGA_CRYPTO_METHOD`, если используете отдельные кнопки.
+3. Проверьте `PLATEGA_RETURN_URL` и `PLATEGA_FAILED_URL`.
+4. Настройте тексты и иконки кнопок через `PAYMENT_PLATEGA_SBP_*` и `PAYMENT_PLATEGA_CRYPTO_*`.
+5. Добавьте нужные методы в `PAYMENT_METHODS_ORDER`.
+
+Справочник переменных: [Platega](../configuration/env-vars.md#platega).
+
+## SeverPay
+
+SeverPay подключается как отдельный платежный метод с собственным MID, token и сроком жизни платежной ссылки.
+
+Что настроить:
+
+1. Включите `SEVERPAY_ENABLED`.
+2. Укажите `SEVERPAY_BASE_URL`.
+3. Заполните `SEVERPAY_MID` и `SEVERPAY_TOKEN`.
+4. Настройте `SEVERPAY_RETURN_URL`.
+5. При необходимости задайте `SEVERPAY_LIFETIME_MINUTES`.
+6. Добавьте `severpay` в `PAYMENT_METHODS_ORDER`.
+
+Справочник переменных: [SeverPay](../configuration/env-vars.md#severpay).
+
+## Wata
+
+Wata подключается как отдельный провайдер с bearer token, платежными ссылками и опциональной проверкой подписи webhook.
+
+Что настроить:
+
+1. Включите `WATA_ENABLED`.
+2. Укажите `WATA_BASE_URL` и `WATA_API_TOKEN`.
+3. Проверьте `WATA_RETURN_URL` и `WATA_FAILED_URL`.
+4. Настройте `WATA_LINK_TTL_MINUTES`: минимум 15 минут, максимум 43200.
+5. Если включаете проверку подписи, задайте `WATA_WEBHOOK_VERIFY_SIGNATURE` и при необходимости `WATA_PUBLIC_KEY`.
+6. Для дополнительной защиты заполните `WATA_TRUSTED_IPS`.
+7. Добавьте `wata` в `PAYMENT_METHODS_ORDER`.
+
+Справочник переменных: [Wata](../configuration/env-vars.md#wata).
+
+## CryptoPay
+
+CryptoPay используется для криптовалютных платежей через отдельный токен и сеть Crypto Bot API.
+
+Что настроить:
+
+1. Включите `CRYPTOPAY_ENABLED`.
+2. Укажите `CRYPTOPAY_TOKEN`.
+3. Выберите `CRYPTOPAY_NETWORK`: `mainnet` или `testnet`.
+4. Задайте `CRYPTOPAY_CURRENCY_TYPE`: `fiat` или `crypto`.
+5. Проверьте `CRYPTOPAY_ASSET`, например `RUB`, `USDT` или `BTC`.
+6. Добавьте `cryptopay` в `PAYMENT_METHODS_ORDER`.
+
+Для тестов используйте соответствующую сеть: testnet-токен не должен попадать в mainnet-настройки. Если сумма или asset выглядят неверно, проверьте сочетание `CRYPTOPAY_CURRENCY_TYPE` и `CRYPTOPAY_ASSET`.
+
+Справочник переменных: [CryptoPay](../configuration/env-vars.md#cryptopay).
+
+## Heleket
+
+Heleket используется для крипто-инвойсов с отдельными merchant ID, ключом платежного API, валютой инвойса и настройками проверки webhook.
+
+Что настроить:
+
+1. Включите `HELEKET_ENABLED`.
+2. Укажите `HELEKET_BASE_URL`, `HELEKET_MERCHANT_ID` и `HELEKET_API_KEY`.
+3. Настройте `HELEKET_CURRENCY`.
+4. При необходимости задайте `HELEKET_TO_CURRENCY` и `HELEKET_NETWORK`.
+5. Проверьте `HELEKET_RETURN_URL` и `HELEKET_SUCCESS_URL`.
+6. Настройте `HELEKET_LIFETIME_SECONDS`: допустимый диапазон 300..43200.
+7. Если включаете проверку webhook, задайте `HELEKET_VERIFY_WEBHOOK_SIGNATURE`.
+8. Для IP-фильтрации заполните `HELEKET_TRUSTED_IPS`.
+9. Добавьте `heleket` в `PAYMENT_METHODS_ORDER`.
+
+Справочник переменных: [Heleket](../configuration/env-vars.md#heleket).
+
+## Telegram Stars
+
+Telegram Stars используются напрямую и поддерживаются в legacy-ценах и JSON-каталоге тарифов.
+
+Где применяются Stars:
+
+- цены периодов подписки;
+- пакеты трафика;
+- premium-докупки;
+- HWID-докупки, если они включены в каталоге тарифов.
+
+Что проверить:
+
+- `STARS_ENABLED`;
+- Stars-цены в legacy-настройках или JSON-каталоге;
+- корректное округление цены до целого количества Stars;
+- сценарии смены тарифа: XTR/Stars-докупки не конвертируются без явного курса.
+
+См. также [переменные платежей](../configuration/env-vars.md#платежи) и [тарифы](tariffs.md).

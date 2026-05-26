@@ -42,14 +42,14 @@
 
 - общие параметры: язык, валюта, ссылки поддержки, документы, обязательный канал, Remnawave-доступы и поведение `/start`;
 - внешний вид и доступность Web App: название, цвет, логотип, emoji-логотип и `WEBAPP_ENABLED`;
-- инструкции подключения: `SUBSCRIPTION_GUIDES_ENABLED`, `SUBSCRIPTION_GUIDES_BOT_MENU_ENABLED`, чтение конфига из Remnawave Panel, JSON-override и fallback-путь к файлу;
+- инструкции подключения: `SUBSCRIPTION_GUIDES_ENABLED`, `SUBSCRIPTION_GUIDES_BOT_MENU_ENABLED`, чтение конфига из Remnawave Panel, JSON-переопределение и резервный путь к файлу;
 - legacy-цены без JSON-каталога: периоды подписки, RUB/Stars цены и пакеты трафика;
 - платежные провайдеры: включение методов, порядок кнопок, публичные параметры и секреты YooKassa, FreeKassa, Platega, SeverPay, Wata, CryptoPay, Heleket и Stars, а также текст и иконки кнопок оплаты;
 - пробный период, реферальные бонусы, уведомления, логирование, поддержка, раздел устройств, лимит устройств и legacy-лимиты трафика.
 
 Секретные поля помечены как secret и не должны использоваться для произвольного просмотра старых значений. Настройки, которых нет в manifest, остаются только в `.env` или коде.
 
-Для каждого платежного метода в разделе провайдера доступны presentation-настройки `PAYMENT_<METHOD>_WEBAPP_LABEL_RU`, `PAYMENT_<METHOD>_WEBAPP_LABEL_EN`, `PAYMENT_<METHOD>_WEBAPP_ICON`, `PAYMENT_<METHOD>_TELEGRAM_LABEL_RU`, `PAYMENT_<METHOD>_TELEGRAM_LABEL_EN` и `PAYMENT_<METHOD>_TELEGRAM_EMOJI`. Пустое значение возвращает мультиязычный дефолт из модуля платежного провайдера. Иконка Web App выбирается из уже подключённых lucide-иконок (`frontend/src/lib/components/ui/icons.js`) через модалку в админке.
+Для каждого платежного метода в разделе провайдера доступны настройки отображения `PAYMENT_<METHOD>_WEBAPP_LABEL_RU`, `PAYMENT_<METHOD>_WEBAPP_LABEL_EN`, `PAYMENT_<METHOD>_WEBAPP_ICON`, `PAYMENT_<METHOD>_TELEGRAM_LABEL_RU`, `PAYMENT_<METHOD>_TELEGRAM_LABEL_EN` и `PAYMENT_<METHOD>_TELEGRAM_EMOJI`. Пустое значение возвращает мультиязычное значение по умолчанию из модуля платежного провайдера. Иконка Web App выбирается из уже подключенных lucide-иконок (`frontend/src/lib/components/ui/icons.js`) через модалку в админке.
 
 ## Переводы
 
@@ -76,9 +76,9 @@
 
 Секция **Система -> Настройки -> Инструкции подключения** управляет встроенным экраном установки. `SUBSCRIPTION_GUIDES_ENABLED` включает `/install` в личном кабинете, а `SUBSCRIPTION_GUIDES_BOT_MENU_ENABLED` заставляет кнопки подключения в Telegram-боте открывать Mini App вместо финальной Remnawave Subscription Page. Оба переключателя включены по умолчанию.
 
-По умолчанию Minishop читает Remnawave Subscription Page config из панели (`SUBSCRIPTION_PAGE_CONFIG_PANEL_ENABLED=True`). Это основной режим, потому что один и тот же конфиг используется и в панели, и во встроенной инструкции. JSON-поле `SUBSCRIPTION_PAGE_CONFIG_JSON` применяется только когда явно включен `SUBSCRIPTION_PAGE_CONFIG_JSON_OVERRIDE_ENABLED`; иначе оно может храниться в админке, но не влияет на пользователей. `SUBSCRIPTION_PAGE_CONFIG_PATH` остается fallback-путем к локальному v1 JSON-файлу, если конфиг панели отключен или недоступен.
+По умолчанию Minishop читает конфиг Remnawave Subscription Page из панели (`SUBSCRIPTION_PAGE_CONFIG_PANEL_ENABLED=True`). Это основной режим, потому что один и тот же конфиг используется и в панели, и во встроенной инструкции. JSON-поле `SUBSCRIPTION_PAGE_CONFIG_JSON` применяется только когда явно включен `SUBSCRIPTION_PAGE_CONFIG_JSON_OVERRIDE_ENABLED`; иначе оно может храниться в админке, но не влияет на пользователей. `SUBSCRIPTION_PAGE_CONFIG_PATH` остается резервным путем к локальному v1 JSON-файлу, если конфиг панели отключен или недоступен.
 
-При сохранении backend валидирует JSON-override как Remnawave Subscription Page v1 config. Ошибки показываются как обычные validation errors настроек, а если рабочий конфиг недоступен, пользовательская кнопка подключения откатывается к старой финальной ссылке подписки.
+При сохранении backend валидирует JSON-переопределение как конфиг Remnawave Subscription Page v1. Ошибки показываются как обычные ошибки валидации настроек, а если рабочий конфиг недоступен, пользовательская кнопка подключения откатывается к старой финальной ссылке подписки.
 
 ## Поддержка
 
@@ -86,7 +86,7 @@
 
 В карточке тикета администратор видит диалог, пользовательский контекст и действия: ответить пользователю, оставить внутреннюю заметку, изменить статус, приоритет, категорию или исполнителя, закрыть тикет и перейти в карточку пользователя. Внутренние заметки не показываются пользователю.
 
-Счетчик непрочитанных обращений отображается в навигации админки. Уведомления о новых тикетах и ответах пользователя настраиваются через `LOG_SUPPORT`, `LOG_SUPPORT_THREAD_ID` и параметры `SUPPORT_*`. Подробности: [support.md](support.md).
+Счетчик непрочитанных обращений отображается в навигации админки. Уведомления о новых тикетах и ответах пользователя настраиваются через `LOG_SUPPORT`, `LOG_SUPPORT_THREAD_ID` и параметры `SUPPORT_*`. Подробности: [поддержка пользователей / тикеты](support.md).
 
 ## Внешний вид
 

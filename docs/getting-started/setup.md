@@ -15,17 +15,27 @@ docker compose logs -f backend worker frontend
 ## Что заполнить в первую очередь
 
 - `BOT_TOKEN` и `ADMIN_IDS` для доступа к боту и админке.
-- `WEBHOOK_BASE_URL` для Telegram, платежных и panel webhook URL.
+- `WEBHOOK_BASE_URL` для Telegram, платежных вебхуков и вебхуков панели.
 - `SUBSCRIPTION_MINI_APP_URL` для Mini App и кнопок в Telegram.
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`.
 - `WEBAPP_SESSION_SECRET`, `WEBHOOK_SECRET_TOKEN`, `PANEL_API_URL`, `PANEL_API_KEY`, `PANEL_WEBHOOK_SECRET`.
 
 ## Как выбрать Compose-вариант
 
-- Для быстрого публичного HTTPS берите [Caddy](../deploy-examples/caddy.md).
-- Если у вас уже есть TLS-сертификаты и нужен Nginx в Docker-сети, берите [Nginx](../deploy-examples/nginx.md).
-- Если нельзя открывать входящие порты на сервере приложения, берите [Pangolin/Newt](../deploy-examples/newt.md).
-- Для локальной проверки или внешнего TLS-терминатора берите [no-proxy](../deploy-examples/no-proxy.md).
+Для продакшена по умолчанию берите [Caddy](../deployment.md#caddy-рекомендуемый-вариант): это самый короткий путь к публичному HTTPS без ручной раскладки сертификатов.
+
+```bash
+cd deploy/examples/caddy
+cp .env.example .env
+nano .env
+docker compose up -d
+```
+
+Остальные варианты описаны в [разделе развертывания](../deployment.md#готовые-папки-запуска):
+
+- [Nginx](../deployment.md#nginx) - если у вас уже есть TLS-сертификаты и нужен Nginx в Docker-сети;
+- [Pangolin/Newt](../deployment.md#pangolin--newt) - если нельзя открывать входящие порты на сервере приложения;
+- [без обратного прокси](../deployment.md#без-обратного-прокси) - для локальной проверки или внешнего TLS-терминатора.
 
 ## После первого входа
 

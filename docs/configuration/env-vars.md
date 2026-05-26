@@ -1,6 +1,6 @@
 # Переменные окружения
 
-`.env` нужен прежде всего для bootstrap: токен бота, доступ к базе, публичный webhook URL и стабильные секреты. После первого входа большая часть продуктовых настроек меняется в Web App админке и сохраняется в БД как override поверх `.env`.
+`.env` нужен прежде всего для bootstrap: токен бота, доступ к базе, публичный URL вебхуков и стабильные секреты. После первого входа большая часть продуктовых настроек меняется в Web App админке и сохраняется в БД как переопределения поверх `.env`.
 
 Рекомендуемый порядок:
 
@@ -14,13 +14,13 @@
 | --- | --- | --- |
 | `BOT_TOKEN` | Только `.env` | Токен Telegram-бота. |
 | `ADMIN_IDS` | Только `.env` | Telegram ID администраторов через запятую. Нужен для первого входа в админку. |
-| `WEBHOOK_BASE_URL` | `.env` | Публичный URL backend/webhook-домена. Используется для Telegram, платежных и Remnawave webhook URL. |
+| `WEBHOOK_BASE_URL` | `.env` | Публичный URL backend/webhook-домена. Используется для URL вебхуков Telegram, платежных провайдеров и Remnawave. |
 | `POSTGRES_USER` | `.env` / Compose | Пользователь PostgreSQL. |
 | `POSTGRES_PASSWORD` | `.env` / Compose | Пароль PostgreSQL. |
 | `POSTGRES_DB` | `.env` / Compose | Имя базы PostgreSQL. |
 | `WEBAPP_ENABLED` | `.env` / админка | Включает Web App и админку. Держите `True` для первого запуска; если выключить, вернуть доступ можно только через `.env` и рестарт. |
 | `WEBAPP_SESSION_SECRET` | `.env` | Стабильный HMAC-секрет сессий Web App. Если пустой, генерируется на процесс, но сессии сбросятся после рестарта. |
-| `WEBHOOK_SECRET_TOKEN` | `.env` | Секрет Telegram webhook. Если пустой, генерируется на процесс. |
+| `WEBHOOK_SECRET_TOKEN` | `.env` | Секрет вебхука Telegram. Если пустой, генерируется на процесс. |
 
 ## Инфраструктура и Compose
 
@@ -29,10 +29,10 @@
 | `APP_ENV_FILE` | CLI/Compose | Путь к env-файлу вместо `.env`. |
 | `IMAGE_TAG` | CLI/Compose | Тег Docker-образов. |
 | `FRONTEND_PORT` | `.env` / Compose | Хостовый порт frontend nginx. По умолчанию `8082`. |
-| `WEB_SERVER_HOST` | `.env` | Внутренний host backend webhook server. Обычно `0.0.0.0`. |
-| `WEB_SERVER_PORT` | `.env` / Compose | Хостовый порт backend webhook server. По умолчанию `8080`. |
-| `WEBAPP_SERVER_HOST` | `.env` | Внутренний host Web App API server. Обычно `0.0.0.0`. |
-| `WEBAPP_SERVER_PORT` | `.env` | Внутренний порт Web App API server. По умолчанию `8081`. |
+| `WEB_SERVER_HOST` | `.env` | Внутренний хост backend-сервера вебхуков. Обычно `0.0.0.0`. |
+| `WEB_SERVER_PORT` | `.env` / Compose | Хостовый порт backend-сервера вебхуков. По умолчанию `8080`. |
+| `WEBAPP_SERVER_HOST` | `.env` | Внутренний хост Web App API-сервера. Обычно `0.0.0.0`. |
+| `WEBAPP_SERVER_PORT` | `.env` | Внутренний порт Web App API-сервера. По умолчанию `8081`. |
 | `POSTGRES_HOST` | Compose | Host PostgreSQL. В штатном Compose задается как `postgres`. |
 | `POSTGRES_PORT` | `.env` | Порт PostgreSQL. |
 | `DB_POOL_SIZE` | `.env` | Размер async SQLAlchemy pool. |
@@ -41,7 +41,7 @@
 | `DB_POOL_RECYCLE_SECONDS` | `.env` | Период recycling DB-соединений. |
 | `REDIS_URL` | Compose | Redis для FSM, кеша, rate-limit, очередей и locks. В Compose задается автоматически. |
 | `REDIS_KEY_PREFIX` | `.env` | Префикс Redis-ключей. |
-| `TRUSTED_PROXIES` | `.env` | IP/CIDR reverse proxy, которым доверяется `X-Forwarded-For`. |
+| `TRUSTED_PROXIES` | `.env` | IP/CIDR обратных прокси, которым доверяется `X-Forwarded-For`. |
 | `HTTP_BIND` / `HTTPS_BIND` | Caddy Compose | Адреса публикации Caddy-варианта. |
 | `NEWT_ID` / `NEWT_SECRET` | Dev Compose | Доступы Newt в dev-compose. |
 
@@ -105,29 +105,29 @@
 | `USER_TRAFFIC_STRATEGY` | Legacy-стратегия лимита трафика. |
 | `USER_HWID_DEVICE_LIMIT` | Legacy-лимит HWID-устройств по умолчанию. |
 
-## Web App, внешний вид и Telegram Login
+## Веб-приложение, внешний вид и Telegram Login
 
 Часть внешнего вида (`WEBAPP_PRIMARY_COLOR`, `WEBAPP_LOGO_*`, `WEBAPP_FAVICON_*`) сохранена для совместимости, но env-значения этих полей игнорируются при загрузке. Настраивайте их в **Админка -> Внешний вид**.
 
 | Переменная | Где менять | Назначение |
 | --- | --- | --- |
 | `WEBAPP_ENABLED` | `.env` / админка | Включает Web App. Если `False`, пользовательский Web App и админка недоступны до включения через `.env` и рестарта. |
-| `SUBSCRIPTION_MINI_APP_URL` | `.env` / админка | Публичный HTTPS URL Mini App/frontend, например `https://app.domain.com/`. Используется в Telegram-кнопках, referral-ссылках, email-входе и BotFather Mini App settings. Не указывайте здесь `/api` или webhook-пути. |
+| `SUBSCRIPTION_MINI_APP_URL` | `.env` / админка | Публичный HTTPS URL Mini App/frontend, например `https://app.domain.com/`. Используется в Telegram-кнопках, реферальных ссылках, входе по email и настройках BotFather Mini App. Не указывайте здесь `/api` или webhook-пути. |
 | `SUBSCRIPTION_GUIDES_ENABLED` | `.env` / админка | Включает встроенные инструкции установки в Web App. По умолчанию `True`; если конфиг недоступен или невалиден, кнопка подключения открывает обычную финальную ссылку подписки. |
 | `SUBSCRIPTION_GUIDES_BOT_MENU_ENABLED` | `.env` / админка | Включает открытие Mini App `/install` из кнопок бота и показ публичной ссылки инструкции `/s/<token>`. По умолчанию `True`; если выключить, бот ведет на финальную Remnawave Subscription Page. |
 | `SUBSCRIPTION_PAGE_CONFIG_PANEL_ENABLED` | `.env` / админка | Читать Remnawave Subscription Page config из панели для встроенных инструкций. По умолчанию `True`, чтобы не дублировать настройку страницы подписки в приложении. |
 | `SUBSCRIPTION_PAGE_CONFIG_JSON_OVERRIDE_ENABLED` | `.env` / админка | Включает использование JSON из поля `SUBSCRIPTION_PAGE_CONFIG_JSON` вместо конфига панели. По умолчанию `False`. |
-| `SUBSCRIPTION_PAGE_CONFIG_PATH` | `.env` / админка | Fallback-путь к локальному Remnawave Subscription Page v1 JSON config, если конфиг панели выключен или недоступен. По умолчанию `data/subpage-config/multiapp.json`; файл не создается автоматически. |
-| `SUBSCRIPTION_PAGE_CONFIG_JSON` | Админка | Опциональный JSON-override Remnawave Subscription Page v1. Применяется только при включенном `SUBSCRIPTION_PAGE_CONFIG_JSON_OVERRIDE_ENABLED`; backend валидирует JSON при сохранении. |
+| `SUBSCRIPTION_PAGE_CONFIG_PATH` | `.env` / админка | Резервный путь к локальному JSON-конфигу Remnawave Subscription Page v1, если конфиг панели выключен или недоступен. По умолчанию `data/subpage-config/multiapp.json`; файл не создается автоматически. |
+| `SUBSCRIPTION_PAGE_CONFIG_JSON` | Админка | Опциональное JSON-переопределение Remnawave Subscription Page v1. Применяется только при включенном `SUBSCRIPTION_PAGE_CONFIG_JSON_OVERRIDE_ENABLED`; backend валидирует JSON при сохранении. |
 | `WEBAPP_TITLE` | Админка | Заголовок Web App. |
 | `WEBAPP_THEMES_DIR` | `.env` | Каталог кастомных тем. |
 | `WEBAPP_DEFAULT_THEME` | `.env` / админка | Ключ темы по умолчанию. |
 | `WEBAPP_SESSION_TTL_SECONDS` | `.env` | Время жизни Web App-сессии. |
 | `WEBAPP_AUTH_MAX_AGE_SECONDS` | `.env` | Максимальный возраст Telegram Mini Apps `initData`. |
 | `WEBAPP_LOGIN_TOKEN_TTL_SECONDS` | `.env` | TTL ссылки внешнего логина. |
-| `TELEGRAM_OAUTH_CLIENT_ID` | `.env` | Client ID Telegram OAuth / OpenID Connect. Если пусто, берется bot ID из `BOT_TOKEN`. |
-| `TELEGRAM_OAUTH_CLIENT_SECRET` | `.env` | Client Secret Telegram OAuth / OpenID Connect. |
-| `TELEGRAM_OAUTH_REQUEST_ACCESS` | `.env` | Дополнительные permissions, например `write`. |
+| `TELEGRAM_OAUTH_CLIENT_ID` | `.env` | Идентификатор клиента Telegram OAuth / OpenID Connect. Если пусто, берется bot ID из `BOT_TOKEN`. |
+| `TELEGRAM_OAUTH_CLIENT_SECRET` | `.env` | Секрет клиента Telegram OAuth / OpenID Connect. |
+| `TELEGRAM_OAUTH_REQUEST_ACCESS` | `.env` | Дополнительные разрешения, например `write`. |
 | `WEBAPP_PRIMARY_COLOR` | Админка | Устаревшее env-поле, игнорируется. |
 | `WEBAPP_LOGO_URL` | Админка | Устаревшее env-поле, игнорируется. |
 | `WEBAPP_LOGO_USE_EMOJI` | Админка | Устаревшее env-поле, игнорируется. |
@@ -139,9 +139,9 @@
 
 Инструкции установки совместимы с Remnawave Subscription Page v1 config: `version`, `locales`, `brandingSettings`, `uiConfig`, `baseSettings`, `baseTranslations`, `svgLibrary` и `platforms`. Текстовые поля рендерятся как текст, а SVG из `svgLibrary` проходит санитарную проверку перед отдачей в Web App.
 
-## SMTP и email-вход
+## SMTP и вход по email
 
-Email-вход появляется только если заполнены `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` и `SMTP_FROM_EMAIL`.
+Вход по email появляется только если заполнены `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` и `SMTP_FROM_EMAIL`.
 
 | Переменная | Назначение |
 | --- | --- |
@@ -150,7 +150,7 @@ Email-вход появляется только если заполнены `SM
 | `SMTP_FALLBACK_PORTS` | Резервные порты через запятую. |
 | `SMTP_TIMEOUT_SECONDS` | Таймаут SMTP-попытки. |
 | `SMTP_USERNAME` | SMTP login. |
-| `SMTP_PASSWORD` | SMTP password/API key. |
+| `SMTP_PASSWORD` | SMTP-пароль или API-ключ. |
 | `SMTP_FROM_EMAIL` | Подтвержденный адрес отправителя. |
 | `SMTP_FROM_NAME` | Имя отправителя. |
 | `SMTP_STARTTLS` | Использовать STARTTLS. |
@@ -164,7 +164,7 @@ Email-вход появляется только если заполнены `SM
 
 ## Платежи
 
-Все включатели, секреты и presentation-настройки провайдеров доступны в админке: **Система -> Настройки -> Платежи**.
+Все включатели, секреты и настройки отображения провайдеров доступны в админке: **Система -> Настройки -> Платежи**.
 
 | Переменная | Назначение |
 | --- | --- |
@@ -185,7 +185,7 @@ Email-вход появляется только если заполнены `SM
 | `CRYPTOPAY_ENABLED` | Включает CryptoPay. |
 | `HELEKET_ENABLED` | Включает Heleket. |
 
-Конкретные presentation-ключи:
+Конкретные ключи отображения:
 
 ```text
 PAYMENT_YOOKASSA_WEBAPP_LABEL_RU
@@ -249,7 +249,7 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | Переменная | Назначение |
 | --- | --- |
 | `YOOKASSA_SHOP_ID` | ID магазина. |
-| `YOOKASSA_SECRET_KEY` | Secret key. |
+| `YOOKASSA_SECRET_KEY` | Секретный ключ. |
 | `YOOKASSA_RETURN_URL` | URL возврата после оплаты. |
 | `YOOKASSA_DEFAULT_RECEIPT_EMAIL` | Email для чеков по умолчанию. |
 | `YOOKASSA_VAT_CODE` | Код НДС. |
@@ -261,22 +261,22 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | Переменная | Назначение |
 | --- | --- |
 | `FREEKASSA_MERCHANT_ID` | ID магазина. |
-| `FREEKASSA_API_KEY` | API key. |
+| `FREEKASSA_API_KEY` | API-ключ. |
 | `FREEKASSA_SECOND_SECRET` | Секрет уведомлений. |
 | `FREEKASSA_PAYMENT_IP` | Публичный IP сервера для запроса оплаты. |
 | `FREEKASSA_PAYMENT_METHOD_ID` | ID метода оплаты. |
-| `FREEKASSA_TRUSTED_IPS` | IP-allowlist webhook-источников. |
+| `FREEKASSA_TRUSTED_IPS` | Список доверенных IP webhook-источников. |
 
 ### Platega
 
 | Переменная | Назначение |
 | --- | --- |
 | `PLATEGA_BASE_URL` | Базовый URL API. |
-| `PLATEGA_MERCHANT_ID` | Merchant ID. |
-| `PLATEGA_SECRET` | API secret. |
-| `PLATEGA_PAYMENT_METHOD` | Legacy/fallback method ID. |
-| `PLATEGA_SBP_METHOD` | Method ID для СБП. |
-| `PLATEGA_CRYPTO_METHOD` | Method ID для крипто. |
+| `PLATEGA_MERCHANT_ID` | ID мерчанта. |
+| `PLATEGA_SECRET` | Секрет API. |
+| `PLATEGA_PAYMENT_METHOD` | Устаревший/резервный ID метода оплаты. |
+| `PLATEGA_SBP_METHOD` | ID метода оплаты для СБП. |
+| `PLATEGA_CRYPTO_METHOD` | ID метода оплаты для крипто. |
 | `PLATEGA_RETURN_URL` | URL успешного возврата. |
 | `PLATEGA_FAILED_URL` | URL неуспешного возврата. |
 
@@ -286,7 +286,7 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | --- | --- |
 | `SEVERPAY_BASE_URL` | Базовый URL API. |
 | `SEVERPAY_MID` | Merchant MID. |
-| `SEVERPAY_TOKEN` | API token/secret. |
+| `SEVERPAY_TOKEN` | API-токен или секрет. |
 | `SEVERPAY_RETURN_URL` | URL возврата. |
 | `SEVERPAY_LIFETIME_MINUTES` | Время жизни платежной ссылки. |
 
@@ -295,19 +295,19 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | Переменная | Назначение |
 | --- | --- |
 | `WATA_BASE_URL` | Базовый URL API. |
-| `WATA_API_TOKEN` | Bearer token. |
+| `WATA_API_TOKEN` | Bearer-токен. |
 | `WATA_RETURN_URL` | URL успешного возврата. |
 | `WATA_FAILED_URL` | URL неуспешного возврата. |
 | `WATA_LINK_TTL_MINUTES` | TTL платежной ссылки в минутах (по умолчанию 15, минимум 15, максимум 43200). |
 | `WATA_WEBHOOK_VERIFY_SIGNATURE` | Проверять `X-Signature`. |
-| `WATA_PUBLIC_KEY` | Cached public key; если пусто, загружается из API. |
-| `WATA_TRUSTED_IPS` | IP-allowlist webhook-источников. |
+| `WATA_PUBLIC_KEY` | Закешированный публичный ключ; если пусто, загружается из API. |
+| `WATA_TRUSTED_IPS` | Список доверенных IP webhook-источников. |
 
 ### CryptoPay
 
 | Переменная | Назначение |
 | --- | --- |
-| `CRYPTOPAY_TOKEN` | API token CryptoPay. |
+| `CRYPTOPAY_TOKEN` | API-токен CryptoPay. |
 | `CRYPTOPAY_NETWORK` | `mainnet` или `testnet`. |
 | `CRYPTOPAY_CURRENCY_TYPE` | `fiat` или `crypto`. |
 | `CRYPTOPAY_ASSET` | Актив, например `RUB`, `USDT`, `BTC`. |
@@ -318,7 +318,7 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | --- | --- |
 | `HELEKET_BASE_URL` | Базовый URL API. |
 | `HELEKET_MERCHANT_ID` | UUID мерчанта. |
-| `HELEKET_API_KEY` | Payment API key. |
+| `HELEKET_API_KEY` | Ключ платежного API. |
 | `HELEKET_CURRENCY` | Валюта инвойса. |
 | `HELEKET_TO_CURRENCY` | Целевая криптовалюта для конвертации. |
 | `HELEKET_NETWORK` | Сеть, например `tron`, `bsc`, `eth`. |
@@ -326,7 +326,7 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | `HELEKET_SUCCESS_URL` | URL после успешной оплаты. |
 | `HELEKET_LIFETIME_SECONDS` | TTL инвойса: 300..43200. |
 | `HELEKET_VERIFY_WEBHOOK_SIGNATURE` | Проверять подпись webhook. |
-| `HELEKET_TRUSTED_IPS` | IP-allowlist webhook-источников. |
+| `HELEKET_TRUSTED_IPS` | Список доверенных IP webhook-источников. |
 
 ## Тарифы и legacy-цены
 
@@ -345,7 +345,7 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | `TRAFFIC_PACKAGES` | Legacy-пакеты трафика RUB, формат `10:199,50:799`. |
 | `STARS_TRAFFIC_PACKAGES` | Legacy-пакеты трафика Stars. |
 
-## Trial, referral и уведомления
+## Пробный период, рефералы и уведомления
 
 Эти настройки доступны в админке.
 
@@ -368,7 +368,7 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 
 ## Поддержка
 
-Подробный сценарий описан в [features/support.md](../features/support.md).
+Подробный сценарий описан в разделе [поддержка пользователей / тикеты](../features/support.md).
 
 | Переменная | Назначение |
 | --- | --- |
@@ -377,8 +377,8 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | `SUPPORT_TICKET_MAX_BODY_LENGTH` | Максимальная длина сообщения. |
 | `SUPPORT_TICKET_MAX_SUBJECT_LENGTH` | Максимальная длина темы. |
 | `SUPPORT_TICKET_RATE_LIMIT_PER_HOUR` | Лимит новых тикетов в час. |
-| `SUPPORT_ADMIN_NOTIFICATION_COOLDOWN_SECONDS` | Cooldown Telegram/log уведомлений. |
-| `SUPPORT_ADMIN_EMAIL_COOLDOWN_SECONDS` | Cooldown email-уведомлений. |
+| `SUPPORT_ADMIN_NOTIFICATION_COOLDOWN_SECONDS` | Пауза между Telegram/log уведомлениями. |
+| `SUPPORT_ADMIN_EMAIL_COOLDOWN_SECONDS` | Пауза между email-уведомлениями. |
 
 ## Логирование
 

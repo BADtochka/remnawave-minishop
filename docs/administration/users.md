@@ -14,6 +14,6 @@
 ## Связанные разделы
 
 - [Админ-панель](../features/admin-panel.md)
-- [Поддержка](../features/support.md)
+- [Поддержка пользователей / тикеты](../features/support.md)
 - [Тарифы](../features/tariffs.md)
 - [Mini App](../features/web-app.md)

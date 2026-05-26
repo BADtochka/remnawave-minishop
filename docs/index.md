@@ -8,7 +8,7 @@ Remnawave Minishop - Telegram-бот и Mini App для продажи и упр
 
 - [Обзор](getting-started/overview.md) - архитектура, сервисы и основные сценарии.
 - [Установка](getting-started/setup.md) - путь от `.env` до первого запуска.
-- [Deploy examples](deploy-examples/index.md) - Caddy, Nginx, Pangolin/Newt и no-proxy варианты.
+- [Развертывание](deployment.md) - Docker Compose, Caddy, Nginx, Pangolin/Newt и запуск без обратного прокси.
 - [Настройка платежей](features/payments.md) - включение провайдеров и проверка вебхуков.
 - [Безопасность](configuration/security.md) - секреты, доступы и публичные URL.
 - [Админ-панель](features/admin-panel.md) - пользователи, настройки, рассылки, поддержка и тарифы.
@@ -17,9 +17,9 @@ Remnawave Minishop - Telegram-бот и Mini App для продажи и упр
 
 ## Ключевые возможности
 
-- **Продажа подписок** - period- и traffic-тарифы, докупки трафика, HWID-устройства, premium-сквады и Telegram Stars.
+- **Продажа подписок** - тарифы на срок и по трафику, докупки трафика, HWID-устройства, premium-сквады и Telegram Stars.
 - **Жизненный цикл пользователей** - регистрация, пробный период, продление, синхронизация с панелью и предупреждения по трафику.
-- **Mini App** - личный кабинет, инструкции установки, Telegram OAuth, email-вход и публичные referral-ссылки.
+- **Mini App** - личный кабинет, инструкции установки, Telegram OAuth, вход по email и публичные реферальные ссылки.
 - **Операционные инструменты** - админка, тикеты поддержки, промокоды, рассылки, логи и настройки поверх `.env`.
 
 ## Справочник

@@ -59,16 +59,8 @@ export default defineConfig({
             { label: 'Главная', link: '/' },
             { label: 'Обзор', slug: 'getting-started/overview' },
             { label: 'Установка', slug: 'getting-started/setup' },
-            { label: 'Deploy examples', slug: 'deploy-examples' },
-          ],
-        },
-        {
-          label: 'Варианты деплоя',
-          items: [
-            { label: 'Caddy', slug: 'deploy-examples/caddy' },
-            { label: 'Nginx', slug: 'deploy-examples/nginx' },
-            { label: 'Pangolin / Newt', slug: 'deploy-examples/newt' },
-            { label: 'Без reverse proxy', slug: 'deploy-examples/no-proxy' },
+            { label: 'Архитектура', slug: 'reference/architecture' },
+            { label: 'Развертывание', slug: 'reference/deployment' },
           ],
         },
         {
@@ -86,23 +78,10 @@ export default defineConfig({
             { label: 'Платежи', slug: 'features/payments' },
             { label: 'Подписки', slug: 'features/subscriptions' },
             { label: 'Тарифы', slug: 'features/tariffs' },
-            { label: 'Mini App', slug: 'features/web-app' },
+            { label: 'Веб-приложение / Mini App', slug: 'features/web-app' },
             { label: 'Темы Web App', slug: 'features/webapp-themes' },
             { label: 'Админ-панель', slug: 'features/admin-panel' },
-            { label: 'Поддержка', slug: 'features/support' },
-          ],
-        },
-        {
-          label: 'Платежные системы',
-          items: [
-            { label: 'YooKassa', slug: 'payments/yookassa' },
-            { label: 'FreeKassa', slug: 'payments/freekassa' },
-            { label: 'Platega', slug: 'payments/platega' },
-            { label: 'SeverPay', slug: 'payments/severpay' },
-            { label: 'Wata', slug: 'payments/wata' },
-            { label: 'CryptoPay', slug: 'payments/cryptopay' },
-            { label: 'Heleket', slug: 'payments/heleket' },
-            { label: 'Telegram Stars', slug: 'payments/telegram-stars' },
+            { label: 'Поддержка пользователей / тикеты', slug: 'features/support' },
           ],
         },
         {
@@ -124,13 +103,6 @@ export default defineConfig({
           items: [
             { label: 'Проблемы', slug: 'troubleshooting/issues' },
             { label: 'Логи', slug: 'troubleshooting/logs' },
-          ],
-        },
-        {
-          label: 'Справочник',
-          items: [
-            { label: 'Архитектура', slug: 'reference/architecture' },
-            { label: 'Развертывание', slug: 'reference/deployment' },
           ],
         },
       ],

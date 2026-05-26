@@ -14,14 +14,14 @@ docker compose logs migrate
 ## Что искать
 
 - ошибки миграций в `migrate`;
-- ошибки Telegram webhook и payment webhook в `backend`;
+- ошибки вебхука Telegram и платежных вебхуков в `backend`;
 - проблемы очереди вебхуков и фоновых задач в `worker`;
-- ошибки проксирования `/api`, `/auth` и theme assets во `frontend`;
+- ошибки проксирования `/api`, `/auth` и ассетов тем во `frontend`;
 - ошибки авторизации Mini App и Telegram OAuth.
 
-## Frontend proxy, `/api`, `/auth` и theme assets
+## Проксирование frontend, `/api`, `/auth` и ассеты тем
 
-`frontend` - это nginx-контейнер Mini App. Он отдает статику и проксирует Web App маршруты во внутренний backend WebApp server на `backend:8081`.
+`frontend` - это nginx-контейнер Mini App. Он отдает статику и проксирует маршруты Web App во внутренний WebApp-сервер backend на `backend:8081`.
 
 Сначала смотрите nginx-логи:
 
@@ -33,7 +33,7 @@ docker compose logs -f frontend
 
 - `/api/*` и `/auth/*` должны попадать в `frontend:80`, а уже frontend проксирует их в `backend:8081`;
 - `/webapp-logo`, `/webapp-uploaded-logo/*`, `/webapp-favicon/*`, `/webapp-theme-css/*` и `/webapp-theme-assets/*` тоже проксируются через frontend;
-- внешний reverse proxy не должен отдельно уводить `/api` или `/auth` на webhook-сервер `backend:8080`.
+- внешний обратный прокси не должен отдельно уводить `/api` или `/auth` на webhook-сервер `backend:8080`.
 
 Быстрые проверки снаружи:
 
@@ -44,7 +44,7 @@ curl -i https://app.domain.com/auth/telegram/start
 curl -i https://app.domain.com/webapp-theme-css/dark/style.css
 ```
 
-Если `/health` отвечает, а `/api/bootstrap` или theme assets падают, смотрите одновременно frontend и backend:
+Если `/health` отвечает, а `/api/bootstrap` или ассеты тем падают, смотрите одновременно frontend и backend:
 
 ```bash
 docker compose logs -f frontend backend
@@ -54,12 +54,12 @@ docker compose logs -f frontend backend
 
 - frontend nginx: `deploy/docker/frontend/nginx.conf`;
 - внешний Caddy/Nginx: `deploy/examples/caddy/Caddyfile` или `deploy/examples/nginx/nginx.conf.template`;
-- Web App домен: `SUBSCRIPTION_MINI_APP_URL`, он должен быть публичным HTTPS URL frontend, без `/api`, `/auth` или webhook-пути;
-- WebApp server backend: `WEBAPP_ENABLED=True`, `WEBAPP_SERVER_HOST=0.0.0.0`, `WEBAPP_SERVER_PORT=8081`.
+- домен Web App: `SUBSCRIPTION_MINI_APP_URL`, он должен быть публичным HTTPS URL frontend, без `/api`, `/auth` или webhook-пути;
+- WebApp-сервер backend: `WEBAPP_ENABLED=True`, `WEBAPP_SERVER_HOST=0.0.0.0`, `WEBAPP_SERVER_PORT=8081`.
 
-## Mini App auth и Telegram OAuth
+## Авторизация Mini App и Telegram OAuth
 
-Ошибки авторизации почти всегда видны в `backend`, потому что проверка Telegram Mini Apps `initData`, Telegram OAuth `id_token`, nonce/state и сессий выполняется на backend WebApp server.
+Ошибки авторизации почти всегда видны в `backend`, потому что проверка Telegram Mini Apps `initData`, Telegram OAuth `id_token`, nonce/state и сессий выполняется на WebApp-сервере backend.
 
 ```bash
 docker compose logs -f backend
@@ -92,7 +92,7 @@ docker compose logs -f backend
 - `/auth/telegram/start` и `/auth/telegram/callback` проходят через frontend nginx в `backend:8081`;
 - в браузере после callback нет статуса `telegram_auth=invalid_state`, `invalid_token`, `not_configured`, `unauthorized` или `failed`.
 
-Подробности по маршрутам и настройке OAuth: [Web App / Mini App](../features/web-app.md).
+Подробности по маршрутам и настройке OAuth: [веб-приложение / Mini App](../features/web-app.md).
 
 ## После изменения конфигурации
 

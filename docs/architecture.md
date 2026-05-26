@@ -1,48 +1,42 @@
-# Project Architecture
+# Архитектура проекта
 
-The repository is split by runtime responsibility:
+Репозиторий разделен по зонам ответственности рантайма:
 
 ```text
-backend/              Python application code
-  bot/                Telegram bot, aiohttp APIs, webhooks, services
-  config/             Pydantic settings and tariff/theme config loaders
-  db/                 SQLAlchemy models, DAL, migrations
-  main_backend.py     aiohttp backend entrypoint
-  main_worker.py      background worker entrypoint
-  main_migrate.py     one-shot migration entrypoint
-  requirements.txt    Python runtime dependencies
+backend/              Python-код приложения
+  bot/                Telegram-бот, aiohttp API, вебхуки, сервисы
+  config/             Pydantic-настройки и загрузчики тарифов/тем
+  db/                 SQLAlchemy-модели, DAL, миграции
+  main_backend.py     точка входа aiohttp backend
+  main_worker.py      точка входа фонового worker
+  main_migrate.py     одноразовый запуск миграций
+  requirements.txt    Python-зависимости рантайма
 
-frontend/             Svelte/Vite Mini App and admin UI
-  src/                Svelte source code
-  scripts/            frontend build helpers
-  package.json        Node scripts and dependencies
+frontend/             Svelte/Vite Mini App и админка
+  src/                исходный код Svelte
+  scripts/            вспомогательные скрипты сборки frontend
+  package.json        Node-скрипты и зависимости
 
 deploy/
-  docker/             Dockerfile, nginx and caddy runtime config
-  compose/            legacy/alternate compose examples
+  docker/             Dockerfile, nginx- и caddy-конфиги рантайма
+  examples/           готовые Docker Compose примеры запуска
 
-data/                 runtime data mounted in containers
-locales/              bot and Web App translations
-tests/                Python test suite
+data/                 данные рантайма, монтируемые в контейнеры
+locales/              переводы бота и Web App
+tests/                Python-тесты
 ```
 
-The default `docker-compose.yml` stays in the repository root so `docker compose up` remains the
-simple production path. It builds three application images from `deploy/docker/Dockerfile`:
+Основной `docker-compose.yml` находится в корне репозитория, чтобы `docker compose up` оставался простым продакшен-путем. Он собирает три прикладных образа из `deploy/docker/Dockerfile`:
 
-- `backend`: aiohttp APIs and webhooks only.
-- `worker`: tariff traffic worker, panel sync, webhook queue consumers.
-- `frontend`: static Svelte assets served by nginx.
+- `backend`: aiohttp API и вебхуки.
+- `worker`: worker тарифов, синхронизация с панелью, обработчики очередей вебхуков.
+- `frontend`: статические Svelte-ассеты, которые отдает nginx.
 
-The `migrate` service is a one-shot container based on the backend image. It is part of the
-default Compose dependency graph: Postgres and Redis become healthy, `migrate` applies
-`Base.metadata.create_all` and pending `schema_migrations`, then `backend` and `worker` start
-only after `migrate` exits successfully. This keeps migrations automatic for `docker compose up`
-without running them inside every backend replica.
+Сервис `migrate` - одноразовый контейнер на базе backend-образа. Он входит в стандартный Compose-граф: Postgres и Redis переходят в healthy-состояние, `migrate` применяет `Base.metadata.create_all` и ожидающие `schema_migrations`, а затем `backend` и `worker` стартуют только после успешного завершения `migrate`. Так миграции остаются автоматическими для `docker compose up`, но не запускаются внутри каждой backend-реплики.
 
-Python imports intentionally remain `bot.*`, `config.*`, and `db.*`. Runtime containers set
-`PYTHONPATH=/app/backend`; local tests use the same layout through `pytest.ini`.
+Python-импорты намеренно остаются в пространствах `bot.*`, `config.*` и `db.*`. Контейнеры рантайма выставляют `PYTHONPATH=/app/backend`; локальные тесты используют такую же раскладку через `pytest.ini`.
 
-Common commands:
+Основные команды:
 
 ```bash
 docker compose up -d --build

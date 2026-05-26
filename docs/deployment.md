@@ -27,18 +27,20 @@ docker compose logs -f backend worker frontend
 
 ## Готовые папки запуска
 
-Для production удобнее использовать не корневой compose, а отдельные примеры из
-[Deploy examples](deploy-examples/index.md). В каждой папке лежат свой `docker-compose.yml`,
-`.env.example` и нужный конфиг рядом, а подробные инструкции хранятся в `docs/`:
+Для продакшена удобнее использовать не корневой compose, а отдельные Docker Compose-примеры из папки `deploy/examples`. В каждой папке лежат свой `docker-compose.yml`, `.env.example` и нужный конфиг прокси.
 
-| Папка | Назначение | Запуск |
-| --- | --- | --- |
-| [Caddy](deploy-examples/caddy.md) | Caddy с автоматическим HTTPS. | `cp .env.example .env`, заполнить `.env`, `docker compose up -d`. |
-| [Nginx](deploy-examples/nginx.md) | Nginx в Docker-сети приложения, TLS-сертификаты кладутся в `ssl/`. | `cp .env.example .env`, заполнить `.env`, положить сертификаты, `docker compose up -d`. |
-| [Pangolin/Newt](deploy-examples/newt.md) | Pangolin/Newt без входящих портов на сервере приложения. | `cp .env.example .env`, заполнить Newt credentials, создать ресурсы в Pangolin, `docker compose up -d`. |
-| [No proxy](deploy-examples/no-proxy.md) | Прямая публикация портов backend/frontend. | `cp .env.example .env`, заполнить публичные URL и порты, `docker compose up -d`. |
+Предпочтительный вариант для обычного публичного сервера - **Caddy**: он сам выпускает и продлевает HTTPS-сертификаты, а конфигурация получается короче, чем с ручным Nginx.
 
-Пример для Caddy:
+| Папка | Когда использовать |
+| --- | --- |
+| [`deploy/examples/caddy`](https://gitlab.com/3252a8/remnawave-minshop/-/tree/main/deploy/examples/caddy) | Нужен простой публичный HTTPS с автоматическими сертификатами Let's Encrypt. |
+| [`deploy/examples/nginx`](https://gitlab.com/3252a8/remnawave-minshop/-/tree/main/deploy/examples/nginx) | Уже используете Nginx и готовы положить TLS-сертификаты рядом с примером. |
+| [`deploy/examples/newt`](https://gitlab.com/3252a8/remnawave-minshop/-/tree/main/deploy/examples/newt) | Публикуете сервисы через Pangolin/Newt без входящих портов на сервере приложения. |
+| [`deploy/examples/no-proxy`](https://gitlab.com/3252a8/remnawave-minshop/-/tree/main/deploy/examples/no-proxy) | Нужно напрямую открыть HTTP-порты backend/frontend или проверить стек за внешним TLS-терминатором. |
+
+## Caddy (рекомендуемый вариант)
+
+Caddy подходит, если DNS-записи `WEBHOOK_HOST` и `MINIAPP_HOST` смотрят на сервер приложения, а входящие `80/tcp` и `443/tcp` открыты.
 
 ```bash
 cd deploy/examples/caddy
@@ -48,8 +50,115 @@ docker compose up -d
 docker compose logs -f caddy backend worker frontend
 ```
 
-Корневой `docker-compose.yml` оставлен для локальной сборки из исходников. Примеры в
-`deploy/examples` используют готовые GHCR-образы и не требуют указывать `-f`.
+Минимально поменяйте в `.env`:
+
+- `WEBHOOK_HOST` и `MINIAPP_HOST`;
+- `BOT_TOKEN`, `ADMIN_IDS`;
+- `POSTGRES_PASSWORD`;
+- `WEBAPP_SESSION_SECRET`, `WEBHOOK_SECRET_TOKEN`;
+- `PANEL_API_URL`, `PANEL_API_KEY`, `PANEL_WEBHOOK_SECRET`.
+
+Если нужна нестандартная логика Caddy, правьте `Caddyfile` рядом с compose и перезапускайте:
+
+```bash
+docker compose up -d --force-recreate caddy
+```
+
+## Nginx
+
+Nginx-вариант поднимает Nginx в той же Docker-сети, что и приложение:
+
+- `WEBHOOK_HOST` проксируется в `backend:8080`;
+- `MINIAPP_HOST` проксируется в `frontend:80`;
+- `frontend` сам проксирует внутренние `/api`, `/auth` и ассеты тем в `backend:8081`.
+
+```bash
+cd deploy/examples/nginx
+cp .env.example .env
+nano .env
+```
+
+Положите TLS-сертификаты в `ssl/`:
+
+```text
+ssl/
+  webhooks.example.com/
+    fullchain.pem
+    privkey.pem
+  app.example.com/
+    fullchain.pem
+    privkey.pem
+```
+
+Имена папок должны совпадать с `WEBHOOK_HOST` и `MINIAPP_HOST` в `.env`.
+
+```bash
+docker compose up -d
+docker compose logs -f nginx backend worker frontend
+```
+
+Если нужно поменять заголовки, лимиты или TLS-настройки, правьте `nginx.conf.template` и перезапускайте Nginx:
+
+```bash
+docker compose up -d --force-recreate nginx
+```
+
+## Pangolin / Newt
+
+Этот вариант не открывает входящие порты на сервере приложения. Newt подключается к Pangolin, а публичные домены настраиваются ресурсами в панели Pangolin.
+
+```bash
+cd deploy/examples/newt
+cp .env.example .env
+nano .env
+docker compose up -d
+```
+
+В `.env` заполните:
+
+- `WEBHOOK_HOST` и `MINIAPP_HOST` - публичные домены ресурсов в Pangolin;
+- `PANGOLIN_ENDPOINT`, `NEWT_ID`, `NEWT_SECRET` - значения из настроек site/client в Pangolin;
+- обычные переменные приложения: `BOT_TOKEN`, `ADMIN_IDS`, `POSTGRES_PASSWORD`, секреты и доступ к Remnawave.
+
+В Pangolin создайте два HTTP-ресурса для этого Newt site:
+
+| Публичный домен | Upstream |
+| --- | --- |
+| `https://webhooks.example.com` | `http://backend:8080` |
+| `https://app.example.com` | `http://frontend:80` |
+
+Проверка:
+
+```bash
+docker compose ps
+docker compose logs -f newt backend worker frontend
+```
+
+## Без обратного прокси
+
+Этот вариант напрямую публикует два HTTP-порта:
+
+- backend/вебхуки: `WEB_SERVER_BIND`, по умолчанию `0.0.0.0:8080`;
+- frontend/Mini App: `FRONTEND_BIND`, по умолчанию `0.0.0.0:8082`.
+
+```bash
+cd deploy/examples/no-proxy
+cp .env.example .env
+nano .env
+docker compose up -d
+```
+
+Важно: контейнеры приложения сами не выпускают TLS-сертификаты. Для реального вебхука Telegram и Mini App публичные URL должны быть HTTPS. Используйте этот вариант для локальной проверки, внутренней сети или ситуации, когда HTTPS завершается внешней платформой и дальше трафик приходит на эти порты.
+
+Проверка локально:
+
+```bash
+curl http://127.0.0.1:8080/healthz
+curl http://127.0.0.1:8082/health
+docker compose logs -f backend worker frontend
+```
+
+Корневой `docker-compose.yml` оставлен для локальной сборки из исходников. Примеры в `deploy/examples` используют готовые GHCR-образы и не требуют указывать `-f`.
 
 ## Миграции
 
@@ -77,14 +186,13 @@ docker compose logs migrate
 
 ## Сервисы
 
-- `backend`: aiohttp API, Telegram webhook, платежные webhooks, panel webhooks, проверка здоровья `/healthz`.
-- `worker`: TariffTrafficWorker, задачи синхронизации с панелью, обработка рассылок, потребители очереди webhooks.
+- `backend`: aiohttp API, вебхук Telegram, платежные вебхуки, вебхуки панели, проверка здоровья `/healthz`.
+- `worker`: TariffTrafficWorker, задачи синхронизации с панелью, обработка рассылок, потребители очереди вебхуков.
 - `frontend`: статические Svelte-ассеты через nginx.
 - `postgres`: PostgreSQL 17.
 - `redis`: Redis 7 для FSM, кеша, rate-limit, очередей и locks.
 
-В production-примерах внешний доступ добавляют `caddy`, `nginx`, `newt` или прямые `ports` в
-соответствующем варианте из [Deploy examples](deploy-examples/index.md).
+В продакшен-примерах внешний доступ добавляют `caddy`, `nginx`, `newt` или прямые `ports` в соответствующем варианте из `deploy/examples`.
 
 ## Логи и проверка
 
@@ -103,7 +211,7 @@ curl http://127.0.0.1:8080/health
 ```
 
 В обычном compose backend публикуется на `127.0.0.1:${WEB_SERVER_PORT:-8080}`, frontend на
-`127.0.0.1:${FRONTEND_PORT:-8082}`. В новых production-примерах проверяйте bind-переменные
+`127.0.0.1:${FRONTEND_PORT:-8082}`. В новых продакшен-примерах проверяйте bind-переменные
 конкретной папки: `HTTP_BIND`, `HTTPS_BIND`, `WEB_SERVER_BIND` или `FRONTEND_BIND`.
 
 ## Обновление
@@ -244,11 +352,11 @@ docker compose up -d backend worker
 
 ## Обратный прокси
 
-Готовые reverse-proxy примеры лежат в:
+Готовые reverse-proxy примеры описаны выше:
 
-- [Caddy](deploy-examples/caddy.md) - автоматический HTTPS;
-- [Nginx](deploy-examples/nginx.md) - сертификаты кладутся рядом в `ssl/`;
-- [Newt/Pangolin](deploy-examples/newt.md) - без входящих портов на сервере приложения.
+- [Caddy](#caddy-рекомендуемый-вариант) - автоматический HTTPS;
+- [Nginx](#nginx) - сертификаты кладутся рядом в `ssl/`;
+- [Newt/Pangolin](#pangolin--newt) - без входящих портов на сервере приложения.
 
 Во всех вариантах схема одинаковая:
 
@@ -271,21 +379,6 @@ app.example.com {
 Минимальная логика Nginx такая же: `webhooks.example.com` проксируется в `backend:8080`,
 `app.example.com` - в `frontend:80`. В `deploy/examples/nginx/nginx.conf.template` уже есть
 заголовки `X-Forwarded-*`, редирект HTTP -> HTTPS и пути сертификатов.
-
-## Newt
-
-Для Newt используйте [Pangolin / Newt](deploy-examples/newt.md). В compose уже есть сервис
-`newt`, а в `.env.example` - поля `PANGOLIN_ENDPOINT`, `NEWT_ID` и `NEWT_SECRET`.
-
-В Pangolin создайте два HTTP-ресурса для этого Newt site:
-
-```text
-Mini App / frontend: http://frontend:80
-Webhooks / backend:  http://backend:8080
-```
-
-`backend:8081` является внутренним WebApp API/auth-сервером для frontend nginx; обычно его не нужно
-указывать в Newt напрямую.
 
 ## Переменный env-файл
 
