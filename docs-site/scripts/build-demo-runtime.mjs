@@ -11,6 +11,8 @@ const templatesDir = path.join(repoRoot, 'backend', 'bot', 'app', 'web', 'templa
 const themesDir = path.join(repoRoot, 'backend', 'bot', 'app', 'web', 'themes');
 const localesDir = path.join(repoRoot, 'locales');
 const runtimeBase = '/demo/runtime';
+const installGuidesConfigUrl =
+  'https://raw.githubusercontent.com/legiz-ru/my-remnawave/main/sub-page/subpage-config/multiapp.json';
 const isWindows = process.platform === 'win32';
 const npmExecPath = process.env.npm_execpath || '';
 
@@ -102,6 +104,19 @@ async function demoI18nPayload() {
   return jsonScriptPayload({ ru: JSON.parse(ru), en: JSON.parse(en) });
 }
 
+async function installGuidesConfigPayload() {
+  const response = await fetch(installGuidesConfigUrl, {
+    headers: { accept: 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Unable to download demo install guides config (${response.status} ${response.statusText})`,
+    );
+  }
+  const config = await response.json();
+  return `${JSON.stringify(config, null, 2)}\n`;
+}
+
 async function appHtml() {
   const i18n = await demoI18nPayload();
   return `<!doctype html>
@@ -144,6 +159,9 @@ await Promise.all([
   copyDirectory(path.join(templatesDir, 'default-brand'), path.join(runtimeDir, 'default-brand')),
   copyDirectory(themesDir, path.join(runtimeDir, 'themes'), copyThemeFile),
   writeFile(path.join(runtimeDir, 'app.html'), html, 'utf8'),
+  installGuidesConfigPayload().then((payload) =>
+    writeFile(path.join(runtimeDir, 'subscription-guides-config.json'), payload, 'utf8'),
+  ),
 ]);
 
 console.log(`Built static docs demo runtime at ${path.relative(repoRoot, runtimeDir)}`);

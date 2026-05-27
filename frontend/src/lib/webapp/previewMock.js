@@ -224,7 +224,6 @@ export const DEV_MOCK = {
     languages: [
       { code: "ru", label: "Русский", flag: "🇷🇺", base: true },
       { code: "en", label: "English", flag: "🇬🇧", base: true },
-      { code: "uk", label: "Українська", flag: "🇺🇦", base: false },
     ],
     emailAuthEnabled: true,
     telegramLoginBotUsername: "preview_bot",
