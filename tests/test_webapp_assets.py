@@ -328,6 +328,13 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/webapp-default-logo.webp", nginx_conf)
         self.assertIn("proxy_pass http://backend:8081;", nginx_conf)
 
+    def test_home_logo_scale_rules_beat_late_loaded_admin_brand_styles(self):
+        css = Path("frontend/src/styles/webapp.css").read_text(encoding="utf-8")
+
+        self.assertIn(".app-shell .home-brand .brand-mark.brand-mark-xl", css)
+        self.assertIn(".app-shell .login-brand-auth .brand-mark.brand-mark-xl", css)
+        self.assertIn(".app-shell .loader .brand-mark.brand-mark-lg", css)
+
     def test_prune_unused_appearance_assets_keeps_only_referenced_logo_and_favicons(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
