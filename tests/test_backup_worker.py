@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -80,6 +81,7 @@ def test_backup_worker_creates_archive_with_db_dump_and_compose_snapshot(tmp_pat
     send_kwargs = bot.send_document.await_args.kwargs
     assert send_kwargs["chat_id"] == 123
     assert "Database dump: yes" in send_kwargs["caption"]
+    assert "Warnings" not in send_kwargs["caption"]
 
     with zipfile.ZipFile(result.archive_path) as archive:
         names = set(archive.namelist())
@@ -168,10 +170,48 @@ def test_backup_worker_does_not_fail_when_compose_source_is_not_mounted(tmp_path
     assert result.archive_path.is_file()
     assert result.db_dump_included is True
     assert result.compose_files_count == 0
-    assert any("Compose source directory is unavailable" in item for item in result.warnings)
+    assert any(
+        "Compose source directory is unavailable in this container" in item
+        for item in result.warnings
+    )
+    bot.send_document.assert_awaited_once()
+    caption = bot.send_document.await_args.kwargs["caption"]
+    assert "Warnings (1):" in caption
+    assert "1. If manual backup includes compose but scheduled backup does not" in caption
+    assert "Compose source directory is unavailable in this container" in caption
+    assert "recreate the worker service" in caption
     with zipfile.ZipFile(result.archive_path) as archive:
         names = set(archive.namelist())
     assert "database/shop.dump" in names
+
+
+def test_backup_worker_caption_lists_and_truncates_warning_details(tmp_path):
+    settings = _settings(tmp_path, tmp_path / "compose")
+    worker = _FakePgDumpBackupWorker(settings, _FakeBot())
+    result = SimpleNamespace(
+        completed_at=datetime.now(timezone.utc),
+        db_dump_included=True,
+        compose_files_count=0,
+        size_bytes=1024,
+        warnings=[
+            "first warning",
+            "second warning",
+            "third warning",
+            "fourth warning",
+            "fifth warning",
+            "sixth warning",
+            "seventh warning",
+        ],
+    )
+
+    caption = worker._caption(result)
+
+    assert "Warnings (7):" in caption
+    assert "1. first warning" in caption
+    assert "6. sixth warning" in caption
+    assert "seventh warning" not in caption
+    assert "... and 1 more warning(s)" in caption
+    assert len(caption) <= 1024
 
 
 def test_backup_settings_refresh_restores_env_default_when_override_is_deleted(monkeypatch):

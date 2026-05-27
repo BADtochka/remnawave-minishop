@@ -54,6 +54,13 @@ BACKUP_THREAD_ID=123
 
 `COMPOSE_BACKUP_SOURCE=.` означает папку рядом с текущим `docker-compose.yml`. Если compose лежит в другом месте, укажите абсолютный host-путь.
 
+Ручное создание бэкапа из админки выполняется в `backend`-контейнере, а автоматический backup по расписанию - в `worker`-контейнере. Оба контейнера должны видеть `/app/compose-source`. Если ручной backup содержит compose-папку, а автоматический нет, пересоздайте worker после обновления compose:
+
+```bash
+docker compose up -d --force-recreate worker
+docker compose exec worker ls -la /app/compose-source
+```
+
 Если нужно запретить восстановление compose-файлов из контейнера, задайте:
 
 ```env

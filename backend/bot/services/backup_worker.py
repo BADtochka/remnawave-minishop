@@ -55,6 +55,9 @@ BACKUP_RUNTIME_SETTING_KEYS = {
     "BACKUP_COMPOSE_SOURCE_DIR",
     "BACKUP_COMPOSE_EXCLUDE_DIRS",
 }
+TELEGRAM_DOCUMENT_CAPTION_LIMIT = 1024
+TELEGRAM_WARNING_DETAIL_LIMIT = 6
+TELEGRAM_WARNING_LINE_LIMIT = 220
 
 
 @dataclass
@@ -263,16 +266,26 @@ class BackupWorker:
     def _stage_compose_source(self, target_dir: Path, warnings: list[str]) -> int:
         source_raw = (self.settings.BACKUP_COMPOSE_SOURCE_DIR or "").strip()
         if not source_raw:
-            warnings.append("Compose source directory is not configured.")
+            warnings.append(
+                "Compose source directory is not configured. Set "
+                "BACKUP_COMPOSE_SOURCE_DIR or mount the compose folder into the backup container."
+            )
             return 0
 
         source_dir = Path(source_raw).expanduser()
         if not source_dir.exists() or not source_dir.is_dir():
-            warnings.append(f"Compose source directory is unavailable: {source_dir}")
+            warnings.append(
+                "If manual backup includes compose but scheduled backup does not, recreate "
+                "the worker service with the compose-source mount. Compose source directory "
+                f"is unavailable in this container: {source_dir}"
+            )
             return 0
 
         if not any((source_dir / marker).is_file() for marker in COMPOSE_MARKER_FILES):
-            warnings.append(f"Compose source directory has no compose file marker: {source_dir}")
+            warnings.append(
+                "Check that COMPOSE_BACKUP_SOURCE points to the folder with docker-compose.yml. "
+                f"Compose source directory has no compose file marker: {source_dir}"
+            )
 
         excluded_dirs = self._compose_excluded_dirs()
         files_count = 0
@@ -358,8 +371,31 @@ class BackupWorker:
             f"Archive size: {self._human_size(result.size_bytes)}",
         ]
         if result.warnings:
-            lines.append(f"Warnings: {len(result.warnings)}")
-        return "\n".join(lines)
+            lines.append(f"Warnings ({len(result.warnings)}):")
+            for index, warning in enumerate(
+                result.warnings[:TELEGRAM_WARNING_DETAIL_LIMIT],
+                start=1,
+            ):
+                lines.append(f"{index}. {self._caption_warning(warning)}")
+            hidden_count = len(result.warnings) - TELEGRAM_WARNING_DETAIL_LIMIT
+            if hidden_count > 0:
+                lines.append(f"... and {hidden_count} more warning(s)")
+        return self._fit_caption(lines)
+
+    @staticmethod
+    def _caption_warning(warning: str) -> str:
+        text = " ".join(str(warning or "").split())
+        if len(text) <= TELEGRAM_WARNING_LINE_LIMIT:
+            return text
+        return f"{text[: TELEGRAM_WARNING_LINE_LIMIT - 1].rstrip()}..."
+
+    @staticmethod
+    def _fit_caption(lines: list[str]) -> str:
+        caption = "\n".join(lines)
+        if len(caption) <= TELEGRAM_DOCUMENT_CAPTION_LIMIT:
+            return caption
+        suffix = "\n... caption truncated"
+        return f"{caption[: TELEGRAM_DOCUMENT_CAPTION_LIMIT - len(suffix)].rstrip()}{suffix}"
 
     @staticmethod
     def _human_size(size_bytes: int) -> str:

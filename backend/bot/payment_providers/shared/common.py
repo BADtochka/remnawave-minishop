@@ -182,13 +182,17 @@ def payment_units_for_activation(payment: Any, sale_mode: str) -> Any:
     """Resolve purchased units from a payment record for webhook activation."""
     base = sale_mode_base(sale_mode)
     if sale_mode_is_traffic(base):
-        return getattr(payment, "purchased_gb", None) or getattr(
-            payment, "subscription_duration_months", None
-        ) or 1
+        return (
+            getattr(payment, "purchased_gb", None)
+            or getattr(payment, "subscription_duration_months", None)
+            or 1
+        )
     if sale_mode_is_hwid_devices(base):
-        return getattr(payment, "purchased_hwid_devices", None) or getattr(
-            payment, "subscription_duration_months", None
-        ) or 1
+        return (
+            getattr(payment, "purchased_hwid_devices", None)
+            or getattr(payment, "subscription_duration_months", None)
+            or 1
+        )
     return getattr(payment, "subscription_duration_months", None) or 1
 
 
