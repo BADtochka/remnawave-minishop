@@ -3510,7 +3510,28 @@
   }
 
   .admin-card-head {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
     padding: 12px 14px;
+  }
+
+  .admin-card-head > .admin-editor-section-actions {
+    justify-self: start;
+    width: 100%;
+  }
+
+  .admin-settings-field-group-head,
+  .admin-trial-settings-groups .admin-settings-field-group-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-settings-field-group-head > .admin-badge {
+    justify-self: start;
+  }
+
+  .admin-setting-meta strong {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .admin-card-body {
