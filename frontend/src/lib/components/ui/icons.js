@@ -63,6 +63,7 @@ export {
   TrendingDown,
   TrendingUp,
   TriangleAlert,
+  Upload,
   User,
   UserMinus,
   UserPlus,

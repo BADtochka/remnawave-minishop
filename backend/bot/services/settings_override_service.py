@@ -263,6 +263,35 @@ async def load_overrides_from_db(settings: Settings, async_session_factory: sess
     return applied
 
 
+async def refresh_overrides_from_db(
+    settings: Settings,
+    async_session_factory: sessionmaker,
+    *,
+    keys: Optional[set[str]] = None,
+) -> int:
+    """Refresh already-known runtime overrides without startup restore side effects."""
+
+    try:
+        async with async_session_factory() as session:
+            overrides = await app_settings_dal.get_all_overrides(session)
+    except Exception as exc:
+        logger.warning("Could not refresh setting overrides from DB: %s", exc)
+        return 0
+    if keys is not None:
+        try:
+            env_only = Settings()
+            for key in keys:
+                if key in overrides:
+                    continue
+                attr_name = _resolve_attribute_name(env_only, key)
+                if attr_name and hasattr(env_only, attr_name):
+                    setattr(settings, attr_name, getattr(env_only, attr_name))
+        except Exception as exc:
+            logger.warning("Failed to restore env defaults while refreshing overrides: %s", exc)
+        overrides = {key: value for key, value in overrides.items() if key in keys}
+    return apply_overrides(settings, overrides)
+
+
 async def update_overrides(
     settings: Settings,
     async_session_factory: sessionmaker,

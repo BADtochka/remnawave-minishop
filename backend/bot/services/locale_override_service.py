@@ -53,6 +53,7 @@ LOCALE_GROUPS = [
             "admin_sort_",
             "admin_status_",
             "admin_badge_",
+            "admin_backups_",
             "admin_aria_",
             "admin_search",
             "admin_clear",
@@ -257,6 +258,7 @@ LOCALE_GROUPS = [
         "audience": "internal",
         "prefixes": (
             "admin_settings_field_log_",
+            "admin_settings_field_backup_",
             "admin_settings_field_support_",
             "admin_settings_field_subscription_notifications_",
             "admin_settings_field_subscription_notify_",

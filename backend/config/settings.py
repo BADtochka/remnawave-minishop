@@ -114,6 +114,35 @@ class Settings(BaseSettings):
     TARIFF_WORKER_LOCK_TTL_SECONDS: int = Field(default=240)
     TARIFF_WORKER_TICK_SECONDS: int = Field(default=300)
     TARIFF_WORKER_BULK_PANEL_FETCH_THRESHOLD: int = Field(default=50)
+    BACKUP_ENABLED: bool = Field(
+        default=False,
+        description="Run periodic backup jobs from the worker container.",
+    )
+    BACKUP_INTERVAL_SECONDS: int = Field(default=60 * 60)
+    BACKUP_LOCK_TTL_SECONDS: int = Field(default=2 * 60 * 60)
+    BACKUP_DIR: str = Field(default="data/backups")
+    BACKUP_LOCAL_RETENTION: int = Field(default=100)
+    BACKUP_CHAT_ID: Optional[int] = Field(
+        default=None,
+        description="Telegram chat ID for backup archives. Falls back to LOG_CHAT_ID.",
+    )
+    BACKUP_THREAD_ID: Optional[int] = Field(
+        default=None,
+        description="Telegram topic/thread ID for backup archives. Falls back to LOG_THREAD_ID.",
+    )
+    BACKUP_POSTGRES_DUMP_ENABLED: bool = Field(default=True)
+    BACKUP_PG_DUMP_PATH: str = Field(default="pg_dump")
+    BACKUP_PG_DUMP_TIMEOUT_SECONDS: int = Field(default=30 * 60)
+    BACKUP_PG_RESTORE_PATH: str = Field(default="pg_restore")
+    BACKUP_PG_RESTORE_TIMEOUT_SECONDS: int = Field(default=30 * 60)
+    BACKUP_ARCHIVE_SIGNATURE_REQUIRED: bool = Field(default=True)
+    BACKUP_ARCHIVE_SIGNATURE_SECRET: Optional[str] = Field(default=None)
+    BACKUP_COMPOSE_ENABLED: bool = Field(default=True)
+    BACKUP_COMPOSE_SOURCE_DIR: Optional[str] = Field(default="/app/compose-source")
+    BACKUP_COMPOSE_RESTORE_DIR: Optional[str] = Field(default=None)
+    BACKUP_COMPOSE_EXCLUDE_DIRS: str = Field(
+        default=".git,node_modules,__pycache__,.pytest_cache,.ruff_cache,postgres-data,redis-data,shop-data,backups"
+    )
 
     DEFAULT_LANGUAGE: str = Field(default="ru")
     DEFAULT_CURRENCY_SYMBOL: str = Field(default="RUB")
@@ -947,7 +976,14 @@ class Settings(BaseSettings):
             return v
         return secrets.token_urlsafe(32)
 
-    @field_validator("LOG_CHAT_ID", "LOG_THREAD_ID", "LOG_SUPPORT_THREAD_ID", mode="before")
+    @field_validator(
+        "LOG_CHAT_ID",
+        "LOG_THREAD_ID",
+        "LOG_SUPPORT_THREAD_ID",
+        "BACKUP_CHAT_ID",
+        "BACKUP_THREAD_ID",
+        mode="before",
+    )
     @classmethod
     def validate_optional_int_fields(cls, v):
         """Convert empty strings to None for optional integer fields"""
@@ -969,6 +1005,9 @@ class Settings(BaseSettings):
         "SMTP_FROM_EMAIL",
         "SMTP_FROM_NAME",
         "SMTP_FALLBACK_PORTS",
+        "BACKUP_ARCHIVE_SIGNATURE_SECRET",
+        "BACKUP_COMPOSE_SOURCE_DIR",
+        "BACKUP_COMPOSE_RESTORE_DIR",
         mode="before",
     )
     @classmethod

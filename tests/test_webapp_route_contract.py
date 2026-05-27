@@ -186,6 +186,9 @@ class WebAppRouteContractTests(unittest.TestCase):
             ("PUT", "/api/admin/themes"): "admin_themes_save_route",
             ("POST", "/api/admin/appearance/logo"): "admin_appearance_logo_upload_route",
             ("POST", "/api/admin/appearance/favicon"): "admin_appearance_favicon_upload_route",
+            ("GET", "/api/admin/backups"): "admin_backups_list_route",
+            ("POST", "/api/admin/backups/upload"): "admin_backups_upload_route",
+            ("POST", "/api/admin/backups/restore"): "admin_backups_restore_route",
             ("GET", "/api/admin/panel/internal-squads"): "admin_panel_internal_squads_route",
         }
 
@@ -215,6 +218,15 @@ class WebAppRouteContractTests(unittest.TestCase):
         subscription_webapp.setup_subscription_webapp_routes(app)
 
         request = make_mocked_request("GET", "/admin/translations", app=app)
+        match_info = asyncio.run(app.router.resolve(request))
+
+        self.assertEqual(match_info.handler.__name__, "index_route")
+
+    def test_admin_backups_page_route_is_registered(self):
+        app = web.Application()
+        subscription_webapp.setup_subscription_webapp_routes(app)
+
+        request = make_mocked_request("GET", "/admin/backups", app=app)
         match_info = asyncio.run(app.router.resolve(request))
 
         self.assertEqual(match_info.handler.__name__, "index_route")

@@ -105,6 +105,8 @@ docker compose exec backend sh -lc 'id; touch /app/data/themes/test && rm /app/d
 - [configuration/env-vars.md](../configuration/env-vars.md) - полный справочник переменных `.env`.
 - [features/admin-panel.md](../features/admin-panel.md) - как устроены overrides и allowlist настроек.
 - [features/tariffs.md](../features/tariffs.md) - JSON-каталог тарифов и редактор тарифов.
-- [Веб-приложение / Mini App](../features/web-app.md) - домен Mini App, Telegram OAuth и вход по email.
+- [Веб-приложение / Mini App](../features/web-app.md) - домен Mini App, инструкции установки и проксирование.
+- [Telegram-авторизация](../features/telegram-auth.md) - BotFather, Mini Apps и OAuth.
+- [Вход по email](../features/email-login.md) - SMTP, коды, magic link и парольный вход.
 - [Поддержка пользователей / тикеты](../features/support.md) - тикеты поддержки и уведомления.
 - [Развертывание](deployment.md) - Docker Compose, обратный прокси, Caddy/Nginx и обновления.

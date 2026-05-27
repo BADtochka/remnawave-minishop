@@ -2,7 +2,9 @@ import json
 import re
 from pathlib import Path
 
-from bot.app.web.admin_settings_manifest import manifest_payload
+import pytest
+
+from bot.app.web.admin_settings_manifest import coerce_value, get_field_by_key, manifest_payload
 from bot.middlewares.i18n import resolve_locale_key
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +33,15 @@ SUBSCRIPTION_GUIDE_SETTINGS = (
     "SUBSCRIPTION_PAGE_CONFIG_JSON_OVERRIDE_ENABLED",
     "SUBSCRIPTION_PAGE_CONFIG_PATH",
     "SUBSCRIPTION_PAGE_CONFIG_JSON",
+)
+
+BACKUP_SETTINGS = (
+    "BACKUP_ENABLED",
+    "BACKUP_CHAT_ID",
+    "BACKUP_THREAD_ID",
+    "BACKUP_INTERVAL_SECONDS",
+    "BACKUP_LOCAL_RETENTION",
+    "BACKUP_COMPOSE_ENABLED",
 )
 
 ADMIN_TARIFF_SETTINGS_PAGE_KEYS = {
@@ -171,6 +182,31 @@ def test_subscription_guide_settings_i18n_keys_exist():
             assert field["i18n_description_key"] in messages
 
 
+def test_backup_settings_i18n_keys_exist():
+    manifest = _manifest_by_key()
+
+    assert manifest["BACKUP_ENABLED"]["section"] == "backups"
+    assert manifest["BACKUP_ENABLED"]["section_order"] == 9
+    assert manifest["BACKUP_INTERVAL_SECONDS"]["min"] == 60
+    assert manifest["BACKUP_INTERVAL_SECONDS"]["optional"] is False
+    assert manifest["BACKUP_LOCAL_RETENTION"]["min"] == 1
+    assert manifest["BACKUP_LOCAL_RETENTION"]["optional"] is False
+
+    for language in ("ru", "en"):
+        messages = _locale(language)
+
+        assert "admin_settings_section_backups" in messages
+        for setting_key in BACKUP_SETTINGS:
+            field = manifest[setting_key]
+            assert field["i18n_label_key"] in messages
+            assert field["i18n_description_key"] in messages
+
+
+def test_backup_required_numeric_settings_reject_empty_values():
+    with pytest.raises(ValueError):
+        coerce_value(get_field_by_key("BACKUP_INTERVAL_SECONDS"), "")
+
+
 def test_payment_provider_settings_include_webhook_metadata():
     manifest = _manifest_by_key()
 
@@ -190,9 +226,7 @@ def test_payment_provider_admin_only_toggles_are_mutually_exclusive():
         manifest["PLATEGA_CRYPTO_ADMIN_ONLY_ENABLED"]["mutually_exclusive_key"]
         == "PLATEGA_CRYPTO_ENABLED"
     )
-    assert (
-        manifest["STARS_ADMIN_ONLY_ENABLED"]["mutually_exclusive_key"] == "STARS_ENABLED"
-    )
+    assert manifest["STARS_ADMIN_ONLY_ENABLED"]["mutually_exclusive_key"] == "STARS_ENABLED"
 
 
 def test_legacy_tariff_settings_are_separated_from_payment_settings():

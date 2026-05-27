@@ -48,6 +48,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - shop-data:/app/data
+      - ${COMPOSE_BACKUP_SOURCE:-.}:/app/compose-source:${COMPOSE_RESTORE_MODE:-rw}
     networks:
       - remnawave-shop
     ports:
@@ -82,6 +83,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - shop-data:/app/data
+      - ${COMPOSE_BACKUP_SOURCE:-.}:/app/compose-source:ro
     networks:
       - remnawave-shop
 

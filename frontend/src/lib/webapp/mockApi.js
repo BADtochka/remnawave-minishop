@@ -270,6 +270,34 @@ export async function mockApi(path, options = {}, context = {}) {
     }
     return out;
   })();
+  const mockBackups = [
+    {
+      name: "remnawave-minishop-backup-20260527-120000+0300.zip",
+      size_bytes: 184320,
+      modified_at: "2026-05-27T09:00:00Z",
+      created_at: "2026-05-27T09:00:00Z",
+      created_at_local: "2026-05-27T12:00:00+03:00",
+      has_database: true,
+      has_compose: true,
+      database_name: "remnawave_minishop",
+      compose_files_count: 6,
+      warnings: [],
+      manifest: {},
+    },
+    {
+      name: "remnawave-minishop-backup-20260527-110000+0300.zip",
+      size_bytes: 153600,
+      modified_at: "2026-05-27T08:00:00Z",
+      created_at: "2026-05-27T08:00:00Z",
+      created_at_local: "2026-05-27T11:00:00+03:00",
+      has_database: true,
+      has_compose: false,
+      database_name: "remnawave_minishop",
+      compose_files_count: 0,
+      warnings: ["Compose source directory is unavailable"],
+      manifest: {},
+    },
+  ];
   if (path === "/admin/stats") {
     return {
       ok: true,
@@ -437,6 +465,41 @@ export async function mockApi(path, options = {}, context = {}) {
       variants: {
         32: "/webapp-favicon/1111111111111111/icon-32.png",
         apple_touch: "/webapp-favicon/1111111111111111/apple-touch-icon.png",
+      },
+    };
+  }
+  if (path === "/admin/backups") {
+    return {
+      ok: true,
+      backup_dir: "data/backups",
+      archives: clone(mockBackups),
+    };
+  }
+  if (path === "/admin/backups/upload") {
+    return {
+      ok: true,
+      archive: {
+        ...mockBackups[0],
+        name: `remnawave-minishop-backup-uploaded-${Date.now()}.zip`,
+        modified_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        created_at_local: new Date().toISOString(),
+      },
+    };
+  }
+  if (path === "/admin/backups/restore") {
+    return {
+      ok: true,
+      result: {
+        archive_name: mockBackups[0].name,
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+        database_restored: true,
+        compose_files_restored: 6,
+        compose_target_dir: "/app/compose-source",
+        compose_pre_restore_archive:
+          "data/backups/remnawave-minishop-compose-pre-restore-20260527-121500+0300.zip",
+        warnings: [],
       },
     };
   }

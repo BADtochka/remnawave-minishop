@@ -356,6 +356,8 @@ docker compose exec backend sh -lc 'id; touch /app/data/themes/test && rm /app/d
 
 ## Резервная копия PostgreSQL
 
+Для штатных автоматических ZIP-бэкапов, отправки в Telegram и восстановления через админку используйте раздел [бэкапы и восстановление](../features/backups.md). Команды ниже - минимальный ручной fallback для PostgreSQL.
+
 ```bash
 docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > backup.sql
 ```

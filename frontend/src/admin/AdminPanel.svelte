@@ -5,6 +5,7 @@
     ChevronsUpDown,
     Coins,
     CreditCard,
+    Database,
     Download,
     FileText,
     Globe2,
@@ -29,6 +30,7 @@
 
   import BrandMark from "$lib/webapp/BrandMark.svelte";
   import AdsSection from "./sections/AdsSection.svelte";
+  import BackupsSection from "./sections/BackupsSection.svelte";
   import BroadcastSection from "./sections/BroadcastSection.svelte";
   import LogsSection from "./sections/LogsSection.svelte";
   import PaymentDetailModal from "./sections/PaymentDetailModal.svelte";
@@ -44,6 +46,7 @@
   import UserDetailModal from "./sections/UserDetailModal.svelte";
   import UsersSection from "./sections/UsersSection.svelte";
   import { createAdsStore } from "../lib/admin/stores/adsStore.js";
+  import { createBackupsStore } from "../lib/admin/stores/backupsStore.js";
   import { createBroadcastStore } from "../lib/admin/stores/broadcastStore.js";
   import { createLogsStore } from "../lib/admin/stores/logsStore.js";
   import { createPaymentsStore } from "../lib/admin/stores/paymentsStore.js";
@@ -133,6 +136,7 @@
         { id: "tariffs", label: at("nav_tariffs", {}, "Тарифы"), icon: Coins },
         { id: "appearance", label: at("nav_appearance", {}, "Внешний вид"), icon: Paintbrush },
         { id: "translations", label: at("nav_translations", {}, "Переводы"), icon: Languages },
+        { id: "backups", label: at("nav_backups", {}, "Бэкапы"), icon: Database },
         { id: "settings", label: at("nav_settings", {}, "Настройки"), icon: Sliders },
       ],
     },
@@ -191,6 +195,10 @@
         "Оверрайды строк локализации из базы данных и data/locales-overrides.json"
       ),
     },
+    backups: {
+      title: at("section_backups_title", {}, "Бэкапы"),
+      subtitle: at("section_backups_subtitle", {}, "Архивы, загрузка и восстановление БД/compose"),
+    },
     settings: {
       title: at("section_settings_title", {}, "Настройки приложения"),
       subtitle: at("section_settings_subtitle", {}, "Оверрайды над .env, применяются мгновенно"),
@@ -227,6 +235,7 @@
   }
 
   const adsStore = createAdsStore({ api, onToast: flash, at });
+  const backupsStore = createBackupsStore({ api, onToast: flash, at });
   const broadcastStore = createBroadcastStore({ api, onToast: flash, at });
   const logsStore = createLogsStore({ api, at });
   const paymentsStore = createPaymentsStore({ api, onToast: flash, at });
@@ -241,6 +250,7 @@
 
   setContext("promosStore", promosStore);
   setContext("adsStore", adsStore);
+  setContext("backupsStore", backupsStore);
   setContext("broadcastStore", broadcastStore);
   setContext("logsStore", logsStore);
   setContext("paymentsStore", paymentsStore);
@@ -788,6 +798,10 @@
 
           {#if active === "settings"}
             <SettingsSection {at} {onSettingsSaved} {currentLang} />
+          {/if}
+
+          {#if active === "backups"}
+            <BackupsSection {at} {fmtDate} />
           {/if}
 
           {#if active === "translations"}

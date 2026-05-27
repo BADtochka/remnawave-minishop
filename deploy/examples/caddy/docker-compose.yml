@@ -67,6 +67,7 @@ services:
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1,::1,172.16.0.0/12}
     volumes:
       - shop-data:/app/data
+      - ${COMPOSE_BACKUP_SOURCE:-.}:/app/compose-source:${COMPOSE_RESTORE_MODE:-rw}
     networks:
       - remnawave-shop
     depends_on:
@@ -91,6 +92,7 @@ services:
       <<: *app_environment
     volumes:
       - shop-data:/app/data
+      - ${COMPOSE_BACKUP_SOURCE:-.}:/app/compose-source:ro
     networks:
       - remnawave-shop
     depends_on:

@@ -39,8 +39,8 @@ docker compose up -d
 
 ## Настройки для веб апп
 
-- [Настройка Telegram бота](../features/web-app.md#telegram-авторизация) - Telegram OAuth и Telegram Mini App.
-- [Настройка SMTP](../features/web-app.md#вход-по-email) - Вход и регистрация по email.
+- [Настройка Telegram бота](../features/telegram-auth.md) - Telegram OAuth и Telegram Mini App.
+- [Настройка SMTP](../features/email-login.md) - Вход и регистрация по email.
 
 ## После первого входа
 

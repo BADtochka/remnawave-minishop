@@ -36,9 +36,11 @@ Remnawave Minishop - Telegram-бот и Web App (Mini App) для продажи
 - [Развертывание](docs/getting-started/deployment.md) - Docker Compose, Caddy, Nginx, Pangolin/Newt и запуск без обратного прокси.
 - [Настройка окружения](docs/getting-started/configuration.md) - bootstrap `.env` и рекомендуемая настройка через Web App админку.
 - [Переменные `.env`](docs/configuration/env-vars.md) - полный справочник всех env-ключей по разделам.
+- [Бэкапы и восстановление](docs/features/backups.md) - автоматические архивы, Telegram-отправка и restore через админку.
 - [Тарифы](docs/features/tariffs.md) - каталог тарифов, модели на срок и по трафику, обычные и premium-докупки, premium-сквады, смена тарифа, HWID-лимиты и обработка трафика.
 - [Админ-панель](docs/features/admin-panel.md) - права доступа, настройки, редактор тарифов, premium-сквады и сохранение JSON-каталога.
-- [Веб-приложение / Mini App](docs/features/web-app.md) - отдельный порт, домен, Telegram OAuth, вход по email, инструкции установки и реферальные ссылки.
+- [Веб-приложение / Mini App](docs/features/web-app.md) - отдельный порт, домен, инструкции установки и реферальные ссылки.
+- [Telegram-авторизация](docs/features/telegram-auth.md) и [вход по email](docs/features/email-login.md) - настройка BotFather/OAuth и SMTP-логина.
 - [Поддержка пользователей / тикеты](docs/features/support.md) - тикеты в Mini App, входящий список админки, уведомления, лимиты и внешняя ссылка поддержки.
 - [Темы Web App](docs/features/webapp-themes.md) - кастомные темы, настройка внешнего вида, логотипы, CSS/ассеты и пайплайн создания новой темы.
 - [Миграции](docs/migrations/index.md) - готовые сценарии переноса с других ботов; сейчас описан `remnawave-tg-shop`.

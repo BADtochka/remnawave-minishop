@@ -38,20 +38,6 @@ WEBAPP_SESSION_TTL_SECONDS=86400
 WEBAPP_AUTH_MAX_AGE_SECONDS=86400
 WEBAPP_LOGIN_TOKEN_TTL_SECONDS=600
 
-TELEGRAM_OAUTH_CLIENT_ID=<client-id-from-botfather>
-TELEGRAM_OAUTH_CLIENT_SECRET=<client-secret-from-botfather>
-TELEGRAM_OAUTH_REQUEST_ACCESS=write
-
-SMTP_HOST=smtp-relay.brevo.com
-SMTP_PORT=587
-SMTP_FALLBACK_PORTS=2525,465
-SMTP_STARTTLS=True
-SMTP_USE_SSL=False
-SMTP_USERNAME=<smtp-login>
-SMTP_PASSWORD=<smtp-password-or-key>
-SMTP_FROM_EMAIL=no-reply@domain.com
-SMTP_FROM_NAME=Remnawave Minishop
-
 SUPPORT_LINK=https://t.me/your_support_link
 SUPPORT_TICKETS_ENABLED=True
 SUPPORT_TICKET_RATE_LIMIT_PER_HOUR=5
@@ -83,42 +69,16 @@ SUPPORT_TICKET_RATE_LIMIT_PER_HOUR=5
 
 Внешний вид настраивается в админке: раздел **Внешний вид** управляет логотипом, emoji-логотипом, accent-цветом, выбранной темой и масштабом логотипа. Кастомные темы читаются из `WEBAPP_THEMES_DIR`, а `WEBAPP_DEFAULT_THEME` может принудительно выбрать тему по ключу. Подробный контракт `theme.json`, CSS/asset-роуты и пайплайн создания темы описаны в [webapp-themes.md](webapp-themes.md).
 
-Если SMTP-настройки не заполнены, вход по email скрывается.
+## Авторизация
+
+Mini App поддерживает вход через Telegram Mini Apps `initData`, Telegram OAuth / OpenID Connect вне Telegram и email-код. Подробная настройка вынесена в отдельные разделы:
+
+- [Telegram-авторизация](telegram-auth.md) - BotFather, Mini Apps, Web Login, callback `/auth/telegram/callback`, OAuth-переменные и типичные ошибки.
+- [Вход по email](email-login.md) - SMTP, одноразовые коды, magic link, парольный вход и проверки доставки писем.
+
+Если SMTP-настройки не заполнены, вход по email скрывается. Если Telegram OAuth не настроен, вход через Telegram продолжает работать внутри Telegram Mini App через `initData`, но внешняя браузерная авторизация не сможет стартовать.
 
 Тикеты поддержки включаются через `SUPPORT_TICKETS_ENABLED`; внешний резервный контакт задается `SUPPORT_LINK`. Полный сценарий пользователя, админа и уведомлений описан в разделе [поддержка пользователей / тикеты](support.md).
-
-## Telegram-авторизация
-
-Внутри Telegram Mini App пользователь авторизуется через Telegram Mini Apps `initData`. При открытии страницы вне Telegram используется Telegram OAuth / OpenID Connect Authorization Code Flow с PKCE, callback `/auth/telegram/callback`, `nonce` и серверной проверкой `id_token` по JWKS Telegram.
-
-Настройка в BotFather:
-
-1. Откройте `@BotFather` -> `/mybots` -> выберите бота.
-2. В `Bot Settings` -> `Domain` укажите домен Web App без протокола и пути, например `app.domain.com`.
-3. В `Bot Settings` -> `Mini Apps` укажите URL, например `https://app.domain.com/`.
-4. В `Bot Settings` -> `Web Login` включите OpenID Connect Login, если BotFather предлагает переключение.
-5. Скопируйте идентификатор клиента и секрет клиента в `TELEGRAM_OAUTH_CLIENT_ID` и `TELEGRAM_OAUTH_CLIENT_SECRET`.
-6. В `Web Login` -> `Allowed URLs` добавьте:
-
-```text
-https://app.domain.com/
-https://app.domain.com/auth/telegram/callback
-```
-
-`TELEGRAM_OAUTH_REQUEST_ACCESS=write` разрешает боту написать пользователю после логина. Если дополнительные разрешения не нужны, оставьте переменную пустой.
-
-## Вход по email
-
-Вход по email работает через одноразовый код:
-
-1. Пользователь вводит email.
-2. Бот отправляет код через SMTP.
-3. Код вводится в модальном окне Web App.
-4. После подтверждения создается или находится пользователь, а email можно связать с Telegram-аккаунтом.
-
-Для Brevo обычно подходит порт `587` с STARTTLS. Если основной порт недоступен, приложение пробует порты из `SMTP_FALLBACK_PORTS`; порт `465` используется через SSL.
-
-Полный список переменных, обязательные поля для включения входа по email и типичные ошибки подключения описаны в разделе **SMTP и вход по email** в [configuration.md](../getting-started/configuration.md).
 
 ## Проксирование
 

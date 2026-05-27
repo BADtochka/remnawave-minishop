@@ -69,6 +69,7 @@ services:
       - "${WEB_SERVER_BIND:-0.0.0.0:8080}:8080"
     volumes:
       - shop-data:/app/data
+      - ${COMPOSE_BACKUP_SOURCE:-.}:/app/compose-source:${COMPOSE_RESTORE_MODE:-rw}
     networks:
       - remnawave-shop
     depends_on:
@@ -93,6 +94,7 @@ services:
       <<: *app_environment
     volumes:
       - shop-data:/app/data
+      - ${COMPOSE_BACKUP_SOURCE:-.}:/app/compose-source:ro
     networks:
       - remnawave-shop
     depends_on:

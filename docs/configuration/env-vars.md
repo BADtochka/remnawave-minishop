@@ -49,6 +49,8 @@
 
 Обычно эти значения не требуют правки.
 
+Настройки `BACKUP_*` управляют автоматическими бэкапами и восстановлением. Практический сценарий, mount compose-папки и проверки архивов описаны в [разделе про бэкапы](../features/backups.md).
+
 | Переменная | Назначение |
 | --- | --- |
 | `WEBAPP_ME_CACHE_TTL_SECONDS` | TTL кеша `/api/me`. |
@@ -71,6 +73,25 @@
 | `TARIFF_WORKER_LOCK_TTL_SECONDS` | TTL Redis lock для tariff worker. |
 | `TARIFF_WORKER_TICK_SECONDS` | Интервал tariff worker. |
 | `TARIFF_WORKER_BULK_PANEL_FETCH_THRESHOLD` | Порог активных подписок для bulk fetch пользователей панели. |
+| `BACKUP_ENABLED` | Включает периодические бэкапы в worker-контейнере. По умолчанию `False`. |
+| `BACKUP_INTERVAL_SECONDS` | Интервал между бэкапами. По умолчанию `3600`; запуск выравнивается на границу часа: 12:00, 13:00 и т.д. |
+| `BACKUP_CHAT_ID` | Telegram chat ID для архивов. Если пусто, используется `LOG_CHAT_ID`. |
+| `BACKUP_THREAD_ID` | Topic/thread ID для архивов. Если пусто, используется `LOG_THREAD_ID`. |
+| `BACKUP_DIR` | Локальная папка архивов внутри контейнера. По умолчанию `data/backups` в volume `shop-data`. |
+| `BACKUP_LOCAL_RETENTION` | Сколько локальных ZIP-архивов хранить после отправки. По умолчанию `100`. |
+| `BACKUP_POSTGRES_DUMP_ENABLED` | Добавлять в архив `pg_dump` базы PostgreSQL. |
+| `BACKUP_PG_DUMP_PATH` | Путь к `pg_dump` внутри worker-контейнера. |
+| `BACKUP_PG_DUMP_TIMEOUT_SECONDS` | Таймаут выполнения `pg_dump`. |
+| `BACKUP_PG_RESTORE_PATH` | Путь к `pg_restore` внутри backend-контейнера для восстановления из админки. |
+| `BACKUP_PG_RESTORE_TIMEOUT_SECONDS` | Таймаут выполнения `pg_restore`. |
+| `BACKUP_ARCHIVE_SIGNATURE_REQUIRED` | Требовать валидную HMAC-подпись `manifest.json` при upload/restore. По умолчанию `True`. |
+| `BACKUP_ARCHIVE_SIGNATURE_SECRET` | Отдельный секрет подписи backup-архивов. Если пусто, используется `BOT_TOKEN`. |
+| `BACKUP_COMPOSE_ENABLED` | Добавлять snapshot compose-каталога в архив. Если mount отсутствует, бэкап БД не падает. |
+| `BACKUP_COMPOSE_SOURCE_DIR` | Путь внутри контейнера к compose-каталогу. В стандартном compose это `/app/compose-source`. |
+| `BACKUP_COMPOSE_RESTORE_DIR` | Куда восстанавливать compose-файлы. Если пусто, используется `BACKUP_COMPOSE_SOURCE_DIR`. |
+| `BACKUP_COMPOSE_EXCLUDE_DIRS` | Имена директорий, которые не попадают в compose snapshot. |
+| `COMPOSE_BACKUP_SOURCE` | Host-путь, который Docker Compose монтирует как `/app/compose-source`. По умолчанию текущая папка compose-файла. |
+| `COMPOSE_RESTORE_MODE` | Режим mount для backend: `rw` позволяет восстанавливать compose-папку из админки, `ro` оставляет только чтение. |
 
 ## Общие настройки
 
@@ -109,6 +130,8 @@
 
 Часть внешнего вида (`WEBAPP_PRIMARY_COLOR`, `WEBAPP_LOGO_*`, `WEBAPP_FAVICON_*`) сохранена для совместимости, но env-значения этих полей игнорируются при загрузке. Настраивайте их в **Админка -> Внешний вид**.
 
+Практическая настройка Mini App вынесена в [веб-приложение](../features/web-app.md), а вход через Telegram - в [Telegram-авторизацию](../features/telegram-auth.md).
+
 | Переменная | Где менять | Назначение |
 | --- | --- | --- |
 | `WEBAPP_ENABLED` | `.env` / админка | Включает Web App. Если `False`, пользовательский Web App и админка недоступны до включения через `.env` и рестарта. |
@@ -142,6 +165,8 @@
 ## SMTP и вход по email
 
 Вход по email появляется только если заполнены `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` и `SMTP_FROM_EMAIL`.
+
+Практический сценарий настройки SMTP, magic link и парольного входа описан в [разделе входа по email](../features/email-login.md).
 
 | Переменная | Назначение |
 | --- | --- |

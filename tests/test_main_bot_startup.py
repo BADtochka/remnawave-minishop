@@ -15,8 +15,7 @@ def test_backend_startup_does_not_run_panel_sync_inline():
     forbidden_imports = [
         node
         for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom)
-        and node.module == "bot.handlers.admin.sync_admin"
+        if isinstance(node, ast.ImportFrom) and node.module == "bot.handlers.admin.sync_admin"
     ]
     forbidden_calls = [
         node
@@ -28,6 +27,22 @@ def test_backend_startup_does_not_run_panel_sync_inline():
 
     assert forbidden_imports == []
     assert forbidden_calls == []
+
+
+def test_worker_starts_backup_task_without_enabled_guard():
+    source = Path("backend/main_worker.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    guarded_backup_tasks = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.If)
+        and isinstance(node.test, ast.Attribute)
+        and node.test.attr == "BACKUP_ENABLED"
+    ]
+
+    assert "BackupWorker" in source
+    assert guarded_backup_tasks == []
 
 
 def test_telegram_startup_network_error_retries_until_success_without_traceback(caplog):

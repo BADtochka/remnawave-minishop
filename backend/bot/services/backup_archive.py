@@ -1,0 +1,108 @@
+import hashlib
+import hmac
+import json
+import zipfile
+from pathlib import Path
+from typing import Any
+
+from config.settings import Settings
+
+BACKUP_APP_ID = "remnawave-minishop"
+BACKUP_FILENAME_PREFIX = "remnawave-minishop-backup-"
+BACKUP_FORMAT_VERSION = 1
+BACKUP_MANIFEST_NAME = "manifest.json"
+
+
+def backup_signature_secret(settings: Settings) -> str:
+    configured = str(getattr(settings, "BACKUP_ARCHIVE_SIGNATURE_SECRET", "") or "").strip()
+    return configured or settings.BOT_TOKEN
+
+
+def canonical_manifest_payload(manifest: dict[str, Any]) -> bytes:
+    payload = json.loads(json.dumps(manifest, ensure_ascii=False))
+    archive = payload.get("archive")
+    if isinstance(archive, dict):
+        archive.pop("signature", None)
+    return json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def sign_manifest(manifest: dict[str, Any], settings: Settings) -> str:
+    return hmac.new(
+        backup_signature_secret(settings).encode("utf-8"),
+        canonical_manifest_payload(manifest),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def verify_manifest_signature(manifest: dict[str, Any], settings: Settings) -> bool:
+    archive = manifest.get("archive") if isinstance(manifest.get("archive"), dict) else {}
+    signature = str(archive.get("signature") or "")
+    if not signature:
+        return False
+    expected = sign_manifest(manifest, settings)
+    return hmac.compare_digest(signature, expected)
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def build_file_records(source_dir: Path) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for path in sorted(source_dir.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(source_dir).as_posix()
+        if relative == BACKUP_MANIFEST_NAME:
+            continue
+        stat = path.stat()
+        records.append(
+            {
+                "path": relative,
+                "size_bytes": int(stat.st_size),
+                "sha256": file_sha256(path),
+            }
+        )
+    return records
+
+
+def attach_archive_integrity(
+    manifest: dict[str, Any],
+    *,
+    file_records: list[dict[str, Any]],
+    settings: Settings,
+) -> None:
+    manifest["app"] = BACKUP_APP_ID
+    manifest["format_version"] = BACKUP_FORMAT_VERSION
+    manifest["archive"] = {
+        "files": file_records,
+    }
+    manifest["archive"]["signature"] = sign_manifest(manifest, settings)
+
+
+def write_manifest(source_dir: Path, manifest: dict[str, Any]) -> None:
+    (source_dir / BACKUP_MANIFEST_NAME).write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def write_zip_from_directory(source_dir: Path, archive_path: Path) -> None:
+    with zipfile.ZipFile(
+        archive_path,
+        mode="w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=6,
+    ) as archive:
+        for path in sorted(source_dir.rglob("*")):
+            if path.is_file():
+                archive.write(path, path.relative_to(source_dir).as_posix())

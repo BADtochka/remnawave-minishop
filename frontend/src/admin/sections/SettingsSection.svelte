@@ -339,6 +339,7 @@
       trial: "Триал",
       referral: "Реферальная программа",
       notifications: "Уведомления",
+      backups: "Бэкапы",
       support: "Поддержка",
       devices: "Устройства",
       subscription_guides: "Connection guides",
@@ -560,6 +561,8 @@
           class="input"
           type="number"
           step={field.type === "float" ? "0.1" : "1"}
+          min={field.min ?? undefined}
+          max={field.max ?? undefined}
           placeholder={fieldPlaceholderText(field)}
           value={valueFor(field) ?? ""}
           oninput={(e) => settingsStore.markDirty(field.key, e.currentTarget.value)}
