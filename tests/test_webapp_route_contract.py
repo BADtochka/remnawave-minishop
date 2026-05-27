@@ -187,6 +187,7 @@ class WebAppRouteContractTests(unittest.TestCase):
             ("POST", "/api/admin/appearance/logo"): "admin_appearance_logo_upload_route",
             ("POST", "/api/admin/appearance/favicon"): "admin_appearance_favicon_upload_route",
             ("GET", "/api/admin/backups"): "admin_backups_list_route",
+            ("POST", "/api/admin/backups/create"): "admin_backups_create_route",
             ("POST", "/api/admin/backups/upload"): "admin_backups_upload_route",
             ("POST", "/api/admin/backups/restore"): "admin_backups_restore_route",
             ("GET", "/api/admin/panel/internal-squads"): "admin_panel_internal_squads_route",

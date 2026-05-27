@@ -67,6 +67,18 @@ class BackupResult:
     size_bytes: int
     warnings: list[str] = field(default_factory=list)
 
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "archive_name": self.archive_path.name,
+            "archive_path": str(self.archive_path),
+            "started_at": self.started_at.isoformat(),
+            "completed_at": self.completed_at.isoformat(),
+            "db_dump_included": self.db_dump_included,
+            "compose_files_count": self.compose_files_count,
+            "size_bytes": self.size_bytes,
+            "warnings": self.warnings,
+        }
+
 
 class BackupWorker:
     SETTINGS_REFRESH_SECONDS = 60
@@ -120,20 +132,21 @@ class BackupWorker:
                 logging.exception("Backup worker tick failed")
                 await self._notify_failure(exc)
 
-    async def create_and_send_backup(self) -> BackupResult:
-        result = await self.create_backup()
+    async def create_and_send_backup(self, *, backup_type: str = "scheduled") -> BackupResult:
+        result = await self.create_backup(backup_type=backup_type)
         try:
             await self.send_backup(result)
         finally:
             self.prune_old_backups()
         return result
 
-    async def create_backup(self) -> BackupResult:
+    async def create_backup(self, *, backup_type: str = "scheduled") -> BackupResult:
         started_at = datetime.now(timezone.utc)
         stamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S%z")
         archive_name = f"{BACKUP_FILENAME_PREFIX}{stamp}.zip"
         backup_dir = Path(self.settings.BACKUP_DIR).expanduser()
         backup_dir.mkdir(parents=True, exist_ok=True)
+        archive_path = self._unique_archive_path(backup_dir / archive_name)
 
         with tempfile.TemporaryDirectory(
             prefix=f"{BACKUP_FILENAME_PREFIX}{stamp}-",
@@ -158,7 +171,7 @@ class BackupWorker:
             manifest = {
                 "app": BACKUP_APP_ID,
                 "format_version": BACKUP_FORMAT_VERSION,
-                "type": "scheduled",
+                "type": str(backup_type or "scheduled"),
                 "created_at": completed_at.isoformat(),
                 "created_at_local": completed_at.astimezone().isoformat(),
                 "postgres": {
@@ -182,8 +195,7 @@ class BackupWorker:
             )
             write_manifest(staging_dir, manifest)
 
-            tmp_archive = backup_dir / f"{archive_name}.tmp"
-            archive_path = backup_dir / archive_name
+            tmp_archive = archive_path.with_name(f"{archive_path.name}.tmp")
             write_zip_from_directory(staging_dir, tmp_archive)
             tmp_archive.replace(archive_path)
 
@@ -196,6 +208,17 @@ class BackupWorker:
             size_bytes=archive_path.stat().st_size,
             warnings=warnings,
         )
+
+    def _unique_archive_path(self, archive_path: Path) -> Path:
+        if not archive_path.exists():
+            return archive_path
+        for index in range(2, 1000):
+            candidate = archive_path.with_name(
+                f"{archive_path.stem}-{index}{archive_path.suffix}"
+            )
+            if not candidate.exists():
+                return candidate
+        raise RuntimeError("Could not allocate a unique backup archive filename")
 
     async def _dump_database(self, dump_path: Path) -> None:
         await asyncio.to_thread(self._run_pg_dump, dump_path)
@@ -352,6 +375,9 @@ class BackupWorker:
         if unit == "B":
             return f"{int(size)} {unit}"
         return f"{size:.1f} {unit}"
+
+    async def refresh_settings(self) -> None:
+        await self._refresh_settings()
 
     async def _refresh_settings(self) -> None:
         if self.session_factory is None:

@@ -475,6 +475,35 @@ export async function mockApi(path, options = {}, context = {}) {
       archives: clone(mockBackups),
     };
   }
+  if (path === "/admin/backups/create") {
+    const createdAt = new Date();
+    const stamp = createdAt
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace("T", "-")
+      .replace(/\.\d{3}Z$/, "+0000");
+    const archive = {
+      ...mockBackups[0],
+      name: `remnawave-minishop-backup-${stamp}.zip`,
+      modified_at: createdAt.toISOString(),
+      created_at: createdAt.toISOString(),
+      created_at_local: createdAt.toISOString(),
+    };
+    return {
+      ok: true,
+      archive,
+      result: {
+        archive_name: archive.name,
+        archive_path: `data/backups/${archive.name}`,
+        started_at: createdAt.toISOString(),
+        completed_at: createdAt.toISOString(),
+        db_dump_included: true,
+        compose_files_count: archive.compose_files_count,
+        size_bytes: archive.size_bytes,
+        warnings: [],
+      },
+    };
+  }
   if (path === "/admin/backups/upload") {
     return {
       ok: true,

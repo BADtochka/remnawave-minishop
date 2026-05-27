@@ -10,6 +10,7 @@
   import {
     CheckCircle2,
     Database,
+    Plus,
     RefreshCw,
     Server,
     TriangleAlert,
@@ -29,6 +30,7 @@
   $: ({
     archives,
     backupDir,
+    backupsCreating,
     backupsLoading,
     backupsUploading,
     backupsRestoring,
@@ -39,13 +41,16 @@
     selectedName = archives[0].name;
   }
   $: selectedArchive = (archives || []).find((item) => item.name === selectedName) || null;
-  $: if (selectedArchive && restoreDatabase && !selectedArchive.has_database) restoreDatabase = false;
+  $: if (selectedArchive && restoreDatabase && !selectedArchive.has_database)
+    restoreDatabase = false;
   $: if (selectedArchive && restoreCompose && !selectedArchive.has_compose) restoreCompose = false;
   $: if (selectedArchive && !restoreDatabase && !restoreCompose) {
     if (selectedArchive.has_database) restoreDatabase = true;
     else if (selectedArchive.has_compose) restoreCompose = true;
   }
-  $: canRestore = Boolean(selectedArchive && (restoreDatabase || restoreCompose) && !backupsRestoring);
+  $: canRestore = Boolean(
+    selectedArchive && (restoreDatabase || restoreCompose) && !backupsRestoring && !backupsCreating
+  );
   $: backupHeaders = [
     "",
     at("backups_col_archive", {}, "Архив"),
@@ -85,6 +90,11 @@
     event.currentTarget.value = "";
   }
 
+  async function createManualBackup() {
+    const archive = await backupsStore.createBackup();
+    if (archive?.name) selectedName = archive.name;
+  }
+
   async function restoreSelected() {
     if (!canRestore) return;
     const confirmText = at(
@@ -113,6 +123,12 @@
       <AdminButton onclick={() => backupsStore.loadArchives()} disabled={backupsLoading}>
         <RefreshCw size={14} />
         {at("btn_refresh", {}, "Обновить")}
+      </AdminButton>
+      <AdminButton onclick={createManualBackup} disabled={backupsCreating || backupsRestoring}>
+        <Plus size={14} />
+        {backupsCreating
+          ? at("backups_creating", {}, "Создание...")
+          : at("backups_create", {}, "Создать бэкап")}
       </AdminButton>
       <AdminButton onclick={() => fileInput?.click()} disabled={backupsUploading}>
         <Upload size={14} />
@@ -222,11 +238,18 @@
                   aria-label={archive.name}
                 />
               </td>
-              <td class="admin-cell-wrap backups-name" data-label={at("backups_col_archive", {}, "Архив")}>
+              <td
+                class="admin-cell-wrap backups-name"
+                data-label={at("backups_col_archive", {}, "Архив")}
+              >
                 {archive.name}
               </td>
-              <td data-label={at("backups_col_created", {}, "Создан")}>{fmtDate(archiveDate(archive))}</td>
-              <td data-label={at("backups_col_size", {}, "Размер")}>{formatSize(archive.size_bytes)}</td>
+              <td data-label={at("backups_col_created", {}, "Создан")}
+                >{fmtDate(archiveDate(archive))}</td
+              >
+              <td data-label={at("backups_col_size", {}, "Размер")}
+                >{formatSize(archive.size_bytes)}</td
+              >
               <td data-label={at("backups_col_contents", {}, "Состав")}>
                 <span class="backups-badges">
                   {#if archive.has_database}

@@ -119,6 +119,39 @@ def test_backup_worker_falls_back_to_log_chat_and_thread(tmp_path):
     assert send_kwargs["message_thread_id"] == 77
 
 
+def test_backup_worker_can_create_manual_backup(tmp_path):
+    compose_dir = tmp_path / "compose"
+    compose_dir.mkdir()
+    settings = _settings(
+        tmp_path,
+        compose_dir,
+        BACKUP_POSTGRES_DUMP_ENABLED=True,
+        BACKUP_COMPOSE_ENABLED=False,
+    )
+    bot = _FakeBot()
+    worker = _FakePgDumpBackupWorker(settings, bot)
+
+    result = asyncio.run(worker.create_backup(backup_type="manual"))
+
+    assert result.archive_path.is_file()
+    assert result.to_payload()["archive_name"] == result.archive_path.name
+    with zipfile.ZipFile(result.archive_path) as archive:
+        manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
+    assert manifest["type"] == "manual"
+    assert "archive" in manifest
+
+
+def test_backup_worker_allocates_unique_archive_path(tmp_path):
+    settings = _settings(tmp_path, tmp_path / "compose")
+    worker = _FakePgDumpBackupWorker(settings, _FakeBot())
+    archive_path = tmp_path / "remnawave-minishop-backup-20260527-120000+0300.zip"
+    archive_path.write_text("existing", encoding="utf-8")
+
+    unique_path = worker._unique_archive_path(archive_path)
+
+    assert unique_path.name == "remnawave-minishop-backup-20260527-120000+0300-2.zip"
+
+
 def test_backup_worker_does_not_fail_when_compose_source_is_not_mounted(tmp_path):
     missing_compose_dir = tmp_path / "missing-compose"
     settings = _settings(

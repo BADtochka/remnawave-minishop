@@ -12,6 +12,7 @@ from bot.services.backup_restore_service import (
     BackupRestoreError,
     BackupRestoreService,
 )
+from bot.services.backup_worker import BackupWorker
 
 
 def _backup_archive_payload(archive) -> Dict[str, Any]:
@@ -87,6 +88,46 @@ async def admin_backups_upload_route(request: web.Request) -> web.Response:
         logger.exception("Failed to save uploaded backup archive")
         return _error(500, "backup_upload_failed", str(exc))
     return _ok({"archive": _backup_archive_payload(archive)})
+
+
+async def admin_backups_create_route(request: web.Request) -> web.Response:
+    _require_admin_user_id(request)
+    settings: Settings = request.app["settings"]
+    bot = request.app["bot"]
+    session_factory = request.app.get("async_session_factory")
+    worker = BackupWorker(settings, bot, session_factory=session_factory)
+
+    ttl_seconds = max(
+        60,
+        int(
+            max(
+                getattr(settings, "BACKUP_LOCK_TTL_SECONDS", 7200) or 7200,
+                getattr(settings, "BACKUP_PG_DUMP_TIMEOUT_SECONDS", 1800) or 1800,
+            )
+        ),
+    )
+    try:
+        async with redis_lock(settings, "backup-worker", ttl_seconds=ttl_seconds) as acquired:
+            if not acquired:
+                return _error(409, "backup_create_busy", "Backup or restore is already running")
+            await worker.refresh_settings()
+            result = await worker.create_and_send_backup(backup_type="manual")
+            archive = BackupRestoreService(settings).inspect_archive(result.archive_path)
+    except BackupArchiveError as exc:
+        return _error(400, "invalid_backup_archive", str(exc))
+    except (OSError, RuntimeError, subprocess.SubprocessError, TimeoutError) as exc:
+        logger.exception("Manual backup creation failed")
+        return _error(500, "backup_create_failed", str(exc))
+    except Exception as exc:
+        logger.exception("Manual backup creation failed")
+        return _error(500, "backup_create_failed", str(exc))
+
+    return _ok(
+        {
+            "result": result.to_payload(),
+            "archive": _backup_archive_payload(archive),
+        }
+    )
 
 
 async def admin_backups_restore_route(request: web.Request) -> web.Response:

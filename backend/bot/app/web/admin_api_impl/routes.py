@@ -76,6 +76,7 @@ def setup_admin_routes(app: web.Application) -> None:
     router.add_post("/api/admin/appearance/logo", admin_appearance_logo_upload_route)
     router.add_post("/api/admin/appearance/favicon", admin_appearance_favicon_upload_route)
     router.add_get("/api/admin/backups", admin_backups_list_route)
+    router.add_post("/api/admin/backups/create", admin_backups_create_route)
     router.add_post("/api/admin/backups/upload", admin_backups_upload_route)
     router.add_post("/api/admin/backups/restore", admin_backups_restore_route)
     router.add_get("/api/admin/panel/internal-squads", admin_panel_internal_squads_route)

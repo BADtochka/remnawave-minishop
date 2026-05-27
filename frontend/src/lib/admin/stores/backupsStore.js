@@ -5,8 +5,10 @@ export function createBackupsStore({ api, onToast, at }) {
     archives: [],
     backupDir: "",
     backupsLoading: false,
+    backupsCreating: false,
     backupsUploading: false,
     backupsRestoring: false,
+    lastCreated: null,
     lastRestore: null,
   });
 
@@ -21,10 +23,35 @@ export function createBackupsStore({ api, onToast, at }) {
           backupDir: data.backup_dir || "",
         }));
       } else {
-        onToast(data?.message || data?.error || at("backups_load_failed", {}, "Не удалось загрузить бэкапы"));
+        onToast(
+          data?.message ||
+            data?.error ||
+            at("backups_load_failed", {}, "Не удалось загрузить бэкапы")
+        );
       }
     } finally {
       state.update((s) => ({ ...s, backupsLoading: false }));
+    }
+  }
+
+  async function createBackup() {
+    state.update((s) => ({ ...s, backupsCreating: true, lastCreated: null }));
+    try {
+      const data = await api("/admin/backups/create", {
+        method: "POST",
+      });
+      if (data?.ok) {
+        state.update((s) => ({ ...s, lastCreated: data.result || null }));
+        onToast(at("backups_create_done", {}, "Бэкап создан"));
+        await loadArchives();
+        return data.archive || null;
+      }
+      onToast(
+        data?.message || data?.error || at("backups_create_failed", {}, "Не удалось создать бэкап")
+      );
+      return null;
+    } finally {
+      state.update((s) => ({ ...s, backupsCreating: false }));
     }
   }
 
@@ -43,7 +70,11 @@ export function createBackupsStore({ api, onToast, at }) {
         await loadArchives();
         return data.archive || null;
       }
-      onToast(data?.message || data?.error || at("backups_upload_failed", {}, "Не удалось загрузить архив"));
+      onToast(
+        data?.message ||
+          data?.error ||
+          at("backups_upload_failed", {}, "Не удалось загрузить архив")
+      );
       return null;
     } finally {
       state.update((s) => ({ ...s, backupsUploading: false }));
@@ -77,7 +108,9 @@ export function createBackupsStore({ api, onToast, at }) {
         onToast(at("backups_restore_done", {}, "Восстановление завершено"));
         return true;
       }
-      onToast(data?.message || data?.error || at("backups_restore_failed", {}, "Не удалось восстановить"));
+      onToast(
+        data?.message || data?.error || at("backups_restore_failed", {}, "Не удалось восстановить")
+      );
       return false;
     } finally {
       state.update((s) => ({ ...s, backupsRestoring: false }));
@@ -87,6 +120,7 @@ export function createBackupsStore({ api, onToast, at }) {
   return {
     subscribe: state.subscribe,
     loadArchives,
+    createBackup,
     uploadArchive,
     restoreArchive,
   };
