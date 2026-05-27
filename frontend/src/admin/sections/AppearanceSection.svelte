@@ -6,6 +6,7 @@
     AdminEmptyState,
     AdminSelect,
   } from "$components/patterns/admin/index.js";
+  import { Checkbox } from "$components/ui/index.js";
   import { Switch } from "$components/ui/primitives.js";
   import { getContext, onDestroy, onMount } from "svelte";
 
@@ -343,9 +344,8 @@
     }
   }
 
-  function toggleAdminTheme(event, theme) {
-    event.stopPropagation();
-    themesStore.toggleAdminUse(theme.key, event.currentTarget.checked);
+  function toggleAdminTheme(theme, checked) {
+    themesStore.toggleAdminUse(theme.key, checked);
   }
 
   function setThemeAccent(theme, value) {
@@ -675,11 +675,11 @@
                   />
                 </label>
                 <label class="admin-theme-card-option">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={theme.use_in_admin !== false}
                     disabled={themesSaving}
-                    onchange={(event) => toggleAdminTheme(event, theme)}
+                    ariaLabel={at("themes_use_in_admin", {}, "Use in admin")}
+                    onCheckedChange={(checked) => toggleAdminTheme(theme, checked)}
                   />
                   <span>{at("themes_use_in_admin", {}, "Использовать в админке")}</span>
                 </label>
@@ -853,10 +853,6 @@
     max-width: 520px;
     color: var(--admin-text);
     font-size: 13px;
-  }
-
-  .admin-theme-card-option input[type="checkbox"] {
-    accent-color: var(--accent);
   }
 
   .admin-theme-grid {

@@ -4,9 +4,11 @@
     AdminBadge,
     AdminButton,
     AdminEmptyState,
+    AdminPagination,
     AdminTable,
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
+  import { Checkbox, RadioGroup, RadioGroupItem } from "$components/ui/index.js";
   import {
     CheckCircle2,
     Database,
@@ -16,15 +18,18 @@
     TriangleAlert,
     Upload,
   } from "$components/ui/icons.js";
+  import { Tooltip } from "$components/ui/primitives.js";
 
   export let at = (key) => key;
   export let fmtDate = (value) => value;
 
+  const BACKUPS_PAGE_SIZE = 10;
   const backupsStore = getContext("backupsStore");
 
   let selectedName = "";
   let restoreDatabase = true;
   let restoreCompose = false;
+  let backupsPage = 0;
   let fileInput = null;
 
   $: ({
@@ -36,9 +41,18 @@
     backupsRestoring,
     lastRestore,
   } = $backupsStore);
-  $: if (!selectedName && archives?.length) selectedName = archives[0].name;
+  $: totalArchives = archives?.length || 0;
+  $: backupsPageCount = Math.max(1, Math.ceil(totalArchives / BACKUPS_PAGE_SIZE));
+  $: if (backupsPage > backupsPageCount - 1) backupsPage = backupsPageCount - 1;
+  $: backupsPageStart = backupsPage * BACKUPS_PAGE_SIZE;
+  $: pagedArchives = (archives || []).slice(backupsPageStart, backupsPageStart + BACKUPS_PAGE_SIZE);
+  $: if (!selectedName && archives?.length) {
+    selectedName = archives[0].name;
+    backupsPage = 0;
+  }
   $: if (selectedName && archives?.length && !archives.some((item) => item.name === selectedName)) {
     selectedName = archives[0].name;
+    backupsPage = 0;
   }
   $: selectedArchive = (archives || []).find((item) => item.name === selectedName) || null;
   $: if (selectedArchive && restoreDatabase && !selectedArchive.has_database)
@@ -82,17 +96,45 @@
     return parts.join(" + ");
   }
 
+  function selectArchive(name) {
+    selectedName = name;
+  }
+
+  function focusArchivePage(name) {
+    const index = (archives || []).findIndex((item) => item.name === name);
+    if (index >= 0) backupsPage = Math.floor(index / BACKUPS_PAGE_SIZE);
+  }
+
+  function warningsText(warnings) {
+    return (warnings || []).filter(Boolean).join("\n");
+  }
+
+  function paginationMeta() {
+    const end = Math.min(backupsPageStart + pagedArchives.length, totalArchives);
+    return at(
+      "backups_pagination_meta",
+      { from: backupsPageStart + 1, to: end, total: totalArchives },
+      `${backupsPageStart + 1}-${end} / ${totalArchives}`
+    );
+  }
+
   async function uploadSelectedFile(event) {
     const file = event?.currentTarget?.files?.[0];
     if (!file) return;
     const archive = await backupsStore.uploadArchive(file);
-    if (archive?.name) selectedName = archive.name;
+    if (archive?.name) {
+      selectedName = archive.name;
+      focusArchivePage(archive.name);
+    }
     event.currentTarget.value = "";
   }
 
   async function createManualBackup() {
     const archive = await backupsStore.createBackup();
-    if (archive?.name) selectedName = archive.name;
+    if (archive?.name) {
+      selectedName = archive.name;
+      focusArchivePage(archive.name);
+    }
   }
 
   async function restoreSelected() {
@@ -167,19 +209,19 @@
     </header>
     <div class="admin-card-body backups-restore-body">
       <label class="backups-check" class:is-disabled={!selectedArchive?.has_database}>
-        <input
-          type="checkbox"
+        <Checkbox
           bind:checked={restoreDatabase}
           disabled={!selectedArchive?.has_database || backupsRestoring}
+          ariaLabel={at("backups_target_database", {}, "БД")}
         />
         <Database size={16} />
         <span>{at("backups_target_database", {}, "БД")}</span>
       </label>
       <label class="backups-check" class:is-disabled={!selectedArchive?.has_compose}>
-        <input
-          type="checkbox"
+        <Checkbox
           bind:checked={restoreCompose}
           disabled={!selectedArchive?.has_compose || backupsRestoring}
+          ariaLabel={at("backups_target_compose", {}, "compose-папка")}
         />
         <Server size={16} />
         <span>{at("backups_target_compose", {}, "compose-папка")}</span>
@@ -214,68 +256,95 @@
         <span class="admin-muted">{at("backups_empty", {}, "Архивов пока нет")}</span>
       </AdminEmptyState>
     {:else}
-      <AdminTable class="backups-table">
-        <thead>
-          <tr>
-            <th aria-label={at("select", {}, "Выбрать")}></th>
-            <th>{at("backups_col_archive", {}, "Архив")}</th>
-            <th>{at("backups_col_created", {}, "Создан")}</th>
-            <th>{at("backups_col_size", {}, "Размер")}</th>
-            <th>{at("backups_col_contents", {}, "Состав")}</th>
-            <th>{at("backups_col_warnings", {}, "Предупреждения")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each archives as archive (archive.name)}
-            <tr class:is-selected={archive.name === selectedName}>
-              <td data-label={at("select", {}, "Выбрать")}>
-                <input
-                  type="radio"
-                  name="backup-archive"
-                  value={archive.name}
-                  checked={archive.name === selectedName}
-                  on:change={() => (selectedName = archive.name)}
-                  aria-label={archive.name}
-                />
-              </td>
-              <td
-                class="admin-cell-wrap backups-name"
-                data-label={at("backups_col_archive", {}, "Архив")}
-              >
-                {archive.name}
-              </td>
-              <td data-label={at("backups_col_created", {}, "Создан")}
-                >{fmtDate(archiveDate(archive))}</td
-              >
-              <td data-label={at("backups_col_size", {}, "Размер")}
-                >{formatSize(archive.size_bytes)}</td
-              >
-              <td data-label={at("backups_col_contents", {}, "Состав")}>
-                <span class="backups-badges">
-                  {#if archive.has_database}
-                    <AdminBadge variant="success">{at("backups_badge_db", {}, "БД")}</AdminBadge>
-                  {/if}
-                  {#if archive.has_compose}
-                    <AdminBadge variant="muted">
-                      {at("backups_badge_compose", {}, "Compose")}
-                    </AdminBadge>
-                  {/if}
-                </span>
-              </td>
-              <td data-label={at("backups_col_warnings", {}, "Предупреждения")}>
-                {#if archive.warnings?.length}
-                  <AdminBadge variant="warning">
-                    <TriangleAlert size={12} />
-                    {archive.warnings.length}
-                  </AdminBadge>
-                {:else}
-                  <span class="admin-muted">-</span>
-                {/if}
-              </td>
+      <RadioGroup
+        class="backups-archive-radio-group"
+        name="backup-archive"
+        value={selectedName}
+        onValueChange={selectArchive}
+      >
+        <AdminTable class="backups-table">
+          <thead>
+            <tr>
+              <th aria-label={at("select", {}, "Выбрать")}></th>
+              <th>{at("backups_col_archive", {}, "Архив")}</th>
+              <th>{at("backups_col_created", {}, "Создан")}</th>
+              <th>{at("backups_col_size", {}, "Размер")}</th>
+              <th>{at("backups_col_contents", {}, "Состав")}</th>
+              <th>{at("backups_col_warnings", {}, "Предупреждения")}</th>
             </tr>
-          {/each}
-        </tbody>
-      </AdminTable>
+          </thead>
+          <tbody>
+            {#each pagedArchives as archive (archive.name)}
+              <tr class:is-selected={archive.name === selectedName}>
+                <td data-label={at("select", {}, "Выбрать")}>
+                  <RadioGroupItem
+                    value={archive.name}
+                    ariaLabel={archive.name}
+                    class="backups-radio"
+                  />
+                </td>
+                <td
+                  class="admin-cell-wrap backups-name"
+                  data-label={at("backups_col_archive", {}, "Архив")}
+                >
+                  {archive.name}
+                </td>
+                <td data-label={at("backups_col_created", {}, "Создан")}
+                  >{fmtDate(archiveDate(archive))}</td
+                >
+                <td data-label={at("backups_col_size", {}, "Размер")}
+                  >{formatSize(archive.size_bytes)}</td
+                >
+                <td data-label={at("backups_col_contents", {}, "Состав")}>
+                  <span class="backups-badges">
+                    {#if archive.has_database}
+                      <AdminBadge variant="success">{at("backups_badge_db", {}, "БД")}</AdminBadge>
+                    {/if}
+                    {#if archive.has_compose}
+                      <AdminBadge variant="muted">
+                        {at("backups_badge_compose", {}, "Compose")}
+                      </AdminBadge>
+                    {/if}
+                  </span>
+                </td>
+                <td data-label={at("backups_col_warnings", {}, "Предупреждения")}>
+                  {#if archive.warnings?.length}
+                    <Tooltip.Root>
+                      <Tooltip.Trigger
+                        class="backups-warning-trigger"
+                        aria-label={warningsText(archive.warnings)}
+                      >
+                        <TriangleAlert size={12} />
+                        {archive.warnings.length}
+                      </Tooltip.Trigger>
+                      <Tooltip.Portal>
+                        <Tooltip.Content class="backups-warning-tooltip" side="top" align="end">
+                          {#each archive.warnings as warning, index}
+                            <p>{index + 1}. {warning}</p>
+                          {/each}
+                        </Tooltip.Content>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
+                  {:else}
+                    <span class="admin-muted">-</span>
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </AdminTable>
+      </RadioGroup>
+      {#if totalArchives > BACKUPS_PAGE_SIZE}
+        <AdminPagination
+          meta={paginationMeta()}
+          prevLabel={at("pagination_prev", {}, "Назад")}
+          nextLabel={at("pagination_next", {}, "Далее")}
+          prevDisabled={backupsPage <= 0}
+          nextDisabled={backupsPage >= backupsPageCount - 1}
+          onPrev={() => (backupsPage = Math.max(0, backupsPage - 1))}
+          onNext={() => (backupsPage = Math.min(backupsPageCount - 1, backupsPage + 1))}
+        />
+      {/if}
     {/if}
   </div>
 </div>
@@ -335,12 +404,6 @@
     font-size: 13px;
   }
 
-  .backups-check input {
-    width: 16px;
-    height: 16px;
-    margin: 0;
-  }
-
   .backups-check.is-disabled {
     opacity: 0.55;
   }
@@ -360,6 +423,56 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+  }
+
+  :global(.backups-archive-radio-group.ui-radio-group) {
+    display: block;
+  }
+
+  :global(.backups-radio.ui-radio-item) {
+    margin-inline: auto;
+  }
+
+  :global(.backups-warning-trigger) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 24px;
+    padding: 2px 7px;
+    border: 1px solid var(--warning-border);
+    border-radius: 999px;
+    background: var(--warning-soft);
+    color: var(--warning-text);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: help;
+    outline: none;
+  }
+
+  :global(.backups-warning-trigger:focus-visible) {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 22%, transparent);
+  }
+
+  :global(.backups-warning-tooltip) {
+    z-index: 120;
+    display: grid;
+    gap: 6px;
+    max-width: min(440px, calc(100vw - 32px));
+    padding: 10px 12px;
+    border: 1px solid var(--admin-border);
+    border-radius: 10px;
+    background: var(--admin-surface);
+    color: var(--admin-text);
+    box-shadow: var(--shadow-popover);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  :global(.backups-warning-tooltip) p {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
   @media (max-width: 760px) {

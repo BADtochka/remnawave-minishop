@@ -1,5 +1,6 @@
 <script>
   import { Label, Separator, Tabs } from "$components/ui/primitives.js";
+  import { Checkbox } from "$components/ui/index.js";
   import Dialog from "$components/ui/dialog.svelte";
   import {
     AdminBadge,
@@ -680,8 +681,7 @@
                   <div class="admin-user-action-sheet-footer admin-override-card-footer">
                     <div class="admin-override-card-toolbar">
                       <label class="admin-override-unlimited-label">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           bind:checked={$usersStore.premiumUnlimitedDraft}
                           aria-label={at("user_override_unlimited_short", {}, "Безлимит")}
                         />
@@ -760,8 +760,7 @@
                   <div class="admin-user-action-sheet-footer admin-override-card-footer">
                     <div class="admin-override-card-toolbar">
                       <label class="admin-override-unlimited-label">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           bind:checked={$usersStore.regularUnlimitedDraft}
                           aria-label={at("user_override_unlimited_short", {}, "Безлимит")}
                         />
@@ -1109,11 +1108,6 @@
     cursor: pointer;
     user-select: none;
     min-height: 36px;
-  }
-  .admin-override-unlimited-label input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
   }
   @media (max-width: 520px) {
     .admin-override-card-toolbar {
