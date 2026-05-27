@@ -32,6 +32,16 @@ class SettingsTests(unittest.TestCase):
         self.assertTrue(settings.WEBHOOK_SECRET_TOKEN)
         self.assertEqual(settings.WEBAPP_SESSION_TTL_SECONDS, 86400)
 
+    def test_webapp_title_defaults_to_minishop(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+        )
+
+        self.assertEqual(settings.WEBAPP_TITLE, "/minishop")
+
     def test_subscription_guides_defaults_are_enabled(self):
         settings = Settings(
             _env_file=None,

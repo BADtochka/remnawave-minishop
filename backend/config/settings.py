@@ -303,7 +303,7 @@ class Settings(BaseSettings):
     )
     WEBAPP_SERVER_HOST: str = Field(default="0.0.0.0")
     WEBAPP_SERVER_PORT: int = Field(default=8081)
-    WEBAPP_TITLE: str = Field(default="Моя подписка")
+    WEBAPP_TITLE: str = Field(default="/minishop")
     WEBAPP_PRIMARY_COLOR: str = Field(default="#00fe7a")
     WEBAPP_THEMES_DIR: str = Field(
         default="data/themes",
