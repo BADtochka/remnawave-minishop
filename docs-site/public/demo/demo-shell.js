@@ -103,6 +103,13 @@ const materializedRouteFromRuntime = (route) => {
 };
 
 const publicPathFromRoute = (route) => `${demoBase}${materializedRouteFromRuntime(route)}`;
+const runtimeSrc = (route, searchParams = new URLSearchParams()) => {
+  const nextParams = new URLSearchParams(searchParams);
+  nextParams.delete("screen");
+  nextParams.delete("admin_section");
+  nextParams.set("path", normalizePath(route));
+  return `${runtimeBase}/app.html?${nextParams.toString()}${window.location.hash || ""}`;
+};
 const topbar = document.querySelector(".demo-topbar");
 const toggle = document.querySelector(".demo-topbar__toggle");
 const hide = document.querySelector(".demo-topbar__hide");
@@ -156,5 +163,5 @@ stateSelect?.addEventListener("change", () => {
   const query = nextParams.toString();
   const publicUrl = `${demoBase}/home${query ? `?${query}` : ""}`;
   window.history.replaceState(null, "", publicUrl);
-  frame.src = `${runtimeBase}/home?mock=${mock}`;
+  frame.src = runtimeSrc("/home", nextParams);
 });
