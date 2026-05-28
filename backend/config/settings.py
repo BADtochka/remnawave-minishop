@@ -243,6 +243,8 @@ class Settings(BaseSettings):
     SUBSCRIPTION_NOTIFY_ON_EXPIRE: bool = Field(default=True)
     SUBSCRIPTION_NOTIFY_AFTER_EXPIRE: bool = Field(default=True)
     SUBSCRIPTION_NOTIFY_DAYS_BEFORE: int = Field(default=3)
+    SUBSCRIPTION_NOTIFY_HOURS_BEFORE: int = Field(default=3)
+    SUBSCRIPTION_NOTIFICATION_WORKER_TICK_SECONDS: int = Field(default=300)
 
     REFERRAL_BONUS_DAYS_INVITER_1_MONTH: Optional[int] = Field(
         default=3, alias="REFERRAL_BONUS_DAYS_1_MONTH"

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from db.models import Subscription
+from db.models import Subscription, SubscriptionNotification
 
 INSTALL_SHARE_TOKEN_BYTES = 16
 
@@ -316,6 +316,45 @@ async def update_subscription_notification_time(
     return await update_subscription(
         session, subscription_id, {"last_notification_sent": notification_time}
     )
+
+
+async def has_subscription_notification(
+    session: AsyncSession,
+    subscription_id: int,
+    notification_key: str,
+) -> bool:
+    stmt = (
+        select(SubscriptionNotification.notification_id)
+        .where(
+            SubscriptionNotification.subscription_id == subscription_id,
+            SubscriptionNotification.notification_key == notification_key,
+        )
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none() is not None
+
+
+async def record_subscription_notification(
+    session: AsyncSession,
+    subscription_id: int,
+    notification_key: str,
+    *,
+    sent_at: Optional[datetime] = None,
+) -> None:
+    if sent_at is None:
+        sent_at = datetime.now(timezone.utc)
+    existing = await has_subscription_notification(session, subscription_id, notification_key)
+    if existing:
+        return
+    session.add(
+        SubscriptionNotification(
+            subscription_id=subscription_id,
+            notification_key=notification_key,
+            sent_at=sent_at,
+        )
+    )
+    await update_subscription_notification_time(session, subscription_id, sent_at)
 
 
 async def find_subscription_for_notification_update(

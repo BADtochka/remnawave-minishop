@@ -84,6 +84,10 @@ class UserDalMergeTests(unittest.IsolatedAsyncioTestCase):
             delete_tables.index("subscriptions"),
         )
         self.assertLess(
+            delete_tables.index("subscription_notifications"),
+            delete_tables.index("subscriptions"),
+        )
+        self.assertLess(
             delete_tables.index("promo_code_activations"),
             delete_tables.index("payments"),
         )

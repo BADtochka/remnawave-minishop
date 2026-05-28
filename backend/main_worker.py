@@ -25,6 +25,7 @@ from bot.payment_providers.yookassa import (
 )
 from bot.services.backup_worker import BackupWorker
 from bot.services.locale_override_service import load_locale_overrides
+from bot.services.subscription_notification_worker import SubscriptionNotificationWorker
 from bot.services.tariff_worker import TariffTrafficWorker
 from bot.utils.message_queue import init_queue_manager
 from config.settings import get_settings
@@ -192,6 +193,20 @@ async def main() -> None:
     tasks = []
     if settings.tariffs_config:
         tasks.append(asyncio.create_task(tariff_worker.run(), name="TariffTrafficWorker"))
+    subscription_notification_worker = SubscriptionNotificationWorker(
+        settings,
+        session_factory,
+        bot,
+        i18n,
+        services["panel_service"],
+        services["subscription_service"],
+    )
+    tasks.append(
+        asyncio.create_task(
+            subscription_notification_worker.run(),
+            name="SubscriptionNotificationWorker",
+        )
+    )
     backup_worker = BackupWorker(settings, bot, session_factory=session_factory)
     tasks.append(asyncio.create_task(backup_worker.run(), name="BackupWorker"))
     tasks.append(asyncio.create_task(_panel_sync_loop(settings, session_factory, i18n, services)))

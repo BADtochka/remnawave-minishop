@@ -18,6 +18,7 @@ from ..models import (
     Payment,
     PromoCodeActivation,
     Subscription,
+    SubscriptionNotification,
     SupportTicket,
     SupportTicketMessage,
     TariffChange,
@@ -778,6 +779,11 @@ async def delete_user_and_relations(session: AsyncSession, user_id: int) -> bool
     )
     await session.execute(
         delete(TrafficWarning).where(TrafficWarning.subscription_id.in_(subscription_ids))
+    )
+    await session.execute(
+        delete(SubscriptionNotification).where(
+            SubscriptionNotification.subscription_id.in_(subscription_ids)
+        )
     )
     await session.execute(
         delete(SupportTicketMessage).where(SupportTicketMessage.ticket_id.in_(support_ticket_ids))

@@ -277,6 +277,26 @@ class TrafficWarning(Base):
     subscription = relationship("Subscription")
 
 
+class SubscriptionNotification(Base):
+    __tablename__ = "subscription_notifications"
+    __table_args__ = (
+        UniqueConstraint(
+            "subscription_id",
+            "notification_key",
+            name="uq_subscription_notification_key",
+        ),
+    )
+
+    notification_id = Column(Integer, primary_key=True, autoincrement=True)
+    subscription_id = Column(
+        Integer, ForeignKey("subscriptions.subscription_id"), nullable=False, index=True
+    )
+    notification_key = Column(String(64), nullable=False, index=True)
+    sent_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    subscription = relationship("Subscription")
+
+
 class TariffChange(Base):
     __tablename__ = "tariff_changes"
 

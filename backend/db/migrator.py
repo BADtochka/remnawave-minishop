@@ -1012,6 +1012,41 @@ def _migration_0030_add_hwid_pricing_metadata(connection: Connection) -> None:
                 )
 
 
+def _migration_0031_add_subscription_notifications(connection: Connection) -> None:
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS subscription_notifications (
+                notification_id SERIAL PRIMARY KEY,
+                subscription_id INTEGER NOT NULL REFERENCES subscriptions(subscription_id),
+                notification_key VARCHAR(64) NOT NULL,
+                sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_subscription_notification_key UNIQUE (
+                    subscription_id,
+                    notification_key
+                )
+            )
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_subscription_notifications_subscription_id
+            ON subscription_notifications (subscription_id)
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_subscription_notifications_notification_key
+            ON subscription_notifications (notification_key)
+            """
+        )
+    )
+
+
 MIGRATIONS: List[Migration] = [
     Migration(
         id="0001_add_channel_subscription_fields",
@@ -1173,6 +1208,11 @@ MIGRATIONS: List[Migration] = [
         id="0030_add_hwid_pricing_metadata",
         description="Persist quoted HWID top-up pricing windows and conversion audit",
         upgrade=_migration_0030_add_hwid_pricing_metadata,
+    ),
+    Migration(
+        id="0031_add_subscription_notifications",
+        description="Track sent subscription notification stages",
+        upgrade=_migration_0031_add_subscription_notifications,
     ),
 ]
 

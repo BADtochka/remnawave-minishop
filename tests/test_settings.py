@@ -271,3 +271,14 @@ class SettingsTests(unittest.TestCase):
         )
 
         self.assertEqual(settings.tariff_traffic_warning_levels, [85, 90, 95])
+
+    def test_subscription_hour_notification_default_is_available(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+        )
+
+        self.assertEqual(settings.SUBSCRIPTION_NOTIFY_HOURS_BEFORE, 3)
+        self.assertEqual(settings.SUBSCRIPTION_NOTIFICATION_WORKER_TICK_SECONDS, 300)

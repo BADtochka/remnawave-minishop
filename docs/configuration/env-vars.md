@@ -388,6 +388,8 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | `SUBSCRIPTION_NOTIFY_ON_EXPIRE` | Уведомлять в день окончания. |
 | `SUBSCRIPTION_NOTIFY_AFTER_EXPIRE` | Уведомлять после окончания. |
 | `SUBSCRIPTION_NOTIFY_DAYS_BEFORE` | За сколько дней предупреждать. |
+| `SUBSCRIPTION_NOTIFY_HOURS_BEFORE` | За сколько часов предупреждать дополнительно. |
+| `SUBSCRIPTION_NOTIFICATION_WORKER_TICK_SECONDS` | Период локальной проверки уведомлений. |
 
 ## Поддержка
 
