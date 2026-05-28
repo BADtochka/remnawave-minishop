@@ -360,6 +360,58 @@ a {
   font-weight: 850;
 }
 
+.traffic-card-compact {
+  display: grid;
+}
+
+.traffic-card-compact .progress {
+  margin-top: 8px;
+}
+
+.traffic-summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.traffic-summary-left,
+.traffic-summary-right {
+  align-items: baseline;
+  min-width: 0;
+  gap: 5px;
+}
+
+.traffic-summary-left {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.traffic-summary-right {
+  display: inline-flex;
+  justify-content: flex-end;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 850;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.traffic-summary-separator {
+  color: color-mix(in srgb, var(--muted) 58%, transparent);
+}
+
+.traffic-summary-right .traffic-summary-separator {
+  flex: 0 0 auto;
+}
+
 .card-heading {
   margin: 0 0 10px;
   color: var(--text);
@@ -412,6 +464,9 @@ a {
 
 .traffic-card-depleted .traffic-top span,
 .traffic-card-depleted .traffic-top strong,
+.traffic-card-depleted .traffic-summary-left,
+.traffic-card-depleted .traffic-summary-right,
+.traffic-card-depleted .traffic-summary-separator,
 .traffic-card-depleted .traffic-meta,
 .traffic-card-depleted .traffic-percent {
   color: var(--danger-text);
@@ -456,6 +511,7 @@ a {
 
 .premium-traffic-meta {
   align-items: flex-start;
+  margin-top: 5px;
 }
 
 .premium-server-dropdown {
@@ -464,21 +520,55 @@ a {
   min-width: 0;
 }
 
-.premium-server-dropdown summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.premium-server-dropdown-inline {
+  display: grid;
   min-width: 0;
-  min-height: 32px;
-  margin: -6px -8px;
-  padding: 6px 8px;
+}
+
+.premium-server-dropdown summary {
+  min-width: 0;
+  min-height: 26px;
+  margin: -4px -7px 0;
+  padding: 4px 7px;
+  border-radius: 999px;
   cursor: pointer;
   list-style: none;
   -webkit-tap-highlight-color: transparent;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.premium-server-dropdown-inline summary {
+  display: grid;
+  max-width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.premium-server-summary {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.premium-summary-trigger {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .premium-server-dropdown summary:focus {
   outline: none;
+}
+
+.premium-server-dropdown summary:focus-visible {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .premium-server-dropdown summary::-webkit-details-marker {
@@ -491,13 +581,64 @@ a {
   white-space: nowrap;
 }
 
+.premium-summary-copy {
+  display: block;
+}
+
+.premium-summary-copy {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .premium-server-dropdown svg {
   flex: 0 0 auto;
-  opacity: 0.72;
+  opacity: 0.82;
+}
+
+.premium-server-help-icon {
+  padding: 1px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+  transition:
+    color 0.16s ease,
+    background 0.16s ease,
+    transform 0.18s ease;
+}
+
+.premium-server-dropdown summary:hover .premium-server-help-icon,
+.premium-server-dropdown[open] .premium-server-help-icon {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .premium-server-list-dropdown {
-  margin-top: 8px;
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: 0;
+  opacity: 0;
+  transform: translateY(-2px);
+  transform-origin: top;
+  transition:
+    grid-template-rows 0.22s ease,
+    margin-top 0.22s ease,
+    opacity 0.18s ease,
+    transform 0.22s ease;
+}
+
+.premium-server-dropdown[open] .premium-server-list-dropdown {
+  grid-template-rows: 1fr;
+  margin-top: 6px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.premium-server-list-dropdown > div {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .premium-detail-grid {
@@ -2466,6 +2607,15 @@ a {
     --screen-gutter: 10px;
   }
 
+  .traffic-summary-row {
+    gap: 6px;
+  }
+
+  .traffic-summary-left,
+  .traffic-summary-right {
+    font-size: 10px;
+  }
+
   .period-grid,
   .method-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2494,6 +2644,12 @@ a {
 
   .auth-card,
   .motion-height-stage.motion-height-locked {
+    transition: none !important;
+  }
+
+  .premium-server-dropdown summary,
+  .premium-server-help-icon,
+  .premium-server-list-dropdown {
     transition: none !important;
   }
 }

@@ -12,6 +12,7 @@ export {
   ChevronRight,
   ChevronsUpDown,
   Circle,
+  CircleQuestionMark,
   CircleX,
   Coins,
   Copy,
