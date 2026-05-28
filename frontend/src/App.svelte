@@ -1043,6 +1043,41 @@
     adminMountedTarget = null;
   }
 
+  function currentMockMode() {
+    if (!MOCK) return "";
+    const currentMock = currentSearchParams().get("mock");
+    if (currentMock) return String(currentMock).trim().toLowerCase();
+    const parentMock = docsDemoParentSearchParams()?.get("mock");
+    return String(parentMock || "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function isDemoAuthMock() {
+    return ["auth", "login", "register"].includes(currentMockMode());
+  }
+
+  function prepareDemoAuthState() {
+    const authDemo = MOCK_SOURCE.data?.auth_demo || {};
+    const email = String(authDemo.email || "demo.user@example.com").trim();
+    authStore.update((s) => ({
+      ...s,
+      authStatus: "",
+      authIsError: false,
+      authBusy: false,
+      authResendCooldown: 0,
+      email,
+      emailPassword: String(authDemo.password || ""),
+      pendingEmail: "",
+      emailCode: "",
+      passwordLoginMode: false,
+      passwordLoginFallback: false,
+      loginEmailFieldError: "",
+      loginEmailTooltipOpen: false,
+      telegramLoginBusy: false,
+    }));
+  }
+
   function currentSearchParams() {
     return new URLSearchParams(window.location.search);
   }
@@ -1196,6 +1231,11 @@
       await loadPublicInstall(shareToken);
       return;
     }
+    if (MOCK && isDemoAuthMock()) {
+      prepareDemoAuthState();
+      showLogin();
+      return;
+    }
     await runWebappBoot({
       MOCK,
       setMode: (next) => {
@@ -1243,7 +1283,7 @@
     window.history.replaceState(null, "", `${u.pathname}${qs}${u.hash}`);
   }
 
-  function isPasswordLoginPath(pathname = window.location.pathname) {
+  function isPasswordLoginPath(pathname = routePathnameFromLocation()) {
     return (
       String(pathname || "")
         .replace(/\/+$/, "")
@@ -1253,7 +1293,15 @@
 
   function syncPasswordLoginPath(enabled, replace = false) {
     if (typeof window === "undefined" || window.location.protocol === "file:") return;
-    const targetPath = enabled ? "/login/password" : "/";
+    const targetPath = enabled ? "/login/password" : isDocsDemo ? "/login" : "/";
+    if (isDocsDemo) {
+      const targetRuntimePath = withRoutePrefix(targetPath, routePrefix);
+      if (window.location.pathname === targetRuntimePath) return;
+      const nextUrl = `${targetRuntimePath}${window.location.search}${window.location.hash}`;
+      window.history[replace ? "replaceState" : "pushState"](null, "", nextUrl);
+      cleanDocsDemoRouteQuery();
+      return;
+    }
     if (window.location.pathname === targetPath) return;
     const nextUrl = `${targetPath}${window.location.search}${window.location.hash}`;
     window.history[replace ? "replaceState" : "pushState"](null, "", nextUrl);

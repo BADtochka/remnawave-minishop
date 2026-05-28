@@ -21,6 +21,9 @@ let demoPaymentSequence = 20000;
 const demoSettingsChanges = new Map();
 const demoPaymentStatuses = new Map();
 const deviceTopupSaleModes = new Set(["hwid_device", "hwid_devices", "hwid_devices_renewal"]);
+const DEFAULT_DEMO_AUTH_EMAIL = "demo.user@example.com";
+const DEFAULT_DEMO_AUTH_CODE = "123456";
+const DEFAULT_DEMO_AUTH_PASSWORD = "demo-password";
 
 function demoPromos() {
   if (!demoPromosState) demoPromosState = defaultClone(DEMO_DATASET.promos || []);
@@ -73,6 +76,75 @@ function jsonBody(options) {
 
 function isDeviceTopupSaleMode(value) {
   return deviceTopupSaleModes.has(String(value || "").toLowerCase());
+}
+
+function demoAuthConfig() {
+  return {
+    email: DEFAULT_DEMO_AUTH_EMAIL,
+    code: DEFAULT_DEMO_AUTH_CODE,
+    password: DEFAULT_DEMO_AUTH_PASSWORD,
+    ...(DEV_MOCK.data.auth_demo || {}),
+  };
+}
+
+function applyDemoEmailAuthUser(email) {
+  const normalizedEmail = String(email || demoAuthConfig().email || DEFAULT_DEMO_AUTH_EMAIL)
+    .trim()
+    .toLowerCase();
+  const language = DEV_MOCK.data.user?.language_code || DEV_MOCK.config.language || "ru";
+  DEV_MOCK.data.user = withDemoAvatar(
+    {
+      ...(DEV_MOCK.data.user || {}),
+      id: 910777,
+      user_id: 910777,
+      telegram_id: null,
+      telegram_linked: false,
+      telegram_photo_url: "",
+      avatar_url: "",
+      username: "",
+      first_name: "Email Demo",
+      last_name: "",
+      email: normalizedEmail,
+      email_verified: true,
+      password_auth_enabled: true,
+      is_admin: false,
+      language_code: language,
+      registration_date: "2026-05-28T12:00:00Z",
+      panel_status: "inactive",
+    },
+    160
+  );
+  DEV_MOCK.data.subscription = {
+    ...(DEV_MOCK.data.subscription || {}),
+    active: false,
+    status: "INACTIVE",
+    remaining_text: "Подписка не активна",
+    end_date_text: "",
+    days_left: 0,
+    config_link: null,
+    connect_url: null,
+    panel_short_uuid: "",
+    install_share_token: "",
+    install_share_url: "",
+    traffic_used: "0 B",
+    traffic_used_bytes: 0,
+    traffic_limit: "0 B",
+    traffic_limit_bytes: 0,
+    premium_used: "0 B",
+    premium_used_bytes: 0,
+    premium_limit: "0 B",
+    premium_limit_bytes: 0,
+    can_topup_regular_traffic: false,
+    can_topup_premium_traffic: false,
+    can_topup_devices: false,
+    extra_hwid_devices: 0,
+    max_devices: 0,
+  };
+  DEV_MOCK.data.settings = {
+    ...(DEV_MOCK.data.settings || {}),
+    trial_enabled: true,
+    trial_available: true,
+  };
 }
 
 function demoDeviceTopupPlan(body) {
@@ -1650,11 +1722,31 @@ export async function mockApi(path, options = {}, context = {}) {
       subscription,
     };
   }
-  if (path === "/auth/email/request") return { ok: true };
+  if (path === "/auth/email/request") {
+    const authDemo = demoAuthConfig();
+    return { ok: true, email_code: authDemo.code };
+  }
   if (path === "/auth/email/verify" || path === "/auth/email/magic") {
+    if (path === "/auth/email/verify") {
+      const body = jsonBody(options);
+      applyDemoEmailAuthUser(body.email);
+    }
     return { ok: true, csrf_token: "local-preview-csrf" };
   }
   if (path === "/auth/email/password") {
+    const body = jsonBody(options);
+    const authDemo = demoAuthConfig();
+    const normalizedEmail = String(body.email || "")
+      .trim()
+      .toLowerCase();
+    const password = String(body.password || "");
+    if (
+      normalizedEmail === String(authDemo.email || DEFAULT_DEMO_AUTH_EMAIL).toLowerCase() &&
+      password === String(authDemo.password || DEFAULT_DEMO_AUTH_PASSWORD)
+    ) {
+      applyDemoEmailAuthUser(normalizedEmail);
+      return { ok: true, csrf_token: "local-preview-csrf" };
+    }
     return { ok: false, error: "password_login_failed", fallback: "email_code" };
   }
   if (path === "/auth/token") {

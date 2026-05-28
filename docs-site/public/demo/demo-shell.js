@@ -8,6 +8,7 @@ const stateMocks = new Set([
   "no-subscription",
   "trial",
   "devices",
+  "auth",
 ]);
 const routeMocks = new Set([...stateMocks, "guides", "install"]);
 const params = new URLSearchParams(window.location.search);
@@ -20,7 +21,9 @@ const normalizePath = (value) => {
 };
 
 const normalizeRouteMock = (value) => {
-  const mock = String(value || "").trim().toLowerCase();
+  const mock = String(value || "")
+    .trim()
+    .toLowerCase();
   return routeMocks.has(mock) ? mock : defaultMock;
 };
 
@@ -36,7 +39,8 @@ const routeFromPublicPath = () => {
   if (!lowerPathname.startsWith(`${demoBase}/`)) return "";
 
   const publicRoute = pathname.slice(demoBase.length);
-  if (!publicRoute || publicRoute.toLowerCase().startsWith("/runtime")) return "";
+  if (!publicRoute || publicRoute.toLowerCase().startsWith("/runtime"))
+    return "";
   return normalizePath(publicRoute);
 };
 
@@ -65,6 +69,7 @@ const routeFromParams = () => {
       "devices",
       "support",
       "settings",
+      "login",
     ].includes(screen)
   ) {
     return `/${screen}`;
@@ -73,7 +78,13 @@ const routeFromParams = () => {
 };
 
 let initialRoute = routeFromParams();
-const mockForRoute = (route) => (normalizePath(route) === "/devices" ? "devices" : "");
+const mockForRoute = (route) => {
+  const normalized = normalizePath(route);
+  if (normalized === "/devices") return "devices";
+  if (normalized === "/login" || normalized.startsWith("/login/"))
+    return "auth";
+  return "";
+};
 const initialMock = params.has("mock")
   ? normalizeRouteMock(params.get("mock"))
   : normalizeRouteMock(mockForRoute(initialRoute) || defaultMock);
@@ -84,7 +95,7 @@ if (initialMock === "trial" && initialRoute === "/trial") {
   window.history.replaceState(
     null,
     "",
-    `${normalizedUrl.pathname}${normalizedUrl.search}${normalizedUrl.hash}`
+    `${normalizedUrl.pathname}${normalizedUrl.search}${normalizedUrl.hash}`,
   );
 }
 params.set("mock", initialMock);
@@ -96,8 +107,11 @@ frame.src = `${runtimeBase}/app.html?${params.toString()}${window.location.hash 
 
 const routeFromRuntimeUrl = (url) => {
   if (url.origin !== window.location.origin) return "";
-  if (!url.pathname.toLowerCase().startsWith(runtimeBase.toLowerCase())) return "";
-  const runtimePath = normalizePath(url.pathname.slice(runtimeBase.length) || "/home");
+  if (!url.pathname.toLowerCase().startsWith(runtimeBase.toLowerCase()))
+    return "";
+  const runtimePath = normalizePath(
+    url.pathname.slice(runtimeBase.length) || "/home",
+  );
   if (runtimePath === "/app.html") {
     return normalizePath(url.searchParams.get("path") || "/home");
   }
@@ -108,14 +122,20 @@ const materializedRouteFromRuntime = (route) => {
   const normalized = normalizePath(route);
   if (/^\/admin\/users\/-?\d+$/i.test(normalized)) return "/admin/users";
   if (/^\/admin\/payments\/\d+$/i.test(normalized)) return "/admin/payments";
-  if (/^\/admin\/payments\/users\/-?\d+$/i.test(normalized)) return "/admin/payments";
+  if (/^\/admin\/payments\/users\/-?\d+$/i.test(normalized))
+    return "/admin/payments";
   if (/^\/admin\/support\/\d+$/i.test(normalized)) return "/admin/support";
   if (/^\/support\/\d+$/i.test(normalized)) return "/support";
   return normalized;
 };
 
-const publicPathFromRoute = (route) => `${demoBase}${materializedRouteFromRuntime(route)}`;
-const routeForStateMock = (mock) => (mock === "devices" ? "/devices" : "/home");
+const publicPathFromRoute = (route) =>
+  `${demoBase}${materializedRouteFromRuntime(route)}`;
+const routeForStateMock = (mock) => {
+  if (mock === "devices") return "/devices";
+  if (mock === "auth") return "/login";
+  return "/home";
+};
 const runtimeSrc = (route, searchParams = new URLSearchParams()) => {
   const nextParams = new URLSearchParams(searchParams);
   nextParams.delete("screen");
@@ -138,7 +158,9 @@ const syncParentUrlFromFrame = () => {
     nextUrl.pathname = publicPathFromRoute(route);
     nextUrl.searchParams.delete("path");
 
-    const mock = normalizeRouteMock(frameUrl.searchParams.get("mock") || params.get("mock"));
+    const mock = normalizeRouteMock(
+      frameUrl.searchParams.get("mock") || params.get("mock"),
+    );
     if (mock === defaultMock) nextUrl.searchParams.delete("mock");
     else nextUrl.searchParams.set("mock", mock);
     if (stateSelect) stateSelect.value = normalizeStateMock(mock);
@@ -147,7 +169,8 @@ const syncParentUrlFromFrame = () => {
     nextUrl.searchParams.delete("admin_section");
     const nextPath = `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
     const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    if (nextPath !== currentPath) window.history.replaceState(null, "", nextPath);
+    if (nextPath !== currentPath)
+      window.history.replaceState(null, "", nextPath);
   } catch (_error) {
     // The iframe is same-origin in docs builds; this keeps local oddities harmless.
   }

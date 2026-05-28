@@ -13,6 +13,8 @@ const userRoutes = [
   "devices",
   "support",
   "settings",
+  "login",
+  "login/password",
 ];
 
 const adminRoutes = [

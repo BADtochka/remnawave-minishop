@@ -181,7 +181,10 @@ export function createAuthStore({
       if (referralParam) payload.referral_code = referralParam;
       const response = await publicApi("/auth/email/request", payload);
       if (!response.ok) throw response;
-      state.update((s) => ({ ...s, pendingEmail: normalized, emailCode: "" }));
+      const presetCode = String(response.email_code || response.code || "")
+        .replace(/\D/g, "")
+        .slice(0, 6);
+      state.update((s) => ({ ...s, pendingEmail: normalized, emailCode: presetCode }));
       changeScreen("code");
       setAuthStatus("");
       startCooldownTimer(60);

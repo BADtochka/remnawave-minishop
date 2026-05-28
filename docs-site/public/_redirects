@@ -16,5 +16,7 @@
 /demo/runtime/support/* /demo/runtime/app.html 200
 /demo/runtime/settings /demo/runtime/app.html 200
 /demo/runtime/settings/* /demo/runtime/app.html 200
+/demo/runtime/login /demo/runtime/app.html 200
+/demo/runtime/login/* /demo/runtime/app.html 200
 /demo/runtime/admin /demo/runtime/app.html 200
 /demo/runtime/admin/* /demo/runtime/app.html 200

@@ -293,6 +293,12 @@ export const DEV_MOCK = {
       language_code: "ru",
       is_admin: true,
     },
+    auth_demo: {
+      enabled: false,
+      email: "demo.user@example.com",
+      code: "123456",
+      password: "demo-password",
+    },
     subscription: {
       active: true,
       status: "ACTIVE",
@@ -548,6 +554,22 @@ export function applyPreviewMock(kind) {
       enabled: true,
       config: INSTALL_GUIDES_CONFIG,
     };
+    return;
+  }
+
+  if (mode === "auth" || mode === "login" || mode === "register") {
+    DEV_MOCK.data.auth_demo = {
+      ...(DEV_MOCK.data.auth_demo || {}),
+      enabled: true,
+      email: "demo.user@example.com",
+      code: "123456",
+      password: "demo-password",
+    };
+    DEV_MOCK.data.settings.email_auth_enabled = true;
+    DEV_MOCK.config.telegramOAuthClientId = 0;
+    DEV_MOCK.config.telegramLoginBotId = 0;
+    DEV_MOCK.data.settings.trial_enabled = true;
+    DEV_MOCK.data.settings.trial_available = true;
     return;
   }
 
