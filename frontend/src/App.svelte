@@ -489,8 +489,12 @@
   $: telegramMiniAppInitData = tg?.initData || readTelegramMiniAppInitDataFromLocation();
   $: telegramMiniAppAuthAvailable = Boolean(telegramMiniAppInitData);
   $: telegramMiniAppContext = hasTelegramLaunchParams();
+  $: demoAuthLogin = MOCK && isDemoAuthMock();
   $: telegramLoginUnavailable =
-    !telegramMiniAppAuthAvailable && !telegramOAuthClientId && telegramSdkStatus !== "loading";
+    !demoAuthLogin &&
+    !telegramMiniAppAuthAvailable &&
+    !telegramOAuthClientId &&
+    telegramSdkStatus !== "loading";
   $: telegramLoginChecking =
     telegramLoginBusy || (authBusy && authStatus === t("wa_auth_checking_telegram"));
   $: telegramLoginLabel = telegramLoginUnavailable
@@ -498,8 +502,9 @@
     : telegramLoginChecking
       ? t("wa_auth_checking_telegram")
       : t("wa_login_telegram_button");
-  $: telegramLoginUnavailableMessage =
-    telegramLoginUnavailable && telegramSdkStatus === "unavailable"
+  $: telegramLoginUnavailableMessage = demoAuthLogin
+    ? ""
+    : telegramLoginUnavailable && telegramSdkStatus === "unavailable"
       ? t("wa_auth_telegram_unavailable")
       : telegramLoginUnavailable
         ? t("wa_auth_telegram_not_configured")
@@ -1076,6 +1081,23 @@
       loginEmailTooltipOpen: false,
       telegramLoginBusy: false,
     }));
+  }
+
+  async function openLoginTelegram() {
+    if (demoAuthLogin) {
+      const authDemo = MOCK_SOURCE.data?.auth_demo || {};
+      await authStore.finalizeTelegramAuth(
+        {
+          id: Number(authDemo.telegram_id || 7410865527),
+          username: authDemo.telegram_username || "demo_minishop_user",
+          first_name: authDemo.telegram_first_name || "Demo",
+          last_name: authDemo.telegram_last_name || "Telegram",
+        },
+        "auth_data"
+      );
+      return;
+    }
+    await authStore.openTelegramLogin(telegramOAuthClientId, () => telegramMiniAppInitData);
   }
 
   function currentSearchParams() {
@@ -2011,8 +2033,7 @@
             requestEmailCode={() => authStore.requestEmailCode((s) => (screen = s))}
             loginWithEmailPassword={authStore.loginWithEmailPassword}
             verifyEmailCode={authStore.verifyEmailCode}
-            openTelegramLogin={() =>
-              authStore.openTelegramLogin(telegramOAuthClientId, () => telegramMiniAppInitData)}
+            openTelegramLogin={openLoginTelegram}
             {openExternalLink}
             {submitEmailOnEnter}
             onBackToLogin={() => (screen = "login")}

@@ -298,6 +298,10 @@ export const DEV_MOCK = {
       email: "demo.user@example.com",
       code: "123456",
       password: "demo-password",
+      telegram_id: 7410865527,
+      telegram_username: "demo_minishop_user",
+      telegram_first_name: "Demo",
+      telegram_last_name: "Telegram",
     },
     subscription: {
       active: true,
@@ -564,10 +568,12 @@ export function applyPreviewMock(kind) {
       email: "demo.user@example.com",
       code: "123456",
       password: "demo-password",
+      telegram_id: 7410865527,
+      telegram_username: "demo_minishop_user",
+      telegram_first_name: "Demo",
+      telegram_last_name: "Telegram",
     };
     DEV_MOCK.data.settings.email_auth_enabled = true;
-    DEV_MOCK.config.telegramOAuthClientId = 0;
-    DEV_MOCK.config.telegramLoginBotId = 0;
     DEV_MOCK.data.settings.trial_enabled = true;
     DEV_MOCK.data.settings.trial_available = true;
     return;

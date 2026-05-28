@@ -24,6 +24,8 @@ const deviceTopupSaleModes = new Set(["hwid_device", "hwid_devices", "hwid_devic
 const DEFAULT_DEMO_AUTH_EMAIL = "demo.user@example.com";
 const DEFAULT_DEMO_AUTH_CODE = "123456";
 const DEFAULT_DEMO_AUTH_PASSWORD = "demo-password";
+const DEFAULT_DEMO_AUTH_TELEGRAM_ID = 7410865527;
+const DEFAULT_DEMO_AUTH_TELEGRAM_USERNAME = "demo_minishop_user";
 
 function demoPromos() {
   if (!demoPromosState) demoPromosState = defaultClone(DEMO_DATASET.promos || []);
@@ -110,6 +112,67 @@ function applyDemoEmailAuthUser(email) {
       is_admin: false,
       language_code: language,
       registration_date: "2026-05-28T12:00:00Z",
+      panel_status: "inactive",
+    },
+    160
+  );
+  DEV_MOCK.data.subscription = {
+    ...(DEV_MOCK.data.subscription || {}),
+    active: false,
+    status: "INACTIVE",
+    remaining_text: "Подписка не активна",
+    end_date_text: "",
+    days_left: 0,
+    config_link: null,
+    connect_url: null,
+    panel_short_uuid: "",
+    install_share_token: "",
+    install_share_url: "",
+    traffic_used: "0 B",
+    traffic_used_bytes: 0,
+    traffic_limit: "0 B",
+    traffic_limit_bytes: 0,
+    premium_used: "0 B",
+    premium_used_bytes: 0,
+    premium_limit: "0 B",
+    premium_limit_bytes: 0,
+    can_topup_regular_traffic: false,
+    can_topup_premium_traffic: false,
+    can_topup_devices: false,
+    extra_hwid_devices: 0,
+    max_devices: 0,
+  };
+  DEV_MOCK.data.settings = {
+    ...(DEV_MOCK.data.settings || {}),
+    trial_enabled: true,
+    trial_available: true,
+  };
+}
+
+function applyDemoTelegramAuthUser(authData = {}) {
+  const authDemo = demoAuthConfig();
+  const telegramId = Number(authData.id || authDemo.telegram_id || DEFAULT_DEMO_AUTH_TELEGRAM_ID);
+  const username =
+    authData.username || authDemo.telegram_username || DEFAULT_DEMO_AUTH_TELEGRAM_USERNAME;
+  const firstName = authData.first_name || authDemo.telegram_first_name || "Demo";
+  const lastName = authData.last_name || authDemo.telegram_last_name || "Telegram";
+  const language = DEV_MOCK.data.user?.language_code || DEV_MOCK.config.language || "ru";
+  DEV_MOCK.data.user = withDemoAvatar(
+    {
+      ...(DEV_MOCK.data.user || {}),
+      id: 910778,
+      user_id: 910778,
+      telegram_id: telegramId,
+      telegram_linked: true,
+      username,
+      first_name: firstName,
+      last_name: lastName,
+      email: "",
+      email_verified: false,
+      password_auth_enabled: false,
+      is_admin: false,
+      language_code: language,
+      registration_date: "2026-05-28T12:05:00Z",
       panel_status: "inactive",
     },
     160
@@ -1750,6 +1813,8 @@ export async function mockApi(path, options = {}, context = {}) {
     return { ok: false, error: "password_login_failed", fallback: "email_code" };
   }
   if (path === "/auth/token") {
+    const body = jsonBody(options);
+    applyDemoTelegramAuthUser(body.auth_data || {});
     return { ok: true, csrf_token: "local-preview-csrf" };
   }
   if (path === "/promo/apply") return { ok: true, end_date_text: "31.05.2026" };
