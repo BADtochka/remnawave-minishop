@@ -1203,7 +1203,7 @@ def _apply_telegram_profile_to_user(
     settings: Settings,
 ) -> None:
     language_code = _normalize_language(
-        telegram_user.get("language_code") or user.language_code or settings.DEFAULT_LANGUAGE
+        user.language_code or telegram_user.get("language_code") or settings.DEFAULT_LANGUAGE
     )
 
     user.telegram_id = int(telegram_user["id"])
@@ -1251,8 +1251,8 @@ async def _link_telegram_to_user(
 
     if not existing_telegram_user and int(current_user.user_id) < 0:
         language_code = _normalize_language(
-            telegram_user.get("language_code")
-            or current_user.language_code
+            current_user.language_code
+            or telegram_user.get("language_code")
             or settings.DEFAULT_LANGUAGE
         )
         target_user, _ = await user_dal.create_user(
@@ -1400,20 +1400,19 @@ async def _ensure_user_from_telegram(
     referral_param: Optional[str] = None,
 ) -> User:
     user_id = int(telegram_user["id"])
-    language_code = _normalize_language(
+    telegram_language_code = _normalize_language(
         telegram_user.get("language_code") or settings.DEFAULT_LANGUAGE
     )
 
-    update_data = {
+    profile_data = {
         "telegram_id": user_id,
         "username": sanitize_username(telegram_user.get("username")),
         "first_name": sanitize_display_name(telegram_user.get("first_name")),
         "last_name": sanitize_display_name(telegram_user.get("last_name")),
-        "language_code": language_code,
     }
     telegram_photo_url = _telegram_photo_url_value(telegram_user)
     if telegram_photo_url:
-        update_data["telegram_photo_url"] = telegram_photo_url
+        profile_data["telegram_photo_url"] = telegram_photo_url
 
     db_user = await user_dal.get_user_by_telegram_id(session, user_id)
     if not db_user:
@@ -1428,7 +1427,8 @@ async def _ensure_user_from_telegram(
             session,
             {
                 "user_id": user_id,
-                **update_data,
+                **profile_data,
+                "language_code": telegram_language_code,
                 "referred_by_id": referred_by_id,
                 "registration_date": datetime.now(timezone.utc),
             },
@@ -1436,6 +1436,10 @@ async def _ensure_user_from_telegram(
         setattr(db_user, "_webapp_created", bool(created))
         return db_user
 
+    update_data = {
+        **profile_data,
+        "language_code": _normalize_language(db_user.language_code or telegram_language_code),
+    }
     changed = {key: value for key, value in update_data.items() if getattr(db_user, key) != value}
     if changed:
         db_user = await user_dal.update_user(session, db_user.user_id, changed) or db_user

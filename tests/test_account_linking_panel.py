@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, patch
 from bot.app.web import subscription_webapp  # noqa: F401
 from bot.app.web.webapp import account as account_routes
 from bot.app.web.webapp.auth import (
+    _apply_telegram_profile_to_user,
+    _ensure_user_from_telegram,
     _link_telegram_to_user,
     _panel_description_for_user,
     _sync_merged_panel_identity_for_user,
@@ -96,6 +98,70 @@ class AccountLinkingPanelTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(_panel_description_for_user(user), "alice??\nSmith")
+
+    def test_telegram_profile_update_preserves_existing_language(self):
+        user = SimpleNamespace(
+            telegram_id=None,
+            username=None,
+            first_name=None,
+            last_name=None,
+            language_code="ru",
+            telegram_photo_url=None,
+        )
+
+        _apply_telegram_profile_to_user(
+            user,
+            {
+                "id": 42,
+                "username": "alice",
+                "first_name": "Alice",
+                "last_name": "",
+                "language_code": "en",
+            },
+            SimpleNamespace(DEFAULT_LANGUAGE="en"),
+        )
+
+        self.assertEqual(user.language_code, "ru")
+        self.assertEqual(user.username, "alice")
+
+    async def test_telegram_login_preserves_existing_language(self):
+        user = SimpleNamespace(
+            user_id=42,
+            telegram_id=42,
+            username="old",
+            first_name="Old",
+            last_name=None,
+            language_code="ru",
+            telegram_photo_url=None,
+        )
+        update_user = AsyncMock(return_value=user)
+
+        with (
+            patch(
+                "bot.app.web.webapp.auth.user_dal.get_user_by_telegram_id",
+                AsyncMock(return_value=user),
+            ),
+            patch(
+                "bot.app.web.webapp.auth.user_dal.get_user_by_id",
+                AsyncMock(return_value=None),
+            ),
+            patch("bot.app.web.webapp.auth.user_dal.update_user", update_user),
+        ):
+            result = await _ensure_user_from_telegram(
+                SimpleNamespace(),
+                {
+                    "id": 42,
+                    "username": "alice",
+                    "first_name": "Alice",
+                    "last_name": "",
+                    "language_code": "en",
+                },
+                SimpleNamespace(DEFAULT_LANGUAGE="en"),
+            )
+
+        self.assertIs(result, user)
+        changed = update_user.await_args.args[2]
+        self.assertNotEqual(changed.get("language_code"), "en")
 
     async def test_merged_panel_identity_deletes_source_before_updating_target(self):
         calls = []
