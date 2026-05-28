@@ -1,49 +1,16 @@
 import { copyFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  demoPublicRoutes,
+  demoRuntimeRoutes,
+} from "../src/lib/demoRoutes.mjs";
 
 const siteRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const distRoot = path.join(siteRoot, "dist");
 
-const userRoutes = [
-  "home",
-  "install",
-  "trial",
-  "invite",
-  "devices",
-  "support",
-  "settings",
-  "login",
-  "login/password",
-];
-
-const adminRoutes = [
-  "stats",
-  "users",
-  "payments",
-  "promos",
-  "ads",
-  "broadcast",
-  "logs",
-  "support",
-  "tariffs",
-  "appearance",
-  "translations",
-  "backups",
-  "settings",
-];
-
-const demoRoutes = [
-  ...userRoutes.map((route) => `demo/${route}`),
-  "demo/admin",
-  ...adminRoutes.map((route) => `demo/admin/${route}`),
-];
-
-const runtimeRoutes = [
-  ...userRoutes.map((route) => `demo/runtime/${route}`),
-  "demo/runtime/admin",
-  ...adminRoutes.map((route) => `demo/runtime/admin/${route}`),
-];
+const demoRoutes = demoPublicRoutes.map((route) => `demo/${route}`);
+const runtimeRoutes = demoRuntimeRoutes.map((route) => `demo/runtime/${route}`);
 
 async function copyHtml(source, route) {
   const targetDir = path.join(distRoot, route);

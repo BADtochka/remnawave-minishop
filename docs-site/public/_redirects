@@ -1,7 +1,13 @@
 # Cloudflare Pages rewrites for the static docs demo SPA.
 # Keep these scoped to app routes so runtime JS/CSS/assets are served directly.
+/demo /demo/index.html 200
+/demo/ /demo/index.html 200
+/demo/app /demo/index.html 200
+/demo/app/ /demo/index.html 200
 /demo/runtime /demo/runtime/app.html 200
 /demo/runtime/ /demo/runtime/app.html 200
+/demo/runtime/app /demo/runtime/app.html 200
+/demo/runtime/app/ /demo/runtime/app.html 200
 /demo/runtime/home /demo/runtime/app.html 200
 /demo/runtime/home/* /demo/runtime/app.html 200
 /demo/runtime/install /demo/runtime/app.html 200

@@ -1,39 +1,9 @@
 ---
 import DemoShell from '../demo.astro';
+import { demoPublicRoutes } from '../../lib/demoRoutes.mjs';
 
 export function getStaticPaths() {
-  const userRoutes = [
-    'home',
-    'install',
-    'trial',
-    'invite',
-    'devices',
-    'support',
-    'settings',
-    'login',
-    'login/password',
-  ];
-  const adminRoutes = [
-    'stats',
-    'users',
-    'payments',
-    'promos',
-    'ads',
-    'broadcast',
-    'logs',
-    'support',
-    'tariffs',
-    'appearance',
-    'translations',
-    'backups',
-    'settings',
-  ];
-
-  return [
-    ...userRoutes.map((path) => ({ params: { path } })),
-    { params: { path: 'admin' } },
-    ...adminRoutes.map((section) => ({ params: { path: `admin/${section}` } })),
-  ];
+  return demoPublicRoutes.map((path) => ({ params: { path } }));
 }
 ---
 

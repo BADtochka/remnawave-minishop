@@ -2,6 +2,7 @@ const frame = document.getElementById("demo-frame");
 const runtimeBase = "/demo/runtime";
 const demoBase = "/demo";
 const defaultMock = "tariffs";
+const publicRouteAliases = new Map([["/app", "/home"]]);
 const stateMocks = new Set([
   "tariffs",
   "depleted",
@@ -41,7 +42,8 @@ const routeFromPublicPath = () => {
   const publicRoute = pathname.slice(demoBase.length);
   if (!publicRoute || publicRoute.toLowerCase().startsWith("/runtime"))
     return "";
-  return normalizePath(publicRoute);
+  const normalized = normalizePath(publicRoute);
+  return publicRouteAliases.get(normalized.toLowerCase()) || normalized;
 };
 
 const routeFromParams = () => {
@@ -88,15 +90,48 @@ const mockForRoute = (route) => {
 const initialMock = params.has("mock")
   ? normalizeRouteMock(params.get("mock"))
   : normalizeRouteMock(mockForRoute(initialRoute) || defaultMock);
-if (initialMock === "trial" && initialRoute === "/trial") {
-  initialRoute = "/home";
+const materializedRouteFromRuntime = (route) => {
+  const normalized = normalizePath(route);
+  if (/^\/admin\/users\/-?\d+$/i.test(normalized)) return "/admin/users";
+  if (/^\/admin\/payments\/\d+$/i.test(normalized)) return "/admin/payments";
+  if (/^\/admin\/payments\/users\/-?\d+$/i.test(normalized))
+    return "/admin/payments";
+  if (/^\/admin\/support\/\d+$/i.test(normalized)) return "/admin/support";
+  if (/^\/support\/\d+$/i.test(normalized)) return "/support";
+  return normalized;
+};
+
+const publicPathFromRoute = (route) =>
+  `${demoBase}${materializedRouteFromRuntime(route)}`;
+const canonicalizeInitialPublicUrl = (route) => {
+  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+  const lowerPathname = pathname.toLowerCase();
+  if (
+    lowerPathname !== demoBase &&
+    !publicRouteAliases.has(pathname.slice(demoBase.length).toLowerCase())
+  ) {
+    return;
+  }
   const normalizedUrl = new URL(window.location.href);
-  normalizedUrl.pathname = `${demoBase}/home`;
+  normalizedUrl.pathname = publicPathFromRoute(route);
   window.history.replaceState(
     null,
     "",
     `${normalizedUrl.pathname}${normalizedUrl.search}${normalizedUrl.hash}`,
   );
+};
+
+if (initialMock === "trial" && initialRoute === "/trial") {
+  initialRoute = "/home";
+  const normalizedUrl = new URL(window.location.href);
+  normalizedUrl.pathname = publicPathFromRoute(initialRoute);
+  window.history.replaceState(
+    null,
+    "",
+    `${normalizedUrl.pathname}${normalizedUrl.search}${normalizedUrl.hash}`,
+  );
+} else {
+  canonicalizeInitialPublicUrl(initialRoute);
 }
 params.set("mock", initialMock);
 params.delete("path");
@@ -112,25 +147,11 @@ const routeFromRuntimeUrl = (url) => {
   const runtimePath = normalizePath(
     url.pathname.slice(runtimeBase.length) || "/home",
   );
-  if (runtimePath === "/app.html") {
+  if (runtimePath === "/app" || runtimePath === "/app.html") {
     return normalizePath(url.searchParams.get("path") || "/home");
   }
   return runtimePath;
 };
-
-const materializedRouteFromRuntime = (route) => {
-  const normalized = normalizePath(route);
-  if (/^\/admin\/users\/-?\d+$/i.test(normalized)) return "/admin/users";
-  if (/^\/admin\/payments\/\d+$/i.test(normalized)) return "/admin/payments";
-  if (/^\/admin\/payments\/users\/-?\d+$/i.test(normalized))
-    return "/admin/payments";
-  if (/^\/admin\/support\/\d+$/i.test(normalized)) return "/admin/support";
-  if (/^\/support\/\d+$/i.test(normalized)) return "/support";
-  return normalized;
-};
-
-const publicPathFromRoute = (route) =>
-  `${demoBase}${materializedRouteFromRuntime(route)}`;
 const routeForStateMock = (mock) => {
   if (mock === "devices") return "/devices";
   if (mock === "auth") return "/login";
