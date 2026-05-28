@@ -1,6 +1,7 @@
 import { writable } from "svelte/store";
+import { withRoutePrefix } from "../../webapp/routes.js";
 
-export function createUsersStore({ api, onToast, at }) {
+export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
   const USERS_PAGE_SIZE = 25;
   const USER_LOGS_PAGE_SIZE = 20;
 
@@ -70,6 +71,7 @@ export function createUsersStore({ api, onToast, at }) {
       target = userId ? `/admin/payments/users/${userId}` : `/admin/payments`;
     }
     if (!target) return;
+    target = withRoutePrefix(target, routePrefix);
     if (window.location.pathname === target) return;
     window.history.pushState(null, "", `${target}${window.location.search}${window.location.hash}`);
   }

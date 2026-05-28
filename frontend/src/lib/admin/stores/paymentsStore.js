@@ -1,9 +1,11 @@
 import { writable } from "svelte/store";
+import { withRoutePrefix } from "../../webapp/routes.js";
 
 export function createPaymentsStore({
   api,
   onToast = () => {},
   at = (key, _params, fallback) => fallback || key,
+  routePrefix = "",
 }) {
   const state = writable({
     payments: [],
@@ -25,7 +27,10 @@ export function createPaymentsStore({
   function pushPaymentPath(paymentId) {
     if (typeof window === "undefined" || window.location.protocol === "file:") return;
     if (active !== "payments") return;
-    const target = paymentId ? `/admin/payments/${paymentId}` : "/admin/payments";
+    const target = withRoutePrefix(
+      paymentId ? `/admin/payments/${paymentId}` : "/admin/payments",
+      routePrefix
+    );
     if (window.location.pathname === target) return;
     window.history.pushState(null, "", `${target}${window.location.search}${window.location.hash}`);
   }

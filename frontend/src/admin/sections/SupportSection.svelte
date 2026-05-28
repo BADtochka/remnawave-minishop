@@ -17,6 +17,7 @@
   export let initialTicketId = null;
   export let brand = {};
   export let resolvedAvatarUrl = () => "";
+  export let onOpenUserCard = () => {};
 
   const supportStore = getContext("adminSupportStore");
   let reply = "";
@@ -306,7 +307,12 @@
         onPatch={(updates) => supportStore.patchTicket(updates)}
         onClose={() => supportStore.closeTicket()}
       />
-      <SupportUserContextPanel ticket={openedTicket} snapshot={userSnapshot} {at} />
+      <SupportUserContextPanel
+        ticket={openedTicket}
+        snapshot={userSnapshot}
+        {at}
+        onOpenUser={onOpenUserCard}
+      />
       <ScrollArea
         bind:element={messagesScrollEl}
         maxHeight="none"

@@ -101,6 +101,7 @@
     sectionFromPath,
     supportTicketIdFromPath,
     syncSectionPath,
+    withRoutePrefix,
   } from "./lib/webapp/routes.js";
 
   export let mockRuntime = null;
@@ -125,6 +126,8 @@
   const MOCK_SOURCE = mockRuntime?.source || EMPTY_MOCK;
   const previewBoardComponent = mockRuntime?.PreviewBoard || null;
   const isDocsDemo = mockRuntime?.docsDemo === true;
+  const routePrefix = isDocsDemo ? "/demo/runtime" : "";
+  let docsDemoParentRouteConsumed = false;
   const query = new URLSearchParams(window.location.search);
   const isAppLaunchRoute = isExternalAppLaunchPath(window.location.pathname);
   mockRuntime?.applyPreviewMock?.(query.get("mock"));
@@ -257,7 +260,7 @@
     telegramSdk,
   });
   const devicesStore = createDevicesStore({ api, t, showToast });
-  const supportStore = createSupportStore({ api, t, showToast });
+  const supportStore = createSupportStore({ api, t, showToast, routePrefix });
   const installGuidesStore = createInstallGuidesStore({ api, t, showToast });
   const accountStore = createAccountStore({
     api,
@@ -773,7 +776,7 @@
       const section =
         isDocsDemo && currentQuery.get("screen")
           ? normalizeSection(currentQuery.get("screen"))
-          : sectionFromPath(window.location.pathname);
+          : sectionFromPath(routePathnameFromLocation(), routePrefix);
       if (mode === "login") {
         setPasswordLoginMode(isPasswordLoginPath(), true);
         screen = "login";
@@ -783,11 +786,11 @@
         if (section === "admin" && isAdmin) {
           adminActiveSection = isDocsDemo
             ? initialAdminSectionFromLocation()
-            : adminSectionFromPath(window.location.pathname);
+            : adminSectionFromPath(routePathnameFromLocation(), routePrefix);
           const pathAtStart = window.location.pathname;
           void Promise.all([ensureI18nScope("admin"), ensureAdminBundle()])
             .then(() => {
-              if (sectionFromPath(window.location.pathname) !== "admin") return;
+              if (sectionFromPath(routePathnameFromLocation(), routePrefix) !== "admin") return;
               if (window.location.pathname !== pathAtStart) return;
               activeTab = "settings";
               screen = "admin";
@@ -1038,39 +1041,95 @@
     return new URLSearchParams(window.location.search);
   }
 
+  function docsDemoParentSearchParams() {
+    if (!isDocsDemo) return null;
+    try {
+      if (window.parent === window) return null;
+      return new URLSearchParams(window.parent.location.search);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function normalizeDemoRoutePath(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const withSlash = raw.startsWith("/") ? raw : `/${raw}`;
+    return withSlash.replace(/\/{2,}/g, "/").replace(/\/+$/, "") || "/";
+  }
+
+  function docsDemoRouteParams() {
+    if (!isDocsDemo) return null;
+    const currentQuery = currentSearchParams();
+    const currentParams = {
+      path: currentQuery.get("path") || "",
+      screen: currentQuery.get("screen") || "",
+      adminSection: currentQuery.get("admin_section") || "",
+    };
+    if (currentParams.path || currentParams.screen || currentParams.adminSection) {
+      return currentParams;
+    }
+    if (docsDemoParentRouteConsumed) return currentParams;
+    const parentQuery = docsDemoParentSearchParams();
+    return {
+      path: parentQuery?.get("path") || "",
+      screen: parentQuery?.get("screen") || "",
+      adminSection: parentQuery?.get("admin_section") || "",
+    };
+  }
+
+  function docsDemoRoutePathFromParams() {
+    const params = docsDemoRouteParams();
+    if (!params) return "";
+    const explicitPath = normalizeDemoRoutePath(params.path);
+    if (explicitPath) return explicitPath;
+    const section = normalizeSection(params.screen);
+    if (section === "admin") {
+      return `/admin/${normalizeAdminSection(params.adminSection || "stats")}`;
+    }
+    return params.screen ? `/${section}` : "";
+  }
+
+  function routePathnameFromLocation() {
+    return docsDemoRoutePathFromParams() || window.location.pathname;
+  }
+
+  function cleanDocsDemoRouteQuery() {
+    if (!isDocsDemo || window.location.protocol === "file:") return;
+    const url = new URL(window.location.href);
+    const routeKeys = ["path", "screen", "admin_section"];
+    const changed = routeKeys.some((key) => url.searchParams.has(key));
+    if (!changed) return;
+    for (const key of routeKeys) url.searchParams.delete(key);
+    const search = url.searchParams.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${url.pathname}${search ? `?${search}` : ""}${url.hash}`
+    );
+  }
+
   function initialAdminSectionFromLocation() {
     const currentQuery = currentSearchParams();
     if (MOCK && currentQuery.get("admin_section")) {
       return normalizeAdminSection(currentQuery.get("admin_section"));
     }
-    return adminSectionFromPath(window.location.pathname);
+    const demoRouteParams = docsDemoRouteParams();
+    if (MOCK && demoRouteParams?.adminSection) {
+      return normalizeAdminSection(demoRouteParams.adminSection);
+    }
+    return adminSectionFromPath(routePathnameFromLocation(), routePrefix);
   }
 
-  function syncDocsDemoSection(section, replace = false, adminSection = null) {
+  function syncDocsDemoSection(section, replace = false, adminSection = null, adminUserId = null) {
     if (!isDocsDemo || window.location.protocol === "file:") return false;
-    const normalized = normalizeSection(section);
-    const currentQuery = currentSearchParams();
-    currentQuery.set("screen", normalized);
-    if (normalized === "admin") {
-      currentQuery.set(
-        "admin_section",
-        normalizeAdminSection(
-          adminSection || adminActiveSection || initialAdminSectionFromLocation()
-        )
-      );
-    } else {
-      currentQuery.delete("admin_section");
-    }
-    const nextSearch = currentQuery.toString();
-    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`;
-    if (nextUrl !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
-      window.history[replace ? "replaceState" : "pushState"](null, "", nextUrl);
-    }
+    syncSectionPath(section, replace, adminSection, adminUserId, routePrefix);
+    cleanDocsDemoRouteQuery();
     return true;
   }
 
   function syncAppSectionPath(section, replace = false, adminSection = null, adminUserId = null) {
-    if (syncDocsDemoSection(section, replace, adminSection)) return;
+    if (syncDocsDemoSection(section, replace, adminSection, adminUserId)) return;
     syncSectionPath(section, replace, adminSection, adminUserId);
   }
 
@@ -1079,14 +1138,15 @@
     onClose: closeAdminPanel,
     onToast: (text) => showToast(text),
     initialSection: screen === "admin" ? adminActiveSection : initialAdminSectionFromLocation(),
-    initialPaymentId: adminPaymentIdFromPath(window.location.pathname),
-    initialPaymentUserId: adminPaymentsUserIdFromPath(window.location.pathname),
-    initialUserId: adminUserIdFromPath(window.location.pathname),
+    initialPaymentId: adminPaymentIdFromPath(routePathnameFromLocation(), routePrefix),
+    initialPaymentUserId: adminPaymentsUserIdFromPath(routePathnameFromLocation(), routePrefix),
+    initialUserId: adminUserIdFromPath(routePathnameFromLocation(), routePrefix),
     onSectionChange: handleAdminSectionChange,
     onSettingsSaved: handleAdminPersistedSaved,
     onTariffsSaved: handleAdminPersistedSaved,
     onThemesSaved: handleAdminPersistedSaved,
     onTranslationsSaved: handleAdminTranslationsSaved,
+    routePrefix,
     brandTitle,
     brand,
     appFaviconUrl: CFG.faviconUrl,
@@ -1231,7 +1291,7 @@
       ? preservedSection
       : MOCK && currentQuery.get("screen")
         ? normalizeSection(currentQuery.get("screen"))
-        : sectionFromPath(window.location.pathname);
+        : sectionFromPath(routePathnameFromLocation(), routePrefix);
     if (section === "admin" && !payload.user?.is_admin) section = "settings";
     if (section === "devices" && !payload.settings?.my_devices_enabled) section = "home";
     if (section === "support" && payload.settings?.support_tickets_enabled === false) {
@@ -1258,7 +1318,10 @@
       }
     }
     const initialSupportTicketId =
-      section === "support" ? supportTicketIdFromPath(window.location.pathname) : null;
+      section === "support"
+        ? supportTicketIdFromPath(routePathnameFromLocation(), routePrefix)
+        : null;
+    if (isDocsDemo) docsDemoParentRouteConsumed = true;
     activeTab =
       section === "admin"
         ? "settings"
@@ -1275,10 +1338,8 @@
       }
       supportStore.startPolling({ includeList: false });
     }
-    if (isDocsDemo) {
-      // The docs demo is a static iframe route; keep query params as its navigation contract.
-    } else if (section === "support" && initialSupportTicketId) {
-      const targetPath = `/support/${initialSupportTicketId}`;
+    if (section === "support" && initialSupportTicketId) {
+      const targetPath = withRoutePrefix(`/support/${initialSupportTicketId}`, routePrefix);
       if (window.location.protocol !== "file:" && window.location.pathname !== targetPath) {
         window.history.replaceState(
           null,
@@ -1286,6 +1347,7 @@
           `${targetPath}${window.location.search}${window.location.hash}`
         );
       }
+      cleanDocsDemoRouteQuery();
     } else {
       syncAppSectionPath(section, true, initialAdminSection);
     }
@@ -1710,7 +1772,7 @@
     clearLanguageClickGuard();
     billingStore.closePaymentModal();
     const nextAdminSection = normalizeAdminSection(
-      adminActiveSection || adminSectionFromPath(window.location.pathname)
+      adminActiveSection || adminSectionFromPath(routePathnameFromLocation(), routePrefix)
     );
     try {
       await ensureI18nScope("admin");
@@ -1737,20 +1799,7 @@
     const nextAdminSection = normalizeAdminSection(adminSection);
     adminActiveSection = nextAdminSection;
     if (window.location.protocol === "file:") return;
-    if (isDocsDemo) {
-      syncDocsDemoSection("admin", false, nextAdminSection);
-      return;
-    }
-    const targetPath =
-      nextAdminSection === "users" && adminUserId
-        ? `/admin/users/${adminUserId}`
-        : `/admin/${nextAdminSection}`;
-    if (window.location.pathname === targetPath) return;
-    window.history.pushState(
-      null,
-      "",
-      `${targetPath}${window.location.search}${window.location.hash}`
-    );
+    syncAppSectionPath("admin", false, nextAdminSection, adminUserId);
   }
 
   function adminPayloadHasLogoChange(options = {}) {

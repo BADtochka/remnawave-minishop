@@ -77,6 +77,7 @@
     userTelegramProfileLink,
     userTelegramProfileLinkKind,
   } from "../lib/admin/users.js";
+  import { stripRoutePrefix } from "../lib/webapp/routes.js";
 
   export let api;
   export let onClose = () => {};
@@ -90,6 +91,7 @@
   export let onTariffsSaved = () => {};
   export let onThemesSaved = () => {};
   export let onTranslationsSaved = () => {};
+  export let routePrefix = "";
   export let brand = {};
   export let brandTitle = "/minishop";
   export let appFaviconUrl = "";
@@ -243,15 +245,15 @@
   const backupsStore = createBackupsStore({ api, onToast: flash, at });
   const broadcastStore = createBroadcastStore({ api, onToast: flash, at });
   const logsStore = createLogsStore({ api, at });
-  const paymentsStore = createPaymentsStore({ api, onToast: flash, at });
+  const paymentsStore = createPaymentsStore({ api, onToast: flash, at, routePrefix });
   const promosStore = createPromosStore({ api, onToast: flash, at });
   const settingsStore = createSettingsStore({ api, onToast: flash, at });
   const statsStore = createStatsStore({ api, onToast: flash, at });
-  const supportStore = createAdminSupportStore({ api, onToast: flash, at });
+  const supportStore = createAdminSupportStore({ api, onToast: flash, at, routePrefix });
   const tariffsStore = createTariffsStore({ api, onToast: flash, onTariffsSaved, flash, at });
   const themesStore = createThemesStore({ api, onThemesSaved, flash, at });
   const translationsStore = createTranslationsStore({ api, onToast: flash, at });
-  const usersStore = createUsersStore({ api, onToast: flash, at });
+  const usersStore = createUsersStore({ api, onToast: flash, at, routePrefix });
 
   setContext("promosStore", promosStore);
   setContext("adsStore", adsStore);
@@ -296,33 +298,38 @@
     onLanguageChange(value, { section: "admin", adminSection: active });
   }
 
+  function currentRoutePathname() {
+    if (typeof window === "undefined") return "/";
+    return stripRoutePrefix(window.location.pathname, routePrefix);
+  }
+
   function readSectionFromPath() {
     if (typeof window === "undefined") return "stats";
-    const match = window.location.pathname.match(/^\/admin\/([a-z0-9_-]+)(?:\/.*)?$/i);
+    const match = currentRoutePathname().match(/^\/admin\/([a-z0-9_-]+)(?:\/.*)?$/i);
     return normalizeSection(match ? match[1].toLowerCase() : "stats");
   }
 
   function readUserIdFromPath() {
     if (typeof window === "undefined") return null;
-    const match = window.location.pathname.match(/^\/admin\/users\/(-?\d+)$/);
+    const match = currentRoutePathname().match(/^\/admin\/users\/(-?\d+)$/);
     return match ? Number(match[1]) : null;
   }
 
   function readSupportTicketIdFromPath() {
     if (typeof window === "undefined") return null;
-    const match = window.location.pathname.match(/^\/admin\/support\/(\d+)$/);
+    const match = currentRoutePathname().match(/^\/admin\/support\/(\d+)$/);
     return match ? Number(match[1]) : null;
   }
 
   function readPaymentIdFromPath() {
     if (typeof window === "undefined") return null;
-    const match = window.location.pathname.match(/^\/admin\/payments\/(\d+)$/);
+    const match = currentRoutePathname().match(/^\/admin\/payments\/(\d+)$/);
     return match ? Number(match[1]) : null;
   }
 
   function readPaymentUserIdFromPath() {
     if (typeof window === "undefined") return null;
-    const match = window.location.pathname.match(/^\/admin\/payments\/users\/(-?\d+)$/);
+    const match = currentRoutePathname().match(/^\/admin\/payments\/users\/(-?\d+)$/);
     return match ? Number(match[1]) : null;
   }
 
@@ -377,8 +384,24 @@
       paymentsStore.closePayment({ skipPush: true });
       onSectionChange(next);
     }
+    usersStore.setActive(next);
     paymentsStore.closePayment({ skipPush: true });
     usersStore.openUser(uid, { pathContext: "payments" });
+  }
+
+  function openUserCard(userId) {
+    const uid = Number(userId);
+    if (!Number.isFinite(uid) || uid === 0) return;
+    const next = normalizeSection("users");
+    sidebarOpen = false;
+    if (active !== next) {
+      active = next;
+      paymentsStore.closePayment({ skipPush: true });
+      supportStore.closeTicketView({ skipPush: true });
+      onSectionChange(next, uid);
+    }
+    usersStore.setActive(next);
+    usersStore.openUser(uid);
   }
 
   function resolvedAvatarUrl(user) {
@@ -786,6 +809,7 @@
               {at}
               {brand}
               {resolvedAvatarUrl}
+              onOpenUserCard={openUserCard}
               initialTicketId={readSupportTicketIdFromPath()}
             />
           {/if}

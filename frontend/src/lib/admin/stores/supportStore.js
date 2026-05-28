@@ -1,6 +1,7 @@
 import { writable } from "svelte/store";
+import { withRoutePrefix } from "../../webapp/routes.js";
 
-export function createAdminSupportStore({ api, onToast, at }) {
+export function createAdminSupportStore({ api, onToast, at, routePrefix = "" }) {
   const OPEN_TICKET_POLL_MS = 3_000;
   const STATS_POLL_MS = 30_000;
   const HIDDEN_POLL_MS = 300_000;
@@ -58,7 +59,10 @@ export function createAdminSupportStore({ api, onToast, at }) {
   function pushTicketPath(ticketId) {
     if (typeof window === "undefined" || window.location.protocol === "file:") return;
     if (active !== "support") return;
-    const target = ticketId ? `/admin/support/${ticketId}` : "/admin/support";
+    const target = withRoutePrefix(
+      ticketId ? `/admin/support/${ticketId}` : "/admin/support",
+      routePrefix
+    );
     if (window.location.pathname !== target) {
       window.history.pushState(
         null,

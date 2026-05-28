@@ -1,6 +1,7 @@
 import { writable } from "svelte/store";
+import { withRoutePrefix } from "../routes.js";
 
-export function createSupportStore({ api, t, showToast }) {
+export function createSupportStore({ api, t, showToast, routePrefix = "" }) {
   const OPEN_TICKET_POLL_MS = 3_000;
   const ACTIVE_POLL_MS = 8_000;
   const BACKGROUND_POLL_MS = 45_000;
@@ -198,7 +199,7 @@ export function createSupportStore({ api, t, showToast }) {
       detailLoading: true,
     }));
     if (!opts.skipPush && typeof window !== "undefined" && window.location.protocol !== "file:") {
-      const target = `/support/${id}`;
+      const target = withRoutePrefix(`/support/${id}`, routePrefix);
       if (window.location.pathname !== target) {
         window.history.pushState(
           null,
@@ -232,11 +233,12 @@ export function createSupportStore({ api, t, showToast }) {
   function closeTicketView(opts = {}) {
     state.update((s) => ({ ...s, openedTicketId: null, openedTicket: null, messages: [] }));
     if (!opts.skipPush && typeof window !== "undefined" && window.location.protocol !== "file:") {
-      if (window.location.pathname.startsWith("/support/")) {
+      const supportPath = withRoutePrefix("/support", routePrefix);
+      if (window.location.pathname.startsWith(`${supportPath}/`)) {
         window.history.pushState(
           null,
           "",
-          `/support${window.location.search}${window.location.hash}`
+          `${supportPath}${window.location.search}${window.location.hash}`
         );
       }
     }

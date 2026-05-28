@@ -5,6 +5,7 @@
   export let ticket;
   export let snapshot = {};
   export let at = (key) => key;
+  export let onOpenUser = () => {};
 
   $: user = ticket?.user || {};
   $: displayName = snapshot?.name || user.username || user.email || user.user_id || "-";
@@ -65,7 +66,7 @@
       variant="ghost"
       size="icon"
       disabled={!canOpenUser}
-      onclick={() => (window.location.href = `/admin/users/${user.user_id}`)}
+      onclick={() => onOpenUser(user.user_id)}
       aria-label={at("support_open_user", {}, "Карточка")}
       title={at("support_open_user", {}, "Карточка")}
     >
