@@ -11,7 +11,7 @@
 - [Админка: пользователи](/demo/admin/users)
 - [Админка: бэкапы](/demo/admin/backups)
 - [Пробный период](/demo/home?mock=trial)
-- [Устройства](/demo/devices?mock=devices)
+- [Докупка устройств](/demo/devices?mock=devices)
 
 ## Как собирается
 

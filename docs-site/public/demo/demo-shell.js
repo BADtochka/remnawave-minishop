@@ -72,8 +72,11 @@ const routeFromParams = () => {
   return "/home";
 };
 
-const initialMock = normalizeRouteMock(params.get("mock"));
 let initialRoute = routeFromParams();
+const mockForRoute = (route) => (normalizePath(route) === "/devices" ? "devices" : "");
+const initialMock = params.has("mock")
+  ? normalizeRouteMock(params.get("mock"))
+  : normalizeRouteMock(mockForRoute(initialRoute) || defaultMock);
 if (initialMock === "trial" && initialRoute === "/trial") {
   initialRoute = "/home";
   const normalizedUrl = new URL(window.location.href);
