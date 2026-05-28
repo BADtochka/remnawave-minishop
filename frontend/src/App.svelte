@@ -1358,7 +1358,7 @@
       syncAppSectionPath(section, true, initialAdminSection);
     }
     if (section === "devices" && payload.settings?.my_devices_enabled) {
-      await devicesStore.loadDevices(true);
+      await devicesStore.loadDevices(true, true);
     }
     if (section === "install") {
       await installGuidesStore.load(true);
