@@ -163,32 +163,66 @@ def _legacy_referral_bonus_periods(settings: Settings) -> List[int]:
     return sorted(int(months) for months in settings.subscription_options)
 
 
+def _serialize_tariff_period_referral_bonus_details(
+    tariff: Any, lang: str
+) -> List[Dict[str, Any]]:
+    details: List[Dict[str, Any]] = []
+    for months in sorted(int(month) for month in tariff.enabled_periods):
+        inviter_days = tariff.referral_inviter_bonus_days(months)
+        friend_days = tariff.referral_referee_bonus_days(months)
+        if inviter_days is None and friend_days is None:
+            continue
+        details.append(
+            {
+                "id": f"{tariff.key}:{months}",
+                "tariff_key": tariff.key,
+                "tariff_name": tariff.name(lang),
+                "months": int(months),
+                "title": _format_months_title(int(months), lang),
+                "inviter_days": int(inviter_days or 0),
+                "friend_days": int(friend_days or 0),
+            }
+        )
+    return details
+
+
 def _serialize_tariff_referral_bonus_details(settings: Settings, lang: str) -> List[Dict[str, Any]]:
     tariffs_config = settings.tariffs_config
     if not tariffs_config:
         return []
 
-    details: List[Dict[str, Any]] = []
-    for tariff in tariffs_config.enabled_tariffs:
-        if tariff.billing_model != "period":
+    period_tariffs = [
+        tariff for tariff in tariffs_config.enabled_tariffs if tariff.billing_model == "period"
+    ]
+    if len(period_tariffs) <= 1:
+        return (
+            _serialize_tariff_period_referral_bonus_details(period_tariffs[0], lang)
+            if period_tariffs
+            else []
+        )
+
+    summaries: List[Dict[str, Any]] = []
+    for tariff in period_tariffs:
+        details = _serialize_tariff_period_referral_bonus_details(tariff, lang)
+        if not details:
             continue
-        for months in sorted(int(month) for month in tariff.enabled_periods):
-            inviter_days = tariff.referral_inviter_bonus_days(months)
-            friend_days = tariff.referral_referee_bonus_days(months)
-            if inviter_days is None and friend_days is None:
-                continue
-            details.append(
-                {
-                    "id": f"{tariff.key}:{months}",
-                    "tariff_key": tariff.key,
-                    "tariff_name": tariff.name(lang),
-                    "months": int(months),
-                    "title": f"{tariff.name(lang)} - {_format_months_title(int(months), lang)}",
-                    "inviter_days": int(inviter_days or 0),
-                    "friend_days": int(friend_days or 0),
-                }
-            )
-    return details
+        inviter_values = [int(item["inviter_days"]) for item in details]
+        friend_values = [int(item["friend_days"]) for item in details]
+        summaries.append(
+            {
+                "id": f"tariff:{tariff.key}",
+                "type": "tariff_summary",
+                "tariff_key": tariff.key,
+                "tariff_name": tariff.name(lang),
+                "title": tariff.name(lang),
+                "inviter_min_days": min(inviter_values),
+                "inviter_max_days": max(inviter_values),
+                "friend_min_days": min(friend_values),
+                "friend_max_days": max(friend_values),
+                "details": details,
+            }
+        )
+    return summaries
 
 
 def _serialize_referral_bonus_details(settings: Settings, lang: str) -> List[Dict[str, Any]]:

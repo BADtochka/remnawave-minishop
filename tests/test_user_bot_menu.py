@@ -20,6 +20,7 @@ from bot.keyboards.inline.user_keyboards import (
     payment_methods_back_callback,
     payment_options_back_callback,
 )
+from config.tariffs_config import TariffsConfig
 
 
 class JsonI18nStub:
@@ -304,3 +305,95 @@ class UserBotMenuTests(unittest.TestCase):
 
         self.assertLess(text.index("Telegram link:"), text.index("Web link:"))
         self.assertLess(text.index("Web link:"), text.index("Invitation bonuses:"))
+
+    def test_single_tariff_referral_text_uses_period_rows_without_tariff_name(self):
+        settings = SimpleNamespace(
+            tariffs_config=TariffsConfig.model_validate(
+                {
+                    "default_tariff": "standard",
+                    "tariffs": [
+                        {
+                            "key": "standard",
+                            "names": {"en": "Standard"},
+                            "descriptions": {},
+                            "squad_uuids": ["standard"],
+                            "billing_model": "period",
+                            "monthly_gb": 100,
+                            "prices_rub": {"2": 400, "4": 800},
+                            "prices_stars": {},
+                            "referral_bonus_days_inviter": {"2": 5, "4": 10},
+                            "referral_bonus_days_referee": {"2": 1, "4": 2},
+                            "enabled_periods": [2, 4],
+                            "enabled": True,
+                        }
+                    ],
+                }
+            ),
+            subscription_options={},
+            referral_bonus_inviter={},
+            referral_bonus_referee={},
+        )
+
+        text = referral._build_referral_bonus_details_text(
+            settings,
+            lambda key, **kwargs: self.i18n.gettext("en", key, **kwargs),
+            "en",
+        )
+
+        self.assertIn("For a friend's 2-month subscription", text)
+        self.assertIn("For a friend's 4-month subscription", text)
+        self.assertNotIn("Standard", text)
+
+    def test_multiple_tariff_referral_text_uses_tariff_ranges(self):
+        settings = SimpleNamespace(
+            tariffs_config=TariffsConfig.model_validate(
+                {
+                    "default_tariff": "standard",
+                    "tariffs": [
+                        {
+                            "key": "standard",
+                            "names": {"en": "Standard"},
+                            "descriptions": {},
+                            "squad_uuids": ["standard"],
+                            "billing_model": "period",
+                            "monthly_gb": 100,
+                            "prices_rub": {"2": 400, "4": 800},
+                            "prices_stars": {},
+                            "referral_bonus_days_inviter": {"2": 5, "4": 10},
+                            "referral_bonus_days_referee": {"2": 1, "4": 2},
+                            "enabled_periods": [2, 4],
+                            "enabled": True,
+                        },
+                        {
+                            "key": "premium",
+                            "names": {"en": "Premium"},
+                            "descriptions": {},
+                            "squad_uuids": ["premium"],
+                            "billing_model": "period",
+                            "monthly_gb": 500,
+                            "prices_rub": {"1": 700, "3": 1800},
+                            "prices_stars": {},
+                            "referral_bonus_days_inviter": {"1": 8, "3": 24},
+                            "referral_bonus_days_referee": {"1": 3, "3": 9},
+                            "enabled_periods": [1, 3],
+                            "enabled": True,
+                        },
+                    ],
+                }
+            ),
+            subscription_options={},
+            referral_bonus_inviter={},
+            referral_bonus_referee={},
+        )
+
+        text = referral._build_referral_bonus_details_text(
+            settings,
+            lambda key, **kwargs: self.i18n.gettext("en", key, **kwargs),
+            "en",
+        )
+
+        self.assertIn("Standard", text)
+        self.assertIn("Premium", text)
+        self.assertIn("from 5 to 10 days", text)
+        self.assertIn("from 8 to 24 days", text)
+        self.assertNotIn("2-month subscription", text)
