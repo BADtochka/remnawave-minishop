@@ -117,12 +117,14 @@
 | --- | --- |
 | `PANEL_API_URL` | URL API панели, например `https://panel.example.com/api`. |
 | `PANEL_API_KEY` | API-ключ панели. |
-| `PANEL_WEBHOOK_SECRET` | Секрет проверки Remnawave webhook. |
+| `PANEL_WEBHOOK_SECRET` | Секрет проверки Remnawave webhook. Задайте его в Remnawave Panel и вставьте то же значение сюда или в админку. |
 | `USER_SQUAD_UUIDS` | Internal Squads по умолчанию для legacy-режима без JSON-каталога. |
 | `USER_EXTERNAL_SQUAD_UUID` | Необязательный External Squad. |
 | `USER_TRAFFIC_LIMIT_GB` | Legacy-лимит трафика пользователя. |
 | `USER_TRAFFIC_STRATEGY` | Legacy-стратегия лимита трафика. |
 | `USER_HWID_DEVICE_LIMIT` | Legacy-лимит HWID-устройств по умолчанию. |
+
+В Remnawave Panel поле `WEBHOOK_URL` должно указывать на публичный Minishop webhook: `WEBHOOK_BASE_URL` + `/webhook/panel`. Если публичный домен приложения `https://app.example.com`, итоговый адрес будет `https://app.example.com/webhook/panel`.
 
 ## Веб-приложение, внешний вид и Telegram Login
 

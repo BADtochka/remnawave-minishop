@@ -20,6 +20,8 @@ docker compose logs -f backend worker frontend
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`.
 - `WEBAPP_SESSION_SECRET`, `WEBHOOK_SECRET_TOKEN`, `PANEL_API_URL`, `PANEL_API_KEY`, `PANEL_WEBHOOK_SECRET`.
 
+Для вебхуков Remnawave в панели укажите `WEBHOOK_URL` как `WEBHOOK_BASE_URL` + `/webhook/panel`, например `https://app.example.com/webhook/panel`. Секрет создается или задается в Remnawave Panel; тот же секрет вставьте в `PANEL_WEBHOOK_SECRET` в `.env` или позже в **Система -> Настройки -> Remnawave Panel**.
+
 ## Как выбрать Compose-вариант
 
 Для продакшена по умолчанию берите [Caddy](deployment.md#caddy-рекомендуемый-вариант): это самый короткий путь к публичному HTTPS без ручной раскладки сертификатов.
