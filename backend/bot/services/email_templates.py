@@ -497,6 +497,101 @@ def render_subscription_expiring(
     return EmailContent(subject=subject, text="\n".join(text_lines), html=rendered)
 
 
+def _subscription_lifecycle_title(
+    i18n: JsonI18n,
+    lang: str,
+    notification_key: str,
+    *,
+    days_left: Optional[int],
+    hours_before: Optional[int],
+) -> str:
+    if notification_key == "before_2d_autorenew":
+        return _t_text(i18n, lang, "email_subscription_lifecycle_subject_autorenew")
+    if notification_key == "expired":
+        return _t_text(i18n, lang, "email_subscription_lifecycle_subject_expired")
+    if notification_key == "expired_24h_after":
+        return _t_text(i18n, lang, "email_subscription_lifecycle_subject_expired_after")
+    if hours_before is not None:
+        return _t_text(
+            i18n,
+            lang,
+            "email_subscription_lifecycle_subject_before_hours",
+            hours=hours_before,
+        )
+    return _t_text(
+        i18n,
+        lang,
+        "email_subscription_lifecycle_subject_before_days",
+        days=max(0, int(days_left or 0)),
+    )
+
+
+def render_subscription_lifecycle_notification(
+    settings: Settings,
+    *,
+    language_code: Optional[str],
+    notification_key: str,
+    message_text: str,
+    end_date_text: str,
+    dashboard_url: Optional[str],
+    days_left: Optional[int] = None,
+    hours_before: Optional[int] = None,
+    i18n: Optional[JsonI18n] = None,
+) -> EmailContent:
+    i18n = _resolve_i18n(i18n)
+    lang = _normalize_lang(language_code, settings)
+    accent = _safe_color(settings.WEBAPP_PRIMARY_COLOR)
+    brand = _brand_title(settings)
+    safe_dashboard_url = (dashboard_url or "").strip()
+    end_date = end_date_text or "—"
+    subject = _subscription_lifecycle_title(
+        i18n,
+        lang,
+        notification_key,
+        days_left=days_left,
+        hours_before=hours_before,
+    )
+    intro = _t_text(i18n, lang, "email_subscription_lifecycle_intro")
+    footer = _t_html(i18n, lang, "email_footer_auto", brand=brand)
+    cta_label = _t_text(i18n, lang, "email_subscription_lifecycle_cta")
+
+    rows = [
+        (_t_text(i18n, lang, "email_subscription_lifecycle_row_end_date"), end_date),
+    ]
+    message_html = (
+        f'<div style="margin:0 0 16px 0;background:{_BG};border:1px solid {_BORDER};'
+        f"border-radius:14px;padding:14px 16px;font-size:14px;line-height:1.55;color:{_TEXT};"
+        f'white-space:pre-wrap;">{html.escape(message_text or "")}</div>'
+    )
+    body_parts = [_info_rows_html(rows), message_html]
+    if safe_dashboard_url:
+        body_parts.append(_cta_button_html(label=cta_label, url=safe_dashboard_url, accent=accent))
+
+    rendered = _layout(
+        settings=settings,
+        preheader=subject,
+        heading=subject,
+        intro_html=html.escape(intro),
+        body_html="".join(body_parts),
+        footer_html=footer,
+    )
+
+    text_lines = [subject, "", message_text]
+    if safe_dashboard_url:
+        text_lines.extend(
+            [
+                "",
+                _t_text(
+                    i18n,
+                    lang,
+                    "email_subscription_lifecycle_text_renew",
+                    url=safe_dashboard_url,
+                ),
+            ]
+        )
+    return EmailContent(subject=subject, text="\n".join(text_lines), html=rendered)
+
+
 def _support_email(
     settings: Settings,
     i18n: Optional[JsonI18n],

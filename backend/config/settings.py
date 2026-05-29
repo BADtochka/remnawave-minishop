@@ -240,6 +240,7 @@ class Settings(BaseSettings):
     )
 
     SUBSCRIPTION_NOTIFICATIONS_ENABLED: bool = Field(default=True)
+    SUBSCRIPTION_EMAIL_NOTIFICATIONS_ENABLED: bool = Field(default=True)
     SUBSCRIPTION_NOTIFY_ON_EXPIRE: bool = Field(default=True)
     SUBSCRIPTION_NOTIFY_AFTER_EXPIRE: bool = Field(default=True)
     SUBSCRIPTION_NOTIFY_DAYS_BEFORE: int = Field(default=3)

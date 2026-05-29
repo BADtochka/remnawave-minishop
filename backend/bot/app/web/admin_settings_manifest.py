@@ -397,6 +397,13 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "Включены уведомления о подписке",
     ),
     SettingField(
+        "SUBSCRIPTION_EMAIL_NOTIFICATIONS_ENABLED",
+        "bool",
+        "notifications",
+        "Дублировать уведомления о подписке на email",
+        "Письма отправляются только пользователям с привязанным email и рабочим SMTP.",
+    ),
+    SettingField(
         "SUBSCRIPTION_NOTIFY_ON_EXPIRE", "bool", "notifications", "Уведомлять об истечении"
     ),
     SettingField(

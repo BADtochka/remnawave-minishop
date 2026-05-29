@@ -282,3 +282,4 @@ class SettingsTests(unittest.TestCase):
 
         self.assertEqual(settings.SUBSCRIPTION_NOTIFY_HOURS_BEFORE, 3)
         self.assertEqual(settings.SUBSCRIPTION_NOTIFICATION_WORKER_TICK_SECONDS, 300)
+        self.assertTrue(settings.SUBSCRIPTION_EMAIL_NOTIFICATIONS_ENABLED)

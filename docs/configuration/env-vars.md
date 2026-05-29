@@ -385,6 +385,7 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | `REFERRAL_BONUS_DAYS_1_MONTH`, `REFERRAL_BONUS_DAYS_3_MONTHS`, `REFERRAL_BONUS_DAYS_6_MONTHS`, `REFERRAL_BONUS_DAYS_12_MONTHS` | Legacy-бонусы пригласившему. |
 | `REFEREE_BONUS_DAYS_1_MONTH`, `REFEREE_BONUS_DAYS_3_MONTHS`, `REFEREE_BONUS_DAYS_6_MONTHS`, `REFEREE_BONUS_DAYS_12_MONTHS` | Legacy-бонусы приглашенному. |
 | `SUBSCRIPTION_NOTIFICATIONS_ENABLED` | Включает напоминания о подписке. |
+| `SUBSCRIPTION_EMAIL_NOTIFICATIONS_ENABLED` | Дублирует пользовательские уведомления жизненного цикла подписки на email, если SMTP настроен и у пользователя есть email. |
 | `SUBSCRIPTION_NOTIFY_ON_EXPIRE` | Уведомлять в день окончания. |
 | `SUBSCRIPTION_NOTIFY_AFTER_EXPIRE` | Уведомлять после окончания. |
 | `SUBSCRIPTION_NOTIFY_DAYS_BEFORE` | За сколько дней предупреждать. |

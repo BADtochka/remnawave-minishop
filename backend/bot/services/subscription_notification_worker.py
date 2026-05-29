@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -15,6 +14,10 @@ from bot.infra.redis import redis_lock
 from bot.keyboards.inline.user_keyboards import get_subscribe_only_markup
 from bot.middlewares.i18n import JsonI18n
 from bot.services.panel_api_service import PanelApiService
+from bot.services.subscription_lifecycle_notifications import (
+    SubscriptionLifecycleNotificationService,
+    SubscriptionNotificationStage,
+)
 from bot.services.subscription_service import SubscriptionService
 from config.settings import Settings
 from db.dal import subscription_dal
@@ -24,13 +27,6 @@ SUBSCRIPTION_NOTIFICATION_LOCK = "subscription-notification-worker"
 DEFAULT_SUBSCRIPTION_NOTIFICATION_TICK_SECONDS = 300
 EXPIRED_NOTIFICATION_WINDOW = timedelta(hours=24)
 EXPIRED_AFTER_NOTIFICATION_WINDOW = timedelta(hours=48)
-
-
-@dataclass(frozen=True)
-class SubscriptionNotificationStage:
-    key: str
-    message_key: str
-    hours_before: Optional[int] = None
 
 
 class SubscriptionNotificationWorker:
@@ -49,6 +45,11 @@ class SubscriptionNotificationWorker:
         self.i18n = i18n
         self.panel_service = panel_service
         self.subscription_service = subscription_service
+        self.lifecycle_notifications = SubscriptionLifecycleNotificationService(
+            settings,
+            bot,
+            i18n,
+        )
         self._stopped = asyncio.Event()
 
     async def run(self) -> None:
@@ -114,18 +115,10 @@ class SubscriptionNotificationWorker:
             stage = self.stage_for_subscription(sub, now)
             if stage is None:
                 continue
-            if await subscription_dal.has_subscription_notification(
+            await self.lifecycle_notifications.send_stage(
                 session,
-                sub.subscription_id,
-                stage.key,
-            ):
-                continue
-            if not await self._send_expiry_notification(sub, stage):
-                continue
-            await subscription_dal.record_subscription_notification(
-                session,
-                sub.subscription_id,
-                stage.key,
+                sub,
+                stage,
                 sent_at=now,
             )
 
@@ -164,6 +157,7 @@ class SubscriptionNotificationWorker:
                     return SubscriptionNotificationStage(
                         key=f"before_{days_before}d",
                         message_key=message_key,
+                        days_left=days_before,
                     )
             return None
 
@@ -175,6 +169,7 @@ class SubscriptionNotificationWorker:
             return SubscriptionNotificationStage(
                 key="expired",
                 message_key="subscription_expired_notification",
+                days_left=0,
             )
         if (
             getattr(self.settings, "SUBSCRIPTION_NOTIFY_AFTER_EXPIRE", True)
@@ -183,6 +178,7 @@ class SubscriptionNotificationWorker:
             return SubscriptionNotificationStage(
                 key="expired_24h_after",
                 message_key="subscription_expired_yesterday_notification",
+                days_left=0,
             )
         return None
 
@@ -256,38 +252,6 @@ class SubscriptionNotificationWorker:
             )
             return None
         return data if isinstance(data, dict) else None
-
-    async def _send_expiry_notification(
-        self,
-        sub: Subscription,
-        stage: SubscriptionNotificationStage,
-    ) -> bool:
-        user_id = int(getattr(sub, "user_id", 0) or 0)
-        if user_id <= 0:
-            return False
-        user = getattr(sub, "user", None)
-        lang = getattr(user, "language_code", None) or self.settings.DEFAULT_LANGUAGE
-        user_name = getattr(user, "first_name", None) or f"User {user_id}"
-        end_date = self._as_utc(getattr(sub, "end_date", None))
-        end_date_text = end_date.strftime("%Y-%m-%d") if end_date else ""
-        translate = lambda k, **kw: self.i18n.gettext(lang, k, **kw)
-        kwargs = {"user_name": user_name, "end_date": end_date_text}
-        if stage.hours_before is not None:
-            kwargs["hours"] = stage.hours_before
-        try:
-            await self.bot.send_message(
-                user_id,
-                translate(stage.message_key, **kwargs),
-                reply_markup=get_subscribe_only_markup(lang, self.i18n),
-            )
-            return True
-        except Exception:
-            logging.exception(
-                "Failed to send subscription notification %s to user %s",
-                stage.key,
-                user_id,
-            )
-            return False
 
     async def _send_trial_traffic_depleted(
         self,
