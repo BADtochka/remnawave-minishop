@@ -48,7 +48,7 @@ services:
     environment:
       <<: *app_environment
     volumes:
-      - shop-data:/app/data
+      - ./data:/app/data
     networks:
       - remnawave-shop
     depends_on:
@@ -66,7 +66,7 @@ services:
       WEBAPP_ENABLED: ${WEBAPP_ENABLED:-true}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1,::1,172.16.0.0/12}
     volumes:
-      - shop-data:/app/data
+      - ./data:/app/data
       - ${COMPOSE_BACKUP_SOURCE:-.}:/app/compose-source:${COMPOSE_RESTORE_MODE:-rw}
     networks:
       - remnawave-shop
@@ -91,7 +91,7 @@ services:
     environment:
       <<: *app_environment
     volumes:
-      - shop-data:/app/data
+      - ./data:/app/data
       - ${COMPOSE_BACKUP_SOURCE:-.}:/app/compose-source:ro
     networks:
       - remnawave-shop
@@ -148,5 +148,3 @@ volumes:
     name: remnawave-minishop-db-data
   redis-data:
     name: remnawave-minishop-redis-data
-  shop-data:
-    name: remnawave-minishop-shop-data

@@ -48,7 +48,7 @@ services:
     environment:
       <<: *app_environment
     volumes:
-      - shop-data:/app/data
+      - ./data:/app/data
     networks:
       - remnawave-shop
     depends_on:
@@ -68,7 +68,7 @@ services:
     ports:
       - "${WEB_SERVER_BIND:-0.0.0.0:8080}:8080"
     volumes:
-      - shop-data:/app/data
+      - ./data:/app/data
       - ${COMPOSE_BACKUP_SOURCE:-.}:/app/compose-source:${COMPOSE_RESTORE_MODE:-rw}
     networks:
       - remnawave-shop
@@ -93,7 +93,7 @@ services:
     environment:
       <<: *app_environment
     volumes:
-      - shop-data:/app/data
+      - ./data:/app/data
       - ${COMPOSE_BACKUP_SOURCE:-.}:/app/compose-source:ro
     networks:
       - remnawave-shop
@@ -132,5 +132,3 @@ volumes:
     name: remnawave-minishop-db-data
   redis-data:
     name: remnawave-minishop-redis-data
-  shop-data:
-    name: remnawave-minishop-shop-data
