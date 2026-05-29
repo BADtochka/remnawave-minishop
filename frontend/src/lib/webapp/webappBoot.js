@@ -21,6 +21,7 @@ export async function runWebappBoot({
   clearToken,
   clearManualLogoutFlag,
   isManuallyLoggedOut,
+  hasEmailCodeLoginDeeplink,
   finalizeMagicLogin,
   finalizeTelegramAuth,
   setAuthStatus,
@@ -35,6 +36,13 @@ export async function runWebappBoot({
 
   if (MOCK) {
     await loadData();
+    return;
+  }
+
+  if (hasEmailCodeLoginDeeplink?.()) {
+    clearManualLogoutFlag();
+    clearToken();
+    showLogin();
     return;
   }
 

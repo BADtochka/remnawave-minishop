@@ -149,7 +149,7 @@ class Tariff(BaseModel):
                 if rub_price <= 0 and stars_price <= 0:
                     raise ValueError(
                         f"period tariff {self.key}: period {months} needs a non-zero rub or stars price"  # noqa: E501
-                )
+                    )
             return self
 
         if not self.traffic_packages or not self.traffic_packages.has_any():

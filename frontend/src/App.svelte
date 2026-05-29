@@ -152,6 +152,7 @@
   let mode = isAppLaunchRoute ? "appLaunch" : isPreviewBoard ? "preview" : "loading";
   let activeTab = "home";
   let screen = "home";
+  let emailLoginDeeplinkConsumed = false;
   let data = isPreviewBoard ? structuredCloneSafe(MOCK_SOURCE.data) : null;
   let appLaunchTarget = isAppLaunchRoute ? readExternalAppLaunchTarget() : "";
   let publicInstallSubscription = null;
@@ -1142,6 +1143,61 @@
     return new URLSearchParams(window.location.search);
   }
 
+  function readEmailCodeLoginDeeplink() {
+    const params = currentSearchParams();
+    if (params.get("login") !== "email_code") return null;
+    const emailHint = normalizedEmail(params.get("login_email") || "");
+    if (!emailHint || !emailHint.includes("@")) return null;
+    return emailHint;
+  }
+
+  function hasEmailCodeLoginDeeplink() {
+    return Boolean(readEmailCodeLoginDeeplink());
+  }
+
+  async function startEmailCodeLoginFromDeeplink() {
+    if (emailLoginDeeplinkConsumed) return;
+    const emailHint = readEmailCodeLoginDeeplink();
+    if (!emailHint) return;
+    emailLoginDeeplinkConsumed = true;
+    authStore.update((s) => ({
+      ...s,
+      email: emailHint,
+      emailCode: "",
+      pendingEmail: "",
+      passwordLoginMode: false,
+      passwordLoginFallback: false,
+    }));
+    await tick();
+    await authStore.requestEmailCode((nextScreen) => {
+      screen = nextScreen;
+    });
+  }
+
+  function readRenewalDeeplink() {
+    const params = currentSearchParams();
+    const shouldRenew = params.get("after_login") === "renew" || params.get("renew") === "1";
+    if (!shouldRenew) return null;
+    return {
+      tariffKey: String(params.get("renew_tariff") || "").trim(),
+    };
+  }
+
+  function stripRenewalLoginQueryFromUrl() {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const keys = ["login", "login_email", "after_login", "renew", "renew_tariff"];
+    const changed = keys.some((key) => url.searchParams.has(key));
+    if (!changed) return;
+    for (const key of keys) url.searchParams.delete(key);
+    const search = url.searchParams.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${url.pathname}${search ? `?${search}` : ""}${url.hash}`
+    );
+  }
+
   function docsDemoParentSearchParams() {
     if (!isDocsDemo) return null;
     try {
@@ -1317,6 +1373,7 @@
       clearToken,
       clearManualLogoutFlag,
       isManuallyLoggedOut,
+      hasEmailCodeLoginDeeplink,
       finalizeMagicLogin: (loginToken) => authStore.finalizeMagicLogin(loginToken),
       finalizeTelegramAuth: (authData, source) => authStore.finalizeTelegramAuth(authData, source),
       setAuthStatus: (message, isError) => authStore.setAuthStatus(message, isError),
@@ -1509,6 +1566,30 @@
         stripTopupQueryFromUrl();
       }
     }
+
+    const renewalDeep = readRenewalDeeplink();
+    if (renewalDeep) {
+      const plansList = payload.plans?.length ? payload.plans : [];
+      const tariffCatalogLocal = buildTariffCatalog(plansList);
+      const tariffModeLocal = plansList.some((plan) => plan?.tariff_key);
+      activeTab = "home";
+      screen = "home";
+      syncAppSectionPath("home", true);
+      billingStore.openPaymentModal(
+        tariffModeLocal,
+        tariffModeLocal && tariffCatalogLocal.length === 1,
+        tariffCatalogLocal,
+        payload.subscription || {},
+        plansList,
+        payload.payment_methods?.[0]?.id || "",
+        {
+          preferredTariffKey: renewalDeep.tariffKey,
+          selectDefaultTariff: true,
+          preferCheckout: true,
+        }
+      );
+      stripRenewalLoginQueryFromUrl();
+    }
     return payload;
   }
 
@@ -1530,6 +1611,7 @@
     screen = "login";
     activeTab = "home";
     setPasswordLoginMode(isPasswordLoginPath(), true);
+    void startEmailCodeLoginFromDeeplink();
   }
 
   async function api(path, options = {}) {

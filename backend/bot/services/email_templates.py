@@ -534,6 +534,7 @@ def render_subscription_lifecycle_notification(
     message_text: str,
     end_date_text: str,
     dashboard_url: Optional[str],
+    mirrored_from_telegram: bool = False,
     days_left: Optional[int] = None,
     hours_before: Optional[int] = None,
     i18n: Optional[JsonI18n] = None,
@@ -551,7 +552,12 @@ def render_subscription_lifecycle_notification(
         days_left=days_left,
         hours_before=hours_before,
     )
-    intro = _t_text(i18n, lang, "email_subscription_lifecycle_intro")
+    intro_key = (
+        "email_subscription_lifecycle_intro_mirrored"
+        if mirrored_from_telegram
+        else "email_subscription_lifecycle_intro_direct"
+    )
+    intro = _t_text(i18n, lang, intro_key)
     footer = _t_html(i18n, lang, "email_footer_auto", brand=brand)
     cta_label = _t_text(i18n, lang, "email_subscription_lifecycle_cta")
 

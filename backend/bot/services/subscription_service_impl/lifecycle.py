@@ -805,9 +805,11 @@ class SubscriptionLifecycleMixin:
         local_active_sub = await subscription_dal.get_active_subscription_by_user_id(
             session, user_id, panel_user_uuid
         )
-        panel_user_data, panel_user_confirmed_absent, panel_lookup_failure_reason = (
-            await self._lookup_panel_user_for_subscription_details(panel_user_uuid)
-        )
+        (
+            panel_user_data,
+            panel_user_confirmed_absent,
+            panel_lookup_failure_reason,
+        ) = await self._lookup_panel_user_for_subscription_details(panel_user_uuid)
 
         if not panel_user_data:
             if panel_user_confirmed_absent:

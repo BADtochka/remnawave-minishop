@@ -88,9 +88,7 @@ class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
                 super().__init__("wrapped")
                 self.orig = orig
 
-        self.assertTrue(
-            TariffTrafficWorker._is_retryable_db_exception(WrappedDbError(PgError()))
-        )
+        self.assertTrue(TariffTrafficWorker._is_retryable_db_exception(WrappedDbError(PgError())))
         self.assertFalse(TariffTrafficWorker._is_retryable_db_exception(RuntimeError("plain")))
 
     async def test_period_tariff_uses_panel_month_strategy_without_resetting(self):

@@ -163,9 +163,7 @@ def _legacy_referral_bonus_periods(settings: Settings) -> List[int]:
     return sorted(int(months) for months in settings.subscription_options)
 
 
-def _serialize_tariff_period_referral_bonus_details(
-    tariff: Any, lang: str
-) -> List[Dict[str, Any]]:
+def _serialize_tariff_period_referral_bonus_details(tariff: Any, lang: str) -> List[Dict[str, Any]]:
     details: List[Dict[str, Any]] = []
     for months in sorted(int(month) for month in tariff.enabled_periods):
         inviter_days = tariff.referral_inviter_bonus_days(months)
@@ -460,6 +458,7 @@ def _serialize_plans(
         for tariff in tariffs_config.enabled_tariffs:
             common = {
                 "tariff_key": tariff.key,
+                "is_default_tariff": tariff.key == tariffs_config.default_tariff,
                 "tariff_name": tariff.name(lang),
                 "billing_model": tariff.billing_model,
                 "description": tariff.description(lang),

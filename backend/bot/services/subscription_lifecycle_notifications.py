@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
@@ -67,20 +68,30 @@ class SubscriptionLifecycleNotificationService:
         resolved_user = user or getattr(sub, "user", None)
         lang = getattr(resolved_user, "language_code", None) or self.settings.DEFAULT_LANGUAGE
         user_id = int(getattr(sub, "user_id", 0) or 0)
-        user_name = getattr(resolved_user, "first_name", None) or f"User {user_id}"
         final_end_date_text = end_date_text
         if final_end_date_text is None:
             end_date = self._as_utc(getattr(sub, "end_date", None))
             final_end_date_text = end_date.strftime("%Y-%m-%d") if end_date else ""
 
-        kwargs = {"user_name": user_name, "end_date": final_end_date_text}
+        recipient_email = self._email_recipient(resolved_user)
+        telegram_user_name = self._telegram_display_name(resolved_user, user_id)
+        email_user_name = self._email_display_name(
+            resolved_user,
+            recipient_email=recipient_email,
+            fallback=telegram_user_name,
+        )
+
+        kwargs = {"user_name": telegram_user_name, "end_date": final_end_date_text}
         if stage.hours_before is not None:
             kwargs["hours"] = stage.hours_before
 
         message_text = self.i18n.gettext(lang, stage.message_key, **kwargs)
+        email_kwargs = {**kwargs, "user_name": email_user_name}
+        email_message_text = self.i18n.gettext(lang, stage.message_key, **email_kwargs)
         final_extra_text = str(extra_text or "").strip()
         if final_extra_text:
             message_text = f"{message_text}\n\n{final_extra_text}"
+            email_message_text = f"{email_message_text}\n\n{final_extra_text}"
 
         telegram_sent = await self._send_telegram(
             session,
@@ -98,8 +109,10 @@ class SubscriptionLifecycleNotificationService:
             stage,
             resolved_user,
             lang=lang,
-            message_text=message_text,
+            message_text=email_message_text,
             end_date_text=final_end_date_text,
+            recipient=recipient_email,
+            telegram_sent=telegram_sent,
             sent_at=sent_at,
         )
         return SubscriptionNotificationDelivery(
@@ -180,13 +193,14 @@ class SubscriptionLifecycleNotificationService:
         lang: str,
         message_text: str,
         end_date_text: str,
+        recipient: str,
+        telegram_sent: bool,
         sent_at: datetime,
     ) -> bool:
         if not getattr(self.settings, "SUBSCRIPTION_EMAIL_NOTIFICATIONS_ENABLED", True):
             return False
         if not getattr(self.settings, "email_auth_configured", False):
             return False
-        recipient = str(getattr(user, "email", "") or "").strip() if user else ""
         if not recipient:
             return False
         if await self._already_sent(session, sub.subscription_id, stage.key, "email"):
@@ -199,7 +213,8 @@ class SubscriptionLifecycleNotificationService:
                 notification_key=stage.key,
                 message_text=message_text,
                 end_date_text=end_date_text,
-                dashboard_url=(self.settings.SUBSCRIPTION_MINI_APP_URL or "").strip() or None,
+                dashboard_url=self._renewal_dashboard_url(recipient, sub),
+                mirrored_from_telegram=telegram_sent,
                 days_left=stage.days_left,
                 hours_before=stage.hours_before,
                 i18n=self.i18n,
@@ -248,6 +263,64 @@ class SubscriptionLifecycleNotificationService:
     @staticmethod
     def _channel_key(stage_key: str, channel: str) -> str:
         return f"{stage_key}:{channel}"
+
+    @staticmethod
+    def _email_recipient(user: Optional[User]) -> str:
+        return str(getattr(user, "email", "") or "").strip().lower() if user else ""
+
+    @staticmethod
+    def _telegram_display_name(user: Optional[User], fallback_user_id: int) -> str:
+        return str(getattr(user, "first_name", "") or "").strip() or f"User {fallback_user_id}"
+
+    @staticmethod
+    def _email_display_name(
+        user: Optional[User],
+        *,
+        recipient_email: str,
+        fallback: str,
+    ) -> str:
+        return str(getattr(user, "first_name", "") or "").strip() or recipient_email or fallback
+
+    def _renewal_dashboard_url(self, recipient_email: str, sub: Subscription) -> Optional[str]:
+        base_url = (self.settings.SUBSCRIPTION_MINI_APP_URL or "").strip()
+        if not base_url:
+            return None
+        parsed = urlsplit(base_url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return None
+
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query.update(
+            {
+                "login": "email_code",
+                "login_email": recipient_email,
+                "after_login": "renew",
+                "renew": "1",
+            }
+        )
+        tariff_key = self._renewal_tariff_key(sub)
+        if tariff_key:
+            query["renew_tariff"] = tariff_key
+        else:
+            query.pop("renew_tariff", None)
+
+        return urlunsplit(
+            (
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path or "/",
+                urlencode(query),
+                parsed.fragment,
+            )
+        )
+
+    @staticmethod
+    def _renewal_tariff_key(sub: Subscription) -> str:
+        provider = str(getattr(sub, "provider", "") or "").strip().lower()
+        status = str(getattr(sub, "status_from_panel", "") or "").strip().upper()
+        if provider == "trial" or status == "TRIAL":
+            return ""
+        return str(getattr(sub, "tariff_key", "") or "").strip()
 
     @staticmethod
     def _telegram_chat_id(user: Optional[User], fallback_user_id: Optional[int]) -> Optional[int]:
