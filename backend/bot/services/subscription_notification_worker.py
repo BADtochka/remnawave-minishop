@@ -20,6 +20,7 @@ from bot.services.subscription_lifecycle_notifications import (
 )
 from bot.services.subscription_service import SubscriptionService
 from config.settings import Settings
+from db.advisory_locks import acquire_subscription_background_sync_lock
 from db.dal import subscription_dal
 from db.models import Subscription
 
@@ -67,6 +68,7 @@ class SubscriptionNotificationWorker:
                     else:
                         started = time.monotonic()
                         async with self.session_factory() as session:
+                            await acquire_subscription_background_sync_lock(session)
                             await self.expiry_tick(session)
                             await self.trial_traffic_tick(session)
                             await session.commit()

@@ -14,6 +14,7 @@ from bot.middlewares.i18n import JsonI18n
 from bot.services.panel_api_service import PanelApiService
 from bot.utils.text_sanitizer import panel_description_from_profile
 from config.settings import Settings
+from db.advisory_locks import acquire_subscription_background_sync_lock
 from db.dal import panel_sync_dal, subscription_dal, user_dal
 from db.models import Subscription, User
 
@@ -928,6 +929,7 @@ async def _perform_sync_impl(
 
         total_panel_users = len(panel_users_data)
         logging.info(f"Starting sync for {total_panel_users} panel users.")
+        await acquire_subscription_background_sync_lock(session)
         sync_indexes = await _prefetch_sync_indexes(session, panel_users_data)
         users_by_telegram_id = sync_indexes["users_by_telegram_id"]
         users_by_user_id = sync_indexes["users_by_user_id"]
