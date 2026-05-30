@@ -1100,7 +1100,7 @@
   "admin_stats_error": "Failed to load statistics: {error}",
   "admin_stats_label_users": "Users",
   "admin_stats_trend_banned": "Banned: {count}",
-  "admin_stats_label_active_subs": "With active subscription",
+  "admin_stats_label_active_subs": "Active users",
   "admin_stats_label_paid_subs": "Paid users",
   "admin_stats_label_trial_users": "With trial subscription",
   "admin_stats_label_free_users": "With free subscription",

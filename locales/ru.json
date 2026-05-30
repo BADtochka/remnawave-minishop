@@ -1100,7 +1100,7 @@
   "admin_stats_error": "Не удалось загрузить статистику: {error}",
   "admin_stats_label_users": "Пользователи",
   "admin_stats_trend_banned": "В бане: {count}",
-  "admin_stats_label_active_subs": "С активной подпиской",
+  "admin_stats_label_active_subs": "Активные пользователи",
   "admin_stats_label_paid_subs": "Платные пользователи",
   "admin_stats_label_trial_users": "С пробной подпиской",
   "admin_stats_label_free_users": "С бесплатной подпиской",
