@@ -46,6 +46,13 @@ EVENT_MAP = {
         days_left=1,
     ),
 }
+ACTIONABLE_EVENTS = frozenset(
+    {
+        *EVENT_MAP.keys(),
+        "user.expired",
+        "user.expired_24_hours_ago",
+    }
+)
 
 
 class PanelWebhookService:
@@ -128,6 +135,15 @@ class PanelWebhookService:
         if not self.settings.SUBSCRIPTION_NOTIFICATIONS_ENABLED:
             return
 
+        if event_name not in ACTIONABLE_EVENTS:
+            logging.info(
+                "Panel webhook event %s ignored: event is not used for subscription "
+                "notifications; %s",
+                event_name,
+                self._payload_log_context(user_payload),
+            )
+            return
+
         async with self.async_session_factory() as session:
             db_user = await self._user_for_payload(session, user_payload)
             sub = await self._subscription_for_payload(session, user_payload, db_user)
@@ -144,7 +160,17 @@ class PanelWebhookService:
             )
             if not sub:
                 if not telegram_id:
-                    logging.warning("Panel webhook event %s has no local subscription", event_name)
+                    local_user_id = getattr(db_user, "user_id", None) if db_user else None
+                    logging.warning(
+                        "Panel webhook event %s cannot be matched to a local subscription; "
+                        "notification skipped. %s local_user_id=%s. Possible causes: "
+                        "panel user was created outside the bot, subscription was deleted "
+                        "or not synced, panel identifiers changed, or skip_notifications "
+                        "is enabled for the local subscription.",
+                        event_name,
+                        self._payload_log_context(user_payload),
+                        local_user_id or "N/A",
+                    )
                     return
                 await self._send_legacy_without_dedupe(
                     event_name,
@@ -402,6 +428,31 @@ class PanelWebhookService:
     @staticmethod
     def _payload_expire_date(user_payload: dict) -> str:
         return str(user_payload.get("expireAt") or "")[:10]
+
+    @staticmethod
+    def _payload_log_context(user_payload: dict) -> str:
+        telegram_id = PanelWebhookService._payload_telegram_id(user_payload)
+        panel_uuid = PanelWebhookService._payload_panel_uuid(user_payload)
+        email = PanelWebhookService._mask_email(str(user_payload.get("email") or "").strip())
+        expire_at = str(user_payload.get("expireAt") or "").strip()
+        payload_keys = ",".join(sorted(str(key) for key in user_payload.keys())) or "none"
+        return (
+            f"telegramId={telegram_id or 'N/A'} "
+            f"panel_uuid={panel_uuid or 'N/A'} "
+            f"email={email or 'N/A'} "
+            f"expireAt={expire_at or 'N/A'} "
+            f"payload_keys={payload_keys}"
+        )
+
+    @staticmethod
+    def _mask_email(email: str) -> str:
+        if not email:
+            return ""
+        local_part, separator, domain = email.partition("@")
+        if not separator or not domain:
+            return "present"
+        visible = local_part[:2] if len(local_part) > 2 else local_part[:1]
+        return f"{visible}***@{domain}"
 
     @staticmethod
     def _payload_expire_datetime(user_payload: dict) -> Optional[datetime]:

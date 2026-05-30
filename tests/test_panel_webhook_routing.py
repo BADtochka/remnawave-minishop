@@ -133,5 +133,69 @@ class HandleWebhookQueueingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(background_seen, [("user.expired", {"telegramId": 7})])
 
 
+class _FakeSessionContext:
+    async def __aenter__(self):
+        return object()
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _FakeSessionFactory:
+    def __call__(self):
+        return _FakeSessionContext()
+
+
+class HandleEventLoggingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_unsupported_event_is_logged_as_ignored(self):
+        service = _make_service()
+
+        with self.assertLogs(level="INFO") as logs:
+            await service.handle_event(
+                "user.modified",
+                {"uuid": "panel-user-1", "email": "client@example.com"},
+            )
+
+        message = "\n".join(logs.output)
+        self.assertIn("Panel webhook event user.modified ignored", message)
+        self.assertIn("event is not used for subscription notifications", message)
+        self.assertIn("panel_uuid=panel-user-1", message)
+        self.assertIn("email=cl***@example.com", message)
+
+    async def test_missing_subscription_warning_includes_payload_context(self):
+        service = _make_service()
+        service.async_session_factory = _FakeSessionFactory()
+
+        async def fake_user_for_payload(session, user_payload):
+            return SimpleNamespace(user_id=123, language_code=None)
+
+        async def fake_subscription_for_payload(session, user_payload, db_user):
+            return None
+
+        with (
+            patch.object(service, "_user_for_payload", fake_user_for_payload),
+            patch.object(service, "_subscription_for_payload", fake_subscription_for_payload),
+            self.assertLogs(level="WARNING") as logs,
+        ):
+            await service.handle_event(
+                "user.expired",
+                {
+                    "uuid": "panel-user-2",
+                    "email": "person@example.com",
+                    "expireAt": "2026-05-30T07:18:32Z",
+                },
+            )
+
+        message = "\n".join(logs.output)
+        self.assertIn("cannot be matched to a local subscription", message)
+        self.assertIn("notification skipped", message)
+        self.assertIn("telegramId=N/A", message)
+        self.assertIn("panel_uuid=panel-user-2", message)
+        self.assertIn("email=pe***@example.com", message)
+        self.assertIn("expireAt=2026-05-30T07:18:32Z", message)
+        self.assertIn("local_user_id=123", message)
+        self.assertIn("subscription was deleted or not synced", message)
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
