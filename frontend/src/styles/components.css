@@ -326,7 +326,7 @@
 }
 
 .scroll-area {
-  overflow: auto;
+  overflow: hidden;
   min-height: 0;
 }
 
@@ -854,7 +854,7 @@
 .ticket-list,
 .ticket-message-list,
 .support-admin-messages,
-.support-inbox-list {
+.support-inbox-list-inner {
   display: grid;
   gap: 10px;
 }
@@ -1457,14 +1457,15 @@
     align-content: stretch;
   }
 
+  .support-ticket-list-scroll {
+    min-height: 0;
+    height: 100%;
+  }
+
   .support-list-card .ticket-list,
   .support-user-list-skeleton {
     align-content: start;
-    min-height: 0;
-    height: 100%;
-    overflow: auto;
     padding-right: 4px;
-    scrollbar-width: thin;
   }
 
   .support-list-card .support-empty-state {
@@ -1538,7 +1539,7 @@
   .support-ticket-screen .support-message-scroll {
     min-height: 0;
     height: 100%;
-    overflow: auto;
+    overflow: hidden;
     padding: 20px;
     scrollbar-width: thin;
   }
@@ -1717,7 +1718,7 @@
   .support-ticket-screen .support-message-scroll {
     min-height: 0;
     height: 100%;
-    overflow: auto;
+    overflow: hidden;
     padding: 10px;
   }
 

@@ -1,5 +1,5 @@
 <script>
-  import { ColorInput, FileInput, Input, Textarea } from "$components/ui/index.js";
+  import { ColorInput, FileInput, Input, ScrollArea, Textarea } from "$components/ui/index.js";
   import {
     Check,
     ChevronRight,
@@ -824,21 +824,23 @@
         />
       </label>
     </div>
-    <div class="admin-icon-picker-grid">
-      {#each filteredIconOptions as iconName}
-        {@const Icon = iconComponent(iconName)}
-        <button
-          class:active={iconPickerField && iconValue(iconPickerField) === iconName}
-          class="admin-icon-picker-option"
-          type="button"
-          onclick={() => selectIcon(iconName)}
-        >
-          {#if Icon}
-            <svelte:component this={Icon} size={18} />
-          {/if}
-          <span>{iconName}</span>
-        </button>
-      {/each}
-    </div>
+    <ScrollArea class="admin-icon-picker-scroll" maxHeight="min(52vh, 460px)">
+      <div class="admin-icon-picker-grid">
+        {#each filteredIconOptions as iconName}
+          {@const Icon = iconComponent(iconName)}
+          <button
+            class:active={iconPickerField && iconValue(iconPickerField) === iconName}
+            class="admin-icon-picker-option"
+            type="button"
+            onclick={() => selectIcon(iconName)}
+          >
+            {#if Icon}
+              <svelte:component this={Icon} size={18} />
+            {/if}
+            <span>{iconName}</span>
+          </button>
+        {/each}
+      </div>
+    </ScrollArea>
   </div>
 </Dialog>

@@ -4,7 +4,7 @@
   import { Check, ChevronsUpDown, LifeBuoy, MessageSquarePlus } from "$components/ui/icons.js";
   import Button from "$components/ui/button.svelte";
   import Card from "$components/ui/card.svelte";
-  import { Input, Skeleton, Textarea } from "$components/ui/index.js";
+  import { Input, ScrollArea, Skeleton, Textarea } from "$components/ui/index.js";
   import { TicketCard } from "$components/patterns/webapp/index.js";
   import { Select, Tabs } from "$components/ui/primitives.js";
   import {
@@ -296,20 +296,22 @@
     </Tabs.Root>
 
     {#if loading}
-      <div class="support-user-list-skeleton" aria-label={t("wa_loading")}>
-        {#each Array(5) as _, index (index)}
-          <article class="support-user-ticket-skeleton">
-            <span class="support-user-ticket-skeleton-main">
-              <Skeleton variant="title" width="min(420px, 76%)" />
-              <Skeleton variant="short" width="min(260px, 58%)" />
-            </span>
-            <span class="support-user-ticket-skeleton-side">
-              <Skeleton variant="badge" width="92px" />
-              <Skeleton variant="tiny" width="64px" />
-            </span>
-          </article>
-        {/each}
-      </div>
+      <ScrollArea class="support-ticket-list-scroll" maxHeight="none">
+        <div class="support-user-list-skeleton" aria-label={t("wa_loading")}>
+          {#each Array(5) as _, index (index)}
+            <article class="support-user-ticket-skeleton">
+              <span class="support-user-ticket-skeleton-main">
+                <Skeleton variant="title" width="min(420px, 76%)" />
+                <Skeleton variant="short" width="min(260px, 58%)" />
+              </span>
+              <span class="support-user-ticket-skeleton-side">
+                <Skeleton variant="badge" width="92px" />
+                <Skeleton variant="tiny" width="64px" />
+              </span>
+            </article>
+          {/each}
+        </div>
+      </ScrollArea>
     {:else if !tickets.length}
       <div class="support-empty-state" in:fade={{ duration: 180 }}>
         <MessageSquarePlus size={34} />
@@ -317,11 +319,13 @@
         <small>{t("wa_support_empty_hint")}</small>
       </div>
     {:else}
-      <div class="ticket-list">
-        {#each tickets as ticket}
-          <TicketCard {ticket} {t} onOpen={(item) => supportStore.openTicket(item.ticket_id)} />
-        {/each}
-      </div>
+      <ScrollArea class="support-ticket-list-scroll" maxHeight="none">
+        <div class="ticket-list">
+          {#each tickets as ticket}
+            <TicketCard {ticket} {t} onOpen={(item) => supportStore.openTicket(item.ticket_id)} />
+          {/each}
+        </div>
+      </ScrollArea>
     {/if}
   </Card>
 </main>

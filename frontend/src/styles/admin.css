@@ -348,7 +348,7 @@
   min-height: 0;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  overflow-y: auto;
+  overflow: hidden;
   overflow-x: hidden;
   padding: 24px 28px 36px;
   display: flex;
@@ -359,7 +359,14 @@
 /* Flex children must NOT shrink — otherwise they collapse to fit the
    container and the main never overflows, breaking scroll. */
 
-.admin-main > * {
+.admin-main-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.admin-main > *,
+.admin-main-scroll > .scroll-area__viewport > * {
   flex-shrink: 0;
 }
 
@@ -1048,16 +1055,18 @@
   color: var(--admin-muted);
 }
 
+.admin-panel-dash-nodes-scroll {
+  max-height: 240px;
+  border-radius: 12px;
+  border: 1px solid var(--admin-border);
+  background: color-mix(in srgb, var(--admin-bg) 65%, var(--admin-surface-2));
+}
+
 .admin-panel-dash-nodes-grid {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  max-height: 240px;
-  overflow-y: auto;
   padding: 10px;
-  border-radius: 12px;
-  border: 1px solid var(--admin-border);
-  background: color-mix(in srgb, var(--admin-bg) 65%, var(--admin-surface-2));
 }
 
 .admin-panel-dash-node {
@@ -2221,12 +2230,14 @@
   padding-left: 36px;
 }
 
+.admin-icon-picker-scroll {
+  border-radius: 10px;
+}
+
 .admin-icon-picker-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
-  max-height: min(52vh, 460px);
-  overflow-y: auto;
   padding: 2px 4px 4px 0;
 }
 
@@ -2726,7 +2737,7 @@
   /* Keep admin dialogs readable on desktop: base .dialog-card uses min(100%, 520px);
      this rule must not stretch the card to full viewport width. */
   width: min(100%, 520px);
-  overflow-y: auto;
+  overflow: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
@@ -3842,7 +3853,7 @@
   z-index: 90;
   min-width: var(--bits-select-anchor-width);
   max-height: var(--bits-select-content-available-height, 320px);
-  overflow-y: auto;
+  overflow: hidden;
   border: 1px solid var(--admin-border);
   border-radius: 10px;
   background:
@@ -3853,6 +3864,31 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+
+.admin-select-viewport {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: inherit;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--admin-muted) 34%, var(--admin-border)) transparent;
+}
+
+.admin-select-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.admin-select-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-select-viewport::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--admin-muted) 34%, var(--admin-border));
+  background-clip: padding-box;
 }
 
 .admin-select-item {
@@ -4050,7 +4086,7 @@
 
 .admin-confirm-message-preview {
   max-height: min(280px, 45vh);
-  overflow: auto;
+  overflow: hidden;
   padding: 12px 14px;
   border: 1px solid var(--admin-border);
   border-radius: 10px;
@@ -4399,11 +4435,14 @@
 }
 
 .support-inbox-list {
-  gap: 8px;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.support-inbox-list-inner {
+  display: grid;
+  gap: 8px;
   padding-right: 2px;
-  scrollbar-width: thin;
 }
 
 .support-inbox-row {
@@ -5033,11 +5072,13 @@
 }
 
 .support-inbox-list {
-  align-content: start;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.support-inbox-list-inner {
+  align-content: start;
   padding-right: 2px;
-  scrollbar-width: thin;
 }
 
 .support-inbox-row {
@@ -5263,7 +5304,7 @@
     height: 100%;
     min-height: 0;
     max-height: none !important;
-    overflow: auto;
+    overflow: hidden;
   }
 }
 
@@ -5436,15 +5477,17 @@
 }
 
 .support-admin-list-panel .support-inbox-list {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+}
+
+.support-admin-list-panel .support-inbox-list-inner {
   display: grid;
   align-content: start;
   gap: 8px;
-  min-height: 0;
-  height: 100%;
-  overflow: auto;
-  padding: 0;
   padding-right: 4px;
-  scrollbar-width: thin;
 }
 
 .support-admin-list-panel > .admin-empty-state {
@@ -5561,7 +5604,7 @@
   min-height: 0;
   height: 100%;
   max-height: none !important;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid var(--admin-border);
   border-radius: 12px;
   background: color-mix(in srgb, var(--admin-bg) 68%, transparent);
@@ -5913,7 +5956,7 @@
   .support-ticket-dialog .support-admin-message-scroll {
     height: 100%;
     min-height: 320px;
-    overflow: auto;
+    overflow: hidden;
   }
 }
 

@@ -1,6 +1,6 @@
 <script>
   import { Label, Separator, Tabs } from "$components/ui/primitives.js";
-  import { Checkbox, Input, Textarea } from "$components/ui/index.js";
+  import { Checkbox, Input, ScrollArea, Textarea } from "$components/ui/index.js";
   import Dialog from "$components/ui/dialog.svelte";
   import {
     AdminBadge,
@@ -552,7 +552,7 @@
                 </div>
               </div>
 
-              <div class="admin-user-logs-wrap">
+              <ScrollArea class="admin-user-logs-wrap" maxHeight="min(52vh, 460px)">
                 {#if userLogsLoading}
                   <AdminTableSkeleton
                     headers={[
@@ -604,7 +604,7 @@
                     </tbody>
                   </AdminTable>
                 {/if}
-              </div>
+              </ScrollArea>
 
               {#if userLogsLoaded && userLogsTotal > userLogsPageSize}
                 <AdminPagination
@@ -976,7 +976,9 @@
   onclose={() => usersStore.updateState({ userMessageConfirmOpen: false })}
   class="admin-dialog"
 >
-  <div class="admin-confirm-message-preview">{userMessageDraft}</div>
+  <ScrollArea class="admin-confirm-message-preview" maxHeight="min(280px, 45vh)">
+    {userMessageDraft}
+  </ScrollArea>
   <div class="admin-dialog-actions">
     <AdminButton onclick={() => usersStore.updateState({ userMessageConfirmOpen: false })}
       >{at("btn_cancel", {}, "Отмена")}</AdminButton
@@ -1230,7 +1232,7 @@
     gap: 8px;
     font-size: 13px;
   }
-  .admin-user-logs-wrap {
+  :global(.admin-user-logs-wrap) {
     min-height: 120px;
   }
   .admin-user-log-event {

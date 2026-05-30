@@ -26,6 +26,7 @@
   import { onMount, setContext } from "svelte";
   import { fade } from "svelte/transition";
   import { Select } from "$components/ui/primitives.js";
+  import { ScrollArea } from "$components/ui/index.js";
   import { AdminBadge, AdminButton } from "$components/patterns/admin/index.js";
 
   import BrandMark from "$lib/webapp/BrandMark.svelte";
@@ -760,88 +761,90 @@
     </header>
 
     <main class="admin-main">
-      {#key active}
-        <div class="admin-section-stage" in:fade={sectionFade} out:fade={sectionFade}>
-          {#if active === "stats"}
-            <StatsSection {at} {fmtDate} {fmtDateShort} {fmtMoney} {paymentStatusVariant} />
-          {/if}
+      <ScrollArea class="admin-main-scroll" maxHeight="none">
+        {#key active}
+          <div class="admin-section-stage" in:fade={sectionFade} out:fade={sectionFade}>
+            {#if active === "stats"}
+              <StatsSection {at} {fmtDate} {fmtDateShort} {fmtMoney} {paymentStatusVariant} />
+            {/if}
 
-          {#if active === "users"}
-            <UsersSection
-              {at}
-              {fmtDateShort}
-              {panelStatusBadge}
-              {resolvedAvatarUrl}
-              {userDisplayName}
-              {userInitials}
-              {userSecondaryName}
-            />
-          {/if}
+            {#if active === "users"}
+              <UsersSection
+                {at}
+                {fmtDateShort}
+                {panelStatusBadge}
+                {resolvedAvatarUrl}
+                {userDisplayName}
+                {userInitials}
+                {userSecondaryName}
+              />
+            {/if}
 
-          {#if active === "payments"}
-            <PaymentsSection
-              {at}
-              {fmtDate}
-              {fmtMoney}
-              {paymentStatusVariant}
-              onOpenUserCard={openPaymentUserCard}
-            />
-          {/if}
+            {#if active === "payments"}
+              <PaymentsSection
+                {at}
+                {fmtDate}
+                {fmtMoney}
+                {paymentStatusVariant}
+                onOpenUserCard={openPaymentUserCard}
+              />
+            {/if}
 
-          {#if active === "promos"}
-            <PromosSection {at} {fmtDateShort} />
-          {/if}
+            {#if active === "promos"}
+              <PromosSection {at} {fmtDateShort} />
+            {/if}
 
-          {#if active === "ads"}
-            <AdsSection {at} {fmtMoney} />
-          {/if}
+            {#if active === "ads"}
+              <AdsSection {at} {fmtMoney} />
+            {/if}
 
-          {#if active === "broadcast"}
-            <BroadcastSection {at} />
-          {/if}
+            {#if active === "broadcast"}
+              <BroadcastSection {at} />
+            {/if}
 
-          {#if active === "logs"}
-            <LogsSection {at} {fmtDate} />
-          {/if}
+            {#if active === "logs"}
+              <LogsSection {at} {fmtDate} />
+            {/if}
 
-          {#if active === "support"}
-            <SupportSection
-              {at}
-              {brand}
-              {resolvedAvatarUrl}
-              onOpenUserCard={openUserCard}
-              initialTicketId={readSupportTicketIdFromPath()}
-            />
-          {/if}
+            {#if active === "support"}
+              <SupportSection
+                {at}
+                {brand}
+                {resolvedAvatarUrl}
+                onOpenUserCard={openUserCard}
+                initialTicketId={readSupportTicketIdFromPath()}
+              />
+            {/if}
 
-          {#if active === "tariffs"}
-            <TariffsSection {at} {fmtMoney} {onSettingsSaved} />
-          {/if}
+            {#if active === "tariffs"}
+              <TariffsSection {at} {fmtMoney} {onSettingsSaved} />
+            {/if}
 
-          {#if active === "appearance"}
-            <AppearanceSection
-              {at}
-              {currentLang}
-              {onSettingsSaved}
-              {brand}
-              {appFaviconUrl}
-              {appFaviconUseCustom}
-            />
-          {/if}
+            {#if active === "appearance"}
+              <AppearanceSection
+                {at}
+                {currentLang}
+                {onSettingsSaved}
+                {brand}
+                {appFaviconUrl}
+                {appFaviconUseCustom}
+              />
+            {/if}
 
-          {#if active === "settings"}
-            <SettingsSection {at} {onSettingsSaved} {currentLang} />
-          {/if}
+            {#if active === "settings"}
+              <SettingsSection {at} {onSettingsSaved} {currentLang} />
+            {/if}
 
-          {#if active === "backups"}
-            <BackupsSection {at} {fmtDate} />
-          {/if}
+            {#if active === "backups"}
+              <BackupsSection {at} {fmtDate} />
+            {/if}
 
-          {#if active === "translations"}
-            <TranslationsSection {at} {onTranslationsSaved} />
-          {/if}
-        </div>
-      {/key}
+            {#if active === "translations"}
+              <TranslationsSection {at} {onTranslationsSaved} />
+            {/if}
+          </div>
+        {/key}
+      </ScrollArea>
     </main>
   </section>
 </div>
