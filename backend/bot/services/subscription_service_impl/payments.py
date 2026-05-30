@@ -93,7 +93,7 @@ class PaymentContextMixin:
         """Best-effort branded email confirming the payment. No-op if SMTP or
         the user's email aren't set. Failures are logged and swallowed so the
         payment flow is never blocked by mail delivery."""
-        if not self.settings.email_auth_configured:
+        if not getattr(self.settings, "email_auth_configured", False):
             return
         recipient = (db_user.email or "").strip() if db_user else ""
         if not recipient:

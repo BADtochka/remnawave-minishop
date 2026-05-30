@@ -2,6 +2,7 @@
   import { ArrowLeft, RefreshCw } from "$components/ui/icons.js";
 
   import Button from "$components/ui/button.svelte";
+  import { Input } from "$components/ui/index.js";
   import { StatusMessage } from "$components/patterns/webapp/index.js";
 
   export let code = "";
@@ -29,7 +30,7 @@
   </header>
   <div class="otp-wrap">
     <label class="otp-input-wrap">
-      <input
+      <Input
         bind:value={code}
         inputmode="numeric"
         autocomplete="one-time-code"

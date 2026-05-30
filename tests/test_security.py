@@ -661,6 +661,7 @@ class WebAppSecurityTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("'unsafe-eval'", csp)
         self.assertIn("img-src 'self' data: blob: https:;", csp)
         self.assertNotIn("img-src 'self' data: https: http:;", csp)
+        self.assertEqual(response.headers["X-Robots-Tag"], "noindex, nofollow, noarchive")
 
 
 class AdminSettingsSecurityTests(unittest.IsolatedAsyncioTestCase):
@@ -760,10 +761,13 @@ class AdminSettingsSecurityTests(unittest.IsolatedAsyncioTestCase):
             response = await admin_api.admin_settings_get_route(request)
 
         payload = json.loads(response.text)
+        section_ids = [section["id"] for section in payload["sections"]]
         fields = {
             field["key"]: field for section in payload["sections"] for field in section["fields"]
         }
 
+        self.assertLess(section_ids.index("general"), section_ids.index("remnawave"))
+        self.assertLess(section_ids.index("remnawave"), section_ids.index("payments"))
         self.assertEqual(
             fields["FREEKASSA_ENABLED"]["webhook_url"],
             "https://web.tnnl.cc/webhook/freekassa",
@@ -773,6 +777,11 @@ class AdminSettingsSecurityTests(unittest.IsolatedAsyncioTestCase):
             fields["PAYMENT_PLATEGA_CRYPTO_WEBAPP_LABEL_RU"]["webhook_url"],
             "https://web.tnnl.cc/webhook/platega",
         )
+        self.assertEqual(
+            fields["PANEL_WEBHOOK_SECRET"]["webhook_url"],
+            "https://web.tnnl.cc/webhook/panel",
+        )
+        self.assertTrue(fields["PANEL_WEBHOOK_SECRET"]["webhook_requires_base_url"])
         self.assertNotIn("webhook_url", fields["PAYMENT_STARS_WEBAPP_LABEL_RU"])
 
 

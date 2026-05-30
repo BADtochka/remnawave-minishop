@@ -117,12 +117,14 @@
 | --- | --- |
 | `PANEL_API_URL` | URL API панели, например `https://panel.example.com/api`. |
 | `PANEL_API_KEY` | API-ключ панели. |
-| `PANEL_WEBHOOK_SECRET` | Секрет проверки Remnawave webhook. |
+| `PANEL_WEBHOOK_SECRET` | Секрет проверки Remnawave webhook. Задайте его в Remnawave Panel и вставьте то же значение сюда или в админку. |
 | `USER_SQUAD_UUIDS` | Internal Squads по умолчанию для legacy-режима без JSON-каталога. |
 | `USER_EXTERNAL_SQUAD_UUID` | Необязательный External Squad. |
 | `USER_TRAFFIC_LIMIT_GB` | Legacy-лимит трафика пользователя. |
 | `USER_TRAFFIC_STRATEGY` | Legacy-стратегия лимита трафика. |
 | `USER_HWID_DEVICE_LIMIT` | Legacy-лимит HWID-устройств по умолчанию. |
+
+В Remnawave Panel поле `WEBHOOK_URL` должно указывать на публичный Minishop webhook: `WEBHOOK_BASE_URL` + `/webhook/panel`. Если публичный домен приложения `https://app.example.com`, итоговый адрес будет `https://app.example.com/webhook/panel`.
 
 ## Веб-приложение, внешний вид и Telegram Login
 
@@ -355,6 +357,8 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 
 Рекомендуемый способ настройки тарифов - раздел **Система -> Тарифы** в админке. Он сохраняет JSON в `TARIFFS_CONFIG_PATH`.
 
+Если JSON-каталог существует и проходит валидацию, цены, периоды и реферальные бонусы period-тарифов берутся из JSON. Legacy-переменные ниже используются только без JSON-каталога.
+
 | Переменная | Назначение |
 | --- | --- |
 | `TARIFFS_CONFIG_PATH` | Путь к JSON-каталогу тарифов. |
@@ -363,7 +367,7 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | `3_MONTHS_ENABLED` | Legacy-доступность периода 3 месяца без JSON-каталога. |
 | `6_MONTHS_ENABLED` | Legacy-доступность периода 6 месяцев без JSON-каталога. |
 | `12_MONTHS_ENABLED` | Legacy-доступность периода 12 месяцев без JSON-каталога. |
-| `RUB_PRICE_1_MONTH`, `RUB_PRICE_3_MONTHS`, `RUB_PRICE_6_MONTHS`, `RUB_PRICE_12_MONTHS` | Legacy-цены RUB. |
+| `RUB_PRICE_1_MONTH`, `RUB_PRICE_3_MONTHS`, `RUB_PRICE_6_MONTHS`, `RUB_PRICE_12_MONTHS` | Legacy-цены RUB. Дефолты: `200`, `600`, `1200`, `2400`. |
 | `STARS_PRICE_1_MONTH`, `STARS_PRICE_3_MONTHS`, `STARS_PRICE_6_MONTHS`, `STARS_PRICE_12_MONTHS` | Legacy-цены Stars. |
 | `TRAFFIC_PACKAGES` | Legacy-пакеты трафика RUB, формат `10:199,50:799`. |
 | `STARS_TRAFFIC_PACKAGES` | Legacy-пакеты трафика Stars. |
@@ -382,9 +386,10 @@ PAYMENT_HELEKET_TELEGRAM_EMOJI
 | `REFERRAL_ONE_BONUS_PER_REFEREE` | Ограничить бонусы одним успешным платежом приглашенного. |
 | `REFERRAL_WELCOME_BONUS_DAYS` | Приветственный бонус пришедшему по реферальной ссылке. |
 | `LEGACY_REFS` | Разрешить ссылки `ref_<telegram_id>`. |
-| `REFERRAL_BONUS_DAYS_1_MONTH`, `REFERRAL_BONUS_DAYS_3_MONTHS`, `REFERRAL_BONUS_DAYS_6_MONTHS`, `REFERRAL_BONUS_DAYS_12_MONTHS` | Legacy-бонусы пригласившему. |
-| `REFEREE_BONUS_DAYS_1_MONTH`, `REFEREE_BONUS_DAYS_3_MONTHS`, `REFEREE_BONUS_DAYS_6_MONTHS`, `REFEREE_BONUS_DAYS_12_MONTHS` | Legacy-бонусы приглашенному. |
+| `REFERRAL_BONUS_DAYS_1_MONTH`, `REFERRAL_BONUS_DAYS_3_MONTHS`, `REFERRAL_BONUS_DAYS_6_MONTHS`, `REFERRAL_BONUS_DAYS_12_MONTHS` | Legacy-бонусы пригласившему без JSON-каталога. В JSON-тарифах используйте `referral_bonus_days_inviter`. |
+| `REFEREE_BONUS_DAYS_1_MONTH`, `REFEREE_BONUS_DAYS_3_MONTHS`, `REFEREE_BONUS_DAYS_6_MONTHS`, `REFEREE_BONUS_DAYS_12_MONTHS` | Legacy-бонусы приглашенному без JSON-каталога. В JSON-тарифах используйте `referral_bonus_days_referee`. |
 | `SUBSCRIPTION_NOTIFICATIONS_ENABLED` | Включает напоминания о подписке. |
+| `SUBSCRIPTION_EMAIL_NOTIFICATIONS_ENABLED` | Дублирует пользовательские уведомления жизненного цикла подписки на email, если SMTP настроен и у пользователя есть email. |
 | `SUBSCRIPTION_NOTIFY_ON_EXPIRE` | Уведомлять в день окончания. |
 | `SUBSCRIPTION_NOTIFY_AFTER_EXPIRE` | Уведомлять после окончания. |
 | `SUBSCRIPTION_NOTIFY_DAYS_BEFORE` | За сколько дней предупреждать. |

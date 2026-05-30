@@ -125,7 +125,7 @@ docker compose \
 | `TELEGRAM_WEBHOOK_PATH` | удалена | Путь вебхука теперь генерируется из `BOT_TOKEN` автоматически. |
 | `REQUIRED_CHANNEL_SUBSCRIBE_TO_USE` | удалена | Гейт включается автоматически, как только задан `REQUIRED_CHANNEL_ID`. |
 | `STARS_PROVIDER_TOKEN` | удалена | Telegram Stars (XTR) используются напрямую. |
-| `REFERRAL_ENABLED` | удалена | Реферальная программа активна по умолчанию; чтобы выключить — обнулите `REFERRAL_BONUS_DAYS_*` и `REFEREE_BONUS_DAYS_*`. |
+| `REFERRAL_ENABLED` | удалена | Реферальная программа активна по умолчанию. В legacy-режиме без JSON-каталога отключайте платежные бонусы через нули в `REFERRAL_BONUS_DAYS_*` и `REFEREE_BONUS_DAYS_*`; в JSON-тарифах обнуляйте или удаляйте `referral_bonus_days_inviter` и `referral_bonus_days_referee` у period-тарифов. |
 | `POSTGRES_HOST=remnawave-tg-shop-db` | в `.env` — `remnawave-minishop-db` или пусто | Под compose значение всё равно переопределяется на сервисное имя `postgres` (см. `environment:` в compose-файлах), поэтому скрипт правит `.env` только для bare-metal сценариев. |
 | `WEBHOOK_BASE_URL` | **обязательна** | Polling-режим удалён, без публичного URL бот не стартует. |
 | — | `REDIS_URL=redis://redis:6379/0` | Обязательна для воркера, очередей и rate-limit. По умолчанию в compose-файлах уже задана. |

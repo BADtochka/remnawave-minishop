@@ -23,6 +23,7 @@ from typing import Any, Optional
 from unittest.mock import AsyncMock, patch
 
 from bot.services.referral_service import ReferralService
+from config.tariffs_config import TariffsConfig
 
 
 def _make_settings(**overrides: Any) -> SimpleNamespace:
@@ -337,6 +338,87 @@ class RefereeBonusTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result["referee_bonus_applied_days"])
         self.assertFalse(result["inviter_bonus_applied_flag"])
         subscription_service.extend_active_subscription_days.assert_not_called()
+
+    async def test_tariff_bonus_uses_referee_purchase_tariff(self):
+        data = {
+            "default_tariff": "standard",
+            "tariffs": [
+                {
+                    "key": "standard",
+                    "names": {"en": "Standard"},
+                    "descriptions": {},
+                    "squad_uuids": ["standard-squad"],
+                    "billing_model": "period",
+                    "monthly_gb": 100,
+                    "prices_rub": {"2": 400},
+                    "prices_stars": {},
+                    "enabled_periods": [2],
+                    "referral_bonus_days_inviter": {"2": 5},
+                    "referral_bonus_days_referee": {"2": 1},
+                    "enabled": True,
+                },
+                {
+                    "key": "premium",
+                    "names": {"en": "Premium"},
+                    "descriptions": {},
+                    "squad_uuids": ["premium-squad"],
+                    "billing_model": "period",
+                    "monthly_gb": 500,
+                    "prices_rub": {"2": 700},
+                    "prices_stars": {},
+                    "enabled_periods": [2],
+                    "referral_bonus_days_inviter": {"2": 20},
+                    "referral_bonus_days_referee": {"2": 7},
+                    "enabled": True,
+                },
+            ],
+        }
+        settings = _make_settings(
+            REFERRAL_ONE_BONUS_PER_REFEREE=False,
+            tariffs_config=TariffsConfig.model_validate(data),
+        )
+        subscription_service = AsyncMock()
+        subscription_service.has_active_subscription = AsyncMock(return_value=False)
+        subscription_service._get_or_create_panel_user_link_details = AsyncMock(
+            return_value=("inviter-panel", "inviter-sub", "short", False)
+        )
+        inviter_new_end = datetime(2026, 4, 1, tzinfo=timezone.utc)
+        referee_new_end = datetime(2026, 5, 1, tzinfo=timezone.utc)
+        subscription_service.extend_active_subscription_days = AsyncMock(
+            side_effect=[inviter_new_end, referee_new_end]
+        )
+        service, _bot = _make_service(settings=settings, subscription_service=subscription_service)
+
+        with patch(
+            "bot.services.referral_service.user_dal.get_user_by_id",
+            AsyncMock(
+                side_effect=lambda session, uid: (
+                    _make_user(uid, referred_by_id=1) if uid == 42 else _make_user(uid)
+                )
+            ),
+        ):
+            result = await service.apply_referral_bonuses_for_payment(
+                session=AsyncMock(),
+                referee_user_id=42,
+                purchased_subscription_months=2,
+                skip_if_active_before_payment=False,
+                tariff_key="premium",
+            )
+
+        self.assertEqual(result["referee_bonus_applied_days"], 7)
+        self.assertTrue(result["inviter_bonus_applied_flag"])
+        inviter_call = [
+            call
+            for call in subscription_service.extend_active_subscription_days.await_args_list
+            if call.kwargs.get("user_id") == 1
+        ][0]
+        referee_call = [
+            call
+            for call in subscription_service.extend_active_subscription_days.await_args_list
+            if call.kwargs.get("user_id") == 42
+        ][0]
+        self.assertEqual(inviter_call.kwargs["bonus_days"], 20)
+        self.assertEqual(referee_call.kwargs["bonus_days"], 7)
 
 
 class GenerateReferralLinkTests(unittest.IsolatedAsyncioTestCase):

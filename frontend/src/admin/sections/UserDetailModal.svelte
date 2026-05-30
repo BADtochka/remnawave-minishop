@@ -1,6 +1,6 @@
 <script>
   import { Label, Separator, Tabs } from "$components/ui/primitives.js";
-  import { Checkbox } from "$components/ui/index.js";
+  import { Checkbox, Input, ScrollArea, Textarea } from "$components/ui/index.js";
   import Dialog from "$components/ui/dialog.svelte";
   import {
     AdminBadge,
@@ -81,11 +81,7 @@
   $: openedUserTelegramProfileLinkKind = openedUser ? userTelegramProfileLinkKind(openedUser) : "";
   $: openedUserTelegramProfileHint =
     openedUserTelegramProfileLinkKind === "id"
-      ? at(
-          "user_open_tg_profile_id_hint",
-          {},
-          "Профиль будет открыт по Telegram ID. Telegram может заблокировать переход из-за настроек приватности пользователя или ограничений клиента."
-        )
+      ? at("user_open_tg_profile_id_hint", {}, "Бот отправит кнопку профиля в Telegram")
       : at("user_open_tg_profile_hint", {}, "Открыть профиль Telegram");
 
   $: if (openedUser && userDetailTab === "logs" && !userLogsLoading && !userLogsLoaded) {
@@ -189,11 +185,6 @@
                   {at("user_open_tg_profile", {}, "Открыть Telegram")}
                 </AdminButton>
               </div>
-              {#if openedUserTelegramProfileLinkKind === "id"}
-                <small class="admin-user-telegram-profile-note"
-                  >{openedUserTelegramProfileHint}</small
-                >
-              {/if}
             </div>
           </div>
 
@@ -552,7 +543,7 @@
                 </div>
               </div>
 
-              <div class="admin-user-logs-wrap">
+              <ScrollArea class="admin-user-logs-wrap" maxHeight="min(52vh, 460px)">
                 {#if userLogsLoading}
                   <AdminTableSkeleton
                     headers={[
@@ -604,7 +595,7 @@
                     </tbody>
                   </AdminTable>
                 {/if}
-              </div>
+              </ScrollArea>
 
               {#if userLogsLoaded && userLogsTotal > userLogsPageSize}
                 <AdminPagination
@@ -632,7 +623,7 @@
                 <Label.Root class="admin-field-label admin-extend-field">
                   <span>{at("user_label_extend", {}, "Продлить подписку")}</span>
                   <div class="admin-extend-control">
-                    <input
+                    <Input
                       class="input"
                       type="number"
                       min="1"
@@ -662,7 +653,7 @@
                       <span>{at("user_premium_override_bonus", {}, "Доп. премиум-трафик, GB")}</span
                       >
                       <small>{at("user_premium_override_bonus_hint", {}, "")}</small>
-                      <input
+                      <Input
                         class="input"
                         type="number"
                         min="0"
@@ -741,7 +732,7 @@
                         >{at("user_regular_override_bonus", {}, "Доп. основной трафик, GB")}</span
                       >
                       <small>{at("user_regular_override_bonus_hint", {}, "")}</small>
-                      <input
+                      <Input
                         class="input"
                         type="number"
                         min="0"
@@ -837,7 +828,7 @@
                     <Label.Root class="admin-field-label admin-extend-field">
                       <span>{at("user_traffic_grant_gb", {}, "ГБ к выдаче")}</span>
                       <div class="admin-extend-control">
-                        <input
+                        <Input
                           class="input"
                           type="number"
                           min="0"
@@ -869,12 +860,12 @@
                     "Поддерживается HTML-разметка Telegram"
                   )}</small
                 >
-                <textarea
+                <Textarea
                   class="admin-textarea"
                   rows="3"
                   placeholder={at("user_placeholder_msg", {}, "Текст сообщения")}
                   bind:value={$usersStore.userMessageDraft}
-                ></textarea>
+                />
               </Label.Root>
               <div class="admin-message-actions">
                 <AdminButton
@@ -976,7 +967,9 @@
   onclose={() => usersStore.updateState({ userMessageConfirmOpen: false })}
   class="admin-dialog"
 >
-  <div class="admin-confirm-message-preview">{userMessageDraft}</div>
+  <ScrollArea class="admin-confirm-message-preview" maxHeight="min(280px, 45vh)">
+    {userMessageDraft}
+  </ScrollArea>
   <div class="admin-dialog-actions">
     <AdminButton onclick={() => usersStore.updateState({ userMessageConfirmOpen: false })}
       >{at("btn_cancel", {}, "Отмена")}</AdminButton
@@ -1166,12 +1159,6 @@
     gap: 8px;
     margin-top: 6px;
   }
-  .admin-user-telegram-profile-note {
-    display: block;
-    margin-top: 2px;
-    color: var(--admin-dim);
-    line-height: 1.35;
-  }
   :global(.admin-avatar-dialog) {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
@@ -1230,7 +1217,7 @@
     gap: 8px;
     font-size: 13px;
   }
-  .admin-user-logs-wrap {
+  :global(.admin-user-logs-wrap) {
     min-height: 120px;
   }
   .admin-user-log-event {

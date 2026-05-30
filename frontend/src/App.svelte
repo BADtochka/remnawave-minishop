@@ -73,6 +73,7 @@
   const ACTIVATION_PENDING_WATCH_INTERVAL_MS = 2000;
   const ACTIVATION_PENDING_WATCH_MAX_ATTEMPTS = 45;
   const ACTIVATION_RESUME_CHECK_COOLDOWN_MS = 1500;
+  const TELEGRAM_NOTIFICATIONS_RESUME_REFRESH_COOLDOWN_MS = 1500;
   import {
     activationPaymentFailed,
     createActivationHandoff,
@@ -152,6 +153,7 @@
   let mode = isAppLaunchRoute ? "appLaunch" : isPreviewBoard ? "preview" : "loading";
   let activeTab = "home";
   let screen = "home";
+  let emailLoginDeeplinkConsumed = false;
   let data = isPreviewBoard ? structuredCloneSafe(MOCK_SOURCE.data) : null;
   let appLaunchTarget = isAppLaunchRoute ? readExternalAppLaunchTarget() : "";
   let publicInstallSubscription = null;
@@ -166,6 +168,9 @@
   let activationPendingWatchBusy = false;
   let activationResumeRefreshBusy = false;
   let activationResumeLastCheckAt = 0;
+  let telegramNotificationsBotOpenedAt = 0;
+  let telegramNotificationsResumeRefreshBusy = false;
+  let telegramNotificationsResumeLastCheckAt = 0;
   let promoCode = "";
   let promoBusy = false;
   let promoStatus = "";
@@ -323,6 +328,7 @@
     devicesBusy,
     devicesStatus,
     devicesIsError,
+    devicesErrorCode,
     deviceConfirmOpen,
     deviceToDisconnect,
     deviceDisconnectBusy,
@@ -473,7 +479,13 @@
     languageOptions.find((option) => option.value === currentLang) || languageOptions[0];
   $: userLanguage = languageName(currentLang);
   $: emailLinkStatus = user?.email ? t("wa_settings_linked") : t("wa_settings_email_not_linked");
-  $: hasUnlinkedIdentity = !user?.telegram_linked || !user?.email;
+  $: telegramNotificationsStatus = String(user?.telegram_notifications_status || "unknown");
+  $: telegramNotificationsNeedPrompt = Boolean(
+    user?.telegram_linked && user?.telegram_notifications_need_prompt
+  );
+  $: telegramNotificationsStartLink = String(user?.telegram_notifications_start_link || "");
+  $: hasUnlinkedIdentity =
+    !user?.telegram_linked || !user?.email || telegramNotificationsNeedPrompt;
   $: referralBonusDetails = Array.isArray(referral?.bonus_details) ? referral.bonus_details : [];
   $: referralWelcomeBonusDays = Math.max(0, Number(referral?.welcome_bonus_days || 0));
   $: referralOneBonusPerReferee = Boolean(referral?.one_bonus_per_referee);
@@ -747,6 +759,34 @@
     }
   }
 
+  async function refreshTelegramNotificationsOnResume() {
+    if (
+      mode !== "app" ||
+      !telegramNotificationsNeedPrompt ||
+      !telegramNotificationsBotOpenedAt ||
+      telegramNotificationsResumeRefreshBusy
+    ) {
+      return;
+    }
+    const now = Date.now();
+    if (
+      now - telegramNotificationsResumeLastCheckAt <
+      TELEGRAM_NOTIFICATIONS_RESUME_REFRESH_COOLDOWN_MS
+    ) {
+      return;
+    }
+    telegramNotificationsResumeLastCheckAt = now;
+    telegramNotificationsResumeRefreshBusy = true;
+    try {
+      await loadData({ fresh: true, preserveView: true });
+      if (!telegramNotificationsNeedPrompt) telegramNotificationsBotOpenedAt = 0;
+    } catch (_error) {
+      void _error;
+    } finally {
+      telegramNotificationsResumeRefreshBusy = false;
+    }
+  }
+
   function refreshAppLaunchTarget() {
     appLaunchTarget = readExternalAppLaunchTarget();
     return appLaunchTarget;
@@ -769,6 +809,7 @@
     const onActivationResume = () => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       void refreshPendingActivationOnResume();
+      void refreshTelegramNotificationsOnResume();
     };
     const onVisibilityChange = () => {
       if (document.visibilityState !== "hidden") onActivationResume();
@@ -1137,8 +1178,83 @@
     }
   }
 
+  function openTelegramNotificationsBot() {
+    const link = telegramNotificationsStartLink;
+    telegramNotificationsBotOpenedAt = Date.now();
+    if (!link) {
+      showToast(t("wa_telegram_notifications_link_unavailable"));
+      return;
+    }
+    const currentTg = tg || telegramSdk.refresh();
+    if (currentTg?.openTelegramLink && /^https:\/\/t\.me\//i.test(link)) {
+      try {
+        tg = currentTg;
+        currentTg.openTelegramLink(link);
+        return;
+      } catch {
+        // Fall back to generic external opening below.
+      }
+    }
+    openExternalLink(link);
+  }
+
   function currentSearchParams() {
     return new URLSearchParams(window.location.search);
+  }
+
+  function readEmailCodeLoginDeeplink() {
+    const params = currentSearchParams();
+    if (params.get("login") !== "email_code") return null;
+    const emailHint = normalizedEmail(params.get("login_email") || "");
+    if (!emailHint || !emailHint.includes("@")) return null;
+    return emailHint;
+  }
+
+  function hasEmailCodeLoginDeeplink() {
+    return Boolean(readEmailCodeLoginDeeplink());
+  }
+
+  async function startEmailCodeLoginFromDeeplink() {
+    if (emailLoginDeeplinkConsumed) return;
+    const emailHint = readEmailCodeLoginDeeplink();
+    if (!emailHint) return;
+    emailLoginDeeplinkConsumed = true;
+    authStore.update((s) => ({
+      ...s,
+      email: emailHint,
+      emailCode: "",
+      pendingEmail: "",
+      passwordLoginMode: false,
+      passwordLoginFallback: false,
+    }));
+    await tick();
+    await authStore.requestEmailCode((nextScreen) => {
+      screen = nextScreen;
+    });
+  }
+
+  function readRenewalDeeplink() {
+    const params = currentSearchParams();
+    const shouldRenew = params.get("after_login") === "renew" || params.get("renew") === "1";
+    if (!shouldRenew) return null;
+    return {
+      tariffKey: String(params.get("renew_tariff") || "").trim(),
+    };
+  }
+
+  function stripRenewalLoginQueryFromUrl() {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const keys = ["login", "login_email", "after_login", "renew", "renew_tariff"];
+    const changed = keys.some((key) => url.searchParams.has(key));
+    if (!changed) return;
+    for (const key of keys) url.searchParams.delete(key);
+    const search = url.searchParams.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${url.pathname}${search ? `?${search}` : ""}${url.hash}`
+    );
   }
 
   function docsDemoParentSearchParams() {
@@ -1316,6 +1432,7 @@
       clearToken,
       clearManualLogoutFlag,
       isManuallyLoggedOut,
+      hasEmailCodeLoginDeeplink,
       finalizeMagicLogin: (loginToken) => authStore.finalizeMagicLogin(loginToken),
       finalizeTelegramAuth: (authData, source) => authStore.finalizeTelegramAuth(authData, source),
       setAuthStatus: (message, isError) => authStore.setAuthStatus(message, isError),
@@ -1508,6 +1625,30 @@
         stripTopupQueryFromUrl();
       }
     }
+
+    const renewalDeep = readRenewalDeeplink();
+    if (renewalDeep) {
+      const plansList = payload.plans?.length ? payload.plans : [];
+      const tariffCatalogLocal = buildTariffCatalog(plansList);
+      const tariffModeLocal = plansList.some((plan) => plan?.tariff_key);
+      activeTab = "home";
+      screen = "home";
+      syncAppSectionPath("home", true);
+      billingStore.openPaymentModal(
+        tariffModeLocal,
+        tariffModeLocal && tariffCatalogLocal.length === 1,
+        tariffCatalogLocal,
+        payload.subscription || {},
+        plansList,
+        payload.payment_methods?.[0]?.id || "",
+        {
+          preferredTariffKey: renewalDeep.tariffKey,
+          selectDefaultTariff: true,
+          preferCheckout: true,
+        }
+      );
+      stripRenewalLoginQueryFromUrl();
+    }
     return payload;
   }
 
@@ -1529,6 +1670,7 @@
     screen = "login";
     activeTab = "home";
     setPasswordLoginMode(isPasswordLoginPath(), true);
+    void startEmailCodeLoginFromDeeplink();
   }
 
   async function api(path, options = {}) {
@@ -2124,10 +2266,14 @@
                 {regularTrafficTopupBarClickable}
                 {regularTrafficTopupUnlocked}
                 {subscription}
+                {telegramNotificationsNeedPrompt}
+                {telegramNotificationsStartLink}
+                {telegramNotificationsStatus}
                 {termUnitLabel}
                 {trafficMode}
                 {trialBusy}
                 {activateTrial}
+                {openTelegramNotificationsBot}
                 openConnectLink={openInstallOrConnect}
                 {openPaymentModal}
                 {openRegularTopupModal}
@@ -2185,6 +2331,7 @@
                 {devicesData}
                 {devicesIsError}
                 {devicesLoaded}
+                {devicesErrorCode}
                 {devicesStatus}
                 {subscription}
                 {loadDevices}
@@ -2230,12 +2377,16 @@
                 {profileEmail}
                 {profileTelegramId}
                 {supportUrl}
+                {telegramNotificationsNeedPrompt}
+                {telegramNotificationsStartLink}
+                {telegramNotificationsStatus}
                 {telegramProfileName}
                 {user}
                 {userAgreementUrl}
                 {userLanguage}
                 showLogout={!telegramMiniAppContext}
                 linkTelegramAccount={linkTelegramFromSettings}
+                {openTelegramNotificationsBot}
                 logout={accountStore.logout}
                 {openAdminPanel}
                 {openExternalLink}

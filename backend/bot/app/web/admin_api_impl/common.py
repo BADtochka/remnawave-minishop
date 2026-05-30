@@ -143,12 +143,18 @@ def _payment_traffic_gb_split(payment: Payment) -> Tuple[Optional[float], Option
     return None, None
 
 
-def _payment_user_display_label(loaded_user: Any, payment_user_id: int) -> str:
-    """Human-facing name for payments tables: TG profile name, else email, else user id."""
-    if loaded_user is None:
-        return str(payment_user_id)
+def _user_display_label(
+    loaded_user: Any,
+    fallback_user_id: Optional[int],
+    *,
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    username: Optional[str] = None,
+    email: Optional[str] = None,
+) -> Optional[str]:
+    """Human-facing name: TG profile name, else email, else user id."""
     tid = getattr(loaded_user, "telegram_id", None)
-    if tid is not None:
+    if loaded_user is not None and tid is not None:
         fn = (getattr(loaded_user, "first_name", None) or "").strip()
         ln = (getattr(loaded_user, "last_name", None) or "").strip()
         full = f"{fn} {ln}".strip()
@@ -157,10 +163,30 @@ def _payment_user_display_label(loaded_user: Any, payment_user_id: int) -> str:
         un = (getattr(loaded_user, "username", None) or "").strip()
         if un:
             return un if un.startswith("@") else f"@{un}"
-        return str(payment_user_id)
-    email = (getattr(loaded_user, "email", None) or "").strip()
-    if email:
-        return email
+    elif loaded_user is not None:
+        email = (getattr(loaded_user, "email", None) or "").strip()
+        if email:
+            return email
+    fn = (first_name or "").strip()
+    ln = (last_name or "").strip()
+    full = f"{fn} {ln}".strip()
+    if full:
+        return full
+    un = (username or "").strip()
+    if un:
+        return un if un.startswith("@") else f"@{un}"
+    email_value = (email or "").strip()
+    if email_value:
+        return email_value
+    if fallback_user_id is None:
+        return None
+    return str(fallback_user_id)
+
+
+def _payment_user_display_label(loaded_user: Any, payment_user_id: int) -> str:
+    label = _user_display_label(loaded_user, payment_user_id)
+    if label:
+        return label
     return str(payment_user_id)
 
 
@@ -229,16 +255,27 @@ def _serialize_ad(campaign: AdCampaign, totals: Optional[Dict[str, Any]] = None)
 
 
 def _serialize_log(entry: MessageLog) -> Dict[str, Any]:
+    author_user = entry.__dict__.get("author_user")
+    target_user = entry.__dict__.get("target_user")
+    user_id = int(entry.user_id) if entry.user_id is not None else None
+    target_user_id = int(entry.target_user_id) if entry.target_user_id is not None else None
     return {
         "log_id": int(entry.log_id),
-        "user_id": int(entry.user_id) if entry.user_id else None,
+        "user_id": user_id,
+        "user_label": _user_display_label(
+            author_user,
+            user_id,
+            first_name=entry.telegram_first_name,
+            username=entry.telegram_username,
+        ),
         "telegram_username": entry.telegram_username,
         "telegram_first_name": entry.telegram_first_name,
-        "email": getattr(getattr(entry, "author_user", None), "email", None),
+        "email": getattr(author_user, "email", None),
         "event_type": entry.event_type,
         "content": entry.content,
         "is_admin_event": bool(entry.is_admin_event),
-        "target_user_id": int(entry.target_user_id) if entry.target_user_id else None,
+        "target_user_id": target_user_id,
+        "target_user_label": _user_display_label(target_user, target_user_id),
         "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
     }
 

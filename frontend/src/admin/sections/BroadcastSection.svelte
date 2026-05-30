@@ -1,4 +1,5 @@
 <script>
+  import { Textarea } from "$components/ui/index.js";
   import { Send } from "$components/ui/icons.js";
   import { getContext } from "svelte";
   import { Label } from "$components/ui/primitives.js";
@@ -31,12 +32,12 @@
       <Label.Root class="admin-field-label">
         <span>{at("broadcast_label_text", {}, "Текст сообщения")}</span>
         <small>{at("broadcast_hint_text", {}, "Поддерживается HTML-разметка Telegram")}</small>
-        <textarea
+        <Textarea
           class="admin-textarea"
           rows="6"
           value={broadcastText}
           on:input={(e) => broadcastStore.updateField({ broadcastText: e.target.value })}
-        ></textarea>
+        />
       </Label.Root>
       <div style="display:flex; gap:8px; align-items:center;">
         <AdminButton

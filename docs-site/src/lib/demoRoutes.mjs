@@ -27,7 +27,6 @@ export const demoAdminRoutes = [
 ];
 
 export const demoPublicRouteAliases = ["app"];
-export const demoRuntimeRouteAliases = ["app"];
 
 export const demoPublicRoutes = [
   ...demoPublicRouteAliases,
@@ -37,7 +36,6 @@ export const demoPublicRoutes = [
 ];
 
 export const demoRuntimeRoutes = [
-  ...demoRuntimeRouteAliases,
   ...demoUserRoutes,
   "admin",
   ...demoAdminRoutes.map((route) => `admin/${route}`),

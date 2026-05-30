@@ -3,6 +3,12 @@ from ._runtime import *  # noqa: F403,F405
 
 from config.subscription_guides_config import subscription_guides_available
 from config.webapp_themes_config import public_themes_catalog_payload
+from bot.services.telegram_notifications import (
+    TELEGRAM_NOTIFICATIONS_ENABLED,
+    normalize_telegram_notification_status,
+    telegram_notifications_need_prompt,
+    telegram_notifications_start_link,
+)
 
 
 async def _build_user_payload(request: web.Request, user_id: int) -> Dict[str, Any]:
@@ -72,6 +78,12 @@ async def _build_user_payload(request: web.Request, user_id: int) -> Dict[str, A
     lang = _normalize_language(db_user.language_code or settings.DEFAULT_LANGUAGE)
     admin_ids = {int(x) for x in (settings.ADMIN_IDS or [])}
     is_admin = bool(db_user.telegram_id and int(db_user.telegram_id) in admin_ids)
+    telegram_notifications_status = normalize_telegram_notification_status(
+        getattr(db_user, "telegram_notifications_status", None)
+    )
+    telegram_notifications_link = telegram_notifications_start_link(
+        request.app.get("bot_username") or ""
+    )
     return {
         "user": {
             "id": user_id,
@@ -83,6 +95,12 @@ async def _build_user_payload(request: web.Request, user_id: int) -> Dict[str, A
             ),
             "telegram_id": db_user.telegram_id,
             "telegram_linked": bool(_telegram_id_for_user(db_user)),
+            "telegram_notifications_status": telegram_notifications_status,
+            "telegram_notifications_enabled": (
+                telegram_notifications_status == TELEGRAM_NOTIFICATIONS_ENABLED
+            ),
+            "telegram_notifications_need_prompt": telegram_notifications_need_prompt(db_user),
+            "telegram_notifications_start_link": telegram_notifications_link,
             "telegram_photo_url": _telegram_avatar_url(avatar),
             "first_name": db_user.first_name,
             "language_code": lang,
@@ -156,12 +174,79 @@ async def _build_user_payload(request: web.Request, user_id: int) -> Dict[str, A
     }
 
 
-def _serialize_referral_bonus_details(settings: Settings, lang: str) -> List[Dict[str, Any]]:
+def _legacy_referral_bonus_periods(settings: Settings) -> List[int]:
     if getattr(settings, "traffic_sale_mode", False):
         return []
 
+    return sorted(int(months) for months in settings.subscription_options)
+
+
+def _serialize_tariff_period_referral_bonus_details(tariff: Any, lang: str) -> List[Dict[str, Any]]:
     details: List[Dict[str, Any]] = []
-    for months, _price in sorted(settings.subscription_options.items()):
+    for months in sorted(int(month) for month in tariff.enabled_periods):
+        inviter_days = tariff.referral_inviter_bonus_days(months)
+        friend_days = tariff.referral_referee_bonus_days(months)
+        if inviter_days is None and friend_days is None:
+            continue
+        details.append(
+            {
+                "id": f"{tariff.key}:{months}",
+                "tariff_key": tariff.key,
+                "tariff_name": tariff.name(lang),
+                "months": int(months),
+                "title": _format_months_title(int(months), lang),
+                "inviter_days": int(inviter_days or 0),
+                "friend_days": int(friend_days or 0),
+            }
+        )
+    return details
+
+
+def _serialize_tariff_referral_bonus_details(settings: Settings, lang: str) -> List[Dict[str, Any]]:
+    tariffs_config = settings.tariffs_config
+    if not tariffs_config:
+        return []
+
+    period_tariffs = [
+        tariff for tariff in tariffs_config.enabled_tariffs if tariff.billing_model == "period"
+    ]
+    if len(period_tariffs) <= 1:
+        return (
+            _serialize_tariff_period_referral_bonus_details(period_tariffs[0], lang)
+            if period_tariffs
+            else []
+        )
+
+    summaries: List[Dict[str, Any]] = []
+    for tariff in period_tariffs:
+        details = _serialize_tariff_period_referral_bonus_details(tariff, lang)
+        if not details:
+            continue
+        inviter_values = [int(item["inviter_days"]) for item in details]
+        friend_values = [int(item["friend_days"]) for item in details]
+        summaries.append(
+            {
+                "id": f"tariff:{tariff.key}",
+                "type": "tariff_summary",
+                "tariff_key": tariff.key,
+                "tariff_name": tariff.name(lang),
+                "title": tariff.name(lang),
+                "inviter_min_days": min(inviter_values),
+                "inviter_max_days": max(inviter_values),
+                "friend_min_days": min(friend_values),
+                "friend_max_days": max(friend_values),
+                "details": details,
+            }
+        )
+    return summaries
+
+
+def _serialize_referral_bonus_details(settings: Settings, lang: str) -> List[Dict[str, Any]]:
+    if settings.tariffs_config:
+        return _serialize_tariff_referral_bonus_details(settings, lang)
+
+    details: List[Dict[str, Any]] = []
+    for months in _legacy_referral_bonus_periods(settings):
         inviter_days = settings.referral_bonus_inviter.get(months)
         friend_days = settings.referral_bonus_referee.get(months)
         if inviter_days is None and friend_days is None:
@@ -391,6 +476,7 @@ def _serialize_plans(
         for tariff in tariffs_config.enabled_tariffs:
             common = {
                 "tariff_key": tariff.key,
+                "is_default_tariff": tariff.key == tariffs_config.default_tariff,
                 "tariff_name": tariff.name(lang),
                 "billing_model": tariff.billing_model,
                 "description": tariff.description(lang),

@@ -1,4 +1,5 @@
 <script>
+  import { Input } from "$components/ui/index.js";
   import { Tabs, Switch, Label } from "$components/ui/primitives.js";
   import Dialog from "$components/ui/dialog.svelte";
   import { Plus, Save, Trash2, X } from "$components/ui/icons.js";
@@ -71,7 +72,7 @@
               "Латиницей, без пробелов. Используется в платежах и подписках, менять после публикации не рекомендуется"
             )}</small
           >
-          <input
+          <Input
             class="input"
             type="text"
             placeholder="standard"
@@ -127,7 +128,7 @@
       <div class="admin-form-row admin-form-row-2">
         <Label.Root class="admin-field-label">
           <span>{at("tariff_label_name_ru", {}, "Название · RU")}</span>
-          <input
+          <Input
             class="input"
             type="text"
             placeholder={at("tariff_placeholder_name_ru", {}, "Стандарт")}
@@ -136,7 +137,7 @@
         </Label.Root>
         <Label.Root class="admin-field-label">
           <span>{at("tariff_label_name_en", {}, "Название · EN")}</span>
-          <input
+          <Input
             class="input"
             type="text"
             placeholder={at("tariff_placeholder_name_en", {}, "Standard")}
@@ -148,7 +149,7 @@
       <div class="admin-form-row admin-form-row-2">
         <Label.Root class="admin-field-label">
           <span>{at("tariff_label_desc_ru", {}, "Описание · RU")}</span>
-          <input
+          <Input
             class="input"
             type="text"
             placeholder={at("tariff_placeholder_desc_ru", {}, "Базовый набор серверов")}
@@ -157,7 +158,7 @@
         </Label.Root>
         <Label.Root class="admin-field-label">
           <span>{at("tariff_label_desc_en", {}, "Описание · EN")}</span>
-          <input
+          <Input
             class="input"
             type="text"
             placeholder={at("tariff_placeholder_desc_en", {}, "Base server pool")}
@@ -211,7 +212,7 @@
               "Сколько устройств может одновременно использовать подписку. Пусто — взять значение из .env, 0 — без ограничений"
             )}</small
           >
-          <input
+          <Input
             class="input"
             type="number"
             min="0"
@@ -229,7 +230,7 @@
                 "Сколько GB включено в тариф на каждый месяц. 0 — безлимитный трафика. Сверху можно докупать пакеты на вкладке «Докупки»"
               )}</small
             >
-            <input
+            <Input
               class="input"
               type="number"
               min="0"
@@ -248,7 +249,7 @@
                 "По этому курсу остаток подписки пересчитывается в гигабайты при переходе пользователя с тарифа «Период» на «Трафик»"
               )}</small
             >
-            <input
+            <Input
               class="input"
               type="number"
               min="0"
@@ -287,7 +288,7 @@
                 "Эта строка заменит «Premium-серверы» в кабинете, докупках и карточках лимитов."
               )}</small
             >
-            <input
+            <Input
               class="input"
               type="text"
               placeholder={at("tariff_placeholder_premium_name_ru", {}, "Premium-серверы")}
@@ -303,7 +304,7 @@
                 "Опционально для английского интерфейса."
               )}</small
             >
-            <input
+            <Input
               class="input"
               type="text"
               placeholder={at("tariff_placeholder_premium_name_en", {}, "Premium servers")}
@@ -359,7 +360,7 @@
                 "Сколько GB через premium-сквады включено в тариф каждый месяц. 0 или пусто — отдельного premium-лимита нет (premium-нодами можно пользоваться без ограничения)"
               )}</small
             >
-            <input
+            <Input
               class="input"
               type="number"
               min="0"
@@ -409,7 +410,7 @@
             {/if}
             {#each tariffDraft.premiumTopupRubRows as row, index}
               <div class="admin-row-editor-line">
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="0.1"
@@ -418,7 +419,7 @@
                   bind:value={row.gb}
                   aria-label={at("tariff_col_volume_gb", {}, "Объём premium-пакета в GB")}
                 />
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="0"
@@ -449,7 +450,7 @@
             {/if}
             {#each tariffDraft.premiumTopupStarsRows as row, index}
               <div class="admin-row-editor-line">
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="0.1"
@@ -458,7 +459,7 @@
                   bind:value={row.gb}
                   aria-label={at("tariff_col_volume_gb", {}, "Объём premium-пакета в GB")}
                 />
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="0"
@@ -501,7 +502,13 @@
             <AdminButton
               size="sm"
               onclick={() =>
-                tariffsStore.addDraftRow("periodRows", { months: 1, rub: "", stars: "" })}
+                tariffsStore.addDraftRow("periodRows", {
+                  months: 1,
+                  rub: "",
+                  stars: "",
+                  referral_inviter: "",
+                  referral_referee: "",
+                })}
             >
               <Plus size={13} />
               {at("tariff_btn_period", {}, "Период")}
@@ -517,15 +524,17 @@
             </p>
           {:else}
             <div class="admin-row-editor">
-              <div class="admin-row-editor-line admin-row-editor-4 admin-row-editor-header">
+              <div class="admin-row-editor-line admin-row-editor-6 admin-row-editor-header">
                 <span>{at("tariff_col_period_months", {}, "Срок, мес.")}</span>
                 <span>{at("tariff_col_price_rub", {}, "Цена, ₽")}</span>
                 <span>{at("tariff_col_price_stars_full", {}, "Цена, ⭐ Stars")}</span>
+                <span>{at("tariff_col_ref_inviter", {}, "Бонус приглашающему")}</span>
+                <span>{at("tariff_col_ref_referee", {}, "Бонус приглашённому")}</span>
                 <span></span>
               </div>
               {#each tariffDraft.periodRows as row, index}
-                <div class="admin-row-editor-line admin-row-editor-4">
-                  <input
+                <div class="admin-row-editor-line admin-row-editor-6">
+                  <Input
                     class="input"
                     type="number"
                     min="1"
@@ -533,7 +542,7 @@
                     bind:value={row.months}
                     aria-label={at("tariff_col_period_months", {}, "Срок (месяцы)")}
                   />
-                  <input
+                  <Input
                     class="input"
                     type="number"
                     min="0"
@@ -542,7 +551,7 @@
                     bind:value={row.rub}
                     aria-label={at("tariff_label_price_rub", {}, "Цена в рублях")}
                   />
-                  <input
+                  <Input
                     class="input"
                     type="number"
                     min="0"
@@ -550,6 +559,24 @@
                     placeholder="150"
                     bind:value={row.stars}
                     aria-label={at("tariff_label_price_stars", {}, "Цена в Telegram Stars")}
+                  />
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="3"
+                    bind:value={row.referral_inviter}
+                    aria-label={at("tariff_label_ref_inviter", {}, "Бонус приглашающему")}
+                  />
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="1"
+                    bind:value={row.referral_referee}
+                    aria-label={at("tariff_label_ref_referee", {}, "Бонус приглашённому")}
                   />
                   <AdminButton
                     size="sm"
@@ -603,7 +630,7 @@
               {/if}
               {#each tariffDraft.trafficRubRows as row, index}
                 <div class="admin-row-editor-line">
-                  <input
+                  <Input
                     class="input"
                     type="number"
                     min="0.1"
@@ -612,7 +639,7 @@
                     bind:value={row.gb}
                     aria-label={at("tariff_col_volume_gb", {}, "Объём пакета в GB")}
                   />
-                  <input
+                  <Input
                     class="input"
                     type="number"
                     min="0"
@@ -643,7 +670,7 @@
               {/if}
               {#each tariffDraft.trafficStarsRows as row, index}
                 <div class="admin-row-editor-line">
-                  <input
+                  <Input
                     class="input"
                     type="number"
                     min="0.1"
@@ -652,7 +679,7 @@
                     bind:value={row.gb}
                     aria-label={at("tariff_col_volume_gb", {}, "Объём пакета в GB")}
                   />
-                  <input
+                  <Input
                     class="input"
                     type="number"
                     min="0"
@@ -717,7 +744,7 @@
               {/if}
               {#each tariffDraft.topupRubRows as row, index}
                 <div class="admin-row-editor-line">
-                  <input
+                  <Input
                     class="input"
                     type="number"
                     min="0.1"
@@ -726,7 +753,7 @@
                     bind:value={row.gb}
                     aria-label={at("tariff_col_volume_gb", {}, "Объём пакета в GB")}
                   />
-                  <input
+                  <Input
                     class="input"
                     type="number"
                     min="0"
@@ -757,7 +784,7 @@
               {/if}
               {#each tariffDraft.topupStarsRows as row, index}
                 <div class="admin-row-editor-line">
-                  <input
+                  <Input
                     class="input"
                     type="number"
                     min="0.1"
@@ -766,7 +793,7 @@
                     bind:value={row.gb}
                     aria-label={at("tariff_col_volume_gb", {}, "Объём пакета в GB")}
                   />
-                  <input
+                  <Input
                     class="input"
                     type="number"
                     min="0"
@@ -841,7 +868,7 @@
             {/if}
             {#each tariffDraft.hwidRubRows as row, index}
               <div class="admin-row-editor-line">
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="1"
@@ -854,7 +881,7 @@
                     "Сколько устройств добавляет пакет"
                   )}
                 />
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="0"
@@ -885,7 +912,7 @@
             {/if}
             {#each tariffDraft.hwidStarsRows as row, index}
               <div class="admin-row-editor-line">
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="1"
@@ -898,7 +925,7 @@
                     "Сколько устройств добавляет пакет"
                   )}
                 />
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="0"

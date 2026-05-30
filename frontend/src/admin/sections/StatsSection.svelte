@@ -4,6 +4,7 @@
 
   import { fmtTrafficBytes } from "../../lib/admin/format.js";
   import Badge from "$components/ui/badge.svelte";
+  import { ScrollArea } from "$components/ui/index.js";
   import * as Card from "$components/ui/card/index.js";
   import {
     AdminDashboardGrid,
@@ -606,21 +607,23 @@
                 style="width:78%;height:9px;margin-top:6px"
               ></span>
             </div>
-            <div class="admin-panel-dash-nodes-grid">
-              {#each Array(4) as _, m (m)}
-                <div class="admin-panel-dash-node">
-                  <span class="admin-skeleton admin-skeleton-line" style="width:82%"></span>
-                  <span
-                    class="admin-skeleton admin-skeleton-line admin-skeleton-line-strong"
-                    style="width:52%;height:16px;margin-top:6px"
-                  ></span>
-                  <span
-                    class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"
-                    style="width:44%;margin-top:6px"
-                  ></span>
-                </div>
-              {/each}
-            </div>
+            <ScrollArea class="admin-panel-dash-nodes-scroll" maxHeight="240px">
+              <div class="admin-panel-dash-nodes-grid">
+                {#each Array(4) as _, m (m)}
+                  <div class="admin-panel-dash-node">
+                    <span class="admin-skeleton admin-skeleton-line" style="width:82%"></span>
+                    <span
+                      class="admin-skeleton admin-skeleton-line admin-skeleton-line-strong"
+                      style="width:52%;height:16px;margin-top:6px"
+                    ></span>
+                    <span
+                      class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"
+                      style="width:44%;margin-top:6px"
+                    ></span>
+                  </div>
+                {/each}
+              </div>
+            </ScrollArea>
           </div>
         </div>
       </Card.Content>
@@ -1018,19 +1021,21 @@
                     {at("stats_panel_inner_nodes_hint", {}, "")}
                   </p>
                 </div>
-                <div class="admin-panel-dash-nodes-grid">
-                  {#each panelNodeTraffic.seven.slice(0, PANEL_NODE_TILE_LIMIT) as node}
-                    <div class="admin-panel-dash-node">
-                      <div class="admin-panel-dash-node-name">{node.label}</div>
-                      <div class="admin-panel-dash-node-value">{node.value}</div>
-                      {#if node.online != null}
-                        <div class="admin-panel-dash-node-meta">
-                          {at("stats_panel_node_users_online", { count: node.online }, "")}
-                        </div>
-                      {/if}
-                    </div>
-                  {/each}
-                </div>
+                <ScrollArea class="admin-panel-dash-nodes-scroll" maxHeight="240px">
+                  <div class="admin-panel-dash-nodes-grid">
+                    {#each panelNodeTraffic.seven.slice(0, PANEL_NODE_TILE_LIMIT) as node}
+                      <div class="admin-panel-dash-node">
+                        <div class="admin-panel-dash-node-name">{node.label}</div>
+                        <div class="admin-panel-dash-node-value">{node.value}</div>
+                        {#if node.online != null}
+                          <div class="admin-panel-dash-node-meta">
+                            {at("stats_panel_node_users_online", { count: node.online }, "")}
+                          </div>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                </ScrollArea>
                 {#if panelNodeTraffic.seven.length > PANEL_NODE_TILE_LIMIT}
                   <p class="admin-panel-dash-nodes-more">
                     {at(

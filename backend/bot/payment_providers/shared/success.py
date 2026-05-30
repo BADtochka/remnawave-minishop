@@ -16,7 +16,13 @@ from bot.utils.text_sanitizer import sanitize_display_name, username_for_display
 from db.dal import payment_dal, user_dal
 from db.models import Payment, User
 
-from .common import Translator, format_human_units, make_translator, sale_mode_base
+from .common import (
+    Translator,
+    format_human_units,
+    make_translator,
+    sale_mode_base,
+    sale_mode_tariff_key,
+)
 
 _TRAFFIC_MODES = {"traffic", "traffic_package", "topup", "premium_topup"}
 _HWID_DEVICE_MODES = {"hwid_device", "hwid_devices", "hwid_devices_renewal"}
@@ -304,6 +310,7 @@ async def finalize_successful_payment(
                 activation_months or 1,
                 current_payment_db_id=req.payment.payment_id,
                 skip_if_active_before_payment=False,
+                tariff_key=sale_mode_tariff_key(req.sale_mode),
             )
         await req.session.commit()
     except Exception:

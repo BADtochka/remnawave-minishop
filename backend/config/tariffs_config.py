@@ -95,6 +95,8 @@ class Tariff(BaseModel):
     monthly_gb: Optional[float] = None
     prices_rub: Dict[str, float] = Field(default_factory=dict)
     prices_stars: Dict[str, float] = Field(default_factory=dict)
+    referral_bonus_days_inviter: Dict[str, int] = Field(default_factory=dict)
+    referral_bonus_days_referee: Dict[str, int] = Field(default_factory=dict)
     enabled_periods: List[int] = Field(default_factory=list)
     topup_packages: Optional[PackageSet] = None
 
@@ -129,6 +131,14 @@ class Tariff(BaseModel):
         if self.billing_model == "period":
             if self.monthly_gb is None or self.monthly_gb < 0:
                 raise ValueError(f"period tariff {self.key}: monthly_gb must be >= 0")
+            self.referral_bonus_days_inviter = self._normalize_referral_bonus_map(
+                self.referral_bonus_days_inviter,
+                "referral_bonus_days_inviter",
+            )
+            self.referral_bonus_days_referee = self._normalize_referral_bonus_map(
+                self.referral_bonus_days_referee,
+                "referral_bonus_days_referee",
+            )
             if not self.enabled_periods:
                 raise ValueError(f"period tariff {self.key}: enabled_periods is required")
             for months in self.enabled_periods:
@@ -152,6 +162,23 @@ class Tariff(BaseModel):
             )
         return self
 
+    def _normalize_referral_bonus_map(
+        self, values: Dict[str, int], field_name: str
+    ) -> Dict[str, int]:
+        normalized: Dict[str, int] = {}
+        for period, days in (values or {}).items():
+            try:
+                months = int(float(str(period).strip()))
+                bonus_days = int(float(days))
+            except (TypeError, ValueError):
+                raise ValueError(f"tariff {self.key}: {field_name} contains invalid entry")
+            if months <= 0:
+                raise ValueError(f"tariff {self.key}: {field_name} periods must be positive")
+            if bonus_days < 0:
+                raise ValueError(f"tariff {self.key}: {field_name} days must be >= 0")
+            normalized[str(months)] = bonus_days
+        return normalized
+
     def name(self, lang: str, fallback: str = "ru") -> str:
         return self.names.get(lang) or self.names.get(fallback) or self.key
 
@@ -172,6 +199,14 @@ class Tariff(BaseModel):
         source = self.prices_rub if currency == "rub" else self.prices_stars
         value = source.get(str(months))
         return float(value) if value is not None else None
+
+    def referral_inviter_bonus_days(self, months: int) -> Optional[int]:
+        value = self.referral_bonus_days_inviter.get(str(int(months)))
+        return int(value) if value is not None else None
+
+    def referral_referee_bonus_days(self, months: int) -> Optional[int]:
+        value = self.referral_bonus_days_referee.get(str(int(months)))
+        return int(value) if value is not None else None
 
     def min_period_price_rub(self) -> Optional[float]:
         prices = [

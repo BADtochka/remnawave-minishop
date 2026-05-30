@@ -8,7 +8,7 @@
     AdminTable,
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
-  import { Checkbox, RadioGroup, RadioGroupItem } from "$components/ui/index.js";
+  import { Checkbox, FileInput, RadioGroup, RadioGroupItem } from "$components/ui/index.js";
   import {
     CheckCircle2,
     Database,
@@ -178,10 +178,9 @@
           ? at("backups_uploading", {}, "Загрузка...")
           : at("backups_upload", {}, "Загрузить архив")}
       </AdminButton>
-      <input
-        bind:this={fileInput}
+      <FileInput
+        bind:element={fileInput}
         class="backups-file-input"
-        type="file"
         accept=".zip,application/zip"
         on:change={uploadSelectedFile}
       />
@@ -362,7 +361,7 @@
     align-items: center;
   }
 
-  .backups-file-input {
+  :global(.backups-file-input) {
     position: absolute;
     width: 1px;
     height: 1px;

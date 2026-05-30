@@ -1,4 +1,5 @@
 <script>
+  import { Input } from "$components/ui/index.js";
   import { Label } from "$components/ui/primitives.js";
   import {
     AdminBadge,
@@ -107,7 +108,7 @@
 
 <div class="admin-toolbar admin-toolbar-users">
   <div class="admin-toolbar-search">
-    <input
+    <Input
       type="search"
       class="input"
       placeholder={at("users_search_placeholder", {}, "ID, @username или email")}

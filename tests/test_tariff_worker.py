@@ -34,6 +34,63 @@ def _tariffs_config_payload() -> dict:
 
 
 class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_db_tick_retries_deadlock_once(self):
+        class FakeSession:
+            def __init__(self):
+                self.execute = AsyncMock()
+                self.commit = AsyncMock()
+                self.rollback = AsyncMock()
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        sessions = []
+
+        def session_factory():
+            session = FakeSession()
+            sessions.append(session)
+            return session
+
+        attempts = 0
+
+        async def tick(_session):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise RuntimeError("deadlock detected")
+
+        worker = TariffTrafficWorker(
+            settings=SimpleNamespace(),
+            session_factory=session_factory,
+            panel_service=SimpleNamespace(),
+            subscription_service=SimpleNamespace(),
+        )
+
+        with patch("bot.services.tariff_worker.asyncio.sleep", new=AsyncMock()) as sleep:
+            await worker._run_db_tick_with_retry("test", tick)
+
+        self.assertEqual(attempts, 2)
+        self.assertEqual(len(sessions), 2)
+        sessions[0].rollback.assert_awaited_once()
+        sessions[0].commit.assert_not_awaited()
+        sessions[1].commit.assert_awaited_once()
+        sleep.assert_awaited_once()
+
+    async def test_retryable_db_exception_detects_wrapped_sqlstate(self):
+        class PgError(Exception):
+            sqlstate = "40P01"
+
+        class WrappedDbError(Exception):
+            def __init__(self, orig):
+                super().__init__("wrapped")
+                self.orig = orig
+
+        self.assertTrue(TariffTrafficWorker._is_retryable_db_exception(WrappedDbError(PgError())))
+        self.assertFalse(TariffTrafficWorker._is_retryable_db_exception(RuntimeError("plain")))
+
     async def test_period_tariff_uses_panel_month_strategy_without_resetting(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = Path(tmpdir) / "tariffs.json"

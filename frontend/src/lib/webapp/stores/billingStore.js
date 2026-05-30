@@ -110,25 +110,43 @@ export function createBillingStore({
     tariffCatalog,
     subscription,
     plans,
-    defaultMethod = ""
+    defaultMethod = "",
+    options = {}
   ) {
     state.update((s) => {
       let step;
       let plan = s.selectedPlan;
       let tariffKey = s.selectedTariffKey;
+      const catalog = tariffCatalog || [];
+      const planList = plans || [];
+      const preferredTariffKey = String(options?.preferredTariffKey || "").trim();
+      const preferredTariff = preferredTariffKey
+        ? catalog.find((tariff) => tariff.key === preferredTariffKey)
+        : null;
+      const fallbackTariff =
+        catalog.find((tariff) => tariff.is_default) ||
+        catalog.find((tariff) => tariff.key === "standard") ||
+        catalog[0] ||
+        null;
+      const deeplinkTariff =
+        preferredTariff || (options?.selectDefaultTariff ? fallbackTariff : null);
 
       if (tariffMode) {
-        if (singleTariffMode && tariffCatalog[0]?.key) {
-          tariffKey = tariffCatalog[0].key;
-          plan = plans.find((p) => p?.tariff_key === tariffKey) || null;
+        if (deeplinkTariff?.key) {
+          tariffKey = deeplinkTariff.key;
+          plan = planList.find((p) => p?.tariff_key === tariffKey) || null;
+          step = options?.preferCheckout && plan ? "checkout" : "tariff";
+        } else if (singleTariffMode && catalog[0]?.key) {
+          tariffKey = catalog[0].key;
+          plan = planList.find((p) => p?.tariff_key === tariffKey) || null;
           step = "checkout";
         } else if (
           subscription?.active &&
           subscription?.tariff_key &&
-          tariffCatalog.some((t) => t.key === subscription.tariff_key)
+          catalog.some((t) => t.key === subscription.tariff_key)
         ) {
           tariffKey = subscription.tariff_key;
-          plan = plans.find((p) => p?.tariff_key === tariffKey) || null;
+          plan = planList.find((p) => p?.tariff_key === tariffKey) || null;
           step = "checkout";
         } else {
           step = "tariff";

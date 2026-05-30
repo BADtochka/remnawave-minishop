@@ -42,6 +42,20 @@ class SettingsTests(unittest.TestCase):
 
         self.assertEqual(settings.WEBAPP_TITLE, "/minishop")
 
+    def test_legacy_subscription_prices_have_defaults(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+            TARIFFS_CONFIG_PATH="missing-tariffs.json",
+        )
+
+        self.assertEqual(
+            settings.subscription_options,
+            {1: 200.0, 3: 600.0, 6: 1200.0, 12: 2400.0},
+        )
+
     def test_subscription_guides_defaults_are_enabled(self):
         settings = Settings(
             _env_file=None,
@@ -282,3 +296,4 @@ class SettingsTests(unittest.TestCase):
 
         self.assertEqual(settings.SUBSCRIPTION_NOTIFY_HOURS_BEFORE, 3)
         self.assertEqual(settings.SUBSCRIPTION_NOTIFICATION_WORKER_TICK_SECONDS, 300)
+        self.assertTrue(settings.SUBSCRIPTION_EMAIL_NOTIFICATIONS_ENABLED)

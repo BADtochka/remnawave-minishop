@@ -1,4 +1,5 @@
 <script>
+  import { Input } from "$components/ui/index.js";
   import {
     ChevronRight,
     RefreshCw,
@@ -36,10 +37,38 @@
   const TRIAL_RESET_KEYS = ["TRIAL_TRAFFIC_STRATEGY"];
   const TRIAL_SQUAD_KEYS = ["TRIAL_SQUAD_UUIDS"];
   const LEGACY_PERIODS = [
-    ["1", "MONTH_1_ENABLED", "RUB_PRICE_1_MONTH", "STARS_PRICE_1_MONTH"],
-    ["3", "MONTH_3_ENABLED", "RUB_PRICE_3_MONTHS", "STARS_PRICE_3_MONTHS"],
-    ["6", "MONTH_6_ENABLED", "RUB_PRICE_6_MONTHS", "STARS_PRICE_6_MONTHS"],
-    ["12", "MONTH_12_ENABLED", "RUB_PRICE_12_MONTHS", "STARS_PRICE_12_MONTHS"],
+    [
+      "1",
+      "MONTH_1_ENABLED",
+      "RUB_PRICE_1_MONTH",
+      "STARS_PRICE_1_MONTH",
+      "REFERRAL_BONUS_DAYS_INVITER_1_MONTH",
+      "REFERRAL_BONUS_DAYS_REFEREE_1_MONTH",
+    ],
+    [
+      "3",
+      "MONTH_3_ENABLED",
+      "RUB_PRICE_3_MONTHS",
+      "STARS_PRICE_3_MONTHS",
+      "REFERRAL_BONUS_DAYS_INVITER_3_MONTHS",
+      "REFERRAL_BONUS_DAYS_REFEREE_3_MONTHS",
+    ],
+    [
+      "6",
+      "MONTH_6_ENABLED",
+      "RUB_PRICE_6_MONTHS",
+      "STARS_PRICE_6_MONTHS",
+      "REFERRAL_BONUS_DAYS_INVITER_6_MONTHS",
+      "REFERRAL_BONUS_DAYS_REFEREE_6_MONTHS",
+    ],
+    [
+      "12",
+      "MONTH_12_ENABLED",
+      "RUB_PRICE_12_MONTHS",
+      "STARS_PRICE_12_MONTHS",
+      "REFERRAL_BONUS_DAYS_INVITER_12_MONTHS",
+      "REFERRAL_BONUS_DAYS_REFEREE_12_MONTHS",
+    ],
   ];
   const LEGACY_TARIFF_SETTING_KEYS = [
     ...LEGACY_PERIODS.flatMap((row) => row.slice(1)),
@@ -375,7 +404,7 @@
                 <code>TRIAL_DURATION_DAYS</code>
               </div>
               <div class="admin-setting-control">
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="0"
@@ -411,7 +440,7 @@
                 <code>TRIAL_TRAFFIC_LIMIT_GB</code>
               </div>
               <div class="admin-setting-control">
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="0"
@@ -563,7 +592,7 @@
                     onValueChange={handleTrialSquadSelect}
                   />
                 {/key}
-                <input
+                <Input
                   class="input"
                   type="text"
                   placeholder={valueForKey("USER_SQUAD_UUIDS", settingsDirty, settingsFieldMap) ||
@@ -794,8 +823,10 @@
               <span>{at("tariffs_legacy_enabled", {}, "Enabled")}</span>
               <span>{at("payment_rub", {}, "RUB")}</span>
               <span>{at("payment_stars", {}, "Stars")}</span>
+              <span>{at("tariffs_legacy_ref_inviter", {}, "Inviter")}</span>
+              <span>{at("tariffs_legacy_ref_referee", {}, "Friend")}</span>
             </div>
-            {#each LEGACY_PERIODS as [months, enabledKey, rubKey, starsKey]}
+            {#each LEGACY_PERIODS as [months, enabledKey, rubKey, starsKey, inviterKey, refereeKey]}
               <div class="admin-legacy-tariff-row">
                 <strong>{months} {at("months_short", {}, "mo")}</strong>
                 <div class="admin-setting-switch">
@@ -807,7 +838,7 @@
                     <Switch.Thumb class="admin-switch-thumb" />
                   </Switch.Root>
                 </div>
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="0"
@@ -815,13 +846,29 @@
                   value={valueForKey(rubKey, settingsDirty, settingsFieldMap)}
                   oninput={(event) => setSetting(rubKey, event.currentTarget.value)}
                 />
-                <input
+                <Input
                   class="input"
                   type="number"
                   min="0"
                   step="1"
                   value={valueForKey(starsKey, settingsDirty, settingsFieldMap)}
                   oninput={(event) => setSetting(starsKey, event.currentTarget.value)}
+                />
+                <Input
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={valueForKey(inviterKey, settingsDirty, settingsFieldMap)}
+                  oninput={(event) => setSetting(inviterKey, event.currentTarget.value)}
+                />
+                <Input
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={valueForKey(refereeKey, settingsDirty, settingsFieldMap)}
+                  oninput={(event) => setSetting(refereeKey, event.currentTarget.value)}
                 />
               </div>
             {/each}
@@ -831,7 +878,7 @@
             <label class="admin-field-label admin-field-label-compact">
               <span>{at("tariffs_legacy_traffic_packages", {}, "Traffic packages")}</span>
               <small>{at("tariffs_legacy_traffic_hint", {}, "Format: 10:199,50:799")}</small>
-              <input
+              <Input
                 class="input"
                 type="text"
                 value={valueForKey("TRAFFIC_PACKAGES", settingsDirty, settingsFieldMap)}
@@ -843,7 +890,7 @@
                 >{at("tariffs_legacy_stars_traffic_packages", {}, "Traffic packages, Stars")}</span
               >
               <small>{at("tariffs_legacy_traffic_hint", {}, "Format: 10:199,50:799")}</small>
-              <input
+              <Input
                 class="input"
                 type="text"
                 value={valueForKey("STARS_TRAFFIC_PACKAGES", settingsDirty, settingsFieldMap)}

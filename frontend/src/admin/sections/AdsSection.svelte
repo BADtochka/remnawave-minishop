@@ -1,4 +1,5 @@
 <script>
+  import { Input } from "$components/ui/index.js";
   import { Trash2 } from "$components/ui/icons.js";
   import { getContext, onMount } from "svelte";
   import Dialog from "$components/ui/dialog.svelte";
@@ -106,7 +107,7 @@
   <div class="admin-form" data-dialog-content>
     <div class="admin-dialog-form-section">
       <AdminField label={at("ad_label_source", {}, "Источник")}>
-        <input
+        <Input
           class="input"
           type="text"
           placeholder="telegram_ads"
@@ -118,7 +119,7 @@
         label={at("ad_label_param", {}, "start-параметр")}
         hint={at("ad_hint_param", {}, "Передаётся в /start, должен быть уникален")}
       >
-        <input
+        <Input
           class="input"
           type="text"
           placeholder="ads_summer25"
@@ -129,7 +130,7 @@
     </div>
     <div class="admin-dialog-form-section">
       <AdminField label={at("ad_label_cost", {}, "Стоимость, RUB")}>
-        <input
+        <Input
           class="input"
           type="number"
           step="0.01"

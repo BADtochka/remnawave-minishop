@@ -30,10 +30,11 @@
   position: relative;
   z-index: 1;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
   width: min(100%, 520px);
   max-height: min(86dvh, 760px);
-  overflow: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
   padding: 18px;
   border: 1px solid var(--border);
@@ -41,6 +42,15 @@
   background: color-mix(in srgb, var(--panel) 96%, var(--bg));
   color: var(--text);
   box-shadow: var(--shadow-strong);
+}
+
+.dialog-body-scroll {
+  min-height: 0;
+  max-height: none;
+}
+
+.dialog-body-scroll > .scroll-area__viewport {
+  display: grid;
 }
 
 .dialog-head {
@@ -94,7 +104,7 @@
 
 .payment-dialog-card {
   max-height: 100%;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .payment-dialog-body {

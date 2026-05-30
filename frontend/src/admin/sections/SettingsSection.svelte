@@ -1,4 +1,5 @@
 <script>
+  import { ColorInput, FileInput, Input, ScrollArea, Textarea } from "$components/ui/index.js";
   import {
     Check,
     ChevronRight,
@@ -198,6 +199,8 @@
       url,
       requiresBaseUrl: Boolean(field.webhook_requires_base_url),
       baseConfigured: field.webhook_base_url_configured !== false,
+      hintI18nKey: field.webhook_hint_i18n_key || "",
+      hintFallback: field.webhook_hint || "",
     };
   }
 
@@ -333,6 +336,7 @@
   function sectionTitle(id) {
     const map = {
       general: "Общие",
+      remnawave: "Remnawave Panel",
       appearance: "Внешний вид",
       pricing: "Тарифы и цены",
       payments: "Платёжные системы",
@@ -415,9 +419,9 @@
       <small>
         {webhook.url
           ? at(
-              "settings_provider_webhook_url_hint",
+              adminLocaleKey(webhook.hintI18nKey || "settings_provider_webhook_url_hint"),
               {},
-              "Use this URL in the provider webhook settings."
+              webhook.hintFallback || "Use this URL in the provider webhook settings."
             )
           : at(
               "settings_provider_webhook_base_missing",
@@ -512,13 +516,13 @@
           >
         </div>
       {:else if field.type === "color"}
-        <input
+        <ColorInput
           class="admin-color"
-          type="color"
           value={valueFor(field) || "#00fe7a"}
+          ariaLabel={fieldLabelText(field)}
           oninput={(e) => settingsStore.markDirty(field.key, e.currentTarget.value)}
         />
-        <input
+        <Input
           class="input"
           type="text"
           value={valueFor(field) || ""}
@@ -557,7 +561,7 @@
           onValueChange={(value) => settingsStore.markDirty(field.key, value)}
         />
       {:else if field.type === "int" || field.type === "float"}
-        <input
+        <Input
           class="input"
           type="number"
           step={field.type === "float" ? "0.1" : "1"}
@@ -568,19 +572,18 @@
           oninput={(e) => settingsStore.markDirty(field.key, e.currentTarget.value)}
         />
       {:else if field.type === "text"}
-        <textarea
+        <Textarea
           class="admin-setting-textarea"
           rows="4"
           placeholder={fieldPlaceholderText(field)}
           value={valueFor(field) ?? ""}
           oninput={(e) => settingsStore.markDirty(field.key, e.currentTarget.value)}
-        ></textarea>
+        />
       {:else if field.type === "json"}
         <div class="admin-json-toolbar">
-          <input
+          <FileInput
             id={"json-file-" + field.key}
             class="admin-json-file-input"
-            type="file"
             accept="application/json,.json"
             onchange={(event) => handleJsonFile(field, event)}
           />
@@ -602,16 +605,16 @@
             </AdminButton>
           {/if}
         </div>
-        <textarea
+        <Textarea
           class="admin-setting-textarea admin-setting-json-textarea"
           rows="10"
           spellcheck="false"
           placeholder={fieldPlaceholderText(field)}
           value={valueFor(field) ?? ""}
           oninput={(e) => settingsStore.markDirty(field.key, e.currentTarget.value)}
-        ></textarea>
+        />
       {:else if field.secret}
-        <input
+        <Input
           class="input"
           type={revealed ? "text" : "password"}
           placeholder={secretPlaceholder(field)}
@@ -628,7 +631,7 @@
           {#if revealed}<EyeOff size={13} />{:else}<Eye size={13} />{/if}
         </AdminButton>
       {:else}
-        <input
+        <Input
           class="input"
           type="text"
           placeholder={fieldPlaceholderText(field)}
@@ -813,7 +816,7 @@
     <div class="admin-icon-picker-toolbar">
       <label class="admin-icon-picker-search">
         <Search size={15} />
-        <input
+        <Input
           bind:value={iconPickerSearch}
           class="input"
           type="text"
@@ -821,21 +824,23 @@
         />
       </label>
     </div>
-    <div class="admin-icon-picker-grid">
-      {#each filteredIconOptions as iconName}
-        {@const Icon = iconComponent(iconName)}
-        <button
-          class:active={iconPickerField && iconValue(iconPickerField) === iconName}
-          class="admin-icon-picker-option"
-          type="button"
-          onclick={() => selectIcon(iconName)}
-        >
-          {#if Icon}
-            <svelte:component this={Icon} size={18} />
-          {/if}
-          <span>{iconName}</span>
-        </button>
-      {/each}
-    </div>
+    <ScrollArea class="admin-icon-picker-scroll" maxHeight="min(52vh, 460px)">
+      <div class="admin-icon-picker-grid">
+        {#each filteredIconOptions as iconName}
+          {@const Icon = iconComponent(iconName)}
+          <button
+            class:active={iconPickerField && iconValue(iconPickerField) === iconName}
+            class="admin-icon-picker-option"
+            type="button"
+            onclick={() => selectIcon(iconName)}
+          >
+            {#if Icon}
+              <svelte:component this={Icon} size={18} />
+            {/if}
+            <span>{iconName}</span>
+          </button>
+        {/each}
+      </div>
+    </ScrollArea>
   </div>
 </Dialog>

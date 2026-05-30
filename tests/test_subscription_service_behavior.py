@@ -1,7 +1,7 @@
 import json
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -391,6 +391,278 @@ class SubscriptionServiceActivationDispatchTests(unittest.IsolatedAsyncioTestCas
             self.assertEqual(kwargs["device_count"], 2)
             self.assertEqual(kwargs["tariff_key"], "standard")
             self.assertEqual(kwargs["payment_db_id"], 12)
+
+
+class SubscriptionServiceBonusExtensionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_referral_extension_preserves_existing_tariff_limit(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = _make_settings(
+                _tariffs_config_payload(),
+                tmpdir,
+                USER_TRAFFIC_LIMIT_GB=999,
+            )
+            service = _make_service(settings)
+            service._get_or_create_panel_user_link_details = AsyncMock(
+                return_value=("panel-user", "short-uuid", "short", False)
+            )
+            service.panel_service.update_user_details_on_panel = AsyncMock(
+                return_value={"ok": True}
+            )
+            active_sub = SimpleNamespace(
+                subscription_id=10,
+                end_date=datetime.now(timezone.utc) + timedelta(days=5),
+                traffic_limit_bytes=100 * GIB,
+                tariff_key="standard",
+            )
+            updated_sub = SimpleNamespace(
+                subscription_id=10,
+                end_date=active_sub.end_date + timedelta(days=3),
+                traffic_limit_bytes=100 * GIB,
+                tariff_key="standard",
+            )
+
+            with (
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.user_dal.get_user_by_id",
+                    AsyncMock(return_value=SimpleNamespace(user_id=42)),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.subscription_dal.get_active_subscription_by_user_id",
+                    AsyncMock(return_value=active_sub),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.subscription_dal.update_subscription_end_date",
+                    AsyncMock(return_value=updated_sub),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.subscription_dal.update_subscription",
+                    AsyncMock(),
+                ) as update_subscription,
+            ):
+                await service.extend_active_subscription_days(
+                    session=AsyncMock(),
+                    user_id=42,
+                    bonus_days=3,
+                    reason="referral bonus from Alice",
+                )
+
+            update_subscription.assert_not_awaited()
+            payload = service.panel_service.update_user_details_on_panel.await_args.args[1]
+            self.assertNotIn("trafficLimitBytes", payload)
+            self.assertNotIn("trafficLimitStrategy", payload)
+
+
+class SubscriptionServiceActiveDetailsTests(unittest.IsolatedAsyncioTestCase):
+    def _local_active_sub(self) -> SimpleNamespace:
+        return SimpleNamespace(
+            subscription_id=7,
+            user_id=42,
+            panel_user_uuid="panel-user",
+            panel_subscription_uuid="short-uuid",
+            end_date=datetime.now(timezone.utc) + timedelta(days=10),
+            is_active=True,
+            status_from_panel="ACTIVE",
+            traffic_limit_bytes=1000,
+            traffic_used_bytes=100,
+            tariff_key=None,
+            tier_baseline_bytes=None,
+            topup_balance_bytes=0,
+            regular_bonus_bytes=0,
+            regular_unlimited_override=False,
+            premium_baseline_bytes=0,
+            premium_topup_balance_bytes=0,
+            premium_topup_used_bytes=0,
+            premium_used_bytes=0,
+            premium_bonus_bytes=0,
+            premium_unlimited_override=False,
+            premium_is_limited=False,
+            premium_period_start_at=None,
+            period_start_at=None,
+            is_throttled=False,
+            hwid_device_limit=None,
+            extra_hwid_devices=0,
+        )
+
+    async def test_get_active_subscription_details_preserves_local_subscription_on_panel_error(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = _make_settings(_tariffs_config_payload(), tmpdir)
+            service = _make_service(settings)
+            service.panel_service.get_user_by_uuid_lookup = AsyncMock(
+                return_value={
+                    "ok": False,
+                    "user": None,
+                    "not_found": False,
+                    "failure_reason": "classification=panel_lookup_failed status_code=-1 "
+                    "message=Connection error",
+                    "response": {"error": True, "status_code": -1},
+                }
+            )
+            service.panel_service.get_subscription_link = AsyncMock(
+                return_value="https://panel.example.test/sub/short-uuid"
+            )
+            session = AsyncMock()
+            db_user = SimpleNamespace(
+                user_id=42,
+                panel_user_uuid="panel-user",
+                username="alice",
+                language_code="en",
+            )
+            local_sub = self._local_active_sub()
+
+            with (
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.user_dal.get_user_by_id",
+                    AsyncMock(return_value=db_user),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.subscription_dal.get_active_subscription_by_user_id",
+                    AsyncMock(return_value=local_sub),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.subscription_dal.deactivate_all_user_subscriptions",
+                    AsyncMock(),
+                ) as deactivate_all,
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.user_dal.update_user",
+                    AsyncMock(),
+                ) as update_user,
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.logging.warning",
+                ) as warning_log,
+            ):
+                result = await service.get_active_subscription_details(session, user_id=42)
+
+        self.assertIsNotNone(result)
+        self.assertFalse(result["is_panel_data"])
+        self.assertEqual(result["end_date"], local_sub.end_date)
+        self.assertEqual(result["config_link"], "https://panel.example.test/sub/short-uuid")
+        deactivate_all.assert_not_awaited()
+        update_user.assert_not_awaited()
+        warning_text = " ".join(str(call) for call in warning_log.call_args_list)
+        self.assertIn("panel access/API problem", warning_text)
+        self.assertIn("status_code=-1", warning_text)
+        self.assertIn("Connection error", warning_text)
+
+    async def test_get_active_subscription_details_clears_link_only_when_panel_confirms_absent(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = _make_settings(_tariffs_config_payload(), tmpdir)
+            service = _make_service(settings)
+            service.panel_service.get_user_by_uuid_lookup = AsyncMock(
+                return_value={
+                    "ok": False,
+                    "user": None,
+                    "not_found": True,
+                    "failure_reason": "classification=confirmed_not_found status_code=404",
+                    "response": {"error": True, "status_code": 404},
+                }
+            )
+            session = AsyncMock()
+            db_user = SimpleNamespace(
+                user_id=42,
+                panel_user_uuid="panel-user",
+                username="alice",
+                language_code="en",
+            )
+
+            with (
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.user_dal.get_user_by_id",
+                    AsyncMock(return_value=db_user),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.subscription_dal.get_active_subscription_by_user_id",
+                    AsyncMock(return_value=self._local_active_sub()),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.subscription_dal.deactivate_all_user_subscriptions",
+                    AsyncMock(),
+                ) as deactivate_all,
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.user_dal.update_user",
+                    AsyncMock(),
+                ) as update_user,
+            ):
+                result = await service.get_active_subscription_details(session, user_id=42)
+
+        self.assertIsNone(result)
+        deactivate_all.assert_awaited_once_with(session, 42)
+        update_user.assert_awaited_once_with(session, 42, {"panel_user_uuid": None})
+
+    async def test_get_active_subscription_details_includes_device_topup_renewal_fields(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = _make_settings(_tariffs_config_payload(), tmpdir)
+            service = _make_service(settings)
+            active_until = datetime(2099, 1, 2, 3, 4, tzinfo=timezone.utc)
+            service.panel_service.get_user_by_uuid_lookup = AsyncMock(
+                return_value={
+                    "ok": True,
+                    "user": {
+                        "uuid": "panel-user",
+                        "shortUuid": "short-uuid",
+                        "status": "ACTIVE",
+                        "expireAt": "2099-02-01T00:00:00Z",
+                        "subscriptionUrl": "https://panel.example.test/sub/short-uuid",
+                        "trafficLimitBytes": 1000,
+                        "trafficLimitStrategy": "MONTH",
+                        "userTraffic": {
+                            "usedTrafficBytes": 100,
+                            "lifetimeUsedTrafficBytes": 100,
+                        },
+                    },
+                }
+            )
+            service.premium_access_for_tariff = AsyncMock(
+                return_value={"squad_uuids": [], "squad_labels": [], "node_labels": []}
+            )
+            session = AsyncMock()
+            db_user = SimpleNamespace(
+                user_id=42,
+                panel_user_uuid="panel-user",
+                username="alice",
+                language_code="en",
+                lifetime_used_traffic_bytes=100,
+            )
+            local_sub = self._local_active_sub()
+            local_sub.tariff_key = "standard"
+            local_sub.extra_hwid_devices = 0
+            local_sub.hwid_device_limit = 3
+
+            with (
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.user_dal.get_user_by_id",
+                    AsyncMock(return_value=db_user),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.subscription_dal.get_active_subscription_by_user_id",
+                    AsyncMock(return_value=local_sub),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.subscription_dal.update_subscription",
+                    AsyncMock(),
+                ),
+                patch(
+                    "bot.services.subscription_service_impl.lifecycle.tariff_dal.get_hwid_device_entitlement_summary",
+                    AsyncMock(
+                        return_value={
+                            "active_devices": 1,
+                            "active_until": active_until,
+                            "next_valid_from": None,
+                        }
+                    ),
+                ),
+            ):
+                result = await service.get_active_subscription_details(session, user_id=42)
+
+        self.assertTrue(result["device_topup_renewal_available"])
+        self.assertEqual(result["extra_hwid_devices"], 1)
+        self.assertEqual(result["extra_hwid_devices_valid_until"], active_until)
+        self.assertEqual(result["extra_hwid_devices_valid_until_text"], "02.01.2099 03:04")
 
 
 class SubscriptionDalPayloadTests(unittest.TestCase):

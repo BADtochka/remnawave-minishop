@@ -214,10 +214,10 @@ class Settings(BaseSettings):
     MONTH_6_ENABLED: bool = Field(default=True, alias="6_MONTHS_ENABLED")
     MONTH_12_ENABLED: bool = Field(default=True, alias="12_MONTHS_ENABLED")
 
-    RUB_PRICE_1_MONTH: Optional[int] = Field(default=None)
-    RUB_PRICE_3_MONTHS: Optional[int] = Field(default=None)
-    RUB_PRICE_6_MONTHS: Optional[int] = Field(default=None)
-    RUB_PRICE_12_MONTHS: Optional[int] = Field(default=None)
+    RUB_PRICE_1_MONTH: Optional[int] = Field(default=200)
+    RUB_PRICE_3_MONTHS: Optional[int] = Field(default=600)
+    RUB_PRICE_6_MONTHS: Optional[int] = Field(default=1200)
+    RUB_PRICE_12_MONTHS: Optional[int] = Field(default=2400)
 
     STARS_PRICE_1_MONTH: Optional[int] = Field(default=None)
     STARS_PRICE_3_MONTHS: Optional[int] = Field(default=None)
@@ -240,6 +240,7 @@ class Settings(BaseSettings):
     )
 
     SUBSCRIPTION_NOTIFICATIONS_ENABLED: bool = Field(default=True)
+    SUBSCRIPTION_EMAIL_NOTIFICATIONS_ENABLED: bool = Field(default=True)
     SUBSCRIPTION_NOTIFY_ON_EXPIRE: bool = Field(default=True)
     SUBSCRIPTION_NOTIFY_AFTER_EXPIRE: bool = Field(default=True)
     SUBSCRIPTION_NOTIFY_DAYS_BEFORE: int = Field(default=3)

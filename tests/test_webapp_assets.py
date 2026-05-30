@@ -76,12 +76,171 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual([plan["tariff_key"] for plan in plans], ["standard", "traffic"])
         self.assertEqual(plans[0]["sale_mode"], "subscription")
+        self.assertTrue(plans[0]["is_default_tariff"])
         self.assertEqual(plans[0]["months"], 1)
         self.assertEqual(plans[0]["hwid_device_limit"], 5)
         self.assertEqual(plans[0]["hwid_device_packages"][0]["device_count"], 1)
         self.assertEqual(plans[1]["sale_mode"], "traffic_package")
+        self.assertFalse(plans[1]["is_default_tariff"])
         self.assertEqual(plans[1]["traffic_gb"], 50.0)
         self.assertEqual(plans[1]["stars_price"], 2500)
+
+    def test_referral_bonus_details_use_custom_tariff_periods(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "tariffs.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "default_tariff": "standard",
+                        "tariffs": [
+                            {
+                                "key": "standard",
+                                "names": {"en": "Standard"},
+                                "descriptions": {"en": "Custom periods"},
+                                "squad_uuids": ["uuid"],
+                                "billing_model": "period",
+                                "monthly_gb": 100,
+                                "prices_rub": {
+                                    "2": 400,
+                                    "4": 800,
+                                    "8": 1600,
+                                    "16": 3200,
+                                },
+                                "prices_stars": {},
+                                "referral_bonus_days_inviter": {
+                                    "2": 5,
+                                    "4": 10,
+                                    "16": 40,
+                                },
+                                "referral_bonus_days_referee": {
+                                    "2": 1,
+                                    "4": 2,
+                                    "8": 4,
+                                },
+                                "enabled_periods": [2, 4, 8, 16],
+                                "enabled": True,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            settings = Settings(
+                _env_file=None,
+                BOT_TOKEN="token",
+                POSTGRES_USER="app_user",
+                POSTGRES_PASSWORD="app_password",
+                TARIFFS_CONFIG_PATH=str(path),
+            )
+
+            details = subscription_webapp._serialize_referral_bonus_details(settings, "en")
+
+        self.assertEqual(
+            details,
+            [
+                {
+                    "id": "standard:2",
+                    "tariff_key": "standard",
+                    "tariff_name": "Standard",
+                    "months": 2,
+                    "title": "2 months",
+                    "inviter_days": 5,
+                    "friend_days": 1,
+                },
+                {
+                    "id": "standard:4",
+                    "tariff_key": "standard",
+                    "tariff_name": "Standard",
+                    "months": 4,
+                    "title": "4 months",
+                    "inviter_days": 10,
+                    "friend_days": 2,
+                },
+                {
+                    "id": "standard:8",
+                    "tariff_key": "standard",
+                    "tariff_name": "Standard",
+                    "months": 8,
+                    "title": "8 months",
+                    "inviter_days": 0,
+                    "friend_days": 4,
+                },
+                {
+                    "id": "standard:16",
+                    "tariff_key": "standard",
+                    "tariff_name": "Standard",
+                    "months": 16,
+                    "title": "16 months",
+                    "inviter_days": 40,
+                    "friend_days": 0,
+                },
+            ],
+        )
+
+    def test_referral_bonus_details_group_multiple_tariffs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "tariffs.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "default_tariff": "standard",
+                        "tariffs": [
+                            {
+                                "key": "standard",
+                                "names": {"en": "Standard"},
+                                "descriptions": {},
+                                "squad_uuids": ["standard"],
+                                "billing_model": "period",
+                                "monthly_gb": 100,
+                                "prices_rub": {"2": 400, "4": 800},
+                                "prices_stars": {},
+                                "referral_bonus_days_inviter": {"2": 5, "4": 10},
+                                "referral_bonus_days_referee": {"2": 1, "4": 2},
+                                "enabled_periods": [2, 4],
+                                "enabled": True,
+                            },
+                            {
+                                "key": "premium",
+                                "names": {"en": "Premium"},
+                                "descriptions": {},
+                                "squad_uuids": ["premium"],
+                                "billing_model": "period",
+                                "monthly_gb": 500,
+                                "prices_rub": {"1": 700, "3": 1800},
+                                "prices_stars": {},
+                                "referral_bonus_days_inviter": {"1": 8, "3": 24},
+                                "referral_bonus_days_referee": {"1": 3, "3": 9},
+                                "enabled_periods": [1, 3],
+                                "enabled": True,
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            settings = Settings(
+                _env_file=None,
+                BOT_TOKEN="token",
+                POSTGRES_USER="app_user",
+                POSTGRES_PASSWORD="app_password",
+                TARIFFS_CONFIG_PATH=str(path),
+            )
+
+            details = subscription_webapp._serialize_referral_bonus_details(settings, "en")
+
+        self.assertEqual([item["type"] for item in details], ["tariff_summary", "tariff_summary"])
+        self.assertEqual(details[0]["title"], "Standard")
+        self.assertEqual(details[0]["inviter_min_days"], 5)
+        self.assertEqual(details[0]["inviter_max_days"], 10)
+        self.assertEqual(details[0]["friend_min_days"], 1)
+        self.assertEqual(details[0]["friend_max_days"], 2)
+        self.assertEqual(
+            [item["title"] for item in details[0]["details"]],
+            ["2 months", "4 months"],
+        )
+        self.assertEqual(details[1]["title"], "Premium")
+        self.assertEqual(details[1]["inviter_min_days"], 8)
+        self.assertEqual(details[1]["inviter_max_days"], 24)
 
     def test_subscription_template_does_not_block_on_telegram_sdk(self):
         html = subscription_webapp.TEMPLATE_PATH.read_text(encoding="utf-8")
@@ -653,6 +812,9 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             YOOKASSA_ENABLED=False,
             CRYPTOPAY_ENABLED=False,
             TARIFFS_CONFIG_PATH="missing-tariffs.json",
+            MONTH_3_ENABLED=False,
+            MONTH_6_ENABLED=False,
+            MONTH_12_ENABLED=False,
             RUB_PRICE_1_MONTH=None,
             STARS_PRICE_1_MONTH=250,
         )

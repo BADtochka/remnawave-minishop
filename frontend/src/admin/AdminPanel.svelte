@@ -389,6 +389,21 @@
     usersStore.openUser(uid, { pathContext: "payments" });
   }
 
+  function openLogsUserCard(userId) {
+    const uid = Number(userId);
+    if (!Number.isFinite(uid) || uid === 0) return;
+    const next = normalizeSection("logs");
+    sidebarOpen = false;
+    if (active !== next) {
+      active = next;
+      paymentsStore.closePayment({ skipPush: true });
+      supportStore.closeTicketView({ skipPush: true });
+      onSectionChange(next);
+    }
+    usersStore.setActive(next);
+    usersStore.openUser(uid, { skipPush: true, pathContext: "logs" });
+  }
+
   function openUserCard(userId) {
     const uid = Number(userId);
     if (!Number.isFinite(uid) || uid === 0) return;
@@ -801,7 +816,7 @@
           {/if}
 
           {#if active === "logs"}
-            <LogsSection {at} {fmtDate} />
+            <LogsSection {at} {fmtDate} onOpenUserCard={openLogsUserCard} />
           {/if}
 
           {#if active === "support"}

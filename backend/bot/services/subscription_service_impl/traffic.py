@@ -269,6 +269,15 @@ class TrafficMixin:
             purchased_bytes=purchase_bytes,
             kind="topup",
         )
+        await self._send_payment_success_email(
+            db_user=db_user,
+            sale_mode="topup",
+            months=0,
+            traffic_gb=float(traffic_gb),
+            payment_amount=payment_amount,
+            end_date=getattr(updated_sub, "end_date", None),
+            provider=provider,
+        )
         return {
             "subscription_id": sub.subscription_id,
             "traffic_limit_bytes": new_limit,
@@ -375,6 +384,15 @@ class TrafficMixin:
             payment_id=payment_db_id,
             purchased_bytes=purchase_bytes,
             kind="premium_topup",
+        )
+        await self._send_payment_success_email(
+            db_user=db_user,
+            sale_mode="premium_topup",
+            months=0,
+            traffic_gb=float(traffic_gb),
+            payment_amount=payment_amount,
+            end_date=getattr(sub, "end_date", None),
+            provider=provider,
         )
         return {
             "subscription_id": sub.subscription_id,

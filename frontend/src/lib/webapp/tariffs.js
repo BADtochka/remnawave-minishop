@@ -21,11 +21,13 @@ export function buildTariffCatalog(planList) {
         (plan?.sale_mode === "traffic_package" || plan?.sale_mode === "traffic"
           ? "traffic"
           : "period"),
+      is_default: Boolean(plan?.is_default_tariff),
       monthly_gb: Number(plan?.monthly_gb || 0),
       traffic_packages: [],
       plans_count: 0,
     };
     if (!entry.description && plan?.description) entry.description = plan.description;
+    if (plan?.is_default_tariff) entry.is_default = true;
     if (!entry.monthly_gb && Number(plan?.monthly_gb || 0) > 0)
       entry.monthly_gb = Number(plan.monthly_gb);
     const trafficGb = Number(plan?.traffic_gb || 0);

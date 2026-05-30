@@ -6,7 +6,7 @@
     AdminEmptyState,
     AdminSelect,
   } from "$components/patterns/admin/index.js";
-  import { Checkbox } from "$components/ui/index.js";
+  import { Checkbox, ColorInput, FileInput, Input, RangeInput } from "$components/ui/index.js";
   import { Switch } from "$components/ui/primitives.js";
   import { getContext, onDestroy, onMount } from "svelte";
 
@@ -444,10 +444,9 @@
 
         <div class="appearance-controls">
           <section class="appearance-control-card">
-            <input
-              bind:this={logoFileInput}
+            <FileInput
+              bind:element={logoFileInput}
               class="appearance-file-input"
-              type="file"
               accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,image/x-icon"
               onchange={handleLogoFileChange}
             />
@@ -461,7 +460,7 @@
               {at("appearance_logo_upload_file", {}, "Загрузить файл")}
             </AdminButton>
             <div class="appearance-url-row">
-              <input
+              <Input
                 class="input appearance-control"
                 type="url"
                 placeholder="https://example.com/logo.png"
@@ -490,7 +489,7 @@
               <span>{at("appearance_use_emoji_logo", {}, "Использовать emoji-логотип")}</span>
             </label>
             <div class="appearance-emoji-grid">
-              <input
+              <Input
                 class="input appearance-control"
                 type="text"
                 maxlength="8"
@@ -547,10 +546,9 @@
                 >{at("appearance_use_custom_favicon", {}, "Использовать отдельную favicon")}</span
               >
             </label>
-            <input
-              bind:this={faviconFileInput}
+            <FileInput
+              bind:element={faviconFileInput}
               class="appearance-file-input"
-              type="file"
               accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,image/x-icon,.ico"
               onchange={handleFaviconFileChange}
             />
@@ -564,7 +562,7 @@
               {at("appearance_favicon_upload_file", {}, "Загрузить favicon")}
             </AdminButton>
             <div class="appearance-url-row">
-              <input
+              <Input
                 class="input appearance-control"
                 type="url"
                 placeholder="https://example.com/icon.png"
@@ -657,18 +655,17 @@
                 </span>
                 <label class="admin-theme-card-option appearance-color-row">
                   <span>{at("appearance_theme_accent", {}, "Accent")}</span>
-                  <input
-                    class="admin-color"
-                    class:is-empty={!isThemeAccentSet(theme)}
-                    type="color"
+                  <ColorInput
+                    class={`admin-color${!isThemeAccentSet(theme) ? " is-empty" : ""}`}
                     value={pickerHex(theme.tokens?.accent)}
+                    ariaLabel={at("appearance_theme_accent", {}, "Accent")}
                     title={isThemeAccentSet(theme)
                       ? theme.tokens?.accent
                       : at("appearance_theme_accent_empty", {}, "Не задан")}
                     onclick={() => openThemeAccentPicker(theme)}
                     oninput={(event) => setThemeAccent(theme, event.currentTarget.value)}
                   />
-                  <input
+                  <Input
                     class="input appearance-color-text"
                     type="text"
                     placeholder={at("appearance_theme_accent_placeholder", {}, "Не задан")}
@@ -693,17 +690,17 @@
                       "Логотип на главной и входе"
                     )}</span
                   >
-                  <input
+                  <RangeInput
                     class="appearance-logo-scale-range"
-                    type="range"
                     min="50"
                     max="300"
                     step="5"
+                    ariaLabel={at("appearance_theme_home_logo_scale", {}, "Home logo scale")}
                     value={homeLogoScale(theme)}
-                    oninput={(event) => setThemeHomeLogoScale(theme, event.currentTarget.value)}
+                    onValueChange={(value) => setThemeHomeLogoScale(theme, value)}
                   />
                   <span class="appearance-logo-scale-value">
-                    <input
+                    <Input
                       class="input"
                       type="number"
                       min="50"
@@ -814,7 +811,7 @@
     background: color-mix(in srgb, var(--admin-surface-2) 40%, transparent);
   }
 
-  .appearance-file-input {
+  :global(.appearance-file-input) {
     display: none;
   }
 
@@ -949,7 +946,7 @@
     width: 100%;
   }
 
-  .appearance-color-text {
+  :global(.appearance-color-text) {
     min-width: 0;
   }
 
@@ -959,7 +956,7 @@
     width: 100%;
   }
 
-  .appearance-logo-scale-range {
+  :global(.appearance-logo-scale-range) {
     width: 100%;
     accent-color: var(--accent);
   }
@@ -971,14 +968,14 @@
     color: var(--admin-text);
   }
 
-  .appearance-logo-scale-value .input {
+  :global(.appearance-logo-scale-value .input) {
     width: 70px;
     min-height: 32px;
     padding: 4px 8px;
     font-size: 12px;
   }
 
-  .admin-color.is-empty {
+  :global(.admin-color.is-empty) {
     opacity: 0.42;
     filter: grayscale(1);
   }

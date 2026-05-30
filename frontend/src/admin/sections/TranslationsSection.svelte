@@ -1,4 +1,5 @@
 <script>
+  import { Input, Textarea } from "$components/ui/index.js";
   import { ChevronRight, Languages, Plus, Search, X } from "$components/ui/icons.js";
   import { AdminBadge, AdminButton, AdminEmptyState } from "$components/patterns/admin/index.js";
   import { getContext, onDestroy, onMount } from "svelte";
@@ -396,7 +397,7 @@
 
     {#if expanded}
       <div class="admin-translation-locale-body" transition:slide={{ duration: 130 }}>
-        <textarea
+        <Textarea
           class="admin-setting-textarea admin-translation-textarea"
           rows="3"
           spellcheck="false"
@@ -404,7 +405,7 @@
           value={localeValue(item, lang, dirtyEntry)}
           oninput={(event) =>
             translationsStore.markDirty(lang, item.key, event.currentTarget.value)}
-        ></textarea>
+        />
         <div class="admin-translation-base">
           <small>{baseKind(item, lang)}</small>
           <span title={baseValue(item, lang)}>{baseValue(item, lang) || "-"}</span>
@@ -457,7 +458,7 @@
   <div class="admin-translations-toolbar">
     <label class="admin-translations-search">
       <Search size={15} />
-      <input
+      <Input
         bind:value={search}
         class="input"
         type="text"
@@ -502,7 +503,7 @@
         addLanguage();
       }}
     >
-      <input
+      <Input
         bind:value={newLanguageCode}
         class="input"
         type="text"

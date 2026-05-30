@@ -1,1 +1,11 @@
-export { Accordion, Label, Select, Separator, Switch, Tabs, Tooltip } from "bits-ui";
+export {
+  Accordion,
+  Label,
+  ScrollArea,
+  Select,
+  Separator,
+  Slider,
+  Switch,
+  Tabs,
+  Tooltip,
+} from "bits-ui";

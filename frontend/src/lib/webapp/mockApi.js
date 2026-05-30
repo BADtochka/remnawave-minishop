@@ -103,6 +103,10 @@ function applyDemoEmailAuthUser() {
       user_id: DEMO_DATASET.currentUser?.user_id || DEMO_DATASET.currentUser?.id || 910001,
       telegram_id: null,
       telegram_linked: false,
+      telegram_notifications_status: "unknown",
+      telegram_notifications_enabled: false,
+      telegram_notifications_need_prompt: false,
+      telegram_notifications_start_link: "https://t.me/preview_bot?start=notifications",
       telegram_photo_url: "",
       avatar_url: "",
       username: DEMO_DATASET.currentUser?.username || "u3252a8",
@@ -181,6 +185,10 @@ function applyDemoTelegramAuthUser(authData = {}) {
       user_id: adminUser.user_id || adminUser.id || 910001,
       telegram_id: telegramId,
       telegram_linked: true,
+      telegram_notifications_status: "needs_start",
+      telegram_notifications_enabled: false,
+      telegram_notifications_need_prompt: true,
+      telegram_notifications_start_link: "https://t.me/preview_bot?start=notifications",
       username,
       first_name: firstName,
       last_name: lastName,
@@ -258,6 +266,10 @@ function applyDemoTelegramLink(authData = {}) {
       user_id: DEV_MOCK.data.user?.user_id || DEV_MOCK.data.user?.id || 910001,
       telegram_id: telegramId,
       telegram_linked: true,
+      telegram_notifications_status: "needs_start",
+      telegram_notifications_enabled: false,
+      telegram_notifications_need_prompt: true,
+      telegram_notifications_start_link: "https://t.me/preview_bot?start=notifications",
       username:
         authData.username ||
         authDemo.telegram_username ||
@@ -1689,17 +1701,25 @@ export async function mockApi(path, options = {}, context = {}) {
             },
             ...[
               ["MONTH_1_ENABLED", "bool", true],
-              ["RUB_PRICE_1_MONTH", "float", 150],
+              ["RUB_PRICE_1_MONTH", "float", 200],
               ["STARS_PRICE_1_MONTH", "int", 0],
+              ["REFERRAL_BONUS_DAYS_INVITER_1_MONTH", "int", 3],
+              ["REFERRAL_BONUS_DAYS_REFEREE_1_MONTH", "int", 1],
               ["MONTH_3_ENABLED", "bool", true],
-              ["RUB_PRICE_3_MONTHS", "float", 400],
+              ["RUB_PRICE_3_MONTHS", "float", 600],
               ["STARS_PRICE_3_MONTHS", "int", 0],
+              ["REFERRAL_BONUS_DAYS_INVITER_3_MONTHS", "int", 7],
+              ["REFERRAL_BONUS_DAYS_REFEREE_3_MONTHS", "int", 3],
               ["MONTH_6_ENABLED", "bool", false],
-              ["RUB_PRICE_6_MONTHS", "float", 750],
+              ["RUB_PRICE_6_MONTHS", "float", 1200],
               ["STARS_PRICE_6_MONTHS", "int", 0],
+              ["REFERRAL_BONUS_DAYS_INVITER_6_MONTHS", "int", 15],
+              ["REFERRAL_BONUS_DAYS_REFEREE_6_MONTHS", "int", 7],
               ["MONTH_12_ENABLED", "bool", false],
-              ["RUB_PRICE_12_MONTHS", "float", 1200],
+              ["RUB_PRICE_12_MONTHS", "float", 2400],
               ["STARS_PRICE_12_MONTHS", "int", 0],
+              ["REFERRAL_BONUS_DAYS_INVITER_12_MONTHS", "int", 30],
+              ["REFERRAL_BONUS_DAYS_REFEREE_12_MONTHS", "int", 15],
               ["TRAFFIC_PACKAGES", "string", "10:99,50:399"],
               ["STARS_TRAFFIC_PACKAGES", "string", ""],
             ].map(([key, type, value]) => ({
@@ -1982,6 +2002,27 @@ export async function mockApi(path, options = {}, context = {}) {
     const body = jsonBody(options);
     applyDemoTelegramLink(body.auth_data || {});
     return { ok: true, csrf_token: "local-preview-csrf" };
+  }
+  if (
+    path === "/account/telegram/notifications/probe" &&
+    String(options.method || "").toUpperCase() === "POST"
+  ) {
+    DEV_MOCK.data.user = {
+      ...(DEV_MOCK.data.user || {}),
+      telegram_notifications_status: "enabled",
+      telegram_notifications_enabled: true,
+      telegram_notifications_need_prompt: false,
+      telegram_notifications_start_link: "https://t.me/preview_bot?start=notifications",
+    };
+    return {
+      ok: true,
+      telegram_notifications: {
+        ok: true,
+        status: "enabled",
+        enabled: true,
+        start_link: "https://t.me/preview_bot?start=notifications",
+      },
+    };
   }
   if (path === "/payments" && String(options.method || "").toUpperCase() === "POST") {
     const body = jsonBody(options);

@@ -11,7 +11,7 @@
   import { TicketMessageBubble } from "$components/patterns/webapp/index.js";
   import Dialog from "$components/ui/dialog.svelte";
   import { Search } from "$components/ui/icons.js";
-  import { ScrollArea, Skeleton } from "$components/ui/index.js";
+  import { Input, ScrollArea, Skeleton } from "$components/ui/index.js";
 
   export let at = (key) => key;
   export let initialTicketId = null;
@@ -215,7 +215,7 @@
     <div class="support-admin-toolbar admin-toolbar-card">
       <label class="support-admin-search">
         <Search size={16} />
-        <input
+        <Input
           class="input"
           type="search"
           placeholder={at("support_search", {}, "Поиск")}
@@ -269,16 +269,18 @@
     {:else if !tickets.length}
       <div class="admin-empty-state">{at("support_empty", {}, "Тикетов пока нет")}</div>
     {:else}
-      <div class="support-inbox-list">
-        {#each tickets as ticket}
-          <SupportInboxRow
-            {ticket}
-            active={openedTicketId === ticket.ticket_id}
-            {at}
-            onOpen={(item) => supportStore.openTicket(item.ticket_id)}
-          />
-        {/each}
-      </div>
+      <ScrollArea class="support-inbox-list" maxHeight="none">
+        <div class="support-inbox-list-inner">
+          {#each tickets as ticket}
+            <SupportInboxRow
+              {ticket}
+              active={openedTicketId === ticket.ticket_id}
+              {at}
+              onOpen={(item) => supportStore.openTicket(item.ticket_id)}
+            />
+          {/each}
+        </div>
+      </ScrollArea>
     {/if}
   </section>
 </div>

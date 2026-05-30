@@ -70,6 +70,28 @@ class TariffsConfigTests(unittest.TestCase):
         self.assertIsNotNone(packages)
         self.assertEqual(packages.rub[0].gb, 25)
 
+    def test_period_tariff_referral_bonuses_load(self):
+        data = _valid_config()
+        data["tariffs"][0]["referral_bonus_days_inviter"] = {"2": 5, "4": 10}
+        data["tariffs"][0]["referral_bonus_days_referee"] = {"2": 1, "4": 2}
+        data["tariffs"][0]["prices_rub"] = {"2": 400, "4": 800}
+        data["tariffs"][0]["prices_stars"] = {}
+        data["tariffs"][0]["enabled_periods"] = [2, 4]
+
+        config = TariffsConfig.model_validate(data)
+        tariff = config.require("standard")
+
+        self.assertEqual(tariff.referral_inviter_bonus_days(2), 5)
+        self.assertEqual(tariff.referral_referee_bonus_days(4), 2)
+        self.assertIsNone(tariff.referral_inviter_bonus_days(8))
+
+    def test_negative_tariff_referral_bonus_rejected(self):
+        data = _valid_config()
+        data["tariffs"][0]["referral_bonus_days_inviter"] = {"1": -1}
+
+        with self.assertRaises(ValueError):
+            TariffsConfig.model_validate(data)
+
     def test_missing_config_returns_none(self):
         import tempfile
         from pathlib import Path

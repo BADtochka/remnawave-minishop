@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -15,8 +14,22 @@ from bot.infra.redis import redis_lock
 from bot.keyboards.inline.user_keyboards import get_subscribe_only_markup
 from bot.middlewares.i18n import JsonI18n
 from bot.services.panel_api_service import PanelApiService
+from bot.services.subscription_lifecycle_notifications import (
+    SubscriptionLifecycleNotificationService,
+    SubscriptionNotificationStage,
+)
 from bot.services.subscription_service import SubscriptionService
+from bot.services.telegram_notifications import (
+    TELEGRAM_NOTIFICATIONS_BLOCKED,
+    TELEGRAM_NOTIFICATIONS_ENABLED,
+    TELEGRAM_NOTIFICATIONS_NEEDS_START,
+    mark_telegram_notifications_status,
+    normalize_telegram_notification_status,
+    telegram_notification_status_from_error,
+)
+from bot.services.user_email_notifications import send_user_notification_email
 from config.settings import Settings
+from db.advisory_locks import acquire_subscription_background_sync_lock
 from db.dal import subscription_dal
 from db.models import Subscription
 
@@ -24,13 +37,6 @@ SUBSCRIPTION_NOTIFICATION_LOCK = "subscription-notification-worker"
 DEFAULT_SUBSCRIPTION_NOTIFICATION_TICK_SECONDS = 300
 EXPIRED_NOTIFICATION_WINDOW = timedelta(hours=24)
 EXPIRED_AFTER_NOTIFICATION_WINDOW = timedelta(hours=48)
-
-
-@dataclass(frozen=True)
-class SubscriptionNotificationStage:
-    key: str
-    message_key: str
-    hours_before: Optional[int] = None
 
 
 class SubscriptionNotificationWorker:
@@ -49,6 +55,11 @@ class SubscriptionNotificationWorker:
         self.i18n = i18n
         self.panel_service = panel_service
         self.subscription_service = subscription_service
+        self.lifecycle_notifications = SubscriptionLifecycleNotificationService(
+            settings,
+            bot,
+            i18n,
+        )
         self._stopped = asyncio.Event()
 
     async def run(self) -> None:
@@ -66,6 +77,7 @@ class SubscriptionNotificationWorker:
                     else:
                         started = time.monotonic()
                         async with self.session_factory() as session:
+                            await acquire_subscription_background_sync_lock(session)
                             await self.expiry_tick(session)
                             await self.trial_traffic_tick(session)
                             await session.commit()
@@ -114,18 +126,10 @@ class SubscriptionNotificationWorker:
             stage = self.stage_for_subscription(sub, now)
             if stage is None:
                 continue
-            if await subscription_dal.has_subscription_notification(
+            await self.lifecycle_notifications.send_stage(
                 session,
-                sub.subscription_id,
-                stage.key,
-            ):
-                continue
-            if not await self._send_expiry_notification(sub, stage):
-                continue
-            await subscription_dal.record_subscription_notification(
-                session,
-                sub.subscription_id,
-                stage.key,
+                sub,
+                stage,
                 sent_at=now,
             )
 
@@ -164,6 +168,7 @@ class SubscriptionNotificationWorker:
                     return SubscriptionNotificationStage(
                         key=f"before_{days_before}d",
                         message_key=message_key,
+                        days_left=days_before,
                     )
             return None
 
@@ -175,6 +180,7 @@ class SubscriptionNotificationWorker:
             return SubscriptionNotificationStage(
                 key="expired",
                 message_key="subscription_expired_notification",
+                days_left=0,
             )
         if (
             getattr(self.settings, "SUBSCRIPTION_NOTIFY_AFTER_EXPIRE", True)
@@ -183,6 +189,7 @@ class SubscriptionNotificationWorker:
             return SubscriptionNotificationStage(
                 key="expired_24h_after",
                 message_key="subscription_expired_yesterday_notification",
+                days_left=0,
             )
         return None
 
@@ -208,11 +215,22 @@ class SubscriptionNotificationWorker:
             .order_by(Subscription.end_date.asc())
         )
         for sub in result.scalars().all():
-            if await subscription_dal.has_subscription_notification(
+            legacy_sent = await subscription_dal.has_subscription_notification(
                 session,
                 sub.subscription_id,
                 "trial_traffic_depleted",
-            ):
+            )
+            telegram_done = legacy_sent or await subscription_dal.has_subscription_notification(
+                session,
+                sub.subscription_id,
+                "trial_traffic_depleted:telegram",
+            )
+            email_done = await subscription_dal.has_subscription_notification(
+                session,
+                sub.subscription_id,
+                "trial_traffic_depleted:email",
+            )
+            if telegram_done and email_done:
                 continue
 
             used = int(getattr(sub, "traffic_used_bytes", 0) or 0)
@@ -234,14 +252,30 @@ class SubscriptionNotificationWorker:
 
             if limit <= 0 or used < limit:
                 continue
-            if not await self._send_trial_traffic_depleted(sub, used=used, limit=limit):
-                continue
-            await subscription_dal.record_subscription_notification(
+            delivery = await self._send_trial_traffic_depleted(
                 session,
-                sub.subscription_id,
-                "trial_traffic_depleted",
-                sent_at=now,
+                sub,
+                used=used,
+                limit=limit,
+                send_telegram=not telegram_done,
+                send_email=not email_done,
             )
+            if not delivery["telegram"] and not delivery["email"]:
+                continue
+            if delivery["telegram"]:
+                await subscription_dal.record_subscription_notification(
+                    session,
+                    sub.subscription_id,
+                    "trial_traffic_depleted:telegram",
+                    sent_at=now,
+                )
+            if delivery["email"]:
+                await subscription_dal.record_subscription_notification(
+                    session,
+                    sub.subscription_id,
+                    "trial_traffic_depleted:email",
+                    sent_at=now,
+                )
 
     async def _panel_user(self, sub: Subscription) -> Optional[dict]:
         panel_uuid = str(getattr(sub, "panel_user_uuid", "") or "").strip()
@@ -257,68 +291,72 @@ class SubscriptionNotificationWorker:
             return None
         return data if isinstance(data, dict) else None
 
-    async def _send_expiry_notification(
-        self,
-        sub: Subscription,
-        stage: SubscriptionNotificationStage,
-    ) -> bool:
-        user_id = int(getattr(sub, "user_id", 0) or 0)
-        if user_id <= 0:
-            return False
-        user = getattr(sub, "user", None)
-        lang = getattr(user, "language_code", None) or self.settings.DEFAULT_LANGUAGE
-        user_name = getattr(user, "first_name", None) or f"User {user_id}"
-        end_date = self._as_utc(getattr(sub, "end_date", None))
-        end_date_text = end_date.strftime("%Y-%m-%d") if end_date else ""
-        translate = lambda k, **kw: self.i18n.gettext(lang, k, **kw)
-        kwargs = {"user_name": user_name, "end_date": end_date_text}
-        if stage.hours_before is not None:
-            kwargs["hours"] = stage.hours_before
-        try:
-            await self.bot.send_message(
-                user_id,
-                translate(stage.message_key, **kwargs),
-                reply_markup=get_subscribe_only_markup(lang, self.i18n),
-            )
-            return True
-        except Exception:
-            logging.exception(
-                "Failed to send subscription notification %s to user %s",
-                stage.key,
-                user_id,
-            )
-            return False
-
     async def _send_trial_traffic_depleted(
         self,
+        session: AsyncSession,
         sub: Subscription,
         *,
         used: int,
         limit: int,
-    ) -> bool:
+        send_telegram: bool = True,
+        send_email: bool = True,
+    ) -> dict[str, bool]:
         user_id = int(getattr(sub, "user_id", 0) or 0)
-        if user_id <= 0:
-            return False
         user = getattr(sub, "user", None)
         lang = getattr(user, "language_code", None) or self.settings.DEFAULT_LANGUAGE
         translate = lambda k, **kw: self.i18n.gettext(lang, k, **kw)
         remaining = max(0, limit - used)
-        try:
-            await self.bot.send_message(
-                user_id,
-                translate(
-                    "trial_traffic_depleted_notification",
-                    used=hd.quote(self._fmt_bytes(used)),
-                    remaining=hd.quote(self._fmt_bytes(remaining)),
-                    limit_total=hd.quote(self._fmt_bytes(limit)),
-                ),
-                reply_markup=get_subscribe_only_markup(lang, self.i18n),
-                parse_mode="HTML",
+        message_text = translate(
+            "trial_traffic_depleted_notification",
+            used=hd.quote(self._fmt_bytes(used)),
+            remaining=hd.quote(self._fmt_bytes(remaining)),
+            limit_total=hd.quote(self._fmt_bytes(limit)),
+        )
+        telegram_sent = False
+        email_sent = False
+        telegram_chat_id = int(getattr(user, "telegram_id", 0) or user_id or 0)
+        telegram_status = normalize_telegram_notification_status(
+            getattr(user, "telegram_notifications_status", None)
+        )
+        can_try_telegram = telegram_status not in {
+            TELEGRAM_NOTIFICATIONS_NEEDS_START,
+            TELEGRAM_NOTIFICATIONS_BLOCKED,
+        }
+        if send_telegram and telegram_chat_id > 0 and can_try_telegram:
+            try:
+                await self.bot.send_message(
+                    telegram_chat_id,
+                    message_text,
+                    reply_markup=get_subscribe_only_markup(lang, self.i18n),
+                    parse_mode="HTML",
+                )
+                telegram_sent = True
+            except Exception as exc:
+                status = telegram_notification_status_from_error(exc)
+                if status and user and user_id:
+                    await mark_telegram_notifications_status(session, user_id, status)
+                logging.exception(
+                    "Failed to send trial traffic depleted warning to user %s",
+                    telegram_chat_id,
+                )
+            else:
+                if user and telegram_status != TELEGRAM_NOTIFICATIONS_ENABLED and user_id:
+                    await mark_telegram_notifications_status(
+                        session,
+                        user_id,
+                        TELEGRAM_NOTIFICATIONS_ENABLED,
+                        telegram_id=telegram_chat_id,
+                    )
+        if send_email and user:
+            email_sent = await send_user_notification_email(
+                settings=self.settings,
+                i18n=self.i18n,
+                user=user,
+                subject_key="email_trial_traffic_depleted_subject",
+                message_text=message_text,
+                dashboard_url=(getattr(self.settings, "SUBSCRIPTION_MINI_APP_URL", "") or None),
             )
-            return True
-        except Exception:
-            logging.exception("Failed to send trial traffic depleted warning to user %s", user_id)
-            return False
+        return {"telegram": telegram_sent, "email": email_sent}
 
     def _max_before_window(self) -> timedelta:
         days_before = max(0, int(getattr(self.settings, "SUBSCRIPTION_NOTIFY_DAYS_BEFORE", 0) or 0))

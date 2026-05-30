@@ -913,6 +913,14 @@ a {
   color: var(--accent);
 }
 
+.devices-inactive-card {
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--border));
+}
+
+.devices-inactive-card svg {
+  color: var(--danger);
+}
+
 .action-stack {
   display: grid;
   gap: 8px;
@@ -1537,6 +1545,89 @@ a {
   font-size: 12px;
 }
 
+.referral-tariff-dropdown {
+  display: grid;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-sheen-soft);
+}
+
+.referral-tariff-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 11px;
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.referral-tariff-summary::-webkit-details-marker {
+  display: none;
+}
+
+.referral-tariff-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.referral-tariff-copy strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.referral-tariff-copy small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.referral-tariff-dropdown summary:hover .premium-server-help-icon,
+.referral-tariff-dropdown[open] .premium-server-help-icon {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.referral-tariff-details {
+  display: grid;
+  grid-template-rows: 0fr;
+  padding: 0 8px;
+  opacity: 0;
+  transform: translateY(-2px);
+  transform-origin: top;
+  transition:
+    grid-template-rows 0.22s ease,
+    padding 0.22s ease,
+    opacity 0.18s ease,
+    transform 0.22s ease;
+}
+
+.referral-tariff-details > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.referral-tariff-detail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.referral-tariff-dropdown[open] .referral-tariff-details {
+  grid-template-rows: 1fr;
+  padding: 0 8px 8px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.referral-bonus-row-nested {
+  background: var(--surface);
+}
+
 .settings-profile {
   display: flex;
   align-items: center;
@@ -1864,6 +1955,78 @@ a {
 
 .settings-telegram-link-btn {
   justify-content: center;
+}
+
+.telegram-notifications-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border-color: color-mix(in srgb, #ff4b4b 46%, var(--border));
+  background:
+    linear-gradient(135deg, rgba(255, 75, 75, 0.11), rgba(0, 254, 122, 0.05)), var(--card);
+}
+
+.home-layout > .telegram-notifications-card {
+  align-self: end;
+}
+
+.telegram-notifications-dot {
+  top: 9px;
+  right: 9px;
+  transform: none;
+}
+
+.telegram-notifications-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, #ff4b4b 16%, var(--surface));
+  color: #ff6b6b;
+}
+
+.telegram-notifications-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.telegram-notifications-copy strong {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.telegram-notifications-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.telegram-notifications-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.telegram-notifications-actions .btn {
+  min-width: 0;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.telegram-notifications-actions .btn svg {
+  flex: 0 0 auto;
+}
+
+.telegram-notifications-primary {
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .attention-wrap {

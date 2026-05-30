@@ -30,12 +30,14 @@
   </Select.Trigger>
   <Select.Portal>
     <Select.Content class="admin-select-content" {sideOffset}>
-      {#each items as item (item.value)}
-        <Select.Item value={item.value} label={item.label} class="admin-select-item">
-          <span>{item.label}</span>
-          <Check size={14} class="admin-select-item-check" />
-        </Select.Item>
-      {/each}
+      <Select.Viewport class="admin-select-viewport">
+        {#each items as item (item.value)}
+          <Select.Item value={item.value} label={item.label} class="admin-select-item">
+            <span>{item.label}</span>
+            <Check size={14} class="admin-select-item-check" />
+          </Select.Item>
+        {/each}
+      </Select.Viewport>
     </Select.Content>
   </Select.Portal>
 </Select.Root>

@@ -18,10 +18,10 @@ export function emptyTariffDraft() {
     hwid_device_limit: "",
     conversion_rate_rub_per_gb: "",
     periodRows: [
-      { months: 1, rub: 150, stars: "" },
-      { months: 3, rub: 400, stars: "" },
-      { months: 6, rub: 750, stars: "" },
-      { months: 12, rub: 1400, stars: "" },
+      { months: 1, rub: 200, stars: "", referral_inviter: 3, referral_referee: 1 },
+      { months: 3, rub: 600, stars: "", referral_inviter: 7, referral_referee: 3 },
+      { months: 6, rub: 1200, stars: "", referral_inviter: 15, referral_referee: 7 },
+      { months: 12, rub: 2400, stars: "", referral_inviter: 30, referral_referee: 15 },
     ],
     topupRubRows: [],
     topupStarsRows: [],
@@ -67,6 +67,8 @@ export function draftFromTariff(tariff) {
       months: month,
       rub: tariff.prices_rub?.[String(month)] ?? "",
       stars: tariff.prices_stars?.[String(month)] ?? "",
+      referral_inviter: tariff.referral_bonus_days_inviter?.[String(month)] ?? "",
+      referral_referee: tariff.referral_bonus_days_referee?.[String(month)] ?? "",
     }));
 
   return {
@@ -190,6 +192,8 @@ export function tariffFromDraft(draft) {
         months: parseIntNumber(row.months),
         rub: parseNumber(row.rub, 0),
         stars: parseNumber(row.stars, 0),
+        referral_inviter: parseIntNumber(row.referral_inviter),
+        referral_referee: parseIntNumber(row.referral_referee),
       }))
       .filter((row) => row.months > 0)
       .filter((row) => {
@@ -203,6 +207,16 @@ export function tariffFromDraft(draft) {
     tariff.prices_rub = Object.fromEntries(rows.map((row) => [String(row.months), row.rub || 0]));
     tariff.prices_stars = Object.fromEntries(
       rows.map((row) => [String(row.months), row.stars || 0])
+    );
+    tariff.referral_bonus_days_inviter = Object.fromEntries(
+      rows
+        .filter((row) => row.referral_inviter !== null)
+        .map((row) => [String(row.months), row.referral_inviter])
+    );
+    tariff.referral_bonus_days_referee = Object.fromEntries(
+      rows
+        .filter((row) => row.referral_referee !== null)
+        .map((row) => [String(row.months), row.referral_referee])
     );
     const topupPackages = packageSetFromRows(draft.topupRubRows, draft.topupStarsRows, "gb");
     if (topupPackages) tariff.topup_packages = topupPackages;

@@ -92,6 +92,8 @@ docker compose logs -f backend worker frontend
 - `PANEL_API_URL`, `PANEL_API_KEY`, `PANEL_WEBHOOK_SECRET` - доступ к Remnawave;
 - остальные настройки удобнее задать в Web App админке.
 
+В Remnawave Panel укажите `WEBHOOK_URL` как публичный адрес Minishop с путем `/webhook/panel`, например `https://app.example.com/webhook/panel`. Секрет вебхука задается в самой Remnawave Panel; это же значение вставьте в `PANEL_WEBHOOK_SECRET` в `.env` или в **Система -> Настройки -> Remnawave Panel** в админке.
+
 После первого входа в админку настройте тарифы, платежные провайдеры, внешний вид, поддержку, уведомления и инструкции подключения через UI. Инструкции установки включены по умолчанию, читают Subscription Page config из Remnawave Panel и при проблемах с конфигом откатываются к обычной ссылке подключения. Полный справочник env-переменных: [docs/configuration/env-vars.md](docs/configuration/env-vars.md).
 
 Для каталога тарифов используется `TARIFFS_CONFIG_PATH` со значением по умолчанию `data/tariffs.json`. Пример формата лежит в [data/tariffs.example.json](data/tariffs.example.json), подробности - в [docs/features/tariffs.md](docs/features/tariffs.md).

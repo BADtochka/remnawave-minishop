@@ -1,4 +1,5 @@
 <script>
+  import { Input } from "$components/ui/index.js";
   import { Trash2 } from "$components/ui/icons.js";
   import { getContext, onMount } from "svelte";
   import Dialog from "$components/ui/dialog.svelte";
@@ -110,7 +111,7 @@
   <div class="admin-form" data-dialog-content>
     <div class="admin-dialog-form-section">
       <AdminField label={at("promo_label_code", {}, "Код")}>
-        <input
+        <Input
           type="text"
           class="input"
           value={promoDraft.code}
@@ -122,7 +123,7 @@
     <div class="admin-dialog-form-section">
       <div class="admin-form-row-2">
         <AdminField label={at("promo_label_bonus_days", {}, "Бонус (дней)")}>
-          <input
+          <Input
             type="number"
             class="input"
             min="1"
@@ -131,7 +132,7 @@
           />
         </AdminField>
         <AdminField label={at("promo_label_max_activations", {}, "Макс. активаций")}>
-          <input
+          <Input
             type="number"
             class="input"
             min="1"
@@ -141,7 +142,7 @@
         </AdminField>
       </div>
       <AdminField label={at("promo_label_valid_days", {}, "Срок действия (дней от текущего)")}>
-        <input
+        <Input
           type="number"
           class="input"
           min="1"

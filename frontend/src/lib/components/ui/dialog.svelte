@@ -5,6 +5,7 @@
   import { onMount } from "svelte";
   import { fade, fly } from "svelte/transition";
   import Button from "./button.svelte";
+  import ScrollArea from "./scroll-area.svelte";
 
   export let open = false;
   export let title = "";
@@ -65,7 +66,9 @@
           <X size={18} />
         </Button>
       </div>
-      <slot />
+      <ScrollArea class="dialog-body-scroll" maxHeight="none">
+        <slot />
+      </ScrollArea>
     </section>
   </div>
 {/if}

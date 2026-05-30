@@ -3,6 +3,175 @@ from ._runtime import *  # noqa: F403,F405
 
 
 class SubscriptionLifecycleMixin:
+    async def _lookup_panel_user_for_subscription_details(
+        self,
+        panel_user_uuid: str,
+    ) -> Tuple[Optional[Dict[str, Any]], bool, str]:
+        lookup_method = getattr(self.panel_service, "get_user_by_uuid_lookup", None)
+        if callable(lookup_method):
+            try:
+                lookup = await lookup_method(panel_user_uuid, log_response=False)
+            except TypeError:
+                try:
+                    lookup = await lookup_method(panel_user_uuid)
+                except Exception as exc:
+                    logging.exception(
+                        "Failed to fetch panel user %s for subscription details",
+                        panel_user_uuid,
+                    )
+                    return None, False, self._panel_lookup_exception_reason(exc)
+            except Exception as exc:
+                logging.exception(
+                    "Failed to fetch panel user %s for subscription details",
+                    panel_user_uuid,
+                )
+                return None, False, self._panel_lookup_exception_reason(exc)
+
+            if isinstance(lookup, dict) and ("ok" in lookup or "not_found" in lookup):
+                user = lookup.get("user")
+                if lookup.get("ok") and isinstance(user, dict):
+                    return user, False, ""
+                reason = str(lookup.get("failure_reason") or "classification=panel_lookup_failed")
+                return None, bool(lookup.get("not_found")), reason
+
+        try:
+            panel_user = await self.panel_service.get_user_by_uuid(panel_user_uuid)
+        except Exception as exc:
+            logging.exception(
+                "Failed to fetch panel user %s for subscription details",
+                panel_user_uuid,
+            )
+            return None, False, self._panel_lookup_exception_reason(exc)
+        return (panel_user if isinstance(panel_user, dict) else None), False, ""
+
+    @staticmethod
+    def _panel_lookup_exception_reason(exc: Exception) -> str:
+        message = str(exc).replace("\n", " ").strip()
+        if len(message) > 300:
+            message = f"{message[:300]}..."
+        reason = f"classification=panel_lookup_failed exception={type(exc).__name__}"
+        if message:
+            reason = f"{reason} message={message}"
+        return reason
+
+    @staticmethod
+    def _display_datetime_text(value: Optional[Any]) -> Optional[str]:
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            normalized = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+            return normalized.strftime("%d.%m.%Y %H:%M")
+        return str(value)
+
+    @staticmethod
+    def _device_topup_renewal_available(
+        extra_hwid_devices: int,
+        extra_hwid_valid_until: Optional[Any],
+        subscription_end_date: Optional[Any],
+    ) -> bool:
+        if not isinstance(extra_hwid_valid_until, datetime) or not isinstance(
+            subscription_end_date, datetime
+        ):
+            return False
+        valid_until = (
+            extra_hwid_valid_until
+            if extra_hwid_valid_until.tzinfo
+            else extra_hwid_valid_until.replace(tzinfo=timezone.utc)
+        )
+        end_date = (
+            subscription_end_date
+            if subscription_end_date.tzinfo
+            else subscription_end_date.replace(tzinfo=timezone.utc)
+        )
+        return bool(int(extra_hwid_devices or 0) > 0 and valid_until < end_date)
+
+    async def _local_active_subscription_details_fallback(
+        self,
+        db_user: User,
+        local_active_sub: Subscription,
+    ) -> Dict[str, Any]:
+        panel_sub_id = str(local_active_sub.panel_subscription_uuid or "").strip()
+        config_link_raw = (
+            await self.panel_service.get_subscription_link(panel_sub_id) if panel_sub_id else None
+        )
+        display_link, connect_button_url = await prepare_config_links(
+            self.settings,
+            config_link_raw,
+        )
+        tariff = None
+        if local_active_sub.tariff_key and self._tariffs_config():
+            try:
+                tariff = self._resolve_tariff(local_active_sub.tariff_key)
+            except Exception:
+                tariff = None
+        language = db_user.language_code or self.settings.DEFAULT_LANGUAGE
+        premium_access = (
+            await self.premium_access_for_tariff(tariff)
+            if tariff
+            else {"squad_uuids": [], "squad_labels": [], "node_labels": []}
+        )
+        premium_baseline = int(local_active_sub.premium_baseline_bytes or 0)
+        premium_topup_balance = int(local_active_sub.premium_topup_balance_bytes or 0)
+        premium_topup_used = int(getattr(local_active_sub, "premium_topup_used_bytes", 0) or 0)
+        premium_bonus_bytes = int(getattr(local_active_sub, "premium_bonus_bytes", 0) or 0)
+        return {
+            "user_id": db_user.panel_user_uuid,
+            "panel_subscription_uuid": local_active_sub.panel_subscription_uuid,
+            "panel_short_uuid": local_active_sub.panel_subscription_uuid,
+            "end_date": local_active_sub.end_date,
+            "status_from_panel": local_active_sub.status_from_panel or "LOCAL_CACHE",
+            "config_link": display_link,
+            "connect_button_url": connect_button_url,
+            "traffic_limit_bytes": local_active_sub.traffic_limit_bytes,
+            "traffic_used_bytes": local_active_sub.traffic_used_bytes,
+            "traffic_limit_strategy": "",
+            "tariff_key": local_active_sub.tariff_key,
+            "tariff_name": tariff.name(language) if tariff else None,
+            "tariff_description": tariff.description(language) if tariff else None,
+            "premium_title": tariff.premium_name(language) if tariff else None,
+            "billing_model": tariff.billing_model
+            if tariff
+            else ("traffic" if getattr(self.settings, "traffic_sale_mode", False) else "period"),
+            "tier_baseline_bytes": local_active_sub.tier_baseline_bytes,
+            "topup_balance_bytes": local_active_sub.topup_balance_bytes,
+            "regular_bonus_bytes": int(getattr(local_active_sub, "regular_bonus_bytes", 0) or 0),
+            "regular_unlimited_override": bool(
+                getattr(local_active_sub, "regular_unlimited_override", False)
+            ),
+            "premium_baseline_bytes": premium_baseline,
+            "premium_topup_balance_bytes": premium_topup_balance,
+            "premium_topup_used_bytes": premium_topup_used,
+            "premium_used_bytes": local_active_sub.premium_used_bytes,
+            "premium_bonus_bytes": premium_bonus_bytes,
+            "premium_unlimited_override": bool(
+                getattr(local_active_sub, "premium_unlimited_override", False)
+            ),
+            "premium_limit_bytes": self._premium_effective_limit_bytes(
+                premium_baseline,
+                premium_topup_balance,
+                premium_topup_used,
+                premium_bonus_bytes,
+            ),
+            "premium_is_limited": bool(local_active_sub.premium_is_limited),
+            "premium_period_start_at": getattr(local_active_sub, "premium_period_start_at", None),
+            "premium_squad_labels": premium_access.get("squad_labels") or [],
+            "premium_node_labels": premium_access.get("node_labels") or [],
+            "period_start_at": local_active_sub.period_start_at,
+            "is_throttled": bool(local_active_sub.is_throttled),
+            "base_hwid_device_limit": local_active_sub.hwid_device_limit,
+            "extra_hwid_devices": int(local_active_sub.extra_hwid_devices or 0),
+            "extra_hwid_devices_valid_until": None,
+            "extra_hwid_devices_valid_until_text": None,
+            "extra_hwid_devices_next_valid_from": None,
+            "device_topup_renewal_available": False,
+            "user_bot_username": db_user.username,
+            "is_panel_data": False,
+            "max_devices": self._effective_hwid_limit(
+                local_active_sub.hwid_device_limit,
+                int(local_active_sub.extra_hwid_devices or 0),
+            ),
+        }
+
     async def switch_tariff_without_payment(
         self,
         session: AsyncSession,
@@ -308,6 +477,17 @@ class SubscriptionLifecycleMixin:
                     )
                     result["end_date"] = sub.end_date
                     result["is_active"] = sub.is_active
+                    db_user = await user_dal.get_user_by_id(session, user_id)
+                    if db_user:
+                        await self._send_payment_success_email(
+                            db_user=db_user,
+                            sale_mode="tariff_upgrade",
+                            months=0,
+                            traffic_gb=None,
+                            payment_amount=payment_amount,
+                            end_date=sub.end_date,
+                            provider=provider,
+                        )
             return result
 
         tariff = self._resolve_tariff(tariff_key, "period") if self._tariffs_config() else None
@@ -568,6 +748,9 @@ class SubscriptionLifecycleMixin:
         active_sub = await subscription_dal.get_active_subscription_by_user_id(
             session, user_id, panel_uuid
         )
+        preserve_tariff_limits = bool(
+            active_sub and active_sub.tariff_key and self._tariffs_config()
+        )
         if not active_sub or not active_sub.end_date:
             logging.info(
                 f"No active subscription found for user {user_id}. Creating new one for {bonus_days} days."  # noqa: E501
@@ -612,6 +795,7 @@ class SubscriptionLifecycleMixin:
 
             if (
                 apply_main_traffic_limit
+                and not preserve_tariff_limits
                 and updated_sub_model
                 and updated_sub_model.traffic_limit_bytes != self.settings.user_traffic_limit_bytes
             ):
@@ -626,7 +810,9 @@ class SubscriptionLifecycleMixin:
             panel_update_payload = self._build_panel_update_payload(
                 expire_at=new_end_date_obj,
                 traffic_limit_bytes=(
-                    self.settings.user_traffic_limit_bytes if apply_main_traffic_limit else None
+                    self.settings.user_traffic_limit_bytes
+                    if apply_main_traffic_limit and not preserve_tariff_limits
+                    else None
                 ),
                 include_uuid=False,
                 include_default_squads=False,
@@ -663,14 +849,36 @@ class SubscriptionLifecycleMixin:
         local_active_sub = await subscription_dal.get_active_subscription_by_user_id(
             session, user_id, panel_user_uuid
         )
-        panel_user_data = await self.panel_service.get_user_by_uuid(panel_user_uuid)
+        (
+            panel_user_data,
+            panel_user_confirmed_absent,
+            panel_lookup_failure_reason,
+        ) = await self._lookup_panel_user_for_subscription_details(panel_user_uuid)
 
         if not panel_user_data:
+            if panel_user_confirmed_absent:
+                logging.warning(
+                    "Panel user %s confirmed absent on panel for user %s. "
+                    "Clearing local linkage. reason=%s",
+                    panel_user_uuid,
+                    user_id,
+                    panel_lookup_failure_reason,
+                )
+                await subscription_dal.deactivate_all_user_subscriptions(session, user_id)
+                await user_dal.update_user(session, user_id, {"panel_user_uuid": None})
+                return None
             logging.warning(
-                f"Panel user {panel_user_uuid} not found on panel for user {user_id}. Clearing local linkage."  # noqa: E501
+                "Panel user %s lookup failed for user %s; treating it as a panel access/API "
+                "problem and preserving local linkage/subscription. reason=%s",
+                panel_user_uuid,
+                user_id,
+                panel_lookup_failure_reason,
             )
-            await subscription_dal.deactivate_all_user_subscriptions(session, user_id)
-            await user_dal.update_user(session, user_id, {"panel_user_uuid": None})
+            if local_active_sub:
+                return await self._local_active_subscription_details_fallback(
+                    db_user,
+                    local_active_sub,
+                )
             return None
 
         panel_lifetime_used = self._extract_lifetime_used_traffic(panel_user_data)
@@ -836,6 +1044,14 @@ class SubscriptionLifecycleMixin:
             if expected_hwid_limit is not None:
                 hwid_limit = expected_hwid_limit
 
+        extra_hwid_valid_until = hwid_entitlement_summary.get("active_until")
+        extra_hwid_next_valid_from = hwid_entitlement_summary.get("next_valid_from")
+        device_topup_renewal_available = self._device_topup_renewal_available(
+            active_extra_hwid_devices,
+            extra_hwid_valid_until,
+            panel_end_date,
+        )
+
         return {
             "user_id": panel_user_data.get("uuid"),
             "panel_subscription_uuid": panel_user_data.get("subscriptionUuid")
@@ -896,8 +1112,12 @@ class SubscriptionLifecycleMixin:
             if local_active_sub
             else None,
             "extra_hwid_devices": active_extra_hwid_devices,
-            "extra_hwid_devices_valid_until": hwid_entitlement_summary.get("active_until"),
-            "extra_hwid_devices_next_valid_from": hwid_entitlement_summary.get("next_valid_from"),
+            "extra_hwid_devices_valid_until": extra_hwid_valid_until,
+            "extra_hwid_devices_valid_until_text": self._display_datetime_text(
+                extra_hwid_valid_until
+            ),
+            "extra_hwid_devices_next_valid_from": extra_hwid_next_valid_from,
+            "device_topup_renewal_available": device_topup_renewal_available,
             "user_bot_username": db_user.username,
             "is_panel_data": True,
             "max_devices": hwid_limit,

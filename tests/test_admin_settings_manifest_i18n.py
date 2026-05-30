@@ -66,6 +66,8 @@ ADMIN_TARIFF_SETTINGS_PAGE_KEYS = {
     "admin_tariffs_legacy_subtitle",
     "admin_tariffs_legacy_period",
     "admin_tariffs_legacy_enabled",
+    "admin_tariffs_legacy_ref_inviter",
+    "admin_tariffs_legacy_ref_referee",
     "admin_tariffs_legacy_traffic_packages",
     "admin_tariffs_legacy_stars_traffic_packages",
     "admin_tariffs_legacy_traffic_hint",
@@ -226,6 +228,32 @@ def test_payment_provider_settings_include_webhook_metadata():
     assert manifest["PAYMENT_PLATEGA_CRYPTO_WEBAPP_LABEL_RU"]["webhook_path"] == "/webhook/platega"
     assert manifest["YOOKASSA_SHOP_ID"]["webhook_requires_base_url"] is True
     assert "webhook_path" not in manifest["PAYMENT_STARS_WEBAPP_LABEL_RU"]
+
+
+def test_remnawave_settings_include_panel_webhook_metadata():
+    manifest = _manifest_by_key()
+    field = manifest["PANEL_WEBHOOK_SECRET"]
+    remnawave_keys = (
+        "PANEL_API_URL",
+        "PANEL_API_KEY",
+        "PANEL_WEBHOOK_SECRET",
+        "USER_SQUAD_UUIDS",
+        "USER_EXTERNAL_SQUAD_UUID",
+    )
+
+    assert field["webhook_path"] == "/webhook/panel"
+    assert field["webhook_requires_base_url"] is True
+    assert field["provider_id"] == "remnawave"
+    assert field["webhook_hint_i18n_key"] == "admin_settings_panel_webhook_url_hint"
+    for setting_key in remnawave_keys:
+        assert manifest[setting_key]["section"] == "remnawave"
+        assert manifest[setting_key]["section_order"] == 3
+        assert manifest[setting_key]["subsection"] is None
+
+    for language in ("ru", "en"):
+        messages = _locale(language)
+        assert "admin_settings_section_remnawave" in messages
+        assert field["webhook_hint_i18n_key"] in messages
 
 
 def test_payment_provider_admin_only_toggles_are_mutually_exclusive():

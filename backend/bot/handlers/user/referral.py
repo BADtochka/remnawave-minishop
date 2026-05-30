@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Union
+from typing import Any, Callable, Optional, Union
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from aiogram import Bot, F, Router, types
@@ -76,31 +76,10 @@ async def referral_command_handler(
             await event.answer()
         return
 
-    bonus_info_parts = []
     if getattr(settings, "traffic_sale_mode", False):
         bonus_details_str = _("referral_not_available_for_traffic")
     else:
-        if settings.subscription_options:
-            for months_period_key, _price in sorted(settings.subscription_options.items()):
-                inv_bonus = settings.referral_bonus_inviter.get(months_period_key)
-                ref_bonus = settings.referral_bonus_referee.get(months_period_key)
-                if inv_bonus is not None or ref_bonus is not None:
-                    bonus_info_parts.append(
-                        _(
-                            "referral_bonus_per_period",
-                            months=months_period_key,
-                            inviter_bonus_days=inv_bonus
-                            if inv_bonus is not None
-                            else _("no_bonus_placeholder"),
-                            referee_bonus_days=ref_bonus
-                            if ref_bonus is not None
-                            else _("no_bonus_placeholder"),
-                        )
-                    )
-
-        bonus_details_str = (
-            "\n".join(bonus_info_parts) if bonus_info_parts else _("referral_no_bonuses_configured")
-        )
+        bonus_details_str = _build_referral_bonus_details_text(settings, _, current_lang)
 
     referral_stats = await referral_service.get_referral_stats(session, inviter_user_id)
 
@@ -206,6 +185,132 @@ async def referral_action_handler(
             await callback.answer(_("error_occurred_try_again"), show_alert=True)
 
     await callback.answer()
+
+
+Translator = Callable[..., str]
+
+
+def _period_bonus_text(
+    translator: Translator,
+    *,
+    months: int,
+    inviter_days: Optional[int],
+    referee_days: Optional[int],
+) -> str:
+    return translator(
+        "referral_bonus_per_period",
+        months=months,
+        inviter_bonus_days=(
+            inviter_days if inviter_days is not None else translator("no_bonus_placeholder")
+        ),
+        referee_bonus_days=(
+            referee_days if referee_days is not None else translator("no_bonus_placeholder")
+        ),
+    )
+
+
+def _tariff_period_bonus_entries(tariff: Any) -> list[dict[str, Optional[int]]]:
+    entries: list[dict[str, Optional[int]]] = []
+    for months in sorted(int(month) for month in getattr(tariff, "enabled_periods", [])):
+        inviter_days = tariff.referral_inviter_bonus_days(months)
+        referee_days = tariff.referral_referee_bonus_days(months)
+        if inviter_days is None and referee_days is None:
+            continue
+        entries.append(
+            {
+                "months": months,
+                "inviter_days": inviter_days,
+                "referee_days": referee_days,
+            }
+        )
+    return entries
+
+
+def _legacy_period_bonus_entries(settings: Settings) -> list[dict[str, Optional[int]]]:
+    entries: list[dict[str, Optional[int]]] = []
+    for months, _price in sorted(settings.subscription_options.items()):
+        inviter_days = settings.referral_bonus_inviter.get(months)
+        referee_days = settings.referral_bonus_referee.get(months)
+        if inviter_days is None and referee_days is None:
+            continue
+        entries.append(
+            {
+                "months": int(months),
+                "inviter_days": inviter_days,
+                "referee_days": referee_days,
+            }
+        )
+    return entries
+
+
+def _bonus_days_range(translator: Translator, values: list[int]) -> str:
+    return translator(
+        "referral_bonus_days_range",
+        min_days=min(values),
+        max_days=max(values),
+    )
+
+
+def _build_referral_bonus_details_text(
+    settings: Settings, translator: Translator, current_lang: str
+) -> str:
+    tariffs_config = settings.tariffs_config
+    if not tariffs_config:
+        bonus_info_parts = [
+            _period_bonus_text(
+                translator,
+                months=int(entry["months"] or 0),
+                inviter_days=entry["inviter_days"],
+                referee_days=entry["referee_days"],
+            )
+            for entry in _legacy_period_bonus_entries(settings)
+        ]
+        return (
+            "\n".join(bonus_info_parts)
+            if bonus_info_parts
+            else translator("referral_no_bonuses_configured")
+        )
+
+    period_tariffs = [
+        tariff for tariff in tariffs_config.enabled_tariffs if tariff.billing_model == "period"
+    ]
+    if len(period_tariffs) <= 1:
+        entries = _tariff_period_bonus_entries(period_tariffs[0]) if period_tariffs else []
+        bonus_info_parts = [
+            _period_bonus_text(
+                translator,
+                months=int(entry["months"] or 0),
+                inviter_days=entry["inviter_days"],
+                referee_days=entry["referee_days"],
+            )
+            for entry in entries
+        ]
+        return (
+            "\n".join(bonus_info_parts)
+            if bonus_info_parts
+            else translator("referral_no_bonuses_configured")
+        )
+
+    bonus_info_parts = []
+    for tariff in period_tariffs:
+        entries = _tariff_period_bonus_entries(tariff)
+        if not entries:
+            continue
+        inviter_values = [int(entry["inviter_days"] or 0) for entry in entries]
+        referee_values = [int(entry["referee_days"] or 0) for entry in entries]
+        bonus_info_parts.append(
+            translator(
+                "referral_bonus_tariff_range",
+                tariff_name=tariff.name(current_lang),
+                inviter_bonus_range=_bonus_days_range(translator, inviter_values),
+                referee_bonus_range=_bonus_days_range(translator, referee_values),
+            )
+        )
+    return (
+        "\n".join(bonus_info_parts)
+        if bonus_info_parts
+        else translator("referral_no_bonuses_configured")
+    )
 
 
 def _build_webapp_referral_link(

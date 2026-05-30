@@ -24,14 +24,14 @@ nano .env
 | --- | --- |
 | `BOT_TOKEN` | Токен Telegram-бота. |
 | `ADMIN_IDS` | Telegram ID администраторов через запятую; без этого не попасть в Web App админку. |
-| `WEBHOOK_BASE_URL` | Публичный URL webhook-домена backend. |
+| `WEBHOOK_BASE_URL` | Публичный URL webhook-домена backend. Для Remnawave Panel `WEBHOOK_URL` будет `WEBHOOK_BASE_URL` + `/webhook/panel`, например `https://app.example.com/webhook/panel`. |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Доступы PostgreSQL для Compose и backend. |
 | `WEBAPP_ENABLED` | Включает Web App и админку. Для первого запуска держите `True`. |
 | `WEBAPP_SESSION_SECRET` | Стабильный секрет сессий Web App. |
 | `WEBHOOK_SECRET_TOKEN` | Стабильный секретный токен вебхука Telegram. |
 | `SUBSCRIPTION_MINI_APP_URL` | Публичный HTTPS URL Mini App/frontend, например `https://app.domain.com/`. Это URL, который открывают кнопки Telegram и который указывается в BotFather; не добавляйте сюда `/api` или webhook-пути. |
 | `SUBSCRIPTION_GUIDES_ENABLED`, `SUBSCRIPTION_GUIDES_BOT_MENU_ENABLED` | Встроенные инструкции установки в Web App и кнопках бота. По умолчанию включены; обычно их достаточно менять в админке. |
-| `PANEL_API_URL`, `PANEL_API_KEY`, `PANEL_WEBHOOK_SECRET` | Базовая интеграция с Remnawave. Эти значения стоит хранить в `.env`, но при необходимости их можно переопределить из админки. |
+| `PANEL_API_URL`, `PANEL_API_KEY`, `PANEL_WEBHOOK_SECRET` | Базовая интеграция с Remnawave. Секрет вебхука задайте в Remnawave Panel и вставьте то же значение в настройки бота; эти значения стоит хранить в `.env`, но при необходимости их можно переопределить из админки. |
 
 `WEBAPP_SESSION_SECRET` и `WEBHOOK_SECRET_TOKEN` можно сгенерировать так:
 
@@ -57,7 +57,7 @@ openssl rand -hex 32
 
 Рекомендуемый порядок первичной настройки:
 
-1. **Система -> Настройки -> Remnawave**: проверьте `PANEL_API_URL`, `PANEL_API_KEY`, `PANEL_WEBHOOK_SECRET`, базовые squads.
+1. **Система -> Настройки -> Remnawave Panel**: проверьте `PANEL_API_URL`, `PANEL_API_KEY`, `PANEL_WEBHOOK_SECRET`, базовые squads. Рядом с настройками Remnawave админка показывает вычисленный адрес для `WEBHOOK_URL` в панели, например `https://app.example.com/webhook/panel`.
 2. **Система -> Тарифы**: создайте JSON-каталог тарифов, выберите Internal Squads, настройте модели на срок/по трафику, premium-сквады и HWID-пакеты.
 3. **Система -> Настройки -> Инструкции подключения**: проверьте, что Remnawave Panel отдает нужный конфиг Subscription Page. JSON-переопределение включайте только если нужно временно заменить конфиг панели.
 4. **Система -> Настройки -> Платежи**: включите нужные провайдеры и заполните их ключи.
