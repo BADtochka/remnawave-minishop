@@ -6,6 +6,7 @@ from typing import Any, Optional
 from aiogram import Bot
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.services.user_email_notifications import send_user_notification_email
 from db.dal import payment_dal, user_dal
 from db.models import Payment
 
@@ -55,11 +56,21 @@ async def notify_user_payment_failed(
         db_user.language_code if db_user and db_user.language_code else settings.DEFAULT_LANGUAGE
     )
     translator = make_translator(i18n, language)
+    message_text = translator(message_key)
     try:
-        await bot.send_message(payment.user_id, translator(message_key))
+        await bot.send_message(payment.user_id, message_text)
     except Exception:
         logging.exception(
             "Webhook helper: failed to notify user %s about %s.",
             payment.user_id,
             message_key,
+        )
+    if db_user:
+        await send_user_notification_email(
+            settings=settings,
+            i18n=i18n,
+            user=db_user,
+            subject_key="email_payment_failed_subject",
+            message_text=message_text,
+            dashboard_url=(getattr(settings, "SUBSCRIPTION_MINI_APP_URL", "") or None),
         )

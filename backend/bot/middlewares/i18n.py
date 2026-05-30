@@ -307,6 +307,7 @@ class JsonI18n:
         self.locales_data: Dict[str, Dict[str, str]] = {}
         self._overrides_path: Optional[Path] = None
         self._overrides_file_mtime_ns: Optional[int] = None
+        self._overrides_file_content: Optional[str] = None
         self._overrides_file_next_check = 0.0
         self._overrides_file_check_interval_seconds = 1.0
         self._load_locales()
@@ -419,6 +420,7 @@ class JsonI18n:
             if self._overrides_file_mtime_ns is None:
                 return False
             self._overrides_file_mtime_ns = None
+            self._overrides_file_content = None
             logging.info(
                 "Locale overrides file removed; keeping current in-memory overrides until "
                 "the DB fallback is reloaded"
@@ -432,19 +434,8 @@ class JsonI18n:
             )
             return False
 
-        if not force and stat.st_mtime_ns == self._overrides_file_mtime_ns:
-            return False
-
         try:
-            payload = json.loads(self._overrides_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            logging.warning(
-                "Failed to parse locale overrides file %s: %s",
-                self._overrides_path,
-                exc,
-            )
-            self._overrides_file_mtime_ns = stat.st_mtime_ns
-            return False
+            content = self._overrides_path.read_text(encoding="utf-8")
         except OSError as exc:
             logging.warning(
                 "Failed to read locale overrides file %s: %s",
@@ -453,7 +444,27 @@ class JsonI18n:
             )
             return False
 
+        if (
+            not force
+            and stat.st_mtime_ns == self._overrides_file_mtime_ns
+            and content == self._overrides_file_content
+        ):
+            return False
+
+        try:
+            payload = json.loads(content)
+        except json.JSONDecodeError as exc:
+            logging.warning(
+                "Failed to parse locale overrides file %s: %s",
+                self._overrides_path,
+                exc,
+            )
+            self._overrides_file_mtime_ns = stat.st_mtime_ns
+            self._overrides_file_content = content
+            return False
+
         self._overrides_file_mtime_ns = stat.st_mtime_ns
+        self._overrides_file_content = content
         self.set_locale_overrides(payload)
         logging.info("Locale overrides reloaded from %s", self._overrides_path)
         return True

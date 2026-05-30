@@ -357,6 +357,15 @@ class HwidDeviceMixin:
             valid_from=valid_from,
             valid_until=valid_until,
         )
+        await self._send_payment_success_email(
+            db_user=db_user,
+            sale_mode="hwid_devices_renewal" if renewal else "hwid_devices",
+            months=purchased_devices,
+            traffic_gb=None,
+            payment_amount=payment_amount,
+            end_date=valid_until,
+            provider=provider,
+        )
         return {
             "subscription_id": updated_sub.subscription_id,
             "end_date": updated_sub.end_date,

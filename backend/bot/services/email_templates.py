@@ -202,6 +202,41 @@ def _format_traffic(traffic_gb: Optional[float]) -> str:
     return str(int(value)) if value.is_integer() else f"{value:g}"
 
 
+_ALLOWED_INLINE_TAGS = {
+    "b": "strong",
+    "strong": "strong",
+    "i": "em",
+    "em": "em",
+    "u": "u",
+    "s": "s",
+    "code": "code",
+}
+_INLINE_TAG_RE = re.compile(r"</?(?:b|strong|i|em|u|s|code)>", re.IGNORECASE)
+_ANY_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _telegram_html_to_email_html(value: str) -> str:
+    """Escape arbitrary text while preserving the tiny Telegram HTML subset we use."""
+    source = str(value or "")
+    chunks: list[str] = []
+    cursor = 0
+    for match in _INLINE_TAG_RE.finditer(source):
+        chunks.append(html.escape(source[cursor : match.start()]))
+        raw_tag = match.group(0)
+        closing = raw_tag.startswith("</")
+        tag_name = raw_tag.strip("</>").lower()
+        mapped = _ALLOWED_INLINE_TAGS.get(tag_name)
+        if mapped:
+            chunks.append(f"</{mapped}>" if closing else f"<{mapped}>")
+        cursor = match.end()
+    chunks.append(html.escape(source[cursor:]))
+    return "".join(chunks).replace("\n", "<br>")
+
+
+def _telegram_html_to_text(value: str) -> str:
+    return html.unescape(_ANY_TAG_RE.sub("", str(value or "")))
+
+
 def _format_minutes(seconds: int) -> int:
     return max(1, int(seconds) // 60)
 
@@ -351,12 +386,15 @@ def render_payment_success(
     lang = _normalize_lang(language_code, settings)
     accent = _safe_color(settings.WEBAPP_PRIMARY_COLOR)
     brand = _brand_title(settings)
-    is_traffic = (sale_mode or "").split("@", 1)[0].split("|", 1)[0] in {
+    sale_base = (sale_mode or "").split("@", 1)[0].split("|", 1)[0]
+    is_traffic = sale_base in {
         "traffic",
         "traffic_package",
         "topup",
         "premium_topup",
     }
+    is_hwid = sale_base in {"hwid_device", "hwid_devices", "hwid_devices_renewal"}
+    is_tariff_upgrade = sale_base == "tariff_upgrade"
     amount_text = _format_amount(amount, currency)
     safe_dashboard_url = (dashboard_url or "").strip()
     end_date = end_date_text or "—"
@@ -370,7 +408,12 @@ def render_payment_success(
     cta_label = _t_text(i18n, lang, "email_payment_success_cta")
 
     if is_traffic:
-        intro = _t_text(i18n, lang, "email_payment_success_intro_traffic", traffic_gb=traffic_label)
+        intro_key = (
+            "email_payment_success_intro_premium_topup"
+            if sale_base == "premium_topup"
+            else "email_payment_success_intro_traffic"
+        )
+        intro = _t_text(i18n, lang, intro_key, traffic_gb=traffic_label)
         period_label = _t_text(i18n, lang, "email_payment_success_row_traffic")
         period_value = _t_text(
             i18n, lang, "email_payment_success_traffic_value", traffic_gb=traffic_label
@@ -381,6 +424,30 @@ def render_payment_success(
             "email_payment_success_text_traffic",
             amount=amount_text,
             traffic_gb=traffic_label,
+            end_date=end_date,
+        )
+    elif is_hwid:
+        devices_count = max(0, int(months or 0))
+        intro = _t_text(i18n, lang, "email_payment_success_intro_hwid", count=devices_count)
+        period_label = _t_text(i18n, lang, "email_payment_success_row_hwid")
+        period_value = _t_text(i18n, lang, "email_payment_success_hwid_value", count=devices_count)
+        text = _t_text(
+            i18n,
+            lang,
+            "email_payment_success_text_hwid",
+            amount=amount_text,
+            count=devices_count,
+            end_date=end_date,
+        )
+    elif is_tariff_upgrade:
+        intro = _t_text(i18n, lang, "email_payment_success_intro_tariff_upgrade")
+        period_label = _t_text(i18n, lang, "email_payment_success_row_operation")
+        period_value = _t_text(i18n, lang, "email_payment_success_tariff_upgrade_value")
+        text = _t_text(
+            i18n,
+            lang,
+            "email_payment_success_text_tariff_upgrade",
+            amount=amount_text,
             end_date=end_date,
         )
     else:
@@ -432,6 +499,66 @@ def render_payment_success(
         footer_html=footer,
     )
     return EmailContent(subject=subject, text="\n".join(text_lines), html=rendered)
+
+
+def render_user_notification(
+    settings: Settings,
+    *,
+    language_code: Optional[str],
+    subject: str,
+    message_text: str,
+    dashboard_url: Optional[str] = None,
+    cta_label: Optional[str] = None,
+    heading: Optional[str] = None,
+    intro: Optional[str] = None,
+    i18n: Optional[JsonI18n] = None,
+) -> EmailContent:
+    i18n = _resolve_i18n(i18n)
+    lang = _normalize_lang(language_code, settings)
+    accent = _safe_color(settings.WEBAPP_PRIMARY_COLOR)
+    brand = _brand_title(settings)
+    safe_dashboard_url = (dashboard_url or "").strip()
+    final_subject = (subject or "").strip() or _t_text(
+        i18n, lang, "email_user_notification_subject"
+    )
+    final_heading = (heading or "").strip() or final_subject
+    final_intro = (intro or "").strip() or _t_text(i18n, lang, "email_user_notification_intro")
+    final_cta_label = (cta_label or "").strip() or _t_text(
+        i18n,
+        lang,
+        "email_user_notification_cta",
+    )
+    footer = _t_html(i18n, lang, "email_footer_auto", brand=brand)
+    message_html = (
+        f'<div style="margin:0 0 16px 0;background:{_BG};border:1px solid {_BORDER};'
+        f"border-radius:14px;padding:14px 16px;font-size:14px;line-height:1.55;color:{_TEXT};"
+        f'white-space:pre-wrap;">{_telegram_html_to_email_html(message_text)}</div>'
+    )
+    body_parts = [message_html]
+    if safe_dashboard_url:
+        body_parts.append(
+            _cta_button_html(label=final_cta_label, url=safe_dashboard_url, accent=accent)
+        )
+
+    rendered = _layout(
+        settings=settings,
+        preheader=final_subject,
+        heading=final_heading,
+        intro_html=html.escape(final_intro),
+        body_html="".join(body_parts),
+        footer_html=footer,
+    )
+    text_lines = [final_subject, "", _telegram_html_to_text(message_text)]
+    if safe_dashboard_url:
+        text_lines.extend(
+            [
+                "",
+                _t_text(
+                    i18n, lang, "email_user_notification_text_dashboard", url=safe_dashboard_url
+                ),
+            ]
+        )
+    return EmailContent(subject=final_subject, text="\n".join(text_lines), html=rendered)
 
 
 def render_subscription_expiring(

@@ -15,6 +15,7 @@ from bot.infra.redis import redis_lock
 from bot.middlewares.i18n import JsonI18n
 from bot.services.panel_api_service import PanelApiService
 from bot.services.subscription_service import SubscriptionService
+from bot.services.user_email_notifications import send_user_notification_email
 from bot.utils.date_utils import month_start
 from bot.utils.mini_app_url import subscription_mini_app_topup_url
 from config.settings import Settings
@@ -101,6 +102,36 @@ class TariffTrafficWorker:
         else:
             button = InlineKeyboardButton(text=_(fallback_key), callback_data="tariff_topup:list")
         return InlineKeyboardMarkup(inline_keyboard=[[button]])
+
+    async def _send_traffic_warning_email(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: int,
+        subject_key: str,
+        message_text: str,
+        kind: str,
+    ) -> None:
+        try:
+            user = await user_dal.get_user_by_id(session, user_id)
+        except Exception:
+            logging.exception("TariffTrafficWorker: failed to load user %s for email", user_id)
+            return
+        if not user:
+            return
+        await send_user_notification_email(
+            settings=self.settings,
+            i18n=self.i18n,
+            user=user,
+            subject_key=subject_key,
+            message_text=message_text,
+            dashboard_url=subscription_mini_app_topup_url(self.settings, kind),
+            cta_label_key=(
+                "email_traffic_warning_premium_cta"
+                if kind == "premium"
+                else "email_traffic_warning_regular_cta"
+            ),
+        )
 
     async def run(self) -> None:
         if not self.settings.tariffs_config:
@@ -525,6 +556,8 @@ class TariffTrafficWorker:
             return
         ratio = used_val / limit_val
         levels = list(getattr(self.settings, "tariff_traffic_warning_levels", [85, 90, 95]))
+        if 100 not in levels:
+            levels.append(100)
         for level in levels:
             threshold = level / 100
             if ratio < threshold:
@@ -545,30 +578,32 @@ class TariffTrafficWorker:
                 level=level,
                 traffic_limit_bytes=limit_val if tariff.billing_model == "traffic" else None,
             )
+            user_lang = await self._user_lang(session, sub.user_id)
+            _ = (
+                (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
+                if self.i18n
+                else (lambda k, **kw: k)
+            )
+            left_pct = max(0, 100 - level)
+            tariff_name = hd.quote(str(tariff.name(user_lang)))
+            usage = self._usage_placeholders(used_val, limit_val)
+            if level < 100:
+                text = _(
+                    "traffic_warning_regular_almost",
+                    tariff_name=tariff_name,
+                    left_pct=left_pct,
+                    **usage,
+                )
+                subject_key = "email_traffic_warning_regular_almost_subject"
+            else:
+                text = _(
+                    "traffic_warning_regular_depleted",
+                    tariff_name=tariff_name,
+                    **usage,
+                )
+                subject_key = "email_traffic_warning_regular_depleted_subject"
             if self.bot:
                 try:
-                    user_lang = await self._user_lang(session, sub.user_id)
-                    _ = (
-                        (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
-                        if self.i18n
-                        else (lambda k, **kw: k)
-                    )
-                    left_pct = max(0, 100 - level)
-                    tariff_name = hd.quote(str(tariff.name(user_lang)))
-                    usage = self._usage_placeholders(used_val, limit_val)
-                    if level < 100:
-                        text = _(
-                            "traffic_warning_regular_almost",
-                            tariff_name=tariff_name,
-                            left_pct=left_pct,
-                            **usage,
-                        )
-                    else:
-                        text = _(
-                            "traffic_warning_regular_depleted",
-                            tariff_name=tariff_name,
-                            **usage,
-                        )
                     markup = self._traffic_topup_markup(user_lang, "regular")
                     await self.bot.send_message(
                         sub.user_id,
@@ -578,6 +613,13 @@ class TariffTrafficWorker:
                     )
                 except Exception:
                     logging.exception("Failed to send traffic warning to user %s", sub.user_id)
+            await self._send_traffic_warning_email(
+                session,
+                user_id=sub.user_id,
+                subject_key=subject_key,
+                message_text=text,
+                kind="regular",
+            )
         if ratio >= 1.0 and not sub.is_throttled:
             logging.info(
                 "Tariff traffic limit reached for user %s subscription %s. "
@@ -1001,31 +1043,31 @@ class TariffTrafficWorker:
                 level=PREMIUM_WARNING_DEPLETED_LEVEL,
                 traffic_limit_bytes=None,
             )
+            user_lang = await self._user_lang(session, sub.user_id)
+            _ = (
+                (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
+                if self.i18n
+                else (lambda k, **kw: k)
+            )
+            access = await self.subscription_service.premium_access_for_tariff(tariff)
+            labels = access.get("node_labels") or access.get("squad_labels") or []
+            if labels:
+                visible = [hd.quote(str(x)) for x in labels[:8]]
+                servers = "\n".join(f"• {label}" for label in visible)
+                if len(labels) > len(visible):
+                    more = len(labels) - len(visible)
+                    servers += "\n" + _("traffic_warning_premium_servers_more", count=more)
+            else:
+                servers = _("traffic_warning_premium_generic_servers")
+            usage = self._usage_placeholders(used_val, limit_val)
+            text = _(
+                "traffic_warning_premium_depleted",
+                tariff_name=hd.quote(str(tariff.name(user_lang))),
+                servers=servers,
+                **usage,
+            )
             if self.bot:
                 try:
-                    user_lang = await self._user_lang(session, sub.user_id)
-                    _ = (
-                        (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
-                        if self.i18n
-                        else (lambda k, **kw: k)
-                    )
-                    access = await self.subscription_service.premium_access_for_tariff(tariff)
-                    labels = access.get("node_labels") or access.get("squad_labels") or []
-                    if labels:
-                        visible = [hd.quote(str(x)) for x in labels[:8]]
-                        servers = "\n".join(f"• {label}" for label in visible)
-                        if len(labels) > len(visible):
-                            more = len(labels) - len(visible)
-                            servers += "\n" + _("traffic_warning_premium_servers_more", count=more)
-                    else:
-                        servers = _("traffic_warning_premium_generic_servers")
-                    usage = self._usage_placeholders(used_val, limit_val)
-                    text = _(
-                        "traffic_warning_premium_depleted",
-                        tariff_name=hd.quote(str(tariff.name(user_lang))),
-                        servers=servers,
-                        **usage,
-                    )
                     markup = self._traffic_topup_markup(user_lang, "premium")
                     await self.bot.send_message(
                         sub.user_id,
@@ -1037,6 +1079,13 @@ class TariffTrafficWorker:
                     logging.exception(
                         "Failed to send premium traffic depleted warning to user %s", sub.user_id
                     )
+            await self._send_traffic_warning_email(
+                session,
+                user_id=sub.user_id,
+                subject_key="email_traffic_warning_premium_depleted_subject",
+                message_text=text,
+                kind="premium",
+            )
             return
 
         for level in levels:
@@ -1060,43 +1109,51 @@ class TariffTrafficWorker:
                 level=storage_level,
                 traffic_limit_bytes=None,
             )
-            if not self.bot:
-                continue
-            try:
-                user_lang = await self._user_lang(session, sub.user_id)
-                _ = (
-                    (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
-                    if self.i18n
-                    else (lambda k, **kw: k)
-                )
-                access = await self.subscription_service.premium_access_for_tariff(tariff)
-                labels = access.get("node_labels") or access.get("squad_labels") or []
-                if labels:
-                    visible = [hd.quote(str(x)) for x in labels[:8]]
-                    servers = "\n".join(f"• {label}" for label in visible)
-                    if len(labels) > len(visible):
-                        more = len(labels) - len(visible)
-                        servers += "\n" + _("traffic_warning_premium_servers_more", count=more)
-                else:
-                    servers = _("traffic_warning_premium_generic_servers")
-                left_pct = max(0, 100 - int(level))
-                usage = self._usage_placeholders(used_val, limit_val)
-                text = _(
-                    "traffic_warning_premium_almost",
-                    tariff_name=hd.quote(str(tariff.name(user_lang))),
-                    left_pct=left_pct,
-                    servers=servers,
-                    **usage,
-                )
-                markup = self._traffic_topup_markup(user_lang, "premium")
-                await self.bot.send_message(
-                    sub.user_id,
-                    text,
-                    reply_markup=markup,
-                    parse_mode="HTML",
-                )
-            except Exception:
-                logging.exception("Failed to send premium traffic warning to user %s", sub.user_id)
+            user_lang = await self._user_lang(session, sub.user_id)
+            _ = (
+                (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
+                if self.i18n
+                else (lambda k, **kw: k)
+            )
+            access = await self.subscription_service.premium_access_for_tariff(tariff)
+            labels = access.get("node_labels") or access.get("squad_labels") or []
+            if labels:
+                visible = [hd.quote(str(x)) for x in labels[:8]]
+                servers = "\n".join(f"• {label}" for label in visible)
+                if len(labels) > len(visible):
+                    more = len(labels) - len(visible)
+                    servers += "\n" + _("traffic_warning_premium_servers_more", count=more)
+            else:
+                servers = _("traffic_warning_premium_generic_servers")
+            left_pct = max(0, 100 - int(level))
+            usage = self._usage_placeholders(used_val, limit_val)
+            text = _(
+                "traffic_warning_premium_almost",
+                tariff_name=hd.quote(str(tariff.name(user_lang))),
+                left_pct=left_pct,
+                servers=servers,
+                **usage,
+            )
+            if self.bot:
+                try:
+                    markup = self._traffic_topup_markup(user_lang, "premium")
+                    await self.bot.send_message(
+                        sub.user_id,
+                        text,
+                        reply_markup=markup,
+                        parse_mode="HTML",
+                    )
+                except Exception:
+                    logging.exception(
+                        "Failed to send premium traffic warning to user %s", sub.user_id
+                    )
+            await self._send_traffic_warning_email(
+                session,
+                user_id=sub.user_id,
+                subject_key="email_traffic_warning_premium_almost_subject",
+                message_text=text,
+                kind="premium",
+            )
 
     async def _premium_node_uuids_for_tariff(self, tariff) -> list[str]:
         cache_key = tuple(sorted(tariff.premium_squad_uuids or []))

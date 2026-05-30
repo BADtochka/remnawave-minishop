@@ -35,6 +35,7 @@ from bot.services.lknpd_service import LknpdService
 from bot.services.panel_api_service import PanelApiService
 from bot.services.referral_service import ReferralService
 from bot.services.subscription_service import SubscriptionService
+from bot.services.user_email_notifications import send_user_notification_email
 from bot.utils.config_link import prepare_config_links
 from bot.utils.install_links import ensure_user_install_guide_links
 from bot.utils.request_security import ip_in_allowlist, request_client_ip
@@ -953,7 +954,20 @@ async def process_cancelled_payment(
             user_lang = db_user.language_code
 
         _ = lambda key, **kwargs: i18n.gettext(user_lang, key, **kwargs)
-        await bot.send_message(user_id, _("payment_failed"))
+        message_text = _("payment_failed")
+        try:
+            await bot.send_message(user_id, message_text)
+        except Exception:
+            logging.exception("Failed to notify YooKassa user %s about cancelled payment.", user_id)
+        if db_user:
+            await send_user_notification_email(
+                settings=settings,
+                i18n=i18n,
+                user=db_user,
+                subject_key="email_payment_failed_subject",
+                message_text=message_text,
+                dashboard_url=(settings.SUBSCRIPTION_MINI_APP_URL or None),
+            )
 
     except Exception as e_process_cancel:
         logging.error(
@@ -1206,13 +1220,32 @@ async def yookassa_webhook_route(request: web.Request):
                                                 get_back_to_payment_methods_keyboard,
                                             )
 
-                                            await bot.send_message(
-                                                chat_id=user_id,
-                                                text=_("payment_method_bound_success"),
-                                                reply_markup=get_back_to_payment_methods_keyboard(
-                                                    i18n_lang, i18n_instance
-                                                ),
-                                            )
+                                            message_text = _("payment_method_bound_success")
+                                            try:
+                                                await bot.send_message(
+                                                    chat_id=user_id,
+                                                    text=message_text,
+                                                    reply_markup=get_back_to_payment_methods_keyboard(
+                                                        i18n_lang, i18n_instance
+                                                    ),
+                                                )
+                                            except Exception:
+                                                logging.exception(
+                                                    "Failed to notify user %s "
+                                                    "about payment method binding.",
+                                                    user_id,
+                                                )
+                                            if db_user:
+                                                await send_user_notification_email(
+                                                    settings=settings,
+                                                    i18n=i18n_instance,
+                                                    user=db_user,
+                                                    subject_key="email_payment_method_bound_subject",
+                                                    message_text=message_text,
+                                                    dashboard_url=(
+                                                        settings.SUBSCRIPTION_MINI_APP_URL or None
+                                                    ),
+                                                )
                                         except Exception:
                                             pass
                                         # Attempt to cancel the authorization to avoid charge hold

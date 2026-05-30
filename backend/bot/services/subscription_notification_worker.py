@@ -19,6 +19,7 @@ from bot.services.subscription_lifecycle_notifications import (
     SubscriptionNotificationStage,
 )
 from bot.services.subscription_service import SubscriptionService
+from bot.services.user_email_notifications import send_user_notification_email
 from config.settings import Settings
 from db.advisory_locks import acquire_subscription_background_sync_lock
 from db.dal import subscription_dal
@@ -206,11 +207,22 @@ class SubscriptionNotificationWorker:
             .order_by(Subscription.end_date.asc())
         )
         for sub in result.scalars().all():
-            if await subscription_dal.has_subscription_notification(
+            legacy_sent = await subscription_dal.has_subscription_notification(
                 session,
                 sub.subscription_id,
                 "trial_traffic_depleted",
-            ):
+            )
+            telegram_done = legacy_sent or await subscription_dal.has_subscription_notification(
+                session,
+                sub.subscription_id,
+                "trial_traffic_depleted:telegram",
+            )
+            email_done = await subscription_dal.has_subscription_notification(
+                session,
+                sub.subscription_id,
+                "trial_traffic_depleted:email",
+            )
+            if telegram_done and email_done:
                 continue
 
             used = int(getattr(sub, "traffic_used_bytes", 0) or 0)
@@ -232,14 +244,29 @@ class SubscriptionNotificationWorker:
 
             if limit <= 0 or used < limit:
                 continue
-            if not await self._send_trial_traffic_depleted(sub, used=used, limit=limit):
-                continue
-            await subscription_dal.record_subscription_notification(
-                session,
-                sub.subscription_id,
-                "trial_traffic_depleted",
-                sent_at=now,
+            delivery = await self._send_trial_traffic_depleted(
+                sub,
+                used=used,
+                limit=limit,
+                send_telegram=not telegram_done,
+                send_email=not email_done,
             )
+            if not delivery["telegram"] and not delivery["email"]:
+                continue
+            if delivery["telegram"]:
+                await subscription_dal.record_subscription_notification(
+                    session,
+                    sub.subscription_id,
+                    "trial_traffic_depleted:telegram",
+                    sent_at=now,
+                )
+            if delivery["email"]:
+                await subscription_dal.record_subscription_notification(
+                    session,
+                    sub.subscription_id,
+                    "trial_traffic_depleted:email",
+                    sent_at=now,
+                )
 
     async def _panel_user(self, sub: Subscription) -> Optional[dict]:
         panel_uuid = str(getattr(sub, "panel_user_uuid", "") or "").strip()
@@ -261,30 +288,46 @@ class SubscriptionNotificationWorker:
         *,
         used: int,
         limit: int,
-    ) -> bool:
+        send_telegram: bool = True,
+        send_email: bool = True,
+    ) -> dict[str, bool]:
         user_id = int(getattr(sub, "user_id", 0) or 0)
-        if user_id <= 0:
-            return False
         user = getattr(sub, "user", None)
         lang = getattr(user, "language_code", None) or self.settings.DEFAULT_LANGUAGE
         translate = lambda k, **kw: self.i18n.gettext(lang, k, **kw)
         remaining = max(0, limit - used)
-        try:
-            await self.bot.send_message(
-                user_id,
-                translate(
-                    "trial_traffic_depleted_notification",
-                    used=hd.quote(self._fmt_bytes(used)),
-                    remaining=hd.quote(self._fmt_bytes(remaining)),
-                    limit_total=hd.quote(self._fmt_bytes(limit)),
-                ),
-                reply_markup=get_subscribe_only_markup(lang, self.i18n),
-                parse_mode="HTML",
+        message_text = translate(
+            "trial_traffic_depleted_notification",
+            used=hd.quote(self._fmt_bytes(used)),
+            remaining=hd.quote(self._fmt_bytes(remaining)),
+            limit_total=hd.quote(self._fmt_bytes(limit)),
+        )
+        telegram_sent = False
+        email_sent = False
+        if send_telegram and user_id > 0:
+            try:
+                await self.bot.send_message(
+                    user_id,
+                    message_text,
+                    reply_markup=get_subscribe_only_markup(lang, self.i18n),
+                    parse_mode="HTML",
+                )
+                telegram_sent = True
+            except Exception:
+                logging.exception(
+                    "Failed to send trial traffic depleted warning to user %s",
+                    user_id,
+                )
+        if send_email and user:
+            email_sent = await send_user_notification_email(
+                settings=self.settings,
+                i18n=self.i18n,
+                user=user,
+                subject_key="email_trial_traffic_depleted_subject",
+                message_text=message_text,
+                dashboard_url=(getattr(self.settings, "SUBSCRIPTION_MINI_APP_URL", "") or None),
             )
-            return True
-        except Exception:
-            logging.exception("Failed to send trial traffic depleted warning to user %s", user_id)
-            return False
+        return {"telegram": telegram_sent, "email": email_sent}
 
     def _max_before_window(self) -> timedelta:
         days_before = max(0, int(getattr(self.settings, "SUBSCRIPTION_NOTIFY_DAYS_BEFORE", 0) or 0))

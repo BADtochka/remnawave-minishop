@@ -444,6 +444,17 @@ class SubscriptionLifecycleMixin:
                     )
                     result["end_date"] = sub.end_date
                     result["is_active"] = sub.is_active
+                    db_user = await user_dal.get_user_by_id(session, user_id)
+                    if db_user:
+                        await self._send_payment_success_email(
+                            db_user=db_user,
+                            sale_mode="tariff_upgrade",
+                            months=0,
+                            traffic_gb=None,
+                            payment_amount=payment_amount,
+                            end_date=sub.end_date,
+                            provider=provider,
+                        )
             return result
 
         tariff = self._resolve_tariff(tariff_key, "period") if self._tariffs_config() else None
