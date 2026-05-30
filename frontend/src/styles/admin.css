@@ -2760,6 +2760,15 @@
   max-height: min(100%, 760px);
 }
 
+.admin-user-dialog .dialog-body-scroll {
+  margin-right: -10px;
+  padding-right: 10px;
+}
+
+.admin-user-dialog .dialog-body-scroll > .scroll-area__viewport {
+  padding-right: 10px;
+}
+
 .admin-user-dialog-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -4131,7 +4140,7 @@
 .admin-user-summary {
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 14px;
   padding: 14px 14px 16px;
   border-radius: 12px;

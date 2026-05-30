@@ -81,11 +81,7 @@
   $: openedUserTelegramProfileLinkKind = openedUser ? userTelegramProfileLinkKind(openedUser) : "";
   $: openedUserTelegramProfileHint =
     openedUserTelegramProfileLinkKind === "id"
-      ? at(
-          "user_open_tg_profile_id_hint",
-          {},
-          "Профиль будет открыт по Telegram ID. Telegram может заблокировать переход из-за настроек приватности пользователя или ограничений клиента."
-        )
+      ? at("user_open_tg_profile_id_hint", {}, "Бот отправит кнопку профиля в Telegram")
       : at("user_open_tg_profile_hint", {}, "Открыть профиль Telegram");
 
   $: if (openedUser && userDetailTab === "logs" && !userLogsLoading && !userLogsLoaded) {
@@ -189,11 +185,6 @@
                   {at("user_open_tg_profile", {}, "Открыть Telegram")}
                 </AdminButton>
               </div>
-              {#if openedUserTelegramProfileLinkKind === "id"}
-                <small class="admin-user-telegram-profile-note"
-                  >{openedUserTelegramProfileHint}</small
-                >
-              {/if}
             </div>
           </div>
 
@@ -1167,12 +1158,6 @@
     flex-wrap: wrap;
     gap: 8px;
     margin-top: 6px;
-  }
-  .admin-user-telegram-profile-note {
-    display: block;
-    margin-top: 2px;
-    color: var(--admin-dim);
-    line-height: 1.35;
   }
   :global(.admin-avatar-dialog) {
     display: grid;
