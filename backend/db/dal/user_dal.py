@@ -95,6 +95,39 @@ async def get_user_by_id(session: AsyncSession, user_id: int) -> Optional[User]:
     return result.scalar_one_or_none()
 
 
+async def get_referrer_for_user(session: AsyncSession, user: User) -> Optional[User]:
+    referred_by_id = getattr(user, "referred_by_id", None)
+    if referred_by_id is None:
+        return None
+    return await get_user_by_id(session, int(referred_by_id))
+
+
+async def get_users_referred_by(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+) -> List[User]:
+    safe_limit = max(1, min(500, int(limit or 50)))
+    safe_offset = max(0, int(offset or 0))
+    stmt = (
+        select(User)
+        .where(User.referred_by_id == user_id)
+        .order_by(User.registration_date.desc().nullslast(), User.user_id.desc())
+        .offset(safe_offset)
+        .limit(safe_limit)
+    )
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+
+async def count_users_referred_by(session: AsyncSession, user_id: int) -> int:
+    stmt = select(func.count(User.user_id)).where(User.referred_by_id == user_id)
+    result = await session.execute(stmt)
+    return int(result.scalar_one() or 0)
+
+
 async def get_user_by_username(session: AsyncSession, username: str) -> Optional[User]:
     clean_username = username.lstrip("@").lower()
     stmt = select(User).where(func.lower(User.username) == clean_username)

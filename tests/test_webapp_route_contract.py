@@ -156,6 +156,7 @@ class WebAppRouteContractTests(unittest.TestCase):
             ("GET", "/api/admin/stats"): "admin_stats_route",
             ("GET", "/api/admin/users"): "admin_users_list_route",
             ("GET", "/api/admin/users/{user_id}"): "admin_user_detail_route",
+            ("GET", "/api/admin/users/{user_id}/referrals"): "admin_user_referrals_route",
             ("GET", "/api/admin/users/{user_id}/avatar"): "admin_user_avatar_route",
             ("POST", "/api/admin/users/{user_id}/ban"): "admin_user_ban_route",
             ("POST", "/api/admin/users/{user_id}/message"): "admin_user_message_route",

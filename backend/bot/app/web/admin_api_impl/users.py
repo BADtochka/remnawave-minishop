@@ -255,6 +255,17 @@ async def _bulk_user_avatar_keys(session: AsyncSession, user_ids: List[int]) -> 
     return {int(uid): (updated_at.isoformat() if updated_at else "") for uid, updated_at in rows}
 
 
+def _serialize_admin_user_with_avatar(user: User, avatar_keys: Dict[int, str]) -> Dict[str, Any]:
+    payload = _serialize_user(user)
+    user_id = int(user.user_id)
+    payload["avatar_url"] = (
+        f"/api/admin/users/{user_id}/avatar?v={avatar_keys[user_id]}"
+        if user_id in avatar_keys
+        else None
+    )
+    return payload
+
+
 async def admin_user_avatar_route(request: web.Request) -> web.Response:
     """Serve the cached Telegram avatar for any user (admin-only).
 
@@ -587,7 +598,12 @@ async def admin_user_detail_route(request: web.Request) -> web.Response:
         )
         recent_payments = (await session.execute(recent_payments_stmt)).scalars().all()
         log_count = await message_log_dal.count_user_message_logs(session, target_id)
-        avatar_keys = await _bulk_user_avatar_keys(session, [target_id])
+        inviter = await user_dal.get_referrer_for_user(session, user)
+        invitees_total = await user_dal.count_users_referred_by(session, target_id)
+        avatar_user_ids = [target_id]
+        if inviter is not None:
+            avatar_user_ids.append(int(inviter.user_id))
+        avatar_keys = await _bulk_user_avatar_keys(session, avatar_user_ids)
 
         # Referral links — both the bot deep-link and the webapp deep-link.
         referral_code: Optional[str] = None
@@ -635,11 +651,9 @@ async def admin_user_detail_route(request: web.Request) -> web.Response:
                     exc_panel,
                 )
 
-    serialized_user = _serialize_user(user)
-    serialized_user["avatar_url"] = (
-        f"/api/admin/users/{target_id}/avatar?v={avatar_keys[target_id]}"
-        if target_id in avatar_keys
-        else None
+    serialized_user = _serialize_admin_user_with_avatar(user, avatar_keys)
+    serialized_inviter = (
+        _serialize_admin_user_with_avatar(inviter, avatar_keys) if inviter is not None else None
     )
 
     return _ok(
@@ -655,7 +669,50 @@ async def admin_user_detail_route(request: web.Request) -> web.Response:
                 "code": referral_code,
                 "bot_link": referral_bot_link,
                 "webapp_link": referral_webapp_link,
+                "inviter": serialized_inviter,
+                "invitees_total": int(invitees_total or 0),
             },
+        }
+    )
+
+
+async def admin_user_referrals_route(request: web.Request) -> web.Response:
+    _require_admin_user_id(request)
+    target_id = int(request.match_info["user_id"])
+    page = max(0, int(request.query.get("page", 0) or 0))
+    page_size = min(100, max(1, int(request.query.get("page_size", 25) or 25)))
+    async_session_factory: sessionmaker = request.app["async_session_factory"]
+
+    async with async_session_factory() as session:
+        user = await user_dal.get_user_by_id(session, target_id)
+        if not user:
+            return _error(404, "not_found", "User not found")
+
+        inviter = await user_dal.get_referrer_for_user(session, user)
+        invitees_total = await user_dal.count_users_referred_by(session, target_id)
+        invitees = await user_dal.get_users_referred_by(
+            session,
+            target_id,
+            limit=page_size,
+            offset=page * page_size,
+        )
+        avatar_user_ids = [target_id, *(int(u.user_id) for u in invitees)]
+        if inviter is not None:
+            avatar_user_ids.append(int(inviter.user_id))
+        avatar_keys = await _bulk_user_avatar_keys(session, avatar_user_ids)
+
+    return _ok(
+        {
+            "user": _serialize_admin_user_with_avatar(user, avatar_keys),
+            "inviter": _serialize_admin_user_with_avatar(inviter, avatar_keys)
+            if inviter is not None
+            else None,
+            "invitees": [
+                _serialize_admin_user_with_avatar(invitee, avatar_keys) for invitee in invitees
+            ],
+            "total": int(invitees_total or 0),
+            "page": page,
+            "page_size": page_size,
         }
     )
 

@@ -405,6 +405,32 @@ function withDemoAvatars(users, size = 96) {
   return (users || []).map((user) => withDemoAvatar(user, size));
 }
 
+function demoAdminUserById(userId) {
+  return (DEMO_DATASET.adminUsers || []).find((user) => Number(user.user_id) === Number(userId));
+}
+
+function demoInviteesForUser(userId) {
+  return (DEMO_DATASET.adminUsers || [])
+    .filter((user) => Number(user.referred_by_id) === Number(userId))
+    .sort((a, b) => stringDate(b.registration_date) - stringDate(a.registration_date));
+}
+
+function withDemoReferralSummary(detail) {
+  if (!detail || typeof detail !== "object") return detail;
+  const decorated = withDemoAvatarDetail(detail);
+  const user = decorated.user || {};
+  const inviter = user.referred_by_id ? demoAdminUserById(user.referred_by_id) : null;
+  const invitees = demoInviteesForUser(user.user_id);
+  return {
+    ...decorated,
+    referral: {
+      ...(decorated.referral || {}),
+      inviter: inviter ? withDemoAvatar(inviter) : null,
+      invitees_total: invitees.length,
+    },
+  };
+}
+
 function withDemoAvatarTickets(tickets, size = 96) {
   return (tickets || []).map((ticket) => withDemoAvatarTicket(ticket, size));
 }
@@ -610,8 +636,21 @@ function demoApiResponse(path, cleanPath, options, context) {
     const id = Number(parts[3]);
     const detail = DEMO_DATASET.adminUserDetails?.[String(id)];
     if (!detail) return { ok: false, error: "not_found" };
-    const decoratedDetail = withDemoAvatarDetail(detail);
+    const decoratedDetail = withDemoReferralSummary(detail);
     if (parts[4]) {
+      if (parts[4] === "referrals") {
+        const invitees = demoInviteesForUser(id);
+        const page = paged(invitees, params, 25);
+        return {
+          ok: true,
+          user: clone(decoratedDetail.user),
+          inviter: clone(decoratedDetail.referral?.inviter || null),
+          invitees: clone(withDemoAvatars(page.items)),
+          total: page.total,
+          page: page.page,
+          page_size: page.pageSize,
+        };
+      }
       if (parts[4] === "telegram-profile-link") {
         return { ok: true, url: `https://t.me/${detail.user?.username || "demo_user"}` };
       }

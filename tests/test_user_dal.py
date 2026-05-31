@@ -17,6 +17,9 @@ class FakeResult:
     def scalar_one_or_none(self):
         return self._scalar_value
 
+    def scalar_one(self):
+        return self._scalar_value
+
     def scalars(self):
         return self
 
@@ -69,6 +72,53 @@ class UserDalStatisticsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("GROUP BY SUBSCRIPTIONS.USER_ID", sql)
         self.assertIn("SUBSCRIPTIONS.PROVIDER", sql)
         self.assertIn("TRIAL", sql)
+
+
+class UserDalReferralTests(unittest.IsolatedAsyncioTestCase):
+    async def test_get_users_referred_by_filters_with_pagination(self):
+        invited = [SimpleNamespace(user_id=1001), SimpleNamespace(user_id=1002)]
+        session = SimpleNamespace(execute=AsyncMock(return_value=FakeResult(invited)))
+
+        result = await user_dal.get_users_referred_by(session, 42, limit=2, offset=10)
+
+        self.assertEqual(result, invited)
+        stmt = session.execute.await_args.args[0]
+        sql = str(
+            stmt.compile(
+                dialect=postgresql.dialect(),
+                compile_kwargs={"literal_binds": True},
+            )
+        ).upper()
+        self.assertIn("REFERRED_BY_ID = 42", sql)
+        self.assertIn("ORDER BY", sql)
+        self.assertIn("LIMIT 2", sql)
+        self.assertIn("OFFSET 10", sql)
+
+    async def test_count_users_referred_by_counts_matching_rows(self):
+        session = SimpleNamespace(execute=AsyncMock(return_value=FakeResult(3)))
+
+        result = await user_dal.count_users_referred_by(session, 42)
+
+        self.assertEqual(result, 3)
+        stmt = session.execute.await_args.args[0]
+        sql = str(
+            stmt.compile(
+                dialect=postgresql.dialect(),
+                compile_kwargs={"literal_binds": True},
+            )
+        ).upper()
+        self.assertIn("COUNT", sql)
+        self.assertIn("REFERRED_BY_ID = 42", sql)
+
+    async def test_get_referrer_for_user_uses_referred_by_id(self):
+        referrer = SimpleNamespace(user_id=7)
+        session = SimpleNamespace(execute=AsyncMock(return_value=FakeResult(referrer)))
+
+        result = await user_dal.get_referrer_for_user(
+            session, SimpleNamespace(user_id=42, referred_by_id=7)
+        )
+
+        self.assertIs(result, referrer)
 
 
 class UserDalMergeTests(unittest.IsolatedAsyncioTestCase):
