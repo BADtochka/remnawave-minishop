@@ -34,6 +34,13 @@ _SQUAD_BULK_TEMPLATES = {
     "add-users": "/internal-squads/<id>/bulk-actions/add-users",
     "remove-users": "/internal-squads/<id>/bulk-actions/remove-users",
 }
+# Exact intercepted endpoints that carry no id and are safe to log verbatim.
+# Mapped to themselves so the logged value comes from this literal table, not
+# from the (tainted) request endpoint.
+_SAFE_LITERAL_ENDPOINTS = {
+    "/users": "/users",
+    "/hwid/devices/delete": "/hwid/devices/delete",
+}
 
 # Panel payloads can carry proxy credentials (e.g. trojanPassword, ssPassword,
 # vless/vmess uuids) and PII (email, telegramId). Redact such values before they
@@ -43,9 +50,35 @@ _SENSITIVE_KEY_RE = re.compile(
     r"email|mail|phone|telegram|mnemonic",
     re.IGNORECASE,
 )
-# Mask opaque id-like path segments (UUIDs, long tokens) in logged endpoints.
-_ENDPOINT_ID_RE = re.compile(r"(?<=/)(?:[0-9a-fA-F]{8}-[0-9a-fA-F-]{8,}|[A-Za-z0-9_-]{24,})")
+# Field names the dry-run validator understands. Keys are echoed into the log
+# only via this table (value == name), so the logged key is always a literal and
+# never the raw, source-derived dict key. Unknown keys collapse to "<field>".
+_FIELD_LABELS = {
+    name: name
+    for name in (
+        "uuid",
+        "username",
+        "status",
+        "expireAt",
+        "trafficLimitBytes",
+        "trafficLimitStrategy",
+        "hwidDeviceLimit",
+        "telegramId",
+        "email",
+        "description",
+        "tag",
+        "activeInternalSquads",
+        "activeUserInbounds",
+        "externalSquadUuid",
+        "userUuid",
+        "userUuids",
+        "users",
+        "hwid",
+    )
+}
 _REDACTED = "***"
+_UNKNOWN_FIELD = "<field>"
+_UNKNOWN_ENDPOINT = "<other>"
 
 
 @dataclass
@@ -115,12 +148,12 @@ class PanelDryRunApiService(PanelApiService):
 
     @staticmethod
     def _safe_endpoint(endpoint: str) -> str:
-        """Rebuild the logged path from constant templates so no id leaks.
+        """Map the request path to a constant log label.
 
-        Intercepted endpoints are a known, finite set. Each is mapped to a literal
-        template; the raw endpoint (which may embed a user/squad UUID) is never
-        echoed into the log, only matched against. Unknown paths fall back to a
-        regex mask of id-like segments.
+        Every return value comes from a literal template/table, never from the
+        (tainted) endpoint itself, so user/squad UUIDs and any other id-like
+        segment can never reach the log as clear text. The raw path is only
+        matched against, not echoed.
         """
         raw = str(endpoint or "")
         if match := _USER_ACTION_RE.match(raw):
@@ -129,13 +162,14 @@ class PanelDryRunApiService(PanelApiService):
             return _SQUAD_BULK_TEMPLATES.get(
                 match.group("action"), "/internal-squads/<id>/bulk-actions/<action>"
             )
-        if raw == "/users":
-            return "/users"
+        literal = _SAFE_LITERAL_ENDPOINTS.get(raw)
+        if literal is not None:
+            return literal
         if raw.startswith("/users/"):
             return "/users/<id>"
         if raw.startswith("/internal-squads/"):
             return "/internal-squads/<id>"
-        return _ENDPOINT_ID_RE.sub("<id>", raw)
+        return _UNKNOWN_ENDPOINT
 
     @staticmethod
     def _summarize_leaf(value: Any) -> Any:
@@ -157,19 +191,32 @@ class PanelDryRunApiService(PanelApiService):
             return "<str>"
         return f"<{type(value).__name__}>"
 
+    @staticmethod
+    def _safe_key(key: Any) -> str:
+        """Return a constant label for a payload key.
+
+        Known field names are echoed from the ``_FIELD_LABELS`` table (the value,
+        not the source-derived key); anything else collapses to ``<field>``. This
+        keeps the raw dict key out of the log entirely.
+        """
+        if isinstance(key, str):
+            return _FIELD_LABELS.get(key, _UNKNOWN_FIELD)
+        return _UNKNOWN_FIELD
+
     @classmethod
     def _redact(cls, value: Any, _depth: int = 0) -> Any:
-        """Recursively summarize values, keeping only keys and JSON shape.
+        """Recursively summarize values, keeping only the JSON shape.
 
-        Sensitive keys collapse to a placeholder and every scalar leaf is replaced
-        by a type token, so the resulting structure shows which fields a mutation
-        would touch without ever logging a field value.
+        Keys are replaced by constant labels, sensitive keys collapse to a
+        placeholder, and every scalar leaf becomes a type token. The result shows
+        which fields a mutation would touch without logging any source-derived
+        string (key or value).
         """
         if _depth > 6:
             return "..."
         if isinstance(value, dict):
             return {
-                str(k): (
+                cls._safe_key(k): (
                     _REDACTED
                     if isinstance(k, str) and _SENSITIVE_KEY_RE.search(k)
                     else cls._redact(v, _depth + 1)
