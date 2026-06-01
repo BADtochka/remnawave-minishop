@@ -67,7 +67,7 @@ async def _build_user_payload(request: web.Request, user_id: int) -> Dict[str, A
         trial_available = bool(
             settings.TRIAL_ENABLED
             and settings.TRIAL_DURATION_DAYS > 0
-            and not await subscription_service.has_had_any_subscription(session, user_id)
+            and not await subscription_service.has_trial_blocking_subscription(session, user_id)
         )
         avatar = await _ensure_cached_telegram_avatar(request, session, db_user)
         try:

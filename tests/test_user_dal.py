@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.dml import Delete, Update
 
-from db.dal import user_dal
+from db.dal import subscription_dal, user_dal
 
 
 class FakeResult:
@@ -121,6 +121,44 @@ class UserDalReferralTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIs(result, referrer)
+
+    async def test_mark_trial_eligibility_reset_updates_user_marker(self):
+        reset_at = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        session = SimpleNamespace(execute=AsyncMock(return_value=FakeResult(rowcount=1)))
+
+        result = await user_dal.mark_trial_eligibility_reset(session, 42, reset_at=reset_at)
+
+        self.assertEqual(result, reset_at)
+        stmt = session.execute.await_args.args[0]
+        sql = str(
+            stmt.compile(
+                dialect=postgresql.dialect(),
+                compile_kwargs={"literal_binds": True},
+            )
+        ).upper()
+        self.assertIn("UPDATE USERS", sql)
+        self.assertIn("TRIAL_ELIGIBILITY_RESET_AT", sql)
+        self.assertIn("USER_ID = 42", sql)
+
+
+class SubscriptionDalTrialEligibilityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_trial_blocking_history_honors_user_reset_marker(self):
+        session = SimpleNamespace(execute=AsyncMock(return_value=FakeResult(7)))
+
+        result = await subscription_dal.has_trial_blocking_subscription_for_user(session, 42)
+
+        self.assertTrue(result)
+        stmt = session.execute.await_args.args[0]
+        sql = str(
+            stmt.compile(
+                dialect=postgresql.dialect(),
+                compile_kwargs={"literal_binds": True},
+            )
+        ).upper()
+        self.assertIn("TRIAL_ELIGIBILITY_RESET_AT", sql)
+        self.assertIn("SUBSCRIPTIONS.IS_ACTIVE = TRUE", sql)
+        self.assertIn("COALESCE(SUBSCRIPTIONS.START_DATE, SUBSCRIPTIONS.END_DATE)", sql)
+        self.assertIn("SUBSCRIPTIONS.USER_ID = 42", sql)
 
 
 class UserDalMergeTests(unittest.IsolatedAsyncioTestCase):

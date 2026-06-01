@@ -62,6 +62,9 @@ class PaymentContextMixin:
     async def has_had_any_subscription(self, session: AsyncSession, user_id: int) -> bool:
         return await subscription_dal.has_any_subscription_for_user(session, user_id)
 
+    async def has_trial_blocking_subscription(self, session: AsyncSession, user_id: int) -> bool:
+        return await subscription_dal.has_trial_blocking_subscription_for_user(session, user_id)
+
     async def has_active_subscription(self, session: AsyncSession, user_id: int) -> bool:
         """Return True if user currently has an active subscription (end_date in future)."""
         try:

@@ -1172,10 +1172,6 @@ async def admin_user_reset_trial_route(request: web.Request) -> web.Response:
     actor_id = _require_admin_user_id(request)
     target_id = int(request.match_info["user_id"])
     settings: Settings = request.app["settings"]
-    panel_service = request.app.get("panel_service")
-    subscription_service = request.app.get("subscription_service")
-    if panel_service is None or subscription_service is None:
-        return _error(503, "service_unavailable")
 
     async_session_factory: sessionmaker = request.app["async_session_factory"]
     async with async_session_factory() as session:
@@ -1183,16 +1179,17 @@ async def admin_user_reset_trial_route(request: web.Request) -> web.Response:
         if not user:
             return _error(404, "not_found")
 
-        active = await subscription_dal.get_active_subscription_by_user_id(session, target_id)
-        if active:
-            await session.delete(active)
+        reset_at = await user_dal.mark_trial_eligibility_reset(session, target_id)
+        if reset_at is None:
+            await session.rollback()
+            return _error(404, "not_found")
 
-        await message_log_dal.create_message_log(
+        await message_log_dal.create_message_log_no_commit(
             session,
             {
                 "user_id": actor_id,
                 "event_type": "admin_reset_trial_webapp",
-                "content": f"Reset trial for user_id={target_id}",
+                "content": f"Reset trial eligibility for user_id={target_id}",
                 "is_admin_event": True,
                 "target_user_id": target_id,
             },

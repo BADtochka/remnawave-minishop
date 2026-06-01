@@ -261,6 +261,20 @@ async def create_email_user(
     )
 
 
+async def mark_trial_eligibility_reset(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    reset_at: Optional[datetime] = None,
+) -> Optional[datetime]:
+    reset_at = reset_at or datetime.now(timezone.utc)
+    stmt = update(User).where(User.user_id == user_id).values(trial_eligibility_reset_at=reset_at)
+    result = await session.execute(stmt)
+    if result.rowcount <= 0:
+        return None
+    return reset_at
+
+
 async def _has_active_panel_subscription(
     session: AsyncSession, user_id: int, panel_user_uuid: str
 ) -> bool:
