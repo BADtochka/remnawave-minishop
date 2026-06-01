@@ -2378,6 +2378,50 @@ a {
   color: var(--accent);
 }
 
+.auth-language-trigger {
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.auth-language-trigger:hover,
+.auth-language-trigger[data-state="open"] {
+  color: var(--accent);
+}
+
+.auth-language-trigger:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+.auth-language-trigger > span:last-of-type {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-language-trigger > svg,
+.auth-language-trigger > .emoji-flag {
+  flex: 0 0 auto;
+}
+
+.auth-language-content {
+  width: min(188px, calc(100vw - 40px));
+  min-width: 154px;
+  transform-origin: top center;
+}
+
 .auth-bottom strong {
   color: var(--accent);
 }
