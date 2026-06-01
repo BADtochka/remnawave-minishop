@@ -31,9 +31,7 @@ _SENSITIVE_KEY_RE = re.compile(
     re.IGNORECASE,
 )
 # Mask opaque id-like path segments (UUIDs, long tokens) in logged endpoints.
-_ENDPOINT_ID_RE = re.compile(
-    r"(?<=/)(?:[0-9a-fA-F]{8}-[0-9a-fA-F-]{8,}|[A-Za-z0-9_-]{24,})"
-)
+_ENDPOINT_ID_RE = re.compile(r"(?<=/)(?:[0-9a-fA-F]{8}-[0-9a-fA-F-]{8,}|[A-Za-z0-9_-]{24,})")
 _REDACTED = "***"
 
 
