@@ -1,5 +1,12 @@
 <script>
   import { Input } from "$components/ui/index.js";
+  import {
+    ArrowDown,
+    ArrowUp,
+    ChevronsUpDown,
+    DollarSign,
+    UsersRound,
+  } from "$components/ui/icons.js";
   import { Label } from "$components/ui/primitives.js";
   import {
     AdminBadge,
@@ -15,6 +22,7 @@
 
   export let at = (key) => key;
   export let fmtDateShort = (value) => value;
+  export let fmtMoney = (value) => value;
   export let panelStatusBadge = () => ({});
   export let resolvedAvatarUrl = () => "";
   export let userDisplayName = () => "";
@@ -49,16 +57,31 @@
     { value: "panel_linked", label: at("filter_panel_linked", {}, "С панелью") },
   ];
 
-  const USERS_SORT_OPTIONS = [
-    { value: "registered_desc", label: at("sort_registered_desc", {}, "Сначала новые") },
-    { value: "registered_asc", label: at("sort_registered_asc", {}, "Сначала старые") },
-    { value: "name_asc", label: at("sort_name_asc", {}, "Имя ↑") },
-    { value: "name_desc", label: at("sort_name_desc", {}, "Имя ↓") },
-    { value: "id_asc", label: at("sort_id_asc", {}, "ID ↑") },
-    { value: "id_desc", label: at("sort_id_desc", {}, "ID ↓") },
-    { value: "premium_ratio_asc", label: at("sort_premium_ratio_asc", {}, "Премиум % ↑") },
-    { value: "premium_ratio_desc", label: at("sort_premium_ratio_desc", {}, "Премиум % ↓") },
-  ];
+  const SORT_COLUMNS = {
+    user: { asc: "name_asc", desc: "name_desc", defaultDirection: "asc" },
+    premium: { asc: "premium_ratio_asc", desc: "premium_ratio_desc", defaultDirection: "desc" },
+    paymentsTotal: {
+      asc: "payments_total_asc",
+      desc: "payments_total_desc",
+      defaultDirection: "desc",
+    },
+    paymentsCount: {
+      asc: "payments_count_asc",
+      desc: "payments_count_desc",
+      defaultDirection: "desc",
+    },
+    invited: {
+      asc: "invited_users_count_asc",
+      desc: "invited_users_count_desc",
+      defaultDirection: "desc",
+    },
+    subscriptionExpires: {
+      asc: "subscription_expires_at_asc",
+      desc: "subscription_expires_at_desc",
+      defaultDirection: "asc",
+    },
+    registration: { asc: "registered_asc", desc: "registered_desc", defaultDirection: "desc" },
+  };
 
   const USERS_PANEL_STATUS_OPTIONS = [
     { value: "all", label: at("panel_status_all", {}, "Все статусы") },
@@ -94,12 +117,77 @@
     return trafficOfLabel(pt.used_bytes, pt.limit_bytes);
   }
 
-  $: userTableHeaders = [
-    at("user", {}, "Пользователь"),
-    at("premium_traffic_filter_label", {}, "Премиум трафик"),
-    at("status", {}, "Статус"),
-    at("users_col_registration", {}, "Регистрация"),
-  ];
+  function userTableColumns() {
+    return [
+      { key: "user", label: at("user", {}, "Пользователь"), sort: SORT_COLUMNS.user },
+      {
+        key: "premium",
+        label: at("premium_traffic_filter_label", {}, "Премиум трафик"),
+        sort: SORT_COLUMNS.premium,
+      },
+      {
+        key: "paymentsTotal",
+        label: at("users_col_payments_total", {}, "Сумма платежей"),
+        sort: SORT_COLUMNS.paymentsTotal,
+      },
+      {
+        key: "paymentsCount",
+        label: at("users_col_payments_count", {}, "Платежи"),
+        sort: SORT_COLUMNS.paymentsCount,
+      },
+      {
+        key: "invited",
+        label: at("users_col_invited", {}, "Приглашенные"),
+        sort: SORT_COLUMNS.invited,
+      },
+      { key: "status", label: at("status", {}, "Статус") },
+      {
+        key: "subscriptionExpires",
+        label: at("users_col_subscription_expires", {}, "Истекает"),
+        sort: SORT_COLUMNS.subscriptionExpires,
+      },
+      {
+        key: "registration",
+        label: at("users_col_registration", {}, "Регистрация"),
+        sort: SORT_COLUMNS.registration,
+      },
+    ];
+  }
+
+  function sortState(column) {
+    if (!column) return "none";
+    if (usersSort === column.asc) return "ascending";
+    if (usersSort === column.desc) return "descending";
+    return "none";
+  }
+
+  function nextSortValue(column) {
+    const state = sortState(column);
+    const defaultValue = column[column.defaultDirection] || column.asc;
+    if (state === "none") return defaultValue;
+    if (usersSort === defaultValue) {
+      return column.defaultDirection === "asc" ? column.desc : column.asc;
+    }
+    return "";
+  }
+
+  function toggleUsersSort(column) {
+    usersStore.updateState({ usersSort: nextSortValue(column), usersPage: 0 });
+    usersStore.loadUsers();
+  }
+
+  function sortTitle(column) {
+    const state = sortState(column);
+    if (state === "ascending") return at("sort_ascending", {}, "По возрастанию");
+    if (state === "descending") return at("sort_descending", {}, "По убыванию");
+    return at("sort_off", {}, "Без сортировки");
+  }
+
+  function rowPaymentsTotal(user) {
+    return fmtMoney(user?.payments_total_amount ?? 0, user?.payments_currency || "RUB");
+  }
+
+  $: userTableHeaders = userTableColumns().map((column) => column.label);
 
   onMount(() => {
     usersStore.loadUsers();
@@ -171,20 +259,6 @@
       />
     </Label.Root>
 
-    <Label.Root class="admin-toolbar-field">
-      <span class="admin-toolbar-field-label">{at("sort", {}, "Сортировка")}</span>
-      <AdminSelect
-        value={usersSort}
-        items={USERS_SORT_OPTIONS}
-        class="admin-toolbar-select"
-        ariaLabel={at("sort", {}, "Сортировка")}
-        onValueChange={(value) => {
-          usersStore.updateState({ usersSort: value, usersPage: 0 });
-          usersStore.loadUsers();
-        }}
-      />
-    </Label.Root>
-
     <div class="admin-toolbar-summary">
       <span class="admin-toolbar-field-label">{at("total", {}, "Всего")}</span>
       <strong>{usersTotal}</strong>
@@ -192,12 +266,12 @@
   </div>
 </div>
 
-<div class="admin-table-wrap admin-users-table-wrap">
+<div class="admin-users-table-wrap">
   {#if usersLoading}
     <AdminTableSkeleton
       headers={userTableHeaders}
       rows={USERS_PAGE_SIZE}
-      widths={["minmax(220px, 42%)", "minmax(140px, 28%)", "108px", "112px"]}
+      widths={["220px", "128px", "112px", "78px", "88px", "96px", "112px", "112px"]}
     />
   {:else if !users.length}
     <AdminEmptyState tone="card"
@@ -208,10 +282,35 @@
     <AdminTable class="admin-users-table">
       <thead>
         <tr>
-          <th>{at("user", {}, "Пользователь")}</th>
-          <th>{at("premium_traffic_filter_label", {}, "Премиум трафик")}</th>
-          <th>{at("status", {}, "Статус")}</th>
-          <th>{at("users_col_registration", {}, "Регистрация")}</th>
+          {#each userTableColumns() as column (column.key)}
+            <th aria-sort={column.sort ? sortState(column.sort) : undefined}>
+              {#if column.sort}
+                <button
+                  type="button"
+                  class="admin-sort-header"
+                  title={sortTitle(column.sort)}
+                  on:click={() => toggleUsersSort(column.sort)}
+                >
+                  <span>{column.label}</span>
+                  <span
+                    class="admin-sort-state"
+                    data-state={sortState(column.sort)}
+                    aria-hidden="true"
+                  >
+                    {#if sortState(column.sort) === "ascending"}
+                      <ArrowUp size={13} />
+                    {:else if sortState(column.sort) === "descending"}
+                      <ArrowDown size={13} />
+                    {:else}
+                      <ChevronsUpDown size={13} />
+                    {/if}
+                  </span>
+                </button>
+              {:else}
+                {column.label}
+              {/if}
+            </th>
+          {/each}
         </tr>
       </thead>
       <tbody>
@@ -264,8 +363,40 @@
                 >
               {/if}
             </td>
+            <td
+              class="admin-users-cell-money"
+              data-label={at("users_col_payments_total", {}, "Сумма платежей")}
+            >
+              <AdminBadge variant="success" class="admin-user-money-badge">
+                {rowPaymentsTotal(user)}
+              </AdminBadge>
+            </td>
+            <td
+              class="admin-users-cell-counter"
+              data-label={at("users_col_payments_count", {}, "Платежи")}
+            >
+              <span class="admin-user-counter">
+                <DollarSign size={12} />
+                <span>{user.payments_count ?? 0}</span>
+              </span>
+            </td>
+            <td
+              class="admin-users-cell-counter"
+              data-label={at("users_col_invited", {}, "Приглашенные")}
+            >
+              <span class="admin-user-counter">
+                <UsersRound size={13} />
+                <span>{user.invited_users_count ?? 0}</span>
+              </span>
+            </td>
             <td data-label={at("status", {}, "Статус")}>
               <AdminBadge variant={badge.variant}>{badge.label}</AdminBadge>
+            </td>
+            <td
+              class="admin-users-cell-date admin-cell-mono"
+              data-label={at("users_col_subscription_expires", {}, "Истекает")}
+            >
+              {fmtDateShort(user.subscription_expires_at || user.panel_status_expired_at)}
             </td>
             <td
               class="admin-users-cell-date admin-cell-mono"
@@ -297,6 +428,57 @@
 />
 
 <style>
+  :global(.admin-toolbar-users .admin-toolbar-controls) {
+    grid-template-columns: repeat(3, minmax(130px, 1fr)) minmax(96px, auto);
+  }
+
+  .admin-users-table-wrap :global(.admin-table-wrap) {
+    overflow-x: auto;
+  }
+
+  .admin-users-table-wrap :global(.admin-users-table) {
+    min-width: 1080px;
+  }
+
+  .admin-sort-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    margin: -4px -6px;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+  }
+
+  .admin-sort-header:hover,
+  .admin-sort-header:focus-visible {
+    color: var(--admin-text);
+    background: color-mix(in srgb, var(--admin-muted) 10%, transparent);
+    outline: none;
+  }
+
+  .admin-sort-header:focus-visible {
+    box-shadow: 0 0 0 2px var(--admin-ring);
+  }
+
+  .admin-sort-state {
+    display: inline-flex;
+    align-items: center;
+    color: var(--admin-dim);
+  }
+
+  .admin-sort-state[data-state="ascending"],
+  .admin-sort-state[data-state="descending"] {
+    color: color-mix(in srgb, var(--accent) 72%, var(--admin-muted));
+  }
+
   .admin-users-cell-user-inner {
     display: flex;
     align-items: center;
@@ -353,6 +535,30 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .admin-users-cell-money,
+  .admin-users-cell-counter {
+    white-space: nowrap;
+  }
+
+  .admin-users-cell-money :global(.admin-user-money-badge) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .admin-user-counter {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--admin-text);
+    font-size: 12px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .admin-user-counter :global(svg) {
+    color: var(--admin-muted);
+    flex: 0 0 auto;
+  }
+
   .admin-users-cell-date {
     white-space: nowrap;
     font-size: 12px;
@@ -362,5 +568,31 @@
   .admin-users-table-wrap :global(.admin-users-table tbody tr.is-clickable:focus-visible) {
     outline: 2px solid var(--admin-ring);
     outline-offset: -2px;
+  }
+
+  @media (max-width: 720px) {
+    .admin-users-table-wrap :global(.admin-users-table thead) {
+      display: table-header-group;
+    }
+
+    .admin-users-table-wrap :global(.admin-users-table tbody tr) {
+      display: table-row;
+      padding: 0;
+      border-bottom: 0;
+    }
+
+    .admin-users-table-wrap :global(.admin-users-table tbody tr:last-child td) {
+      border-bottom: 0;
+    }
+
+    .admin-users-table-wrap :global(.admin-users-table tbody td) {
+      display: table-cell;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--admin-border);
+    }
+
+    .admin-users-table-wrap :global(.admin-users-table tbody td::before) {
+      content: none;
+    }
   }
 </style>

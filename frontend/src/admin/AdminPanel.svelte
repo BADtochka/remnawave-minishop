@@ -785,6 +785,7 @@
             <UsersSection
               {at}
               {fmtDateShort}
+              {fmtMoney}
               {panelStatusBadge}
               {resolvedAvatarUrl}
               {userDisplayName}

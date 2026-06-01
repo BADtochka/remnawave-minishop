@@ -13,7 +13,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
     usersFilter: "all",
     usersPanelStatus: "all",
     usersPremiumTraffic: "all",
-    usersSort: "registered_desc",
+    usersSort: "",
     usersLoading: false,
 
     openedUser: null,
@@ -103,7 +103,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
       if (s.usersPremiumTraffic && s.usersPremiumTraffic !== "all") {
         params.set("premium_traffic", s.usersPremiumTraffic);
       }
-      if (s.usersSort && s.usersSort !== "registered_desc") params.set("sort", s.usersSort);
+      if (s.usersSort) params.set("sort", s.usersSort);
       const data = await api(`/admin/users?${params.toString()}`);
       if (data?.ok) {
         state.update((st) => ({
