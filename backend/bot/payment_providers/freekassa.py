@@ -777,8 +777,7 @@ SPEC = PaymentProviderSpec(
     manifest_fields=_CONFIG_MANIFEST + _PRESENTATION_MANIFEST,
     supported_currencies=FREEKASSA_SUPPORTED_CURRENCIES,
     currency_support_note=(
-        "FreeKassa SCI documents the payment currency parameter as "
-        "RUB, USD, EUR, UAH or KZT."
+        "FreeKassa SCI documents the payment currency parameter as RUB, USD, EUR, UAH or KZT."
     ),
     currency_support_url="https://docs.freekassa.net/",
 )

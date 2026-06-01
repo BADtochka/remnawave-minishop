@@ -682,8 +682,7 @@ SPEC = PaymentProviderSpec(
     manifest_fields=_CONFIG_MANIFEST + _PRESENTATION_MANIFEST,
     supported_currencies_resolver=lambda config: getattr(config, "SUPPORTED_CURRENCIES", "RUB,USD"),
     currency_support_note=(
-        "SeverPay PayIn requires a currency; keep this list aligned with your "
-        "merchant account."
+        "SeverPay PayIn requires a currency; keep this list aligned with your merchant account."
     ),
     currency_support_url="https://docs.severpay.io/ru/payin/create",
 )

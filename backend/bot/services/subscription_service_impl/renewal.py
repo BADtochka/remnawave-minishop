@@ -44,9 +44,7 @@ class RenewalMixin:
         currency = default_payment_currency_code_for_settings(self.settings)
         amount = None
         tariffs_config = (
-            self._tariffs_config()
-            if callable(getattr(self, "_tariffs_config", None))
-            else None
+            self._tariffs_config() if callable(getattr(self, "_tariffs_config", None)) else None
         )
         if tariffs_config and callable(getattr(self, "_resolve_tariff", None)):
             try:

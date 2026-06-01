@@ -671,10 +671,7 @@ async def device_topup_options_route(request: web.Request) -> web.Response:
             default_packages = packages.for_currency(default_currency)
         else:
             default_packages = getattr(packages, default_currency, []) if packages else []
-        currency_counts = {
-            int(package.count)
-            for package in default_packages
-        }
+        currency_counts = {int(package.count) for package in default_packages}
         stars_counts = {int(package.count) for package in (packages.stars if packages else [])}
         plans = []
         for count in sorted(currency_counts | stars_counts):

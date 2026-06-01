@@ -350,7 +350,6 @@ def test_webapp_payment_methods_filter_by_default_currency(monkeypatch):
     assert [method["id"] for method in methods] == ["wata"]
 
 
-
 def test_admin_only_provider_toggle_pairs_are_declared():
     pairs = set(provider_admin_only_pairs())
 
