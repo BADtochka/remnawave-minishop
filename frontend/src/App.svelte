@@ -1219,6 +1219,7 @@
     const emailHint = readEmailCodeLoginDeeplink();
     if (!emailHint) return;
     emailLoginDeeplinkConsumed = true;
+    authStore.clearPendingEmailCode();
     authStore.update((s) => ({
       ...s,
       email: emailHint,
@@ -1670,6 +1671,9 @@
     screen = "login";
     activeTab = "home";
     setPasswordLoginMode(isPasswordLoginPath(), true);
+    authStore.restorePendingEmailCode((nextScreen) => {
+      screen = nextScreen;
+    });
     void startEmailCodeLoginFromDeeplink();
   }
 

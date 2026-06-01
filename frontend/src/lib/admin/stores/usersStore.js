@@ -25,6 +25,13 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
     userDeleteOpen: false,
     userBanConfirmOpen: false,
     userMessageConfirmOpen: false,
+    userReferralsOpen: false,
+    userReferralsLoading: false,
+    userReferrals: [],
+    userReferralsTotal: 0,
+    userReferralsPage: 0,
+    userReferralsPageSize: USERS_PAGE_SIZE,
+    userReferralsInviter: null,
     userDetailTab: "profile",
     premiumUnlimitedDraft: false,
     premiumBonusGbDraft: "",
@@ -126,6 +133,12 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
       userExtendDays: 30,
       userDetailLoading: true,
       userDetailTab: "subscription",
+      userReferralsOpen: false,
+      userReferralsLoading: false,
+      userReferrals: [],
+      userReferralsTotal: 0,
+      userReferralsPage: 0,
+      userReferralsInviter: null,
       userLogs: [],
       userLogsTotal: 0,
       userLogsPage: 0,
@@ -175,6 +188,12 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
         userDeleteOpen: false,
         userBanConfirmOpen: false,
         userMessageConfirmOpen: false,
+        userReferralsOpen: false,
+        userReferralsLoading: false,
+        userReferrals: [],
+        userReferralsTotal: 0,
+        userReferralsPage: 0,
+        userReferralsInviter: null,
         userLogs: [],
         userLogsTotal: 0,
         userLogsPage: 0,
@@ -229,6 +248,58 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
 
   function setUserLogsPage(page) {
     loadUserLogs(page);
+  }
+
+  async function openUserReferrals(page = 0) {
+    let s;
+    state.update((st) => {
+      s = st;
+      return st;
+    });
+    if (!s.openedUser) return;
+    const userId = s.openedUser.user_id;
+    const targetPage = Number.isFinite(page) ? Math.max(0, Math.floor(page)) : 0;
+    state.update((st) => ({
+      ...st,
+      userReferralsOpen: true,
+      userReferralsLoading: true,
+      userReferralsPage: targetPage,
+    }));
+    try {
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        page_size: String(s.userReferralsPageSize || USERS_PAGE_SIZE),
+      });
+      const data = await api(`/admin/users/${userId}/referrals?${params.toString()}`);
+      if (data?.ok) {
+        state.update((st) => {
+          if (!st.openedUser || st.openedUser.user_id !== userId) return st;
+          return {
+            ...st,
+            userReferrals: data.invitees || [],
+            userReferralsTotal: Number(data.total || 0),
+            userReferralsPage: Number(data.page || 0),
+            userReferralsPageSize: Number(data.page_size || st.userReferralsPageSize),
+            userReferralsInviter: data.inviter || null,
+          };
+        });
+      } else if (data?.error) {
+        onToast(data.error);
+      }
+    } finally {
+      state.update((st) => ({ ...st, userReferralsLoading: false }));
+    }
+  }
+
+  function closeUserReferrals() {
+    state.update((s) => ({
+      ...s,
+      userReferralsOpen: false,
+    }));
+  }
+
+  function setUserReferralsPage(page) {
+    openUserReferrals(page);
   }
 
   function copyToClipboard(text, successMessage = at("link_copied", {}, "Скопировано")) {
@@ -564,5 +635,8 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
     grantTraffic,
     loadUserLogs,
     setUserLogsPage,
+    openUserReferrals,
+    closeUserReferrals,
+    setUserReferralsPage,
   };
 }
