@@ -1100,6 +1100,37 @@ class Settings(BaseSettings):
     )
     LOG_SUPPORT: bool = Field(default=True, description="Send support ticket notifications")
 
+    # Anonymous install telemetry (self-hosted friendly, opt-out).
+    TELEMETRY_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Send an anonymous daily install heartbeat (version, OS, locale, "
+            "user-count range). No personal data. Opt out here, via the web "
+            "admin, or by clearing TELEMETRY_ENDPOINT/TELEMETRY_API_KEY."
+        ),
+    )
+    TELEMETRY_ENDPOINT: str = Field(
+        default="https://eu.i.posthog.com",
+        description="PostHog ingestion host. Empty disables telemetry.",
+    )
+    TELEMETRY_API_KEY: str = Field(
+        default="phc_sRiAbbrjhyYPfsgBwSZyLvujDXBLaDpmWKt6paGmCCMm",
+        description=(
+            "PostHog project API key (phc_...). Safe to ship in the image: it is "
+            "a write-only ingest key. Empty disables telemetry."
+        ),
+    )
+    TELEMETRY_INTERVAL_HOURS: int = Field(default=24)
+
+    @property
+    def telemetry_configured(self) -> bool:
+        """True when telemetry is enabled and has a delivery target."""
+        return bool(
+            self.TELEMETRY_ENABLED
+            and str(self.TELEMETRY_ENDPOINT or "").strip()
+            and str(self.TELEMETRY_API_KEY or "").strip()
+        )
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore", populate_by_name=True
     )

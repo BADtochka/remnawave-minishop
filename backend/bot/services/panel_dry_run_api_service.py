@@ -22,6 +22,18 @@ _INTERNAL_SQUAD_BULK_RE = re.compile(
 _LIVE_POST_ENDPOINTS = frozenset({"/system/tools/happ/encrypt"})
 _KNOWN_TRAFFIC_STRATEGIES = frozenset({"NO_RESET", "DAY", "WEEK", "MONTH"})
 
+# Panel payloads can carry proxy credentials (e.g. trojanPassword, ssPassword,
+# vless/vmess uuids) and PII (email, telegramId). Redact such values before they
+# reach the dry-run log so secrets are never written in clear text.
+_SENSITIVE_KEY_RE = re.compile(
+    r"pass|pwd|secret|token|key|credential|auth|cookie|session|"
+    r"email|mail|phone|telegram|mnemonic",
+    re.IGNORECASE,
+)
+# Mask opaque id-like path segments (UUIDs, long tokens) in logged endpoints.
+_ENDPOINT_ID_RE = re.compile(r"(?<=/)(?:[0-9a-fA-F]{8}-[0-9a-fA-F-]{8,}|[A-Za-z0-9_-]{24,})")
+_REDACTED = "***"
+
 
 @dataclass
 class _DryRunValidation:
@@ -89,11 +101,35 @@ class PanelDryRunApiService(PanelApiService):
         return f"/{str(endpoint or '').lstrip('/')}"
 
     @staticmethod
-    def _payload_preview(payload: Any) -> str:
+    def _safe_endpoint(endpoint: str) -> str:
+        """Mask opaque id-like segments so logged paths carry no private ids."""
+        return _ENDPOINT_ID_RE.sub("<id>", str(endpoint or ""))
+
+    @classmethod
+    def _redact(cls, value: Any, _depth: int = 0) -> Any:
+        """Recursively replace values under sensitive keys with a placeholder."""
+        if _depth > 6:
+            return "..."
+        if isinstance(value, dict):
+            return {
+                k: (
+                    _REDACTED
+                    if isinstance(k, str) and _SENSITIVE_KEY_RE.search(k)
+                    else cls._redact(v, _depth + 1)
+                )
+                for k, v in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [cls._redact(item, _depth + 1) for item in value]
+        return value
+
+    @classmethod
+    def _payload_preview(cls, payload: Any) -> str:
+        redacted = cls._redact(payload)
         try:
-            text = json.dumps(payload, ensure_ascii=False, default=str, sort_keys=True)
+            text = json.dumps(redacted, ensure_ascii=False, default=str, sort_keys=True)
         except Exception:
-            text = str(payload)
+            text = str(redacted)
         if len(text) > 1200:
             return f"{text[:1200]}..."
         return text
@@ -111,7 +147,7 @@ class PanelDryRunApiService(PanelApiService):
             "[PANEL DRY-RUN %s] would %s %s payload=%s%s",
             status,
             method,
-            endpoint,
+            self._safe_endpoint(endpoint),
             self._payload_preview(payload),
             f" errors={errors}" if errors else "",
         )
