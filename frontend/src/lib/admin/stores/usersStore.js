@@ -469,8 +469,11 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
     state.update((st) => ({ ...st, userActionBusy: true }));
     try {
       const res = await api(`/admin/users/${s.openedUser.user_id}/reset-trial`, { method: "POST" });
-      if (res?.ok) onToast(at("trial_reset", {}, "Триал сброшен"));
-      else onToast(res?.error || at("error", {}, "Ошибка"));
+      if (res?.ok) {
+        onToast(at("trial_reset", {}, "Триал сброшен"));
+        await openUser(s.openedUser.user_id, { skipPush: true, pathContext: _pathContext });
+        if (_activeRef === "users") await loadUsers();
+      } else onToast(res?.error || at("error", {}, "Ошибка"));
     } finally {
       state.update((st) => ({ ...st, userActionBusy: false }));
     }

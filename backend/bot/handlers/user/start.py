@@ -45,12 +45,12 @@ async def should_show_trial_button(
     if not settings.TRIAL_ENABLED:
         return False
 
-    if hasattr(subscription_service, "has_had_any_subscription") and callable(
-        getattr(subscription_service, "has_had_any_subscription")
+    if hasattr(subscription_service, "has_trial_blocking_subscription") and callable(
+        getattr(subscription_service, "has_trial_blocking_subscription")
     ):
-        return not await subscription_service.has_had_any_subscription(session, user_id)
+        return not await subscription_service.has_trial_blocking_subscription(session, user_id)
 
-    logging.error("Method has_had_any_subscription is missing in SubscriptionService!")
+    logging.error("Method has_trial_blocking_subscription is missing in SubscriptionService!")
     return False
 
 

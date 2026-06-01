@@ -932,8 +932,7 @@ async def handle_reset_trial(
     _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
 
     try:
-        # Delete all user subscriptions to reset trial eligibility
-        await subscription_dal.delete_all_user_subscriptions(session, user.user_id)
+        await user_dal.mark_trial_eligibility_reset(session, user.user_id)
         await session.commit()
 
         await callback.answer(_("admin_user_trial_reset_success"), show_alert=True)
