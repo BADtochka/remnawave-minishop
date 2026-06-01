@@ -1018,6 +1018,7 @@ class Settings(BaseSettings):
         "LOG_SUPPORT_THREAD_ID",
         "BACKUP_CHAT_ID",
         "BACKUP_THREAD_ID",
+        "REQUIRED_CHANNEL_ID",
         mode="before",
     )
     @classmethod
