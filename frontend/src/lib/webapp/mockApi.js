@@ -1,5 +1,6 @@
 import { DEV_MOCK } from "./previewMock.js";
 import { DEMO_DATASET } from "./demoDataset.js";
+import SETTINGS_MANIFEST_SECTIONS from "./settingsManifest.generated.json";
 import { withDemoAvatar, withDemoAvatarDetail, withDemoAvatarTicket } from "./demoAvatars.js";
 
 const DEMO_LANGUAGE_STORAGE_KEY = "rw_minishop_demo_language";
@@ -605,18 +606,43 @@ function filterDemoSupportTickets(items, params) {
   return out;
 }
 
+function demoSettingsValuesByKey() {
+  const map = new Map();
+  for (const section of DEMO_DATASET.settingsSections || []) {
+    for (const field of section.fields || []) {
+      map.set(field.key, field);
+    }
+  }
+  return map;
+}
+
 function demoSettingsSections(clone) {
-  const sections = clone(DEMO_DATASET.settingsSections || []);
+  // Section/field structure comes from the manifest snapshot generated off the
+  // Python source of truth (scripts/export_settings_manifest.py), so the demo
+  // stays in sync with the real admin. Realistic values are overlaid per field
+  // key from the dump-based dataset; fields absent there (e.g. a freshly added
+  // section) simply show their placeholders.
+  const demoValues = demoSettingsValuesByKey();
+  const sections = clone(SETTINGS_MANIFEST_SECTIONS);
   for (const section of sections) {
     for (const field of section.fields || []) {
-      if (!demoSettingsChanges.has(field.key)) continue;
-      const change = demoSettingsChanges.get(field.key);
-      if (change.deleted) {
-        field.value = field.default ?? "";
-        field.overridden = false;
-      } else {
-        field.value = change.value;
-        field.overridden = true;
+      const demoField = demoValues.get(field.key);
+      if (demoField) {
+        if ("value" in demoField) field.value = demoField.value;
+        if ("overridden" in demoField) field.overridden = demoField.overridden;
+        if ("updated_at" in demoField) field.updated_at = demoField.updated_at;
+        if ("source" in demoField) field.source = demoField.source;
+        if (field.secret && "has_value" in demoField) field.has_value = demoField.has_value;
+      }
+      if (demoSettingsChanges.has(field.key)) {
+        const change = demoSettingsChanges.get(field.key);
+        if (change.deleted) {
+          field.value = field.default ?? "";
+          field.overridden = false;
+        } else {
+          field.value = change.value;
+          field.overridden = true;
+        }
       }
     }
   }
