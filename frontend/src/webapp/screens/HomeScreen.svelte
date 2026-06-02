@@ -29,6 +29,7 @@
   } from "../../lib/webapp/traffic.js";
 
   const SUBSCRIPTION_EXPIRY_WARNING_MS = 72 * 60 * 60 * 1000;
+  const SUBSCRIPTION_EXPIRING_SOON_MS = 24 * 60 * 60 * 1000;
 
   export let appSettings = {};
   export let brand = {};
@@ -151,8 +152,22 @@
   );
   $: subscriptionEndDateText = subscriptionEndDateLabel(subscription);
   $: subscriptionEndCountdown = formatSubscriptionCountdown(subscriptionRemainingMs);
+  $: subscriptionEndCountdownLabel = t(
+    "wa_subscription_remaining_countdown",
+    { countdown: subscriptionEndCountdown },
+    `осталось: ${subscriptionEndCountdown}`
+  );
+  $: subscriptionExpiringSoon = Boolean(
+    subscription?.active &&
+    subscriptionEndMs &&
+    subscriptionRemainingMs > 0 &&
+    subscriptionRemainingMs < SUBSCRIPTION_EXPIRING_SOON_MS
+  );
+  $: subscriptionTermDisplayText = subscriptionExpiringSoon
+    ? t("wa_subscription_expiring_soon", {}, "Скоро закончится!")
+    : activeSubscriptionTermLabel(subscription);
   $: subscriptionEndDisplayText = subscriptionExpiryWarning
-    ? `${subscriptionEndDateText || subscription.end_date_text} · ${subscriptionEndCountdown}`
+    ? `${subscriptionEndDateText || subscription.end_date_text} \u00b7 ${subscriptionEndCountdownLabel}`
     : subscriptionEndDateText;
   $: statusCardClass = [
     "status-card",
@@ -203,9 +218,7 @@
           <CheckCircle2 class="sub-status-icon" size={23} />
           <div class="sub-status-main">
             <h2>
-              {trafficMode ? t("wa_home_access_active") : t("wa_home_subscription_active")} | {activeSubscriptionTermLabel(
-                subscription
-              )}
+              {trafficMode ? t("wa_home_access_active") : t("wa_home_subscription_active")} | {subscriptionTermDisplayText}
             </h2>
             <div
               class:sub-status-details-with-tariff={hasActiveTariffSubscription &&
