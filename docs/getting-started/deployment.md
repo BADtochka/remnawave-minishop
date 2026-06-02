@@ -13,6 +13,37 @@ docker compose ps
 docker compose logs -f backend worker frontend
 ```
 
+## Интерактивный install wizard
+
+Для нового сервера можно не клонировать весь репозиторий и не ставить Python.
+Скачайте только POSIX `sh`-скрипт через `raw.githubusercontent.com` и
+запустите его:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/3252a8/remnawave-minishop/main/scripts/install.sh -o install.sh
+sh install.sh
+```
+
+Wizard работает через меню с цифрами и подтверждениями `y/n`. Он умеет:
+
+- скачать выбранный compose-профиль (`Caddy`, `Nginx`, `Pangolin/Newt` или `no-proxy`);
+- сгенерировать минимальный `.env`, включая пароли и стабильные secrets;
+- сохранить backup существующих файлов перед перезаписью;
+- запустить `docker compose pull && docker compose up -d`;
+- проверить текущий стек через `docker compose ps` и логи `migrate`;
+- запустить миграцию из поддерживаемых legacy-ботов, сейчас - из Remnashop.
+
+Для тестирования другой ветки или форка задайте источник перед запуском:
+
+```bash
+MINISHOP_INSTALL_REPO=3252a8/remnawave-minishop \
+MINISHOP_INSTALL_REF=main \
+sh install.sh
+```
+
+Миграция в wizard сначала запускает `dry-run`, показывает JSON-сводку и только
+после отдельного подтверждения применяет изменения в целевую БД.
+
 Обычный `docker compose up -d --build` поднимает:
 
 - `postgres` и `redis` с проверками здоровья;
