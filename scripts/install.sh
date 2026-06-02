@@ -8,6 +8,8 @@ DEFAULT_REF="${MINISHOP_INSTALL_REF:-main}"
 DEFAULT_IMAGE_TAG="${MINISHOP_IMAGE_TAG:-latest}"
 INSTALL_STATE_DIR=".installer"
 IMPORTER_CACHE_PATH="$INSTALL_STATE_DIR/import_legacy.py"
+APP_UID=10001
+APP_GID=10001
 OLD_TGSHOP_DB_VOLUME="remnawave-tg-shop-db-data"
 NEW_MINISHOP_DB_VOLUME="remnawave-minishop-db-data"
 OLD_TGSHOP_CADDY_DATA_VOLUME="remnawave-tg-shop-caddy-data"
@@ -635,6 +637,37 @@ write_env_file() {
     ok "Wrote $ENV_PATH"
 }
 
+prepare_data_mount() {
+    section "Prepare data mount"
+    data_dir="$TARGET_DIR/data"
+    created=0
+    if [ ! -d "$data_dir" ]; then
+        mkdir -p "$data_dir" || return 1
+        created=1
+    fi
+
+    if [ "$created" = "1" ]; then
+        if command -v chown >/dev/null 2>&1; then
+            if ! chown "$APP_UID:$APP_GID" "$data_dir" 2>/dev/null; then
+                warn "Could not chown $data_dir. Run: sudo chown $APP_UID:$APP_GID data"
+            fi
+        fi
+        chmod u+rwx "$data_dir" 2>/dev/null || true
+        ok "Created writable $data_dir"
+        return 0
+    fi
+
+    info "$data_dir already exists."
+    if confirm "Adjust $data_dir owner to $APP_UID:$APP_GID for container writes?" 0; then
+        if command -v chown >/dev/null 2>&1; then
+            if ! chown "$APP_UID:$APP_GID" "$data_dir" 2>/dev/null; then
+                warn "Could not chown $data_dir. Run: sudo chown $APP_UID:$APP_GID data"
+            fi
+        fi
+        chmod u+rwx "$data_dir" 2>/dev/null || true
+    fi
+}
+
 require_docker() {
     if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
         COMPOSE_STYLE="docker"
@@ -1049,6 +1082,7 @@ install_flow() {
     download_profile_files || return 1
     write_env_file || return 1
     mkdir -p "$TARGET_DIR/$INSTALL_STATE_DIR"
+    prepare_data_mount || return 1
     if [ "$with_migration" = "1" ]; then
         choose_legacy_source
     elif confirm "Run a migration from another bot now?" 0; then
@@ -1080,6 +1114,8 @@ migration_only_flow() {
     LEGACY_SOURCE=""
     installation_directory || return 1
     choose_legacy_source
+    [ "$LEGACY_SOURCE" = "skip" ] && return 0
+    prepare_data_mount || return 1
     case "$LEGACY_SOURCE" in
         remnashop)
             github_source || return 1
