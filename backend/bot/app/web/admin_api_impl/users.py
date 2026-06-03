@@ -1347,6 +1347,78 @@ async def admin_user_regular_traffic_override_route(request: web.Request) -> web
     return _ok({"subscription": _serialize_subscription(active)})
 
 
+async def admin_user_hwid_device_limit_route(request: web.Request) -> web.Response:
+    """Override the user's base HWID device limit.
+
+    ``hwid_device_limit == 0`` means unlimited; ``NULL`` means the tariff/.env
+    default is used. Purchased extra devices remain tracked separately and are
+    added when syncing the effective panel limit.
+    """
+    actor_id = _require_admin_user_id(request)
+    target_id = int(request.match_info["user_id"])
+    settings: Settings = request.app["settings"]
+    payload = await _read_json(request)
+
+    unlimited = bool(payload.get("unlimited"))
+    use_default = bool(payload.get("use_default") or payload.get("reset_to_default"))
+    limit_raw = payload.get("hwid_device_limit", payload.get("limit"))
+
+    if unlimited:
+        hwid_device_limit: Optional[int] = 0
+    elif use_default or limit_raw is None or limit_raw == "":
+        hwid_device_limit = None
+    else:
+        try:
+            hwid_device_limit = int(limit_raw)
+        except (TypeError, ValueError):
+            return _error(
+                400,
+                "invalid_hwid_device_limit",
+                "hwid_device_limit must be a non-negative integer",
+            )
+        if hwid_device_limit < 0 or hwid_device_limit > 1_000_000:
+            return _error(
+                400,
+                "invalid_hwid_device_limit",
+                "hwid_device_limit must be an integer from 0 to 1000000",
+            )
+
+    subscription_service = request.app.get("subscription_service")
+
+    async_session_factory: sessionmaker = request.app["async_session_factory"]
+    async with async_session_factory() as session:
+        active = await subscription_dal.get_active_subscription_by_user_id(session, target_id)
+        if not active:
+            return _error(404, "no_active_subscription")
+
+        active.hwid_device_limit = hwid_device_limit
+
+        effective_limit = None
+        if subscription_service is not None:
+            effective_limit = await subscription_service.sync_hwid_device_limit_to_panel(
+                session, target_id
+            )
+
+        await message_log_dal.create_message_log(
+            session,
+            {
+                "user_id": actor_id,
+                "event_type": "admin_hwid_device_limit_webapp",
+                "content": (
+                    f"hwid_device_limit={hwid_device_limit!r} "
+                    f"effective_hwid_device_limit={effective_limit!r}"
+                ),
+                "is_admin_event": True,
+                "target_user_id": target_id,
+            },
+        )
+        await session.commit()
+        await session.refresh(active)
+
+    await _invalidate_after_admin_user_mutation(settings, target_id)
+    return _ok({"subscription": _serialize_subscription(active)})
+
+
 async def admin_user_traffic_grant_route(request: web.Request) -> web.Response:
     """Credit regular or premium traffic to a user without a payment.
 

@@ -120,6 +120,8 @@ def _serialize_subscription(sub: Subscription) -> Dict[str, Any]:
         "regular_unlimited_override": regular_unlimited_override,
         "premium_unlimited_override": premium_unlimited_override,
         "premium_is_limited": bool(sub.premium_is_limited),
+        "hwid_device_limit": getattr(sub, "hwid_device_limit", None),
+        "extra_hwid_devices": int(getattr(sub, "extra_hwid_devices", 0) or 0),
         "tariff_key": sub.tariff_key,
         "display_label": display_label,
         "is_trial": is_trial,

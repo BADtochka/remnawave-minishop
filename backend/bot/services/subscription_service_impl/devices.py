@@ -31,6 +31,49 @@ class HwidDeviceMixin:
             )
             return int(getattr(sub, "extra_hwid_devices", 0) or 0)
 
+    async def sync_hwid_device_limit_to_panel(
+        self,
+        session: AsyncSession,
+        user_id: int,
+    ) -> Optional[int]:
+        """Push the current local HWID device limit override to the panel."""
+        db_user = await user_dal.get_user_by_id(session, user_id)
+        if not db_user or not db_user.panel_user_uuid:
+            return None
+        sub = await subscription_dal.get_active_subscription_by_user_id(
+            session, user_id, db_user.panel_user_uuid
+        )
+        if not sub:
+            return None
+
+        tariff = self._resolve_tariff(sub.tariff_key) if sub.tariff_key else None
+        base_hwid_limit = (
+            int(sub.hwid_device_limit)
+            if sub.hwid_device_limit is not None
+            else self._base_hwid_limit_for_tariff(tariff)
+        )
+        extra_hwid_devices = await self._active_hwid_extra_devices_for_sub(session, sub)
+        sub.extra_hwid_devices = extra_hwid_devices
+        effective_hwid_limit = self._effective_hwid_limit(base_hwid_limit, extra_hwid_devices)
+        if effective_hwid_limit is None:
+            return None
+
+        panel_payload = self._build_panel_update_payload(
+            panel_user_uuid=db_user.panel_user_uuid,
+            expire_at=sub.end_date,
+            status="ACTIVE",
+            hwid_device_limit=effective_hwid_limit,
+            include_default_squads=False,
+        )
+        panel_payload.update(self._panel_identity_payload_for_user(db_user))
+        try:
+            await self.panel_service.update_user_details_on_panel(
+                db_user.panel_user_uuid, panel_payload
+            )
+        except Exception:
+            logging.exception("sync_hwid_device_limit_to_panel failed for user %s", user_id)
+        return effective_hwid_limit
+
     async def _hwid_topup_validity_window(
         self,
         session: AsyncSession,
@@ -150,7 +193,7 @@ class HwidDeviceMixin:
             if sub.hwid_device_limit is not None
             else self._base_hwid_limit_for_tariff(tariff)
         )
-        if base_hwid_limit == 0:
+        if base_hwid_limit in (None, 0):
             return None
 
         package = self._find_hwid_package(tariff, purchased_devices, currency)
@@ -248,7 +291,7 @@ class HwidDeviceMixin:
             if sub.hwid_device_limit is not None
             else self._base_hwid_limit_for_tariff(tariff)
         )
-        if base_hwid_limit == 0:
+        if base_hwid_limit in (None, 0):
             logging.info(
                 "Skipping HWID top-up for user %s because current limit is unlimited", user_id
             )

@@ -73,6 +73,23 @@
     return trial.active ? `${base} · ${at("user_trial_active", {}, "активен")}` : base;
   }
 
+  function hwidLimitLabel(sub) {
+    const rawBase = sub?.hwid_device_limit;
+    const hasBase = rawBase !== null && rawBase !== undefined;
+    const extra = Math.max(0, Number(sub?.extra_hwid_devices || 0));
+    if (!hasBase) return at("user_hwid_limit_default", {}, "Тарифный / default");
+    const base = Number(rawBase);
+    if (base === 0) return at("user_hwid_limit_unlimited", {}, "Безлимит");
+    if (extra > 0) {
+      return at(
+        "user_hwid_limit_with_extra",
+        { base, extra, total: base + extra },
+        `${base + extra} (${base} + ${extra})`
+      );
+    }
+    return at("user_hwid_limit_count", { count: base }, `${base}`);
+  }
+
   const usersStore = getContext("usersStore");
 
   $: ({
@@ -91,6 +108,7 @@
     userReferralsPage,
     userReferralsPageSize,
     premiumUnlimitedDraft,
+    hwidUnlimitedDraft,
     userDetailTab,
     userLogs,
     userLogsTotal,
@@ -435,6 +453,11 @@
                   <li>
                     <span>{at("user_label_provider", {}, "Провайдер")}</span><strong
                       >{openedUserDetail.active_subscription.provider || "—"}</strong
+                    >
+                  </li>
+                  <li>
+                    <span>{at("user_label_hwid_devices", {}, "HWID-устройства")}</span><strong
+                      >{hwidLimitLabel(openedUserDetail.active_subscription)}</strong
                     >
                   </li>
                 </ul>
@@ -893,6 +916,66 @@
                           )}</span
                         >
                       {/if}
+                    </div>
+                  </div>
+                </section>
+
+                <section class="admin-user-action-sheet admin-user-action-sheet--hwid-limit">
+                  <AdminSectionHeader
+                    title={at("user_hwid_limit_card_title", {}, "HWID-устройства")}
+                    description={at(
+                      "user_hwid_limit_card_hint",
+                      {},
+                      "Ручной лимит устройств для пользователя. Пустое поле вернёт тарифный или default-лимит."
+                    )}
+                  />
+                  <div class="admin-user-action-sheet-body admin-user-override-stack">
+                    <Label.Root class="admin-field-label admin-extend-field">
+                      <span>{at("user_hwid_limit_input", {}, "Лимит устройств")}</span>
+                      <small
+                        >{at(
+                          "user_hwid_limit_input_hint",
+                          {},
+                          "Пусто — тариф/default; 0 или галочка — безлимит."
+                        )}</small
+                      >
+                      <Input
+                        class="input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder={at("user_hwid_limit_default_placeholder", {}, "Тариф")}
+                        disabled={hwidUnlimitedDraft}
+                        aria-label={at("user_hwid_limit_input", {}, "Лимит устройств")}
+                        bind:value={$usersStore.hwidDeviceLimitDraft}
+                      />
+                    </Label.Root>
+                  </div>
+                  <div class="admin-user-action-sheet-footer admin-override-card-footer">
+                    <div class="admin-override-card-toolbar">
+                      <label class="admin-override-unlimited-label">
+                        <Checkbox
+                          bind:checked={$usersStore.hwidUnlimitedDraft}
+                          aria-label={at("user_override_unlimited_short", {}, "Безлимит")}
+                        />
+                        <span>{at("user_override_unlimited_short", {}, "Безлимит")}</span>
+                      </label>
+                      <AdminButton
+                        variant="primary"
+                        onclick={usersStore.saveHwidDeviceLimit}
+                        disabled={userActionBusy}
+                      >
+                        {at("user_hwid_limit_save", {}, "Сохранить")}
+                      </AdminButton>
+                    </div>
+                    <div class="admin-override-status-lines">
+                      <span class="admin-meta-truncate">
+                        {at(
+                          "user_hwid_limit_status",
+                          { current: hwidLimitLabel(openedUserDetail.active_subscription) },
+                          `Сейчас: ${hwidLimitLabel(openedUserDetail.active_subscription)}`
+                        )}
+                      </span>
                     </div>
                   </div>
                 </section>

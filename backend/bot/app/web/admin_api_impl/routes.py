@@ -31,6 +31,10 @@ def setup_admin_routes(app: web.Application) -> None:
         admin_user_regular_traffic_override_route,
     )
     router.add_post(
+        "/api/admin/users/{user_id:-?\\d+}/hwid-device-limit",
+        admin_user_hwid_device_limit_route,
+    )
+    router.add_post(
         "/api/admin/users/{user_id:-?\\d+}/traffic-grant",
         admin_user_traffic_grant_route,
     )

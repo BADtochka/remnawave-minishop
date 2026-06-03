@@ -779,9 +779,31 @@ def _get_cached_webapp_settings(request: web.Request) -> Dict[str, Any]:
 def _resolve_app_version() -> str:
     # Single source of truth shared with the telemetry worker so the admin
     # sidebar and the install beacon always report the same version.
-    from bot.utils.app_version import resolve_app_version
+    from bot.utils import app_version as app_version_module
 
-    return resolve_app_version()
+    global _APP_VERSION_CACHE
+
+    app_version_module.APP_ROOT = APP_ROOT
+    app_version_module._run_git_command = _run_git_command
+    app_version_module._APP_VERSION_CACHE = _APP_VERSION_CACHE
+    version = app_version_module.resolve_app_version()
+    _APP_VERSION_CACHE = app_version_module._APP_VERSION_CACHE
+    return version
+
+
+def _run_git_command(*args: str) -> str:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=APP_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=1.5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip()
 
 
 async def _enforce_webapp_rate_limit(

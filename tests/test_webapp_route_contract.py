@@ -173,6 +173,10 @@ class WebAppRouteContractTests(unittest.TestCase):
                 "POST",
                 "/api/admin/users/{user_id}/regular-traffic-override",
             ): "admin_user_regular_traffic_override_route",
+            (
+                "POST",
+                "/api/admin/users/{user_id}/hwid-device-limit",
+            ): "admin_user_hwid_device_limit_route",
             ("POST", "/api/admin/users/{user_id}/traffic-grant"): "admin_user_traffic_grant_route",
             ("DELETE", "/api/admin/users/{user_id}"): "admin_user_delete_route",
             ("GET", "/api/admin/payments"): "admin_payments_list_route",

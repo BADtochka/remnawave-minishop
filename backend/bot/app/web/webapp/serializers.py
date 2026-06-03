@@ -342,11 +342,12 @@ def _serialize_subscription(
                 and tariff.premium_topup_packages.has_any()
             )
             can_topup_traffic = bool(can_topup_regular_traffic or can_topup_premium_traffic)
-            # max_devices == 0 means unlimited — top-up is pointless in that case.
+            max_devices = _coerce_int_or_none(active.get("max_devices"))
+            # max_devices == 0 or None means unlimited — top-up is pointless in that case.
             can_topup_devices = bool(
                 tariff.billing_model == "period"
                 and tariff.has_hwid_device_packages()
-                and _coerce_int_or_none(active.get("max_devices")) != 0
+                and max_devices not in (None, 0)
             )
         except Exception:
             can_topup_regular_traffic = False
