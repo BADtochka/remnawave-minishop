@@ -127,6 +127,7 @@
 .theme-key-windows95 svg.lucide-file-text,
 .theme-key-windows95 svg.lucide-gift,
 .theme-key-windows95 svg.lucide-globe-2,
+.theme-key-windows95 svg.lucide-grip-vertical,
 .theme-key-windows95 svg.lucide-home,
 .theme-key-windows95 svg.lucide-house,
 .theme-key-windows95 svg.lucide-info,
@@ -230,6 +231,10 @@
 .theme-key-windows95 svg.lucide-external-link,
 .theme-key-windows95 svg.lucide-globe-2 {
   --win95-button-icon: var(--win95-icon-globe);
+}
+
+.theme-key-windows95 svg.lucide-grip-vertical {
+  --win95-button-icon: var(--win95-icon-sliders);
 }
 
 .theme-key-windows95 svg.lucide-file-text {
@@ -375,6 +380,7 @@
   svg.lucide-file-text,
   svg.lucide-gift,
   svg.lucide-globe-2,
+  svg.lucide-grip-vertical,
   svg.lucide-home,
   svg.lucide-house,
   svg.lucide-info,
@@ -1169,6 +1175,86 @@ body:has(.theme-key-windows95) .install-platform-item[data-selected] {
 .theme-key-windows95 input[type="range"]:disabled {
   cursor: not-allowed;
   opacity: 0.52;
+}
+
+/* Admin controls: range sliders and sortable rows */
+
+.theme-key-windows95 .ui-range-input {
+  height: 22px;
+}
+
+.theme-key-windows95 .ui-range-input::before {
+  height: 8px;
+  border: 2px solid;
+  border-color: #404040 #ffffff #ffffff #404040;
+  border-radius: 0 !important;
+  background: #ffffff;
+  box-shadow:
+    inset 1px 1px 0 #808080,
+    inset -1px -1px 0 #dfdfdf;
+}
+
+.theme-key-windows95 .ui-range-input__range {
+  height: 8px;
+  border-radius: 0 !important;
+  background: var(--accent);
+}
+
+.theme-key-windows95 .ui-range-input__thumb {
+  width: 14px;
+  height: 20px;
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  border-radius: 0 !important;
+  background: #c0c0c0;
+  box-shadow:
+    inset 1px 1px 0 #dfdfdf,
+    inset -1px -1px 0 #808080;
+  transition: none;
+}
+
+.theme-key-windows95 .ui-range-input__thumb:hover,
+.theme-key-windows95 .ui-range-input__thumb:focus-visible {
+  background: #dfdfdf;
+}
+
+.theme-key-windows95 .ui-range-input__thumb[data-active] {
+  border-color: #404040 #ffffff #ffffff #404040;
+  box-shadow:
+    inset 1px 1px 0 #808080,
+    inset -1px -1px 0 #dfdfdf;
+}
+
+.theme-key-windows95 .ui-sortable-item.is-drop-target {
+  outline: 1px dotted #000000;
+  outline-offset: 3px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--admin-surface));
+}
+
+.theme-key-windows95 .ui-sortable-handle {
+  align-self: center;
+  width: 24px;
+  height: 28px;
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  background: #c0c0c0;
+  color: #000000;
+  box-shadow:
+    inset 1px 1px 0 #dfdfdf,
+    inset -1px -1px 0 #808080;
+  transition: none;
+}
+
+.theme-key-windows95 .ui-sortable-handle:hover,
+.theme-key-windows95 .ui-sortable-handle:focus-visible {
+  background: #dfdfdf;
+}
+
+.theme-key-windows95 .ui-sortable-handle:active {
+  border-color: #404040 #ffffff #ffffff #404040;
+  box-shadow:
+    inset 1px 1px 0 #808080,
+    inset -1px -1px 0 #dfdfdf;
 }
 
 .theme-key-windows95 input::placeholder,

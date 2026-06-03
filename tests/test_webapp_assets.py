@@ -568,6 +568,24 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("--home-logo-scale-mobile", base_css)
         self.assertIn("--home-logo-scale-desktop", base_css)
 
+    def test_builtin_css_themes_cover_admin_range_and_sortable_controls(self):
+        theme_root = Path("backend/bot/app/web/themes")
+        required_selectors = (
+            "ui-range-input",
+            "ui-range-input__thumb",
+            "ui-sortable-item",
+            "ui-sortable-handle",
+            "is-drop-target",
+        )
+
+        for key in ("light", "ascii", "windows95"):
+            css = (theme_root / key / "style.css").read_text(encoding="utf-8")
+            for selector in required_selectors:
+                self.assertIn(selector, css, f"{key} theme must style {selector}")
+
+        windows95_css = (theme_root / "windows95" / "style.css").read_text(encoding="utf-8")
+        self.assertIn("lucide-grip-vertical", windows95_css)
+
     def test_prune_unused_appearance_assets_keeps_only_referenced_logo_and_favicons(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
