@@ -65,7 +65,6 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "SUPPORT_LINK", "url", "general", "Ссылка поддержки", "Куда вести пользователей за помощью."
     ),
     SettingField("SERVER_STATUS_URL", "url", "general", "Ссылка на статус серверов"),
-    SettingField("TERMS_OF_SERVICE_URL", "url", "general", "Условия использования"),
     SettingField("PRIVACY_POLICY_URL", "url", "general", "Политика конфиденциальности"),
     SettingField("USER_AGREEMENT_URL", "url", "general", "Пользовательское соглашение"),
     SettingField("DISABLE_WELCOME_MESSAGE", "bool", "general", "Скрыть приветствие /start"),

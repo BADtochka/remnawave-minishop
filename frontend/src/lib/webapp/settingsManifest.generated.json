@@ -99,25 +99,6 @@
         "updated_at": null
       },
       {
-        "key": "TERMS_OF_SERVICE_URL",
-        "type": "url",
-        "section": "general",
-        "section_order": 1,
-        "subsection": null,
-        "label": "Условия использования",
-        "description": "",
-        "i18n_label_key": "admin_settings_field_terms_of_service_url_label",
-        "i18n_description_key": null,
-        "i18n_subsection_key": null,
-        "i18n_placeholder_key": null,
-        "placeholder": "",
-        "optional": true,
-        "secret": false,
-        "value": "",
-        "overridden": false,
-        "updated_at": null
-      },
-      {
         "key": "PRIVACY_POLICY_URL",
         "type": "url",
         "section": "general",

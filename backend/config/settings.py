@@ -148,7 +148,6 @@ class Settings(BaseSettings):
 
     SUPPORT_LINK: Optional[str] = Field(default=None)
     SERVER_STATUS_URL: Optional[str] = Field(default=None)
-    TERMS_OF_SERVICE_URL: Optional[str] = Field(default=None)
     PRIVACY_POLICY_URL: Optional[str] = Field(default=None)
     USER_AGREEMENT_URL: Optional[str] = Field(default=None)
     REQUIRED_CHANNEL_ID: Optional[int] = Field(

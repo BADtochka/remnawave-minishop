@@ -46,7 +46,6 @@ class UserBotMenuTests(unittest.TestCase):
             SUPPORT_LINK="https://t.me/support",
             PRIVACY_POLICY_URL="https://example.com/privacy",
             USER_AGREEMENT_URL="https://example.com/agreement",
-            TERMS_OF_SERVICE_URL="",
             TRIAL_ENABLED=True,
             SERVER_STATUS_URL="",
             SUBSCRIPTION_GUIDES_ENABLED=True,

@@ -1184,7 +1184,7 @@ async def main_action_callback_handler(
         _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs) if i18n else key
 
         privacy_url = settings.PRIVACY_POLICY_URL
-        user_agreement_url = settings.USER_AGREEMENT_URL or settings.TERMS_OF_SERVICE_URL
+        user_agreement_url = settings.USER_AGREEMENT_URL
 
         if not privacy_url and not user_agreement_url:
             await safe_answer_callback(

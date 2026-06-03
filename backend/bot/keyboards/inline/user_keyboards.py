@@ -166,8 +166,7 @@ def get_main_menu_inline_keyboard(
             InlineKeyboardButton(text=_(key="menu_support_button"), url=settings.SUPPORT_LINK)
         )
 
-    user_agreement_url = settings.USER_AGREEMENT_URL or settings.TERMS_OF_SERVICE_URL
-    if settings.PRIVACY_POLICY_URL or user_agreement_url:
+    if settings.PRIVACY_POLICY_URL or settings.USER_AGREEMENT_URL:
         builder.row(
             InlineKeyboardButton(text=_(key="menu_info_button"), callback_data="main_action:info")
         )
@@ -234,8 +233,7 @@ def get_bot_interface_inline_keyboard(
             InlineKeyboardButton(text=_(key="menu_support_button"), url=settings.SUPPORT_LINK)
         )
 
-    user_agreement_url = settings.USER_AGREEMENT_URL or settings.TERMS_OF_SERVICE_URL
-    if settings.PRIVACY_POLICY_URL or user_agreement_url:
+    if settings.PRIVACY_POLICY_URL or settings.USER_AGREEMENT_URL:
         builder.row(
             InlineKeyboardButton(
                 text=_(key="menu_info_button"), callback_data="main_action:bot_info"
