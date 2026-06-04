@@ -5,6 +5,7 @@ import gzip
 from config.webapp_themes_config import (
     default_webapp_theme_asset_file,
     default_webapp_theme_css_files,
+    effective_webapp_theme_accent,
     ensure_default_webapp_theme_descriptor_files,
     public_theme_payload,
     public_themes_catalog_payload,
@@ -1188,6 +1189,11 @@ async def app_deeplink_route(request: web.Request) -> web.Response:
 
     nonce = html.escape(str(request.get("csp_nonce", "")), quote=True)
     query = getattr(request, "query", {}) or {}
+    themes_catalog = getattr(settings, "webapp_themes_catalog", None)
+    primary_color = getattr(settings, "WEBAPP_PRIMARY_COLOR", None) or "#00fe7a"
+    initial_theme = (
+        _initial_theme_for_request(request, themes_catalog) if themes_catalog is not None else None
+    )
     lang = _normalize_language(query.get("lang") or getattr(settings, "DEFAULT_LANGUAGE", "ru"))
     messages = _app_deeplink_i18n_payload(request, lang)
     page_title = _webapp_page_title(settings, messages["title"])
@@ -1204,6 +1210,14 @@ async def app_deeplink_route(request: web.Request) -> web.Response:
         .replace("__NONCE__", nonce)
         .replace("__MESSAGES_JSON__", messages_json)
     )
+    initial_theme_markup = _app_deeplink_theme_head_markup(
+        request,
+        initial_theme,
+        themes_catalog,
+        primary_color,
+    )
+    if initial_theme_markup:
+        html_text = html_text.replace("</head>", f"{initial_theme_markup}\n</head>", 1)
     html_text = _apply_webapp_head_metadata(html_text, page_title, favicon_url)
     response = web.Response(text=html_text, content_type="text/html", charset="utf-8")
     response.headers["Cache-Control"] = "no-store"
@@ -1578,7 +1592,8 @@ def _theme_css_href_for_html(theme: Any) -> str:
 
 
 def _initial_theme_for_request(request: web.Request, catalog: Any) -> Any:
-    preview_key = str(request.query.get("theme_preview") or "").strip()
+    query = getattr(request, "query", {}) or {}
+    preview_key = str(query.get("theme_preview") or "").strip()
     if preview_key:
         preview_theme = catalog.theme_by_key(preview_key)
         if preview_theme is not None and preview_theme.enabled:
@@ -1590,13 +1605,16 @@ def _initial_theme_for_request(request: web.Request, catalog: Any) -> Any:
     return catalog.enabled_themes()[0] if catalog.enabled_themes() else None
 
 
-def _initial_theme_head_markup(request: web.Request, theme: Any, primary_color: str) -> str:
+def _initial_theme_tokens(theme: Any, primary_color: str) -> Dict[str, Any]:
     if theme is None:
-        return ""
+        return {}
 
     payload = public_theme_payload(theme, primary_color)
     tokens = payload.get("tokens") if isinstance(payload, dict) else {}
-    tokens = tokens if isinstance(tokens, dict) else {}
+    return tokens if isinstance(tokens, dict) else {}
+
+
+def _initial_theme_declarations(tokens: Dict[str, Any]) -> List[str]:
     declarations = []
     for token_key, css_name in _INITIAL_THEME_TOKEN_CSS_MAP.items():
         if token_key in _INITIAL_THEME_LOGO_SCALE_TOKENS:
@@ -1610,6 +1628,15 @@ def _initial_theme_head_markup(request: web.Request, theme: Any, primary_color: 
         value = str(tokens.get(token_key) or "").strip()
         if value:
             declarations.append(f"{css_name}:{value}")
+    return declarations
+
+
+def _initial_theme_head_markup(request: web.Request, theme: Any, primary_color: str) -> str:
+    if theme is None:
+        return ""
+
+    tokens = _initial_theme_tokens(theme, primary_color)
+    declarations = _initial_theme_declarations(tokens)
 
     scheme = "light" if tokens.get("color_scheme") == "light" else "dark"
     bg = str(tokens.get("bg") or "").strip()
@@ -1631,6 +1658,37 @@ def _initial_theme_head_markup(request: web.Request, theme: Any, primary_color: 
         f'data-initial-theme-css="{html.escape(str(theme.key), quote=True)}">'
     )
     return stylesheet + "\n" + style_tag
+
+
+def _app_deeplink_theme_head_markup(
+    request: web.Request,
+    theme: Any,
+    catalog: Any,
+    primary_color: str,
+) -> str:
+    tokens = _initial_theme_tokens(theme, primary_color)
+    declarations = _initial_theme_declarations(tokens)
+    try:
+        accent = effective_webapp_theme_accent(
+            catalog,
+            primary_color,
+            theme_key=str(getattr(theme, "key", "") or "") or None,
+        )
+    except Exception:
+        accent = str(primary_color or "#00fe7a").strip() or "#00fe7a"
+    if accent and not any(item.startswith("--accent:") for item in declarations):
+        declarations.insert(0, f"--accent:{accent}")
+    if not declarations:
+        return ""
+
+    scheme = "light" if tokens.get("color_scheme") == "light" else "dark"
+    nonce = html.escape(str(request.get("csp_nonce", "")), quote=True)
+    return (
+        f'<style id="webapp-initial-theme" nonce="{nonce}">'
+        f"html{{color-scheme:{scheme};}}"
+        f":root{{{';'.join(declarations)}}}"
+        "</style>"
+    )
 
 
 def _favicon_head_markup(favicon_url: str) -> str:

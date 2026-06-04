@@ -11,6 +11,7 @@ from aiohttp.test_utils import make_mocked_request
 from bot.app.web import admin_api, subscription_webapp
 from bot.app.web.admin_api_impl import auth as admin_auth_routes
 from bot.app.web.webapp_auth import create_webapp_session_token
+from config.webapp_themes_config import WebappThemesConfig
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -331,6 +332,39 @@ class WebAppRouteContractTests(unittest.TestCase):
         self.assertTrue(
             (REPO_ROOT / "backend/bot/app/web/templates/open_app_gateway.html").is_file()
         )
+
+    def test_app_deeplink_gateway_uses_webapp_theme_accent(self):
+        catalog = WebappThemesConfig(
+            default_theme="custom",
+            themes=[
+                {
+                    "key": "custom",
+                    "enabled": True,
+                    "default": True,
+                    "tokens": {"color_scheme": "dark", "accent": "#123abc"},
+                }
+            ],
+        )
+        request = _Request(
+            app={
+                "settings": SimpleNamespace(
+                    WEBAPP_ENABLED=True,
+                    WEBAPP_TITLE="/minishop",
+                    DEFAULT_LANGUAGE="en",
+                    WEBAPP_PRIMARY_COLOR="#00fe7a",
+                    webapp_themes_catalog=catalog,
+                )
+            }
+        )
+        request["csp_nonce"] = "nonce-value"
+
+        response = asyncio.run(subscription_webapp.app_deeplink_route(request))
+
+        self.assertEqual(response.status, 200)
+        self.assertIn('id="webapp-initial-theme"', response.text)
+        self.assertIn("--accent:#123abc", response.text)
+        self.assertIn("background: var(--accent)", response.text)
+        self.assertNotIn("background: #14b86f;", response.text)
 
     def test_app_launch_i18n_keys_are_available_to_webapp_bootstrap(self):
         required_keys = {

@@ -619,6 +619,38 @@ def merge_primary_accent_into_theme_tokens(
     return base
 
 
+def effective_webapp_theme_accent(
+    config: WebappThemesConfig,
+    primary_accent: str,
+    *,
+    theme_key: Optional[str] = None,
+) -> str:
+    """Return the accent color users see for the selected/default Web App theme."""
+    try:
+        fallback = ThemeTokens(accent=primary_accent or "#00fe7a").accent or "#00fe7a"
+    except ValueError:
+        fallback = "#00fe7a"
+    theme: Optional[WebappTheme] = None
+    if theme_key:
+        theme = config.theme_by_key(theme_key)
+        if theme is not None and not theme.enabled:
+            theme = None
+    if theme is None:
+        theme = config.theme_by_key(config.default_theme)
+    if theme is None:
+        enabled = config.enabled_themes()
+        theme = enabled[0] if enabled else None
+    if theme is None:
+        return fallback
+
+    tokens = (
+        merge_primary_accent_into_theme_tokens(theme, fallback)
+        if theme.use_primary_accent
+        else theme.tokens
+    )
+    return tokens.accent or fallback
+
+
 def public_theme_payload(theme: WebappTheme, primary_accent: str) -> Dict[str, object]:
     tokens = (
         merge_primary_accent_into_theme_tokens(theme, primary_accent)

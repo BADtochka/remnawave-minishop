@@ -8,6 +8,7 @@ from config.webapp_themes_config import (
     apply_webapp_theme_env_overrides,
     builtin_webapp_themes_config,
     default_webapp_theme_descriptors,
+    effective_webapp_theme_accent,
     ensure_webapp_core_themes,
     load_webapp_theme_dir,
     public_themes_catalog_payload,
@@ -280,6 +281,44 @@ class WebappThemesConfigTests(unittest.TestCase):
         self.assertFalse(win95["use_primary_accent"])
         self.assertTrue(win95["use_in_admin"])
         self.assertNotIn("accent", win95["tokens"])
+
+    def test_effective_accent_uses_default_theme_token(self):
+        cfg = WebappThemesConfig(
+            default_theme="custom",
+            themes=[
+                {
+                    "key": "custom",
+                    "enabled": True,
+                    "default": True,
+                    "tokens": {"color_scheme": "dark", "accent": "#123abc"},
+                }
+            ],
+        )
+
+        self.assertEqual(effective_webapp_theme_accent(cfg, "#00fe7a"), "#123abc")
+
+    def test_effective_accent_can_use_preview_theme_token(self):
+        cfg = WebappThemesConfig(
+            default_theme="dark",
+            themes=[
+                {
+                    "key": "dark",
+                    "enabled": True,
+                    "default": True,
+                    "tokens": {"color_scheme": "dark", "accent": "#123abc"},
+                },
+                {
+                    "key": "neon",
+                    "enabled": True,
+                    "tokens": {"color_scheme": "dark", "accent": "#ff33aa"},
+                },
+            ],
+        )
+
+        self.assertEqual(
+            effective_webapp_theme_accent(cfg, "#00fe7a", theme_key="neon"),
+            "#ff33aa",
+        )
 
     def test_theme_accent_is_normalized_to_hex(self):
         cfg = WebappThemesConfig(

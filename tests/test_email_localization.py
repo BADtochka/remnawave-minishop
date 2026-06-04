@@ -20,6 +20,7 @@ from bot.services.email_templates import (
     render_support_user_reply_admin,
     render_user_notification,
 )
+from config.webapp_themes_config import WebappThemesConfig
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EMAIL_KEY_RE = re.compile(r"""["'](?P<key>email_[a-z0-9_]+)["']""")
@@ -31,13 +32,19 @@ EMAIL_KEY_ASSIGNMENT_HINTS = (
 )
 
 
-def _settings(default_language: str = "ru"):
+def _settings(
+    default_language: str = "ru",
+    *,
+    webapp_themes_catalog: WebappThemesConfig | None = None,
+    primary_color: str = "#00fe7a",
+):
     return SimpleNamespace(
         DEFAULT_LANGUAGE=default_language,
         EMAIL_CODE_TTL_SECONDS=600,
         WEBAPP_LOGO_URL="",
-        WEBAPP_PRIMARY_COLOR="#00fe7a",
+        WEBAPP_PRIMARY_COLOR=primary_color,
         WEBAPP_TITLE="Mini Shop",
+        webapp_themes_catalog=webapp_themes_catalog,
     )
 
 
@@ -254,6 +261,34 @@ def test_all_email_template_variants_render_without_raw_locale_keys():
     for language in ("en", "ru"):
         for content in _all_rendered_email_variants(language):
             _assert_content_is_localized(content, language)
+
+
+def test_email_templates_use_default_webapp_theme_accent():
+    catalog = WebappThemesConfig(
+        default_theme="custom",
+        themes=[
+            {
+                "key": "custom",
+                "enabled": True,
+                "default": True,
+                "tokens": {"color_scheme": "dark", "accent": "#123abc"},
+            }
+        ],
+    )
+    settings = _settings("en", webapp_themes_catalog=catalog, primary_color="#00fe7a")
+
+    content = render_login_code(
+        settings,
+        code="123456",
+        language_code="en",
+        magic_link="https://app.example.com/magic",
+        purpose="login",
+        i18n=_i18n("en"),
+    )
+
+    assert "color:#123abc" in content.html
+    assert 'bgcolor="#123abc"' in content.html
+    assert "#00fe7a" not in content.html
 
 
 def test_uploaded_webapp_logo_is_embedded_inline(tmp_path, monkeypatch):

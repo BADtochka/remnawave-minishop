@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Sequence, Tuple
 from urllib.parse import urlsplit
 
+from config.webapp_themes_config import effective_webapp_theme_accent
+
 if TYPE_CHECKING:
     from bot.middlewares.i18n import JsonI18n
     from config.settings import Settings
@@ -72,6 +74,17 @@ def _safe_color(value: Optional[str]) -> str:
     if _HEX_RE.match(candidate):
         return candidate
     return _DEFAULT_ACCENT
+
+
+def _theme_accent(settings: Settings) -> str:
+    primary = _safe_color(getattr(settings, "WEBAPP_PRIMARY_COLOR", None))
+    try:
+        catalog = getattr(settings, "webapp_themes_catalog", None)
+        if catalog is None:
+            return primary
+        return _safe_color(effective_webapp_theme_accent(catalog, primary))
+    except Exception:
+        return primary
 
 
 def _public_logo_url(settings: Settings) -> Optional[str]:
@@ -174,8 +187,9 @@ def _layout(
     intro_html: str,
     body_html: str,
     footer_html: str,
+    accent: Optional[str] = None,
 ) -> _EmailLayout:
-    accent = _safe_color(settings.WEBAPP_PRIMARY_COLOR)
+    accent = _safe_color(accent) if accent else _theme_accent(settings)
     brand_title = html.escape(_brand_title(settings))
     logo_url, inline_images = _email_logo(settings)
     html_lang = html.escape((language_code or "en").replace("_", "-"), quote=True)
@@ -344,7 +358,7 @@ def render_login_code(
     i18n = _resolve_i18n(i18n)
     lang = _normalize_lang(language_code, settings)
     minutes = _format_minutes(settings.EMAIL_CODE_TTL_SECONDS)
-    accent = _safe_color(settings.WEBAPP_PRIMARY_COLOR)
+    accent = _theme_accent(settings)
     brand = _brand_title(settings)
     template_prefix = "email_set_password_code" if purpose == "set_password" else "email_login_code"
     safe_magic_link = (magic_link or "").strip() if template_prefix == "email_login_code" else ""
@@ -404,6 +418,7 @@ def render_login_code(
         intro_html=html.escape(intro),
         body_html=body_html,
         footer_html=footer,
+        accent=accent,
     )
     return _email_content(subject=subject, text="\n".join(text_lines), layout=rendered)
 
@@ -477,7 +492,7 @@ def render_payment_success(
 ) -> EmailContent:
     i18n = _resolve_i18n(i18n)
     lang = _normalize_lang(language_code, settings)
-    accent = _safe_color(settings.WEBAPP_PRIMARY_COLOR)
+    accent = _theme_accent(settings)
     brand = _brand_title(settings)
     sale_base = (sale_mode or "").split("@", 1)[0].split("|", 1)[0]
     is_traffic = sale_base in {
@@ -591,6 +606,7 @@ def render_payment_success(
         intro_html=html.escape(intro),
         body_html="".join(body_parts),
         footer_html=footer,
+        accent=accent,
     )
     return _email_content(subject=subject, text="\n".join(text_lines), layout=rendered)
 
@@ -609,7 +625,7 @@ def render_user_notification(
 ) -> EmailContent:
     i18n = _resolve_i18n(i18n)
     lang = _normalize_lang(language_code, settings)
-    accent = _safe_color(settings.WEBAPP_PRIMARY_COLOR)
+    accent = _theme_accent(settings)
     brand = _brand_title(settings)
     safe_dashboard_url = (dashboard_url or "").strip()
     final_subject = (subject or "").strip() or _t_text(
@@ -642,6 +658,7 @@ def render_user_notification(
         intro_html=html.escape(final_intro),
         body_html="".join(body_parts),
         footer_html=footer,
+        accent=accent,
     )
     text_lines = [final_subject, "", _telegram_html_to_text(message_text)]
     if safe_dashboard_url:
@@ -667,7 +684,7 @@ def render_subscription_expiring(
 ) -> EmailContent:
     i18n = _resolve_i18n(i18n)
     lang = _normalize_lang(language_code, settings)
-    accent = _safe_color(settings.WEBAPP_PRIMARY_COLOR)
+    accent = _theme_accent(settings)
     brand = _brand_title(settings)
     safe_dashboard_url = (dashboard_url or "").strip()
     days = max(0, int(days_left))
@@ -716,6 +733,7 @@ def render_subscription_expiring(
         intro_html=html.escape(intro),
         body_html="".join(body_parts),
         footer_html=footer,
+        accent=accent,
     )
     return _email_content(subject=subject, text="\n".join(text_lines), layout=rendered)
 
@@ -764,7 +782,7 @@ def render_subscription_lifecycle_notification(
 ) -> EmailContent:
     i18n = _resolve_i18n(i18n)
     lang = _normalize_lang(language_code, settings)
-    accent = _safe_color(settings.WEBAPP_PRIMARY_COLOR)
+    accent = _theme_accent(settings)
     brand = _brand_title(settings)
     safe_dashboard_url = (dashboard_url or "").strip()
     end_date = end_date_text or "—"
@@ -804,6 +822,7 @@ def render_subscription_lifecycle_notification(
         intro_html=html.escape(intro),
         body_html="".join(body_parts),
         footer_html=footer,
+        accent=accent,
     )
 
     text_lines = [subject, "", message_text]
@@ -838,7 +857,7 @@ def _support_email(
     i18n = _resolve_i18n(i18n)
     lang = _normalize_lang(language, settings)
     brand = _brand_title(settings)
-    accent = _safe_color(settings.WEBAPP_PRIMARY_COLOR)
+    accent = _theme_accent(settings)
     safe_url = (ticket_url or "").strip()
     footer = _t_html(i18n, lang, "email_footer_auto", brand=brand)
     localized_rows = [
@@ -861,6 +880,7 @@ def _support_email(
         intro_html=html.escape(intro),
         body_html="".join(body_parts),
         footer_html=footer,
+        accent=accent,
     )
     text_lines = [
         intro,
