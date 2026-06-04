@@ -106,3 +106,54 @@ docker compose logs -f backend
 - Пользователь получает `rate_limited`: подождите `EMAIL_CODE_RESEND_SECONDS` или проверьте brute-force настройки.
 
 Email-уведомления поддержки, платежей и жизненного цикла подписки используют тот же SMTP-контур. Сценарий поддержки описан в [разделе тикетов](support.md), сводка по каналам - в разделе [уведомления](notifications.md).
+
+## Настройка локального SMTP-сервера
+
+### Требования
+
+Перед запуском локального SMTP-сервера вам потребуется настроить DNS-записи вашего домена:
+
+* A — mail.example.com (указать IP вашего сервера)
+* MX — mail.example.com (приоритет 10)
+* PTR — mail.example.com (настраивается у вашего хостера VPS)
+* TXT — `v=spf1 ip4:1.2.3.4 ~all` (поддомен @, замените `1.2.3.4` на реальный ipv4 вашего сервера)
+
+После изменения DNS-записей подождите некоторое время (иногда требуется от 3 часов до суток) для применения изменений.
+
+Для использования STARTTLS необходимо получить TLS/SSL-сертификат для домена mail.example.com. Самый простой способ это сделать — прописать следующую директиву в Caddyfile (если вы используете Caddy):
+
+```Caddyfile
+https://mail.example.com {
+    respond "Mail server"
+}
+```
+
+### Установка
+
+1. Настройка docker-compose.yml:
+
+```bash
+mkdir -p /opt/mailserver
+cd /opt/mailserver
+curl -O https://github.com/3252a8/remnawave-minishop/blob/main/deploy/examples/mail/docker-compose.yml
+nano docker-compose.yml
+```
+
+2. Запуск:
+
+```bash
+docker compose up -d
+```
+3. Создание пользователя:
+```bash
+# Скрипт попросит придумать пароль и потвердить его
+docker exec -it mailserver setup email add no-reply@example.com
+
+# Проверка создания пользователя
+docker exec -it mailserver setup email list
+
+# Должны увидеть:
+# no-reply@example.com
+```
+
+После всех настроек вы можете использовать свой почтовый клиент (Microsoft Outlook, Mozilla Thunderbird) для отправки и получения писем. В окне добавления нового аккаунта достаточно ввести созданную почту no-reply@example.com и пароль.
