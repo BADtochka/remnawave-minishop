@@ -291,6 +291,13 @@ def _clean_paykilla_text(value: Any, *, fallback: str, max_length: int = 255) ->
     return text[:max_length].strip() or fallback_text[:max_length].strip() or "Payment"
 
 
+def _invoice_text(payment_db_id: int) -> str:
+    return _clean_paykilla_text(
+        f"Minishop payment {payment_db_id}",
+        fallback=f"Payment {payment_db_id}",
+    )
+
+
 def _payment_currencies(config: PaykillaConfig) -> List[str]:
     currencies = list(parse_supported_currency_codes(config.PAYMENT_CURRENCIES))
     return currencies or ["USDTTRC"]
@@ -423,27 +430,18 @@ class PaykillaService(HttpClientMixin):
         description: str,
     ) -> Dict[str, Any]:
         currency_code = normalize_payment_currency_code(currency or self.currency)
-        purpose = _clean_paykilla_text(
-            description,
-            fallback=f"Payment {payment_db_id}",
-            max_length=255,
-        )
+        invoice_text = _invoice_text(payment_db_id)
         body: Dict[str, Any] = {
             "type": _invoice_type_for(self.config, currency_code),
-            "purpose": purpose,
+            "purpose": invoice_text,
             "currency": currency_code,
             "totalPrice": str(format_decimal_amount(amount)),
             "paymentCurrencies": _payment_currencies(self.config),
             "clientOrderId": str(payment_db_id),
             "userPaysServiceFee": bool(self.config.USER_PAYS_SERVICE_FEE),
             "userPaysNetworkFee": bool(self.config.USER_PAYS_NETWORK_FEE),
+            "description": invoice_text,
         }
-        if description:
-            body["description"] = _clean_paykilla_text(
-                description,
-                fallback=purpose,
-                max_length=255,
-            )
         if self.config.LIFETIME_SECONDS:
             expires_at = datetime.now(timezone.utc) + timedelta(
                 seconds=int(self.config.LIFETIME_SECONDS)

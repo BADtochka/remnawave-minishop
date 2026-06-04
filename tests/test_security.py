@@ -243,7 +243,7 @@ class PaykillaServiceTests(unittest.TestCase):
         self.assertEqual(text, "Oplata podpiski na 1 mes. tarif Bazovyy")
         self.assertRegex(text, r"^[A-Za-z0-9_\s.,]+$")
 
-    def test_invoice_body_uses_ascii_safe_purpose_and_description(self):
+    def test_invoice_body_uses_english_purpose_and_description(self):
         service = self._make_service()
 
         body = service._invoice_body(
@@ -253,7 +253,7 @@ class PaykillaServiceTests(unittest.TestCase):
             description="Оплата подписки на 1 мес. - тариф «Базовый» ✅",
         )
 
-        self.assertEqual(body["purpose"], "Oplata podpiski na 1 mes. tarif Bazovyy")
+        self.assertEqual(body["purpose"], "Minishop payment 556")
         self.assertEqual(body["description"], body["purpose"])
         self.assertRegex(body["purpose"], r"^[A-Za-z0-9_\s.,]+$")
 
