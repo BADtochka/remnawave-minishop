@@ -9,6 +9,8 @@ const stateMocks = new Set([
   "depleted",
   "no-subscription",
   "trial",
+  "trial-telegram",
+  "referral-telegram",
   "devices",
   "notifications",
   "auth",

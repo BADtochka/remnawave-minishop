@@ -672,6 +672,20 @@ function applyInactiveSubscriptionScenario({ trialAvailable = false } = {}) {
     DEMO_DATASET.tariff_change_options || DEV_MOCK.data.tariff_change_options;
 }
 
+function applyEmailOnlyAccountPatch({
+  email = "preview-user@mailinator.com",
+  referredById = null,
+} = {}) {
+  DEV_MOCK.data.user = {
+    ...(DEV_MOCK.data.user || {}),
+    telegram_id: null,
+    telegram_linked: false,
+    email,
+    email_verified: true,
+    referred_by_id: referredById,
+  };
+}
+
 export function applyPreviewMock(kind) {
   const mode = String(kind || "")
     .trim()
@@ -720,11 +734,7 @@ export function applyPreviewMock(kind) {
 
   if (mode === "trial-telegram" || mode === "trial_requires_telegram") {
     applyInactiveSubscriptionScenario();
-    DEV_MOCK.data.user = {
-      ...(DEV_MOCK.data.user || {}),
-      telegram_id: null,
-      telegram_linked: false,
-    };
+    applyEmailOnlyAccountPatch({ email: "trial-user@mailinator.com" });
     DEV_MOCK.data.settings.trial_enabled = true;
     DEV_MOCK.data.settings.trial_available = false;
     DEV_MOCK.data.settings.trial_requires_telegram = true;
@@ -732,6 +742,30 @@ export function applyPreviewMock(kind) {
     DEV_MOCK.data.referral = {
       ...(DEV_MOCK.data.referral || {}),
       welcome_bonus_days: 3,
+      welcome_bonus_requires_telegram: false,
+      welcome_bonus_block_reason: "",
+    };
+    return;
+  }
+
+  if (
+    mode === "referral-telegram" ||
+    mode === "referral_welcome_telegram" ||
+    mode === "referral-welcome-telegram"
+  ) {
+    applyInactiveSubscriptionScenario();
+    applyEmailOnlyAccountPatch({
+      email: "referral-user@mailinator.com",
+      referredById: 910001,
+    });
+    DEV_MOCK.data.settings.trial_enabled = true;
+    DEV_MOCK.data.settings.trial_available = false;
+    DEV_MOCK.data.settings.trial_requires_telegram = false;
+    DEV_MOCK.data.settings.trial_block_reason = "";
+    DEV_MOCK.data.referral = {
+      ...(DEV_MOCK.data.referral || {}),
+      welcome_bonus_days: 3,
+      welcome_bonus_without_telegram_enabled: false,
       welcome_bonus_requires_telegram: true,
       welcome_bonus_block_reason: "telegram_required",
     };
