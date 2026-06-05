@@ -15,6 +15,24 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_WINDOW_SECONDS = 60
 DEFAULT_MAX_UPDATES_PER_WINDOW = 180
+DEFAULT_MESSAGE_MAX_PER_WINDOW = 120
+DEFAULT_CALLBACK_MAX_PER_WINDOW = 240
+DEFAULT_INLINE_MAX_PER_WINDOW = 60
+DEFAULT_START_MAX_PER_WINDOW = 30
+DEFAULT_EXPENSIVE_CALLBACK_MAX_PER_WINDOW = 60
+
+EXPENSIVE_CALLBACK_PREFIXES = (
+    "pay_",
+    "trial_action:confirm_activate",
+    "main_action:request_trial",
+    "main_action:apply_promo",
+    "main_action:bot_apply_promo",
+    "tariff_change:apply:",
+    "tariff_change:confirm_pay:",
+    "tariff_change:pay:",
+    "autorenew:confirm:",
+    "disconnect_device:",
+)
 
 
 @dataclass(frozen=True)
@@ -31,6 +49,7 @@ class UpdateAntiFloodMiddleware(BaseMiddleware):
         settings: Settings,
         *,
         default_rule: Optional[RateLimitRule] = None,
+        action_rules: Optional[Dict[str, RateLimitRule]] = None,
     ) -> None:
         super().__init__()
         self.settings = settings
@@ -48,6 +67,7 @@ class UpdateAntiFloodMiddleware(BaseMiddleware):
                 or DEFAULT_MAX_UPDATES_PER_WINDOW
             ),
         )
+        self.action_rules = action_rules or _default_action_rules(settings)
         self._local_buckets: Dict[str, Deque[float]] = defaultdict(deque)
         self._local_lock = asyncio.Lock()
 
@@ -64,18 +84,23 @@ class UpdateAntiFloodMiddleware(BaseMiddleware):
         if not actor_key:
             return await handler(event, data)
 
-        if await self._is_limited(actor_key, self.default_rule):
+        action_key = _update_action_key(event)
+        if await self._is_limited("updates", actor_key, self.default_rule) or (
+            action_key
+            and action_key in self.action_rules
+            and await self._is_limited(action_key, actor_key, self.action_rules[action_key])
+        ):
             logger.warning(
                 "Telegram update dropped by anti-flood: actor=%s update_type=%s",
                 actor_key,
-                getattr(event, "event_type", "unknown"),
+                action_key or getattr(event, "event_type", "unknown"),
             )
             data["antiflood_dropped"] = True
             return None
 
         return await handler(event, data)
 
-    async def _is_limited(self, actor_key: str, rule: RateLimitRule) -> bool:
+    async def _is_limited(self, bucket_name: str, actor_key: str, rule: RateLimitRule) -> bool:
         if rule.window_seconds <= 0 or rule.max_events <= 0:
             return False
 
@@ -86,7 +111,7 @@ class UpdateAntiFloodMiddleware(BaseMiddleware):
                     self.settings,
                     "rate-limit",
                     "telegram",
-                    "updates",
+                    bucket_name,
                     actor_key,
                 )
                 current = int(await redis.incr(key))
@@ -96,7 +121,7 @@ class UpdateAntiFloodMiddleware(BaseMiddleware):
         except Exception as exc:
             logger.warning("Redis telegram anti-flood unavailable; using local fallback: %s", exc)
 
-        return await self._is_limited_local(actor_key, rule)
+        return await self._is_limited_local(f"{bucket_name}:{actor_key}", rule)
 
     async def _is_limited_local(self, actor_key: str, rule: RateLimitRule) -> bool:
         now = time.monotonic()
@@ -132,3 +157,83 @@ def _update_actor_key(update: Update) -> Optional[str]:
     if chat_id is not None:
         return f"chat:{int(chat_id)}"
     return None
+
+
+def _update_action_key(update: Update) -> str:
+    if update.message:
+        text = update.message.text or ""
+        if text.startswith("/start"):
+            return "start"
+        return "message"
+    if update.callback_query:
+        data = update.callback_query.data or ""
+        if data.startswith(EXPENSIVE_CALLBACK_PREFIXES):
+            return "expensive_callback"
+        return "callback"
+    if update.inline_query:
+        return "inline"
+    return "updates"
+
+
+def _default_action_rules(settings: Settings) -> Dict[str, RateLimitRule]:
+    window_seconds = int(
+        getattr(settings, "TELEGRAM_ANTIFLOOD_WINDOW_SECONDS", DEFAULT_WINDOW_SECONDS)
+        or DEFAULT_WINDOW_SECONDS
+    )
+    return {
+        "message": RateLimitRule(
+            window_seconds,
+            int(
+                getattr(
+                    settings,
+                    "TELEGRAM_ANTIFLOOD_MESSAGE_MAX_PER_WINDOW",
+                    DEFAULT_MESSAGE_MAX_PER_WINDOW,
+                )
+                or DEFAULT_MESSAGE_MAX_PER_WINDOW
+            ),
+        ),
+        "callback": RateLimitRule(
+            window_seconds,
+            int(
+                getattr(
+                    settings,
+                    "TELEGRAM_ANTIFLOOD_CALLBACK_MAX_PER_WINDOW",
+                    DEFAULT_CALLBACK_MAX_PER_WINDOW,
+                )
+                or DEFAULT_CALLBACK_MAX_PER_WINDOW
+            ),
+        ),
+        "inline": RateLimitRule(
+            window_seconds,
+            int(
+                getattr(
+                    settings,
+                    "TELEGRAM_ANTIFLOOD_INLINE_MAX_PER_WINDOW",
+                    DEFAULT_INLINE_MAX_PER_WINDOW,
+                )
+                or DEFAULT_INLINE_MAX_PER_WINDOW
+            ),
+        ),
+        "start": RateLimitRule(
+            window_seconds,
+            int(
+                getattr(
+                    settings,
+                    "TELEGRAM_ANTIFLOOD_START_MAX_PER_WINDOW",
+                    DEFAULT_START_MAX_PER_WINDOW,
+                )
+                or DEFAULT_START_MAX_PER_WINDOW
+            ),
+        ),
+        "expensive_callback": RateLimitRule(
+            window_seconds,
+            int(
+                getattr(
+                    settings,
+                    "TELEGRAM_ANTIFLOOD_EXPENSIVE_CALLBACK_MAX_PER_WINDOW",
+                    DEFAULT_EXPENSIVE_CALLBACK_MAX_PER_WINDOW,
+                )
+                or DEFAULT_EXPENSIVE_CALLBACK_MAX_PER_WINDOW
+            ),
+        ),
+    }

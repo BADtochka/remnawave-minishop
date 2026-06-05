@@ -30,6 +30,35 @@ def _message_update(*, user_id=42, chat_id=42, chat_type="private", text="hello"
     )
 
 
+def _callback_update(
+    *,
+    user_id=42,
+    chat_id=42,
+    chat_type="private",
+    data="main_action:back_to_main",
+):
+    return SimpleNamespace(
+        event_type="callback_query",
+        message=None,
+        callback_query=SimpleNamespace(
+            from_user=SimpleNamespace(id=user_id),
+            message=SimpleNamespace(chat=SimpleNamespace(id=chat_id, type=chat_type)),
+            data=data,
+            answer=AsyncMock(),
+        ),
+        inline_query=None,
+    )
+
+
+def _inline_update(*, user_id=42, query="ref"):
+    return SimpleNamespace(
+        event_type="inline_query",
+        message=None,
+        callback_query=None,
+        inline_query=SimpleNamespace(from_user=SimpleNamespace(id=user_id), query=query),
+    )
+
+
 class UpdateAntiFloodMiddlewareTests(unittest.IsolatedAsyncioTestCase):
     async def test_extreme_update_flood_is_dropped_before_handler(self):
         middleware = UpdateAntiFloodMiddleware(
@@ -57,6 +86,43 @@ class UpdateAntiFloodMiddlewareTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await middleware(handler, _message_update(), {}), "ok")
 
         handler.assert_awaited_once()
+
+    async def test_action_specific_limits_are_counted_separately(self):
+        middleware = UpdateAntiFloodMiddleware(
+            _settings(),
+            default_rule=RateLimitRule(window_seconds=60, max_events=100),
+            action_rules={
+                "start": RateLimitRule(window_seconds=60, max_events=1),
+                "callback": RateLimitRule(window_seconds=60, max_events=2),
+                "expensive_callback": RateLimitRule(window_seconds=60, max_events=1),
+                "inline": RateLimitRule(window_seconds=60, max_events=1),
+            },
+        )
+        handler = AsyncMock(return_value="ok")
+
+        with patch("bot.middlewares.update_antiflood.get_redis", AsyncMock(return_value=None)):
+            self.assertEqual(
+                await middleware(handler, _message_update(text="/start"), {}),
+                "ok",
+            )
+            self.assertIsNone(await middleware(handler, _message_update(text="/start abc"), {}))
+
+            self.assertEqual(await middleware(handler, _callback_update(), {}), "ok")
+            self.assertEqual(await middleware(handler, _callback_update(), {}), "ok")
+            self.assertIsNone(await middleware(handler, _callback_update(), {}))
+
+            self.assertEqual(
+                await middleware(handler, _callback_update(data="pay_fk:1:100:subscription"), {}),
+                "ok",
+            )
+            self.assertIsNone(
+                await middleware(handler, _callback_update(data="pay_fk:1:100:subscription"), {})
+            )
+
+            self.assertEqual(await middleware(handler, _inline_update(), {}), "ok")
+            self.assertIsNone(await middleware(handler, _inline_update(), {}))
+
+        self.assertEqual(handler.await_count, 5)
 
 
 if __name__ == "__main__":
