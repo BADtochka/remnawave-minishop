@@ -27,11 +27,12 @@ export function escapeHtml(value) {
 }
 
 // Default project logo, served by the backend when no custom logo is set.
+export const DEFAULT_BRAND_TITLE = "Subscription";
 export const DEFAULT_LOGO_URL = "/webapp-default-logo.webp";
 
 export function normalizeBrand(brand = {}) {
   return {
-    title: String(brand.title || "/minishop").trim() || "/minishop",
+    title: String(brand.title || DEFAULT_BRAND_TITLE).trim() || DEFAULT_BRAND_TITLE,
     logoUrl: String(brand.logoUrl || "").trim() || DEFAULT_LOGO_URL,
   };
 }

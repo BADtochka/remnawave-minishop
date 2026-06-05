@@ -331,6 +331,8 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("https://fonts.googleapis.com", html)
         self.assertNotIn('id="logo-preload"', html)
         self.assertNotIn('href=""', html)
+        self.assertNotIn("<title>/minishop</title>", html)
+        self.assertIn("<title>Subscription</title>", html)
         self.assertLess(html.index("/subscription_webapp.css"), html.index("WEBAPP_JS_SCRIPT"))
 
     def test_https_webapp_logo_uses_same_origin_proxy(self):
@@ -568,6 +570,18 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('href="/apple-touch-icon.png"', template)
         self.assertIn('href="/favicon.ico"', template)
 
+    def test_frontend_runtime_fallback_title_is_not_minishop_path(self):
+        app_source = Path("frontend/src/App.svelte").read_text(encoding="utf-8")
+        browser_source = Path("frontend/src/lib/webapp/browser.js").read_text(encoding="utf-8")
+        preview_source = Path("frontend/src/PreviewBoard.svelte").read_text(encoding="utf-8")
+        admin_source = Path("frontend/src/admin/AdminPanel.svelte").read_text(encoding="utf-8")
+
+        self.assertNotIn('title: "/minishop"', app_source)
+        self.assertNotIn('CFG.title || "/minishop"', app_source)
+        self.assertNotIn('brand.title || "/minishop"', browser_source)
+        self.assertNotIn('config.title || "/minishop"', preview_source)
+        self.assertNotIn('brandTitle = "/minishop"', admin_source)
+
     def test_frontend_nginx_proxies_root_icon_aliases(self):
         nginx_conf = Path("deploy/docker/frontend/nginx.conf").read_text(encoding="utf-8")
 
@@ -575,6 +589,19 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("favicon\\.ico", nginx_conf)
         self.assertIn("/webapp-default-logo.webp", nginx_conf)
         self.assertIn("proxy_pass http://backend:8081;", nginx_conf)
+
+    def test_frontend_nginx_proxies_shell_routes_for_dynamic_head(self):
+        nginx_conf = Path("deploy/docker/frontend/nginx.conf").read_text(encoding="utf-8")
+        marker = "location ~ ^/(?:$|login/password$|home$|install$|trial$|s/[a-f0-9]{32}$"
+
+        self.assertIn(marker, nginx_conf)
+        start = nginx_conf.index(marker)
+        shell_block = nginx_conf[start : nginx_conf.index("\n\n", start)]
+
+        self.assertIn("proxy_pass http://backend:8081;", shell_block)
+        self.assertIn("proxy_set_header Host $host;", shell_block)
+        self.assertIn("devices$", shell_block)
+        self.assertIn("admin(?:/.*)?$", shell_block)
 
     def test_home_logo_scale_rules_beat_late_loaded_admin_brand_styles(self):
         css = Path("frontend/src/styles/webapp.css").read_text(encoding="utf-8")

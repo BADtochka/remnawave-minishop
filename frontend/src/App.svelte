@@ -111,9 +111,10 @@
 
   export let mockRuntime = null;
 
+  const FALLBACK_BRAND_TITLE = "Subscription";
   const EMPTY_MOCK = {
     config: {
-      title: "/minishop",
+      title: FALLBACK_BRAND_TITLE,
       primaryColor: "#00fe7a",
       apiBase: "/api",
       language: "ru",
@@ -362,7 +363,7 @@
     languageBusy,
   } = $accountStore);
 
-  $: brandTitle = CFG.title || "/minishop";
+  $: brandTitle = CFG.title || FALLBACK_BRAND_TITLE;
   $: brand = normalizeBrand({
     title: brandTitle,
     logoUrl: CFG.logoUrl,

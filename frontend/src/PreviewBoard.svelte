@@ -30,7 +30,7 @@
   export let config = {};
   export let mockData = {};
 
-  const title = config.title || "/minishop";
+  const title = config.title || "Subscription";
   const logoUrl = config.logoUrl || "/webapp-default-logo.webp";
   const plans = mockData.plans || [];
   const sub = mockData.subscription || {};

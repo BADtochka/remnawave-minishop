@@ -93,7 +93,7 @@
   export let onTranslationsSaved = () => {};
   export let routePrefix = "";
   export let brand = {};
-  export let brandTitle = "/minishop";
+  export let brandTitle = "Subscription";
   export let appFaviconUrl = "";
   export let appFaviconUseCustom = false;
   export let appVersion = "dev+local";
