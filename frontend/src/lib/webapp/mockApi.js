@@ -1529,6 +1529,8 @@ export async function mockApi(path, options = {}, context = {}) {
       ],
       log_count: 18,
       subscription_url: "https://panel.example.com/sub/aBcDeFgHiJkLmNoP",
+      last_vpn_connected_at: "2026-06-05T08:42:00Z",
+      vpn_connection_status: "connected",
       referral: {
         code: "ABCD1234",
         bot_link: "https://t.me/preview_bot?start=ref_uABCD1234",

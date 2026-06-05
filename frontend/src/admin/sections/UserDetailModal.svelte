@@ -90,6 +90,17 @@
     return at("user_hwid_limit_count", { count: base }, `${base}`);
   }
 
+  function vpnLastConnectionLabel(detail) {
+    const connectedAt = detail?.last_vpn_connected_at;
+    const status = detail?.vpn_connection_status;
+    if (connectedAt) return fmtDate(connectedAt);
+    if (status === "never") return at("user_vpn_never_connected", {}, "Никогда");
+    if (status === "connected") {
+      return at("user_vpn_connected_no_time", {}, "Подключался, время неизвестно");
+    }
+    return "—";
+  }
+
   const usersStore = getContext("usersStore");
 
   $: ({
@@ -273,6 +284,10 @@
               <span>{at("user_label_registration", {}, "Регистрация")}</span><strong
                 >{fmtDate(openedUser.registration_date)}</strong
               >
+            </li>
+            <li>
+              <span>{at("user_label_vpn_last_connected", {}, "Последнее VPN-подключение")}</span
+              ><strong>{vpnLastConnectionLabel(openedUserDetail)}</strong>
             </li>
             <li>
               <span>{at("user_label_ref_code", {}, "Реф. код")}</span><strong

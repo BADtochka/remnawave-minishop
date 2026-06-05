@@ -5,6 +5,7 @@ from .common import (
     _build_admin_webapp_referral_link,
     _error,
     _ok,
+    _panel_user_connection_activity,
     _premium_traffic_list_payload,
     _read_json,
     _serialize_payment,
@@ -836,7 +837,13 @@ async def admin_user_detail_route(request: web.Request) -> web.Response:
     # imports into their VPN client. May be missing if the user has never
     # been provisioned on the panel.
     subscription_url: Optional[str] = None
-    panel_uuid = getattr(user, "panel_user_uuid", None)
+    last_vpn_connected_at: Optional[str] = None
+    vpn_connection_status = "unknown"
+    panel_uuid = getattr(user, "panel_user_uuid", None) or getattr(
+        active_sub,
+        "panel_user_uuid",
+        None,
+    )
     if panel_uuid:
         subscription_service = request.app.get("subscription_service")
         panel_service = getattr(subscription_service, "panel_service", None)
@@ -845,9 +852,12 @@ async def admin_user_detail_route(request: web.Request) -> web.Response:
                 panel_data = await panel_service.get_user_by_uuid(panel_uuid)
                 if panel_data:
                     subscription_url = panel_data.get("subscriptionUrl") or None
+                    vpn_activity = _panel_user_connection_activity(panel_data)
+                    vpn_connection_status = str(vpn_activity.get("status") or "unknown")
+                    last_vpn_connected_at = vpn_activity.get("last_connected_at")
             except Exception as exc_panel:  # pragma: no cover
                 logger.warning(
-                    "Failed to fetch subscriptionUrl for user %s (uuid=%s): %s",
+                    "Failed to fetch panel details for user %s (uuid=%s): %s",
                     target_id,
                     panel_uuid,
                     exc_panel,
@@ -869,6 +879,8 @@ async def admin_user_detail_route(request: web.Request) -> web.Response:
             "recent_payments": [_serialize_payment(p) for p in recent_payments],
             "log_count": int(log_count or 0),
             "subscription_url": subscription_url,
+            "last_vpn_connected_at": last_vpn_connected_at,
+            "vpn_connection_status": vpn_connection_status,
             "referral": {
                 "code": referral_code,
                 "bot_link": referral_bot_link,
