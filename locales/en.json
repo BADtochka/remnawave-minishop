@@ -1200,6 +1200,7 @@
   "admin_broadcast_target_active": "With subscription",
   "admin_broadcast_target_inactive": "No subscription",
   "admin_broadcast_target_expired": "Expired subscription",
+  "admin_broadcast_target_active_never_connected": "With subscription, no VPN connections",
   "admin_broadcast_target_never": "No subscription, no history",
   "admin_expired_at": "Expired {date}",
   "admin_expired_badge": "Expired {date}",

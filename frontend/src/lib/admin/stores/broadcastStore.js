@@ -15,6 +15,14 @@ export function createBroadcastStore({ api, onToast, at }) {
     { value: "inactive", label: at("broadcast_target_inactive", {}, "Без подписки") },
     { value: "expired", label: at("broadcast_target_expired", {}, "Expired subscription") },
     {
+      value: "active_never_connected",
+      label: at(
+        "broadcast_target_active_never_connected",
+        {},
+        "С подпиской, но без VPN-подключений"
+      ),
+    },
+    {
       value: "never",
       label: at("broadcast_target_never", {}, "Без подписки и без истории"),
     },
