@@ -136,7 +136,7 @@ class SeverPayService(HttpClientMixin):
         self.referral_service = referral_service
         self._default_return_url = default_return_url
 
-        self._init_http_client(total_timeout=15)
+        self._init_http_client(total_timeout=self.settings.PAYMENT_REQUEST_TIMEOUT_SECONDS)
 
         if not self.configured:
             logging.warning(

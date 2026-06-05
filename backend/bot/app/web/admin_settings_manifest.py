@@ -348,6 +348,16 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "Английская версия текста на этапе оплаты.",
         subsection="checkout",
     ),
+    SettingField(
+        "PAYMENT_REQUEST_TIMEOUT_SECONDS",
+        "float",
+        "payments",
+        "Таймаут запроса к провайдеру",
+        "Максимальное общее время одного API-запроса к платёжному провайдеру, в секундах.",
+        optional=False,
+        min=1,
+        subsection="checkout",
+    ),
     # ─── Payment providers (toggles) ───────────────────────────────
     # Common
     SettingField("STARS_ENABLED", "bool", "payments", "Telegram Stars", subsection="common"),

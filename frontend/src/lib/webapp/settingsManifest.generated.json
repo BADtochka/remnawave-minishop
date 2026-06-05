@@ -604,6 +604,26 @@
         "updated_at": null
       },
       {
+        "key": "PAYMENT_REQUEST_TIMEOUT_SECONDS",
+        "type": "float",
+        "section": "payments",
+        "section_order": 4,
+        "subsection": "checkout",
+        "label": "Таймаут запроса к провайдеру",
+        "description": "Максимальное общее время одного API-запроса к платёжному провайдеру, в секундах.",
+        "i18n_label_key": "admin_settings_field_payment_request_timeout_seconds_label",
+        "i18n_description_key": "admin_settings_field_payment_request_timeout_seconds_description",
+        "i18n_subsection_key": "admin_settings_subsection_checkout",
+        "i18n_placeholder_key": null,
+        "placeholder": "",
+        "optional": false,
+        "secret": false,
+        "min": 1,
+        "value": "",
+        "overridden": false,
+        "updated_at": null
+      },
+      {
         "key": "STARS_ENABLED",
         "type": "bool",
         "section": "payments",

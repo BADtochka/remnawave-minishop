@@ -200,6 +200,7 @@
 | `PAYMENT_METHODS_ORDER` | Порядок кнопок оплаты: `severpay,wata,freekassa,platega,yookassa,stars,cryptopay,heleket,paykilla`. |
 | `SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED` | Показывать описание подписки перед выбором срока. |
 | `SUBSCRIPTION_PURCHASE_DESCRIPTION_RU` / `SUBSCRIPTION_PURCHASE_DESCRIPTION_EN` | Локализованное описание подписки. |
+| `PAYMENT_REQUEST_TIMEOUT_SECONDS` | Общий таймаут одного API-запроса к платёжному провайдеру, в секундах. По умолчанию `20`. |
 | `PAYMENT_<METHOD>_WEBAPP_LABEL_RU` / `PAYMENT_<METHOD>_WEBAPP_LABEL_EN` | Текст кнопки провайдера в Web App. |
 | `PAYMENT_<METHOD>_WEBAPP_ICON` | Lucide-иконка кнопки в Web App. |
 | `PAYMENT_<METHOD>_TELEGRAM_LABEL_RU` / `PAYMENT_<METHOD>_TELEGRAM_LABEL_EN` | Текст кнопки в Telegram. |
