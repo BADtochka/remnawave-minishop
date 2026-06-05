@@ -34,12 +34,27 @@ def _parse_ip(value: Optional[str]) -> Optional[ipaddress._BaseAddress]:
         return None
 
 
-def _last_forwarded_ip(header_value: str) -> Optional[str]:
-    candidates = [item.strip() for item in header_value.split(",") if item.strip()]
-    if not candidates:
+def _forwarded_ips(header_value: str) -> list[ipaddress._BaseAddress]:
+    parsed: list[ipaddress._BaseAddress] = []
+    for item in header_value.split(","):
+        ip = _parse_ip(item.strip())
+        if ip is not None:
+            parsed.append(ip)
+    return parsed
+
+
+def _trusted_forwarded_ip(
+    header_value: str,
+    trusted_networks: Sequence[ipaddress._BaseNetwork],
+) -> Optional[str]:
+    forwarded_ips = _forwarded_ips(header_value)
+    if not forwarded_ips:
         return None
-    candidate = candidates[-1]
-    return candidate if _parse_ip(candidate) is not None else None
+
+    for ip in reversed(forwarded_ips):
+        if not any(ip in network for network in trusted_networks):
+            return str(ip)
+    return str(forwarded_ips[0])
 
 
 def request_client_ip(
@@ -53,15 +68,15 @@ def request_client_ip(
     if remote_ip and forwarded_for:
         trusted_networks = parse_ip_entries(trusted_proxies)
         if any(remote_ip in network for network in trusted_networks):
-            forwarded_ip = _last_forwarded_ip(forwarded_for)
+            forwarded_ip = _trusted_forwarded_ip(forwarded_for, trusted_networks)
             if forwarded_ip:
                 return forwarded_ip
 
     if remote_ip:
         return str(remote_ip)
 
-    forwarded_ip = _last_forwarded_ip(forwarded_for)
-    return forwarded_ip
+    forwarded_ips = _forwarded_ips(forwarded_for)
+    return str(forwarded_ips[-1]) if forwarded_ips else None
 
 
 def ip_in_allowlist(

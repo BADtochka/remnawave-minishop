@@ -48,15 +48,26 @@ class RequestSecurityTests(unittest.IsolatedAsyncioTestCase):
             "198.51.100.7",
         )
 
+    async def test_request_client_ip_skips_trusted_forwarded_proxy_chain(self):
+        request = SimpleNamespace(
+            remote="172.19.0.6",
+            headers={"X-Forwarded-For": "203.0.113.10, 172.19.0.7"},
+        )
+
+        self.assertEqual(
+            request_client_ip(request, trusted_proxies=["172.19.0.0/16"]),
+            "203.0.113.10",
+        )
+
     async def test_access_logger_uses_forwarded_ip_only_for_trusted_proxy(self):
         trusted_request = SimpleNamespace(
-            remote="172.19.0.7",
-            headers={"X-Forwarded-For": "203.0.113.10"},
+            remote="172.19.0.6",
+            headers={"X-Forwarded-For": "203.0.113.10, 172.19.0.7"},
             app={"settings": SimpleNamespace(trusted_proxies=["172.19.0.0/16"])},
         )
         untrusted_request = SimpleNamespace(
-            remote="172.19.0.7",
-            headers={"X-Forwarded-For": "203.0.113.10"},
+            remote="172.19.0.6",
+            headers={"X-Forwarded-For": "203.0.113.10, 172.19.0.7"},
             app={"settings": SimpleNamespace(trusted_proxies=["127.0.0.1"])},
         )
 
@@ -66,7 +77,7 @@ class RequestSecurityTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             TrustedProxyAccessLogger._format_a(untrusted_request, object(), 0),
-            "172.19.0.7",
+            "172.19.0.6",
         )
 
     async def test_yookassa_webhook_rejects_untrusted_ip_before_reading_body(self):
