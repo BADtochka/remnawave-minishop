@@ -5,15 +5,10 @@ import json
 import logging
 from typing import Any, Callable, Dict, Mapping, Optional, Tuple
 
-from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, TraceConfig
+from aiohttp import ClientError, ClientSession, ClientTimeout, TraceConfig
 
 SuccessCheck = Callable[[int, Any], bool]
 _TRANSPORT_ATTEMPTS = 2
-_PAYMENT_REQUEST_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/125.0.0.0 Safari/537.36"
-)
 
 
 def http_ok(status: int, _body: Any) -> bool:
@@ -120,27 +115,21 @@ class HttpClientMixin:
     ``__init__`` and inherits ``_get_session`` / ``close``. The session is
     created on first use and recreated transparently if it was closed.
 
-    Payment provider calls are infrequent but user-facing, so the default
-    connector does not reuse TCP connections. This avoids intermittent hangs
-    on stale keep-alive sockets after long idle periods.
+    Provider API calls are traced so callers can retry transport failures only
+    when aiohttp has not sent request headers yet.
     """
 
     _timeout: ClientTimeout
     _session: Optional[ClientSession]
-    _connector_force_close: bool
 
     def _init_http_client(self, *, total_timeout: float = 20.0) -> None:
         self._timeout = ClientTimeout(total=total_timeout)
         self._session = None
-        self._connector_force_close = True
 
     async def _get_session(self) -> ClientSession:
         if self._session is None or self._session.closed:
-            connector = TCPConnector(force_close=self._connector_force_close)
             self._session = ClientSession(
                 timeout=self._timeout,
-                connector=connector,
-                headers={"User-Agent": _PAYMENT_REQUEST_USER_AGENT},
                 trace_configs=[_payment_trace_config()],
             )
         return self._session
