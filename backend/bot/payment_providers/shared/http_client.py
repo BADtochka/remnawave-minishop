@@ -1,17 +1,47 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, Callable, Dict, Mapping, Optional, Tuple
 
-from aiohttp import ClientSession, ClientTimeout, TCPConnector
+from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, TraceConfig
 
 SuccessCheck = Callable[[int, Any], bool]
+_TRANSPORT_ATTEMPTS = 2
+_PAYMENT_REQUEST_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/125.0.0.0 Safari/537.36"
+)
 
 
 def http_ok(status: int, _body: Any) -> bool:
     """Default success criterion — HTTP 200 with any body."""
     return status == 200
+
+
+def _trace_request_ctx(trace_config_ctx: Any) -> Optional[dict]:
+    ctx = getattr(trace_config_ctx, "trace_request_ctx", None)
+    return ctx if isinstance(ctx, dict) else None
+
+
+async def _mark_request_headers_sent(session, trace_config_ctx, params) -> None:
+    ctx = _trace_request_ctx(trace_config_ctx)
+    if ctx is not None:
+        ctx["headers_sent"] = True
+
+
+def _payment_trace_config() -> TraceConfig:
+    trace_config = TraceConfig()
+    trace_config.on_request_headers_sent.append(_mark_request_headers_sent)
+    return trace_config
+
+
+def _should_retry_transport_error(exc: Exception, trace_ctx: Mapping[str, Any]) -> bool:
+    if trace_ctx.get("headers_sent"):
+        return False
+    return isinstance(exc, (asyncio.TimeoutError, ClientError, OSError))
 
 
 async def post_json_request(
@@ -29,34 +59,47 @@ async def post_json_request(
     returns ``(False, {"status": ..., "message": ..., "raw": ...?})`` so callers
     can decide what to do (typically: mark the payment as ``failed_creation``).
     """
-    try:
-        async with session.post(
-            url,
-            json=body,
-            headers=dict(headers) if headers else None,
-        ) as response:
-            response_text = await response.text()
-            try:
-                response_data = json.loads(response_text) if response_text else {}
-            except json.JSONDecodeError:
-                logging.error("%s: invalid JSON response: %s", log_prefix, response_text)
-                return False, {
-                    "status": response.status,
-                    "message": "invalid_json",
-                    "raw": response_text,
-                }
-            if not is_success(response.status, response_data):
-                logging.error(
-                    "%s: API returned error (status=%s, body=%s)",
+    for attempt in range(1, _TRANSPORT_ATTEMPTS + 1):
+        trace_ctx: dict[str, Any] = {"headers_sent": False}
+        try:
+            async with session.post(
+                url,
+                json=body,
+                headers=dict(headers) if headers else None,
+                trace_request_ctx=trace_ctx,
+            ) as response:
+                response_text = await response.text()
+                try:
+                    response_data = json.loads(response_text) if response_text else {}
+                except json.JSONDecodeError:
+                    logging.error("%s: invalid JSON response: %s", log_prefix, response_text)
+                    return False, {
+                        "status": response.status,
+                        "message": "invalid_json",
+                        "raw": response_text,
+                    }
+                if not is_success(response.status, response_data):
+                    logging.error(
+                        "%s: API returned error (status=%s, body=%s)",
+                        log_prefix,
+                        response.status,
+                        response_data,
+                    )
+                    return False, {"status": response.status, "message": response_data}
+                return True, response_data
+        except Exception as exc:
+            if attempt < _TRANSPORT_ATTEMPTS and _should_retry_transport_error(exc, trace_ctx):
+                logging.warning(
+                    "%s: transport failed before request headers were sent; retrying (%s/%s): %s",  # noqa: E501
                     log_prefix,
-                    response.status,
-                    response_data,
+                    attempt + 1,
+                    _TRANSPORT_ATTEMPTS,
+                    exc,
                 )
-                return False, {"status": response.status, "message": response_data}
-            return True, response_data
-    except Exception as exc:
-        logging.exception("%s: request failed.", log_prefix)
-        return False, {"message": str(exc)}
+                continue
+            logging.exception("%s: request failed.", log_prefix)
+            return False, {"message": str(exc)}
+    return False, {"message": "request_failed"}
 
 
 def first_value(data: Optional[Mapping[str, Any]], *keys: str) -> Optional[str]:
@@ -94,7 +137,12 @@ class HttpClientMixin:
     async def _get_session(self) -> ClientSession:
         if self._session is None or self._session.closed:
             connector = TCPConnector(force_close=self._connector_force_close)
-            self._session = ClientSession(timeout=self._timeout, connector=connector)
+            self._session = ClientSession(
+                timeout=self._timeout,
+                connector=connector,
+                headers={"User-Agent": _PAYMENT_REQUEST_USER_AGENT},
+                trace_configs=[_payment_trace_config()],
+            )
         return self._session
 
     async def close(self) -> None:
