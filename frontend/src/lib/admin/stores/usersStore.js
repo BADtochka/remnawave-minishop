@@ -54,6 +54,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
 
   let _activeRef = "stats"; // fallback if active isn't tracked
   let _pathContext = null;
+  let _openUserRequestId = 0;
 
   function setActive(active) {
     _activeRef = active;
@@ -124,6 +125,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
     const userId =
       typeof userOrId === "object" && userOrId !== null ? userOrId.user_id : Number(userOrId);
     if (!userId) return;
+    const requestId = ++_openUserRequestId;
     _setPathContext(opts.pathContext);
 
     state.update((s) => ({
@@ -161,39 +163,72 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }) {
         const hasHwidLimit =
           sub?.hwid_device_limit !== null && sub?.hwid_device_limit !== undefined;
         const hwidLimit = hasHwidLimit ? Number(sub?.hwid_device_limit) : null;
-        state.update((s) => ({
-          ...s,
-          openedUserDetail: res,
-          openedUser: res.user ? { ...res.user, ...s.openedUser, ...res.user } : s.openedUser,
-          premiumUnlimitedDraft: Boolean(sub?.premium_unlimited_override),
-          premiumBonusGbDraft: bonusBytes > 0 ? +(bonusBytes / 1024 ** 3).toFixed(2) : "",
-          regularUnlimitedDraft: Boolean(sub?.regular_unlimited_override),
-          regularBonusGbDraft:
-            regularBonusBytes > 0 ? +(regularBonusBytes / 1024 ** 3).toFixed(2) : "",
-          hwidUnlimitedDraft: hasHwidLimit && hwidLimit === 0,
-          hwidDeviceLimitDraft: hasHwidLimit && hwidLimit > 0 ? String(hwidLimit) : "",
-          grantTrafficGbDraft: "",
-          grantTrafficKindDraft: "regular",
-        }));
+        state.update((s) => {
+          if (
+            requestId !== _openUserRequestId ||
+            !s.openedUser ||
+            s.openedUser.user_id !== userId
+          ) {
+            return s;
+          }
+          return {
+            ...s,
+            openedUserDetail: res,
+            openedUser: res.user ? { ...res.user, ...s.openedUser, ...res.user } : s.openedUser,
+            premiumUnlimitedDraft: Boolean(sub?.premium_unlimited_override),
+            premiumBonusGbDraft: bonusBytes > 0 ? +(bonusBytes / 1024 ** 3).toFixed(2) : "",
+            regularUnlimitedDraft: Boolean(sub?.regular_unlimited_override),
+            regularBonusGbDraft:
+              regularBonusBytes > 0 ? +(regularBonusBytes / 1024 ** 3).toFixed(2) : "",
+            hwidUnlimitedDraft: hasHwidLimit && hwidLimit === 0,
+            hwidDeviceLimitDraft: hasHwidLimit && hwidLimit > 0 ? String(hwidLimit) : "",
+            grantTrafficGbDraft: "",
+            grantTrafficKindDraft: "regular",
+          };
+        });
       } else {
-        onToast(res?.error || "load_failed");
-        state.update((s) => ({ ...s, openedUser: null }));
-        if (!opts.skipPush) _pushUserPath(null);
-        _pathContext = null;
+        let shouldClearPath = false;
+        let shouldShowError = false;
+        state.update((s) => {
+          if (
+            requestId !== _openUserRequestId ||
+            !s.openedUser ||
+            s.openedUser.user_id !== userId
+          ) {
+            return s;
+          }
+          shouldShowError = true;
+          shouldClearPath = true;
+          _pathContext = null;
+          return { ...s, openedUser: null };
+        });
+        if (shouldShowError) onToast(res?.error || "load_failed");
+        if (shouldClearPath && !opts.skipPush) _pushUserPath(null);
       }
     } finally {
-      state.update((s) => ({ ...s, userDetailLoading: false }));
+      state.update((s) => {
+        if (
+          requestId !== _openUserRequestId ||
+          !s.openedUser ||
+          s.openedUser.user_id !== userId
+        ) {
+          return s;
+        }
+        return { ...s, userDetailLoading: false };
+      });
     }
   }
 
   function closeUser(opts = {}) {
     let wasOpen = false;
+    _openUserRequestId += 1;
     state.update((s) => {
       wasOpen = Boolean(s.openedUser);
       return {
         ...s,
         openedUser: null,
         openedUserDetail: null,
+        userDetailLoading: false,
         userDeleteOpen: false,
         userBanConfirmOpen: false,
         userMessageConfirmOpen: false,
