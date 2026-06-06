@@ -42,6 +42,7 @@
   export let userTelegramProfileLink = () => "";
   export let userTelegramProfileLinkKind = () => "";
   export let openTelegramProfileLink = () => false;
+  export let onClose = () => usersStore.closeUser();
 
   let avatarPreviewOpen = false;
   let avatarPreviewUrl = "";
@@ -184,7 +185,7 @@
     : ""}
   description={openedUser?.username ? "@" + openedUser.username : ""}
   closeLabel={at("close", {}, "Закрыть")}
-  onclose={usersStore.closeUser}
+  onclose={onClose}
   class="admin-dialog admin-user-dialog"
 >
   {#if openedUser}

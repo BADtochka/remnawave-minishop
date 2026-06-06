@@ -422,6 +422,13 @@
     usersStore.openUser(uid);
   }
 
+  function closeUserCard() {
+    usersStore.closeUser({ skipPush: true });
+    if (active === "users" || active === "payments") {
+      onSectionChange(active);
+    }
+  }
+
   function resolvedAvatarUrl(user) {
     return userAvatarUrl(user) || (user?.email ? gravatarCache.gravatarUrl(user.email) : "");
   }
@@ -892,4 +899,5 @@
   {trafficPercentValue}
   {trafficLeftLabel}
   {trafficOfLabel}
+  onClose={closeUserCard}
 />
