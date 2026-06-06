@@ -425,7 +425,7 @@
   function closeUserCard() {
     usersStore.closeUser({ skipPush: true });
     if (active === "users" || active === "payments") {
-      onSectionChange(active);
+      onSectionChange(active, 0);
     }
   }
 
