@@ -783,6 +783,7 @@ class SubscriptionLifecycleMixin:
         bonus_days: int,
         reason: str = "bonus",
         extend_hwid_devices: bool = True,
+        tariff_key: Optional[str] = None,
     ) -> Optional[datetime]:
         reason_lower = (reason or "").lower()
         apply_main_traffic_limit = any(
@@ -809,6 +810,17 @@ class SubscriptionLifecycleMixin:
         preserve_tariff_limits = bool(
             active_sub and active_sub.tariff_key and self._tariffs_config()
         )
+        bonus_tariff = None
+        if not active_sub and tariff_key and self._tariffs_config():
+            try:
+                bonus_tariff = self._resolve_tariff(tariff_key)
+            except Exception:
+                logging.warning(
+                    "Unable to resolve bonus tariff %s for user %s.",
+                    tariff_key,
+                    user_id,
+                    exc_info=True,
+                )
         if not active_sub or not active_sub.end_date:
             logging.info(
                 f"No active subscription found for user {user_id}. Creating new one for {bonus_days} days."  # noqa: E501
@@ -818,9 +830,16 @@ class SubscriptionLifecycleMixin:
 
             # Apply main traffic limit for admin/referral/promo bonuses, fallback to trial limit otherwise  # noqa: E501
             traffic_limit = (
+                self._traffic_limit_for_period_tariff(bonus_tariff)
+                if bonus_tariff
+                else
                 self.settings.user_traffic_limit_bytes
                 if apply_main_traffic_limit
                 else self.settings.trial_traffic_limit_bytes
+            )
+            premium_baseline_bytes = bonus_tariff.premium_monthly_bytes if bonus_tariff else 0
+            base_hwid_limit = (
+                self._base_hwid_limit_for_tariff(bonus_tariff) if bonus_tariff else None
             )
 
             bonus_sub_payload = {
@@ -834,6 +853,21 @@ class SubscriptionLifecycleMixin:
                 "status_from_panel": "ACTIVE_BONUS",
                 "traffic_limit_bytes": traffic_limit,
                 "auto_renew_enabled": False,
+                "tariff_key": bonus_tariff.key if bonus_tariff else None,
+                "tier_baseline_bytes": bonus_tariff.monthly_bytes if bonus_tariff else None,
+                "topup_balance_bytes": 0,
+                "regular_bonus_bytes": 0,
+                "regular_unlimited_override": False,
+                "premium_baseline_bytes": premium_baseline_bytes,
+                "premium_topup_balance_bytes": 0,
+                "premium_topup_used_bytes": 0,
+                "premium_used_bytes": 0,
+                "premium_is_limited": False,
+                "premium_period_start_at": None,
+                "period_start_at": None,
+                "is_throttled": False,
+                "hwid_device_limit": base_hwid_limit,
+                "extra_hwid_devices": 0,
                 # Registration/referral bonus grants are short-lived, like a
                 # trial: only warn a few hours before they end, not days ahead.
                 "suppress_early_expiry_notifications": True,
@@ -886,13 +920,36 @@ class SubscriptionLifecycleMixin:
             panel_update_payload = self._build_panel_update_payload(
                 expire_at=new_end_date_obj,
                 traffic_limit_bytes=(
+                    updated_sub_model.traffic_limit_bytes
+                    if bonus_tariff
+                    else
                     self.settings.user_traffic_limit_bytes
                     if apply_main_traffic_limit and not preserve_tariff_limits
+                    else None
+                ),
+                traffic_limit_strategy=(
+                    "MONTH"
+                    if bonus_tariff and bonus_tariff.billing_model == "period"
+                    else self.settings.USER_TRAFFIC_STRATEGY
+                    if bonus_tariff
+                    else None
+                ),
+                hwid_device_limit=(
+                    self._effective_hwid_limit(updated_sub_model.hwid_device_limit, 0)
+                    if bonus_tariff
                     else None
                 ),
                 include_uuid=False,
                 include_default_squads=False,
             )
+            if bonus_tariff:
+                panel_update_payload["activeInternalSquads"] = self._panel_squads_for_tariff(
+                    bonus_tariff
+                )
+                if self.settings.parsed_user_external_squad_uuid:
+                    panel_update_payload["externalSquadUuid"] = (
+                        self.settings.parsed_user_external_squad_uuid
+                    )
 
             panel_update_success = await self.panel_service.update_user_details_on_panel(
                 panel_uuid,

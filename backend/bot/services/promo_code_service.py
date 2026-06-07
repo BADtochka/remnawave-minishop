@@ -87,12 +87,17 @@ class PromoCodeService:
             return False, _("promo_code_already_used_by_user", code=code_display)
 
         bonus_days = promo_data.bonus_days
+        default_tariff_key = None
+        tariffs_config = getattr(self.settings, "tariffs_config", None)
+        if tariffs_config:
+            default_tariff_key = getattr(tariffs_config, "default_tariff", None)
 
         new_end_date = await self.subscription_service.extend_active_subscription_days(
             session=session,
             user_id=user_id,
             bonus_days=bonus_days,
             reason=f"promo code {applied_code}",
+            tariff_key=default_tariff_key,
         )
 
         if new_end_date:
