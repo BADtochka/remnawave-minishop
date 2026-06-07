@@ -3556,20 +3556,23 @@
 }
 
 .admin-row-editor-line {
+  --admin-row-editor-action-size: 36px;
   display: grid;
-  grid-template-columns: minmax(90px, 1fr) minmax(110px, 1fr) 32px;
+  grid-template-columns: minmax(90px, 1fr) minmax(110px, 1fr) var(--admin-row-editor-action-size);
   gap: 8px;
   align-items: center;
 }
 
 .admin-row-editor-line.admin-row-editor-4 {
-  grid-template-columns: minmax(80px, 0.8fr) minmax(100px, 1fr) minmax(100px, 1fr) 32px;
+  grid-template-columns:
+    minmax(80px, 0.8fr) minmax(100px, 1fr) minmax(100px, 1fr)
+    var(--admin-row-editor-action-size);
 }
 
 .admin-row-editor-line.admin-row-editor-6 {
   grid-template-columns:
     minmax(72px, 0.8fr) minmax(90px, 1fr) minmax(90px, 1fr) minmax(120px, 1fr)
-    minmax(120px, 1fr) 32px;
+    minmax(120px, 1fr) var(--admin-row-editor-action-size);
 }
 
 /* Rows with a leading drag handle (Sortable) so the purchase order can be
@@ -3577,12 +3580,12 @@
 .admin-row-editor-line.admin-row-editor-period {
   grid-template-columns:
     24px minmax(72px, 0.8fr) minmax(90px, 1fr) minmax(90px, 1fr) minmax(120px, 1fr)
-    minmax(120px, 1fr) 32px;
+    minmax(120px, 1fr) var(--admin-row-editor-action-size);
 }
 
 .admin-row-editor-line.admin-row-editor-drag {
   grid-template-columns: 24px minmax(90px, 1fr) minmax(110px, 1fr) minmax(110px, 1fr)
-    32px;
+    var(--admin-row-editor-action-size);
 }
 
 .admin-dialog-actions {

@@ -275,7 +275,10 @@
 }
 
 .admin-row-editor-line .admin-btn {
-  width: 32px;
+  width: var(--admin-row-editor-action-size, 36px);
+  min-width: var(--admin-row-editor-action-size, 36px);
+  height: var(--admin-row-editor-action-size, 36px);
+  min-height: var(--admin-row-editor-action-size, 36px);
   padding: 0;
 }
 
