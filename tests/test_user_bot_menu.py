@@ -23,6 +23,7 @@ from bot.keyboards.inline.user_keyboards import (
     get_yk_autopay_choice_keyboard,
     payment_methods_back_callback,
     payment_options_back_callback,
+    tariff_purchase_back_callback,
 )
 from bot.middlewares.i18n import LOCALE_KEY_ALIASES
 from config.tariffs_config import TariffsConfig
@@ -332,14 +333,16 @@ class UserBotMenuTests(unittest.TestCase):
             "en",
             self.i18n,
             settings,
-            back_callback="main_action:bot_subscribe",
+            back_callback=tariff_purchase_back_callback("bot"),
             callback_context="bot",
         )
 
         self.assertIn("tariff:select:basic:bot", self._callback_data(catalog))
         self.assertIn("main_action:bot_interface", self._callback_data(catalog))
         self.assertIn("tariff:period:basic:1:bot", self._callback_data(periods))
-        self.assertIn("main_action:bot_subscribe", self._callback_data(periods))
+        self.assertIn("main_action:bot_interface", self._callback_data(periods))
+        self.assertEqual(tariff_purchase_back_callback("bot"), "main_action:bot_interface")
+        self.assertEqual(tariff_purchase_back_callback(None), "main_action:subscribe")
         self.assertEqual(
             payment_options_back_callback("subscription@basic|bot"),
             "tariff:select:basic:bot",

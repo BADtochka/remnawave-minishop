@@ -22,7 +22,7 @@ from bot.keyboards.inline.user_keyboards import (
     get_tariff_packages_keyboard,
     get_tariff_periods_keyboard,
     sale_mode_with_callback_context,
-    subscription_options_callback,
+    tariff_purchase_back_callback,
 )
 from bot.middlewares.i18n import JsonI18n
 from bot.services.panel_api_service import PanelApiService
@@ -303,7 +303,7 @@ async def select_tariff_callback(
         current_lang,
         i18n,
         settings,
-        back_callback=subscription_options_callback(callback_context),
+        back_callback=tariff_purchase_back_callback(callback_context),
         callback_context=callback_context,
     )
     text = _tariff_purchase_text(tariff, current_lang, i18n, settings)

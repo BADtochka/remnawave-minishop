@@ -71,6 +71,12 @@ def subscription_options_callback(context: Optional[str]) -> str:
     return "main_action:bot_subscribe" if context == BOT_MENU_CONTEXT else "main_action:subscribe"
 
 
+def tariff_purchase_back_callback(context: Optional[str]) -> str:
+    if context == BOT_MENU_CONTEXT:
+        return "main_action:bot_interface"
+    return subscription_options_callback(context)
+
+
 def payment_methods_back_callback(
     value: str, sale_mode: str = "subscription", price: Optional[float] = None
 ) -> str:
