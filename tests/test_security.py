@@ -37,9 +37,56 @@ from db.database_setup import redacted_database_url
 
 
 class RequestSecurityTests(unittest.IsolatedAsyncioTestCase):
-    async def test_request_client_ip_uses_last_forwarded_for_value_for_trusted_proxy(self):
+    async def test_request_client_ip_uses_rightmost_untrusted_forwarded_ip(self):
         request = SimpleNamespace(
             remote="127.0.0.1",
+            headers={"X-Forwarded-For": "203.0.113.10, 198.51.100.7"},
+        )
+
+        self.assertEqual(
+            request_client_ip(
+                request,
+                trusted_proxies=["127.0.0.1", "198.51.100.0/24"],
+            ),
+            "203.0.113.10",
+        )
+
+    async def test_request_client_ip_ignores_spoofed_forwarded_prefix(self):
+        request = SimpleNamespace(
+            remote="127.0.0.1",
+            headers={"X-Forwarded-For": "198.51.100.200, 203.0.113.10"},
+        )
+
+        self.assertEqual(
+            request_client_ip(request, trusted_proxies=["127.0.0.1"]),
+            "203.0.113.10",
+        )
+
+    async def test_request_client_ip_ignores_forwarded_for_from_untrusted_remote(self):
+        request = SimpleNamespace(
+            remote="203.0.113.50",
+            headers={"X-Forwarded-For": "198.51.100.200, 192.0.2.10"},
+        )
+
+        self.assertEqual(
+            request_client_ip(request, trusted_proxies=["127.0.0.1"]),
+            "203.0.113.50",
+        )
+
+    async def test_request_client_ip_uses_leftmost_forwarded_ip_when_all_hops_are_trusted(self):
+        request = SimpleNamespace(
+            remote="127.0.0.1",
+            headers={"X-Forwarded-For": "172.18.0.4, 172.18.0.5"},
+        )
+
+        self.assertEqual(
+            request_client_ip(request, trusted_proxies=["127.0.0.1", "172.16.0.0/12"]),
+            "172.18.0.4",
+        )
+
+    async def test_request_client_ip_keeps_last_forwarded_ip_without_remote(self):
+        request = SimpleNamespace(
+            remote=None,
             headers={"X-Forwarded-For": "203.0.113.10, 198.51.100.7"},
         )
 

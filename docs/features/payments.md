@@ -28,6 +28,12 @@
 
 Все платежные webhook URL строятся от `WEBHOOK_BASE_URL` - публичного HTTPS-адреса backend/webhook-домена. Это должен быть домен, который проксируется на backend-сервер вебхуков (`backend:8080`), а не `SUBSCRIPTION_MINI_APP_URL` frontend/Mini App. Если `WEBHOOK_BASE_URL=https://bot.example.com`, то полный адрес получается как `https://bot.example.com` + путь из таблицы.
 
+Если у провайдера включена IP-фильтрация (`FREEKASSA_TRUSTED_IPS`, `WATA_TRUSTED_IPS`,
+`HELEKET_TRUSTED_IPS`, `PAYKILLA_TRUSTED_IPS` или встроенный allowlist YooKassa),
+reverse proxy должен прокидывать `X-Forwarded-For`, а его IP/CIDR должен входить в
+`TRUSTED_PROXIES`. Иначе backend увидит IP proxy/Docker gateway и может отклонить
+валидный webhook с ошибкой `403`.
+
 | Провайдер | Что указать в кабинете провайдера | Комментарий |
 | --- | --- | --- |
 | YooKassa | `WEBHOOK_BASE_URL` + `/webhook/yookassa` | Например `https://bot.example.com/webhook/yookassa`. |

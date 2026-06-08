@@ -138,6 +138,17 @@ DEFAULT_DISPOSABLE_EMAIL_DOMAINS = "\n".join(
     ]
 )
 
+DEFAULT_TRUSTED_PROXIES = ",".join(
+    [
+        "127.0.0.1",
+        "::1",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "fc00::/7",
+    ]
+)
+
 
 class DBSettings(BaseModel):
     user: str
@@ -298,7 +309,7 @@ class Settings(BaseSettings):
 
     WEBHOOK_BASE_URL: Optional[str] = None
     TRUSTED_PROXIES: Optional[str] = Field(
-        default="127.0.0.1,::1",
+        default=DEFAULT_TRUSTED_PROXIES,
         description="Comma-separated list of reverse proxy IPs or CIDRs trusted to forward X-Forwarded-For.",  # noqa: E501
     )
 

@@ -433,6 +433,16 @@ docker compose up -d backend worker
 - Mini App/frontend-домен целиком идет в `frontend:80`;
 - API/auth/theme routes Mini App дальше проксируются frontend nginx в `backend:8081`.
 
+Для платежных провайдеров с IP allowlist важно, чтобы reverse proxy передавал реальный IP
+отправителя в `X-Forwarded-For`, а backend доверял IP последнего proxy-hop через
+`TRUSTED_PROXIES`. Готовые профили `caddy`, `nginx` и `newt` уже доверяют loopback и
+private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`), чтобы
+Docker/LAN/Kubernetes proxy не ломал проверки `YOOKASSA`, `FREEKASSA_TRUSTED_IPS`,
+`WATA_TRUSTED_IPS`, `HELEKET_TRUSTED_IPS` и `PAYKILLA_TRUSTED_IPS`. Если в вашей
+Docker-сети есть недоверенные контейнеры, сузьте `TRUSTED_PROXIES` до конкретного IP
+Caddy/Nginx/Newt. Trust-all режим возможен через `0.0.0.0/0,::/0`, но используйте его
+только когда backend недоступен напрямую, а внешний proxy очищает входящий `X-Forwarded-For`.
+
 Минимальная логика Caddy:
 
 ```caddyfile

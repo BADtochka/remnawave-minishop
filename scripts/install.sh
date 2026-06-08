@@ -483,7 +483,7 @@ prompt_common_env() {
             WEBHOOK_HOST_VALUE="$PROMPT_VALUE"
             prompt_value "Mini App public hostname" "$(env_get MINIAPP_HOST app.example.com)" 1 0 "hostname"
             MINIAPP_HOST_VALUE="$PROMPT_VALUE"
-            TRUSTED_PROXIES_VALUE="$(env_get TRUSTED_PROXIES '127.0.0.1,::1,172.16.0.0/12')"
+            TRUSTED_PROXIES_VALUE="$(env_get TRUSTED_PROXIES '127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7')"
             ;;
     esac
 

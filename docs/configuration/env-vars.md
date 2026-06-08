@@ -41,9 +41,18 @@
 | `DB_POOL_RECYCLE_SECONDS` | `.env` | Период recycling DB-соединений. |
 | `REDIS_URL` | Compose | Redis для FSM, кеша, rate-limit, очередей и locks. В Compose задается автоматически. |
 | `REDIS_KEY_PREFIX` | `.env` | Префикс Redis-ключей. |
-| `TRUSTED_PROXIES` | `.env` | IP/CIDR обратных прокси, которым доверяется `X-Forwarded-For`. |
+| `TRUSTED_PROXIES` | `.env` | IP/CIDR обратных прокси, которым доверяется `X-Forwarded-For`. По умолчанию включает loopback и private ranges для Docker/LAN/Kubernetes proxy. |
 | `HTTP_BIND` / `HTTPS_BIND` | Caddy Compose | Адреса публикации Caddy-варианта. |
 | `NEWT_ID` / `NEWT_SECRET` | Dev Compose | Доступы Newt в dev-compose. |
+
+`TRUSTED_PROXIES` нужен не только для логов: платежные webhook-обработчики с IP-фильтром
+сравнивают allowlist провайдера с client IP после обработки `X-Forwarded-For`. Если внешний
+proxy не передает этот заголовок или его IP не входит в `TRUSTED_PROXIES`, backend увидит IP
+proxy/Docker gateway и может отклонить валидный webhook. Для Caddy/Nginx/Newt из
+`deploy/examples` дефолта достаточно; в кастомной инфраструктуре добавьте CIDR своего proxy
+или сузьте значение до конкретных proxy IP. Trust-all вариант записывается как
+`0.0.0.0/0,::/0`, но он безопасен только если backend не доступен напрямую, а внешний proxy
+очищает входящий `X-Forwarded-For`.
 
 ## Кеши, rate limits и worker
 

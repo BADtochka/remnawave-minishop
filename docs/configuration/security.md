@@ -28,6 +28,14 @@ openssl rand -hex 32
 - `SUBSCRIPTION_MINI_APP_URL` должен вести на frontend/Mini App-домен.
 - Не добавляйте `/api`, `/auth` или webhook-пути в `SUBSCRIPTION_MINI_APP_URL`.
 
+## IP allowlist вебхуков
+
+- Reverse proxy для `WEBHOOK_BASE_URL` должен передавать `X-Forwarded-For` с реальным IP отправителя.
+- `TRUSTED_PROXIES` должен включать IP/CIDR последнего proxy-hop до backend. Иначе платежные webhook-обработчики будут проверять allowlist по IP proxy или Docker gateway.
+- В Docker Compose профилях Caddy, Nginx и Pangolin/Newt дефолт покрывает loopback и private ranges: `127.0.0.1`, `::1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`.
+- Если backend находится в общей Docker-сети с недоверенными контейнерами, сузьте `TRUSTED_PROXIES` до конкретных IP ваших reverse proxy.
+- Если вы сознательно хотите доверять любому proxy-hop, используйте `0.0.0.0/0,::/0`, но только когда backend не опубликован напрямую, а внешний proxy очищает входящий `X-Forwarded-For`.
+
 ## Дополнительно
 
 - Используйте HTTPS на всех публичных доменах.

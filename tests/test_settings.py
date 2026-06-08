@@ -42,6 +42,26 @@ class SettingsTests(unittest.TestCase):
 
         self.assertEqual(settings.WEBAPP_TITLE, "/minishop")
 
+    def test_trusted_proxies_default_includes_private_proxy_ranges(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+        )
+
+        self.assertEqual(
+            settings.trusted_proxies,
+            [
+                "127.0.0.1",
+                "::1",
+                "10.0.0.0/8",
+                "172.16.0.0/12",
+                "192.168.0.0/16",
+                "fc00::/7",
+            ],
+        )
+
     def test_panel_write_mode_defaults_to_live_in_production(self):
         settings = Settings(
             _env_file=None,
