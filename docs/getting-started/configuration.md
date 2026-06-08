@@ -84,6 +84,8 @@ openssl rand -hex 32
 
 В compose-примерах данные монтируются из локальной папки `./data` рядом с выбранным `docker-compose.yml`. Внутри нее лежат тарифы, темы, логотипы и прочие файловые данные приложения.
 
+Папка `./data` монтируется в `/app/data` для `migrate`, `backend` и `worker`. Если вы меняете compose-файл вручную, не убирайте этот mount у `migrate`: иначе `docker compose run --rm migrate` не увидит `data/tariffs.json` из `TARIFFS_CONFIG_PATH`.
+
 Перед первым запуском создайте каталоги и отдайте их пользователю контейнера:
 
 ```bash
@@ -91,6 +93,7 @@ mkdir -p data/themes data/webapp-logo data/tariffs
 touch data/locales-overrides.json
 chown -R 10001:10001 data
 chmod -R u+rwX data
+docker compose run --rm migrate
 docker compose up -d --force-recreate backend worker
 ```
 

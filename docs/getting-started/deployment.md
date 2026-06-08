@@ -381,6 +381,8 @@ distributed lock; код подготовлен к нескольким репл
 Файлы приложения монтируются из локальной папки `./data` рядом с выбранным `docker-compose.yml` в
 `/app/data`; внутри нее лежат тарифы, темы, логотипы и прочие файловые данные приложения.
 
+Тот же `/app/data` должен быть смонтирован в `migrate`, `backend` и `worker`. Это важно для `data/tariffs.json`: `docker compose run --rm migrate` читает тот же каталог тарифов, что и приложение. В текущих compose-файлах этот mount уже есть у всех трех сервисов.
+
 Перед первым запуском на сервере заранее дайте права пользователю контейнера `10001`:
 
 ```bash
@@ -388,6 +390,7 @@ mkdir -p data/themes data/webapp-logo data/tariffs
 touch data/locales-overrides.json
 chown -R 10001:10001 data
 chmod -R u+rwX data
+docker compose run --rm migrate
 docker compose up -d --force-recreate backend worker
 ```
 

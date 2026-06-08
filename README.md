@@ -98,10 +98,12 @@ docker compose logs -f backend worker frontend
 
 Для каталога тарифов используется `TARIFFS_CONFIG_PATH` со значением по умолчанию `data/tariffs.json`. Пример формата лежит в [data/tariffs.example.json](data/tariffs.example.json), подробности - в [docs/features/tariffs.md](docs/features/tariffs.md).
 
+В Docker этот файл должен быть доступен не только `backend` и `worker`, но и одноразовому сервису `migrate`: мигратор читает каталог тарифов при привязке существующих подписок к тарифу по умолчанию. В текущих compose-файлах весь `/app/data` уже смонтирован в `migrate`, `backend` и `worker`; если переносите compose вручную, сохраните одинаковый mount для всех трех сервисов.
+
 В compose-примерах `/app/data` монтируется из папки `./data` рядом с `docker-compose.yml`. Заранее создайте каталог и отдайте его пользователю контейнера. Это нужно для сохранения `data/tariffs.json`, каталога тем `data/themes` и кеша логотипа Web App:
 
 ```bash
-mkdir -p data/themes data/webapp-logo
+mkdir -p data/themes data/webapp-logo data/tariffs
 touch data/locales-overrides.json
 chown -R 10001:10001 data
 chmod -R u+rwX data
