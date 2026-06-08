@@ -33,7 +33,8 @@ docker-dev:
     - test -n "$DOCKERHUB_USERNAME"
     - test -n "$DOCKERHUB_TOKEN"
     - echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
-    - docker buildx create --name gitlab-builder --use
+    - docker buildx create --name gitlab-builder --driver docker-container --use
+    - docker buildx inspect --bootstrap
   script:
     - git fetch origin dev --tags
     - |
@@ -41,7 +42,17 @@ docker-dev:
         echo "A newer dev commit exists; skipping Docker Hub build for $IMAGE."
         exit 0
       fi
-    - docker buildx build --load --platform linux/amd64 --file deploy/docker/Dockerfile --target "$TARGET" --build-arg "CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME" --tag "3252a8/$IMAGE:dev" .
+    - |
+      docker buildx build \
+        --load \
+        --platform linux/amd64 \
+        --file deploy/docker/Dockerfile \
+        --target "$TARGET" \
+        --build-arg "CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME" \
+        --build-arg "BUILDKIT_INLINE_CACHE=1" \
+        --cache-from "type=registry,ref=3252a8/$IMAGE:dev" \
+        --tag "3252a8/$IMAGE:dev" \
+        .
     - git fetch origin dev --tags
     - |
       if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/dev)" ]; then
