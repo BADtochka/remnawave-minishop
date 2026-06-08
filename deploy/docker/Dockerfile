@@ -86,7 +86,34 @@ COPY --from=version-builder /build-commit /app/.build-commit
 USER appuser
 
 
+FROM node:22-slim AS frontend-builder
+
+WORKDIR /app/frontend
+
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN --mount=type=cache,target=/root/.npm \
+    if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+COPY frontend ./
+RUN mkdir -p ../backend/bot/app/web/templates
+
+RUN npm run build:webapp
+COPY backend/bot/app/web/templates/subscription_webapp.html ../backend/bot/app/web/templates/subscription_webapp.html
+RUN node ./scripts/prepare_nginx_assets.mjs --out ../frontend-nginx-dist
+
+
 FROM python-base AS backend
+
+# The Mini App shell is rendered by the backend, which rewrites the stylesheet
+# and script tags to the content-hashed asset names (subscription_webapp.<hash>.css).
+# Those hashed files are build artifacts and gitignored, so a clean checkout has
+# none of them: without this copy the asset resolver falls back to the bare
+# /subscription_webapp.css URL. That URL never changes between deploys and is
+# served no-store, which iOS WebViews (WKWebView) cache aggressively and refuse to
+# revalidate -> stale CSS and a broken-looking Mini App on iOS only. Pull the
+# freshly built assets (the same hashes the nginx image serves) into the image so
+# the shell emits immutable, cache-busting URLs.
+COPY --from=frontend-builder /app/backend/bot/app/web/templates/ ./backend/bot/app/web/templates/
 
 LABEL org.opencontainers.image.source="https://github.com/3252a8/remnawave-minishop" \
       org.opencontainers.image.title="remnawave-minishop-backend" \
@@ -105,22 +132,6 @@ LABEL org.opencontainers.image.source="https://github.com/3252a8/remnawave-minis
       org.opencontainers.image.licenses="MIT"
 
 CMD ["python", "backend/main_worker.py"]
-
-
-FROM node:22-slim AS frontend-builder
-
-WORKDIR /app/frontend
-
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN --mount=type=cache,target=/root/.npm \
-    if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
-COPY frontend ./
-RUN mkdir -p ../backend/bot/app/web/templates
-
-RUN npm run build:webapp
-COPY backend/bot/app/web/templates/subscription_webapp.html ../backend/bot/app/web/templates/subscription_webapp.html
-RUN node ./scripts/prepare_nginx_assets.mjs --out ../frontend-nginx-dist
 
 
 FROM nginx:1.27-alpine AS frontend
