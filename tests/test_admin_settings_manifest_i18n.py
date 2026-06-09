@@ -24,6 +24,7 @@ SUBSCRIPTION_PURCHASE_DESCRIPTION_SETTINGS = (
     "SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED",
     "SUBSCRIPTION_PURCHASE_DESCRIPTION_RU",
     "SUBSCRIPTION_PURCHASE_DESCRIPTION_EN",
+    "PAYMENT_REQUEST_TIMEOUT_SECONDS",
 )
 
 SUBSCRIPTION_GUIDE_SETTINGS = (
@@ -176,6 +177,11 @@ def test_support_settings_i18n_keys_exist_in_admin_locales():
 
 def test_subscription_purchase_description_settings_i18n_keys_exist():
     manifest = _manifest_by_key()
+
+    timeout_field = manifest["PAYMENT_REQUEST_TIMEOUT_SECONDS"]
+    assert timeout_field["type"] == "float"
+    assert timeout_field["optional"] is False
+    assert timeout_field["min"] == 1
 
     for language in ("ru", "en"):
         messages = _locale(language)

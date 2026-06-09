@@ -331,6 +331,11 @@ class Settings(BaseSettings):
         default=DEFAULT_SUBSCRIPTION_PURCHASE_DESCRIPTION_EN,
         description="English subscription description shown before purchase/renewal options.",
     )
+    PAYMENT_REQUEST_TIMEOUT_SECONDS: float = Field(
+        default=20,
+        ge=1,
+        description="Maximum total time for one payment provider API request, in seconds.",
+    )
 
     MONTH_1_ENABLED: bool = Field(default=True, alias="1_MONTH_ENABLED")
     MONTH_3_ENABLED: bool = Field(default=True, alias="3_MONTHS_ENABLED")
