@@ -1,11 +1,18 @@
+import json
+import time
 from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, patch
 
 import bot.app.web.subscription_webapp  # noqa: F401
 from bot.app.web.webapp import billing as billing_module
-from bot.payment_providers.base import WebAppPaymentContext
-from bot.payment_providers.yookassa import create_webapp_payment
+from bot.payment_providers.base import PaymentProviderSpec, WebAppPaymentContext
+from bot.payment_providers.freekassa import FreeKassaService
+from bot.payment_providers.heleket import HeleketService
+from bot.payment_providers.platega import PlategaService
+from bot.payment_providers.severpay import SeverPayService
+from bot.payment_providers.shared import reusable_webapp_payment_response
+from bot.payment_providers.yookassa import create_webapp_payment, reuse_webapp_payment
 
 
 class _SessionFactory:
@@ -20,6 +27,374 @@ class _SessionFactory:
 
 
 class WebAppPaymentStatusTests(IsolatedAsyncioTestCase):
+    async def test_heleket_reuses_unexpired_check_payment(self):
+        payment = SimpleNamespace(
+            payment_id=77,
+            amount=299.0,
+            currency="RUB",
+            provider_payment_id="invoice-77",
+            provider_payment_url=None,
+        )
+        service = object.__new__(HeleketService)
+        service.get_payment_info = AsyncMock(
+            return_value=(
+                True,
+                {
+                    "uuid": "invoice-77",
+                    "order_id": "77",
+                    "amount": "299.00",
+                    "currency": "RUB",
+                    "payment_status": "check",
+                    "is_final": False,
+                    "expired_at": int(time.time()) + 900,
+                    "url": "https://heleket.example/pay/77",
+                },
+            )
+        )
+
+        url = await service.try_reuse_pending_payment(payment)
+
+        self.assertEqual(url, "https://heleket.example/pay/77")
+        service.get_payment_info.assert_awaited_once_with("invoice-77")
+
+    async def test_heleket_does_not_reuse_processing_payment(self):
+        payment = SimpleNamespace(
+            payment_id=77,
+            amount=299.0,
+            currency="RUB",
+            provider_payment_id="invoice-77",
+            provider_payment_url="https://heleket.example/pay/77",
+        )
+        service = object.__new__(HeleketService)
+        service.get_payment_info = AsyncMock(
+            return_value=(
+                True,
+                {
+                    "uuid": "invoice-77",
+                    "order_id": "77",
+                    "amount": "299.00",
+                    "currency": "RUB",
+                    "payment_status": "process",
+                    "is_final": False,
+                    "expired_at": int(time.time()) + 900,
+                },
+            )
+        )
+
+        self.assertIsNone(await service.try_reuse_pending_payment(payment))
+
+    async def test_severpay_reuses_new_payment(self):
+        payment = SimpleNamespace(
+            payment_id=77,
+            amount=299.0,
+            currency="RUB",
+            provider_payment_id="12345",
+            provider_payment_url="https://severpay.example/pay/77",
+        )
+        service = object.__new__(SeverPayService)
+        service.get_payment = AsyncMock(
+            return_value=(
+                True,
+                {
+                    "id": 12345,
+                    "uid": "payment-uid-77",
+                    "order_id": "77",
+                    "amount": 299.0,
+                    "currency": "RUB",
+                    "status": "new",
+                },
+            )
+        )
+
+        url = await service.try_reuse_pending_payment(payment)
+
+        self.assertEqual(url, "https://severpay.example/pay/77")
+        service.get_payment.assert_awaited_once_with("12345")
+
+    async def test_severpay_does_not_reuse_failed_payment(self):
+        payment = SimpleNamespace(
+            payment_id=77,
+            amount=299.0,
+            currency="RUB",
+            provider_payment_id="12345",
+            provider_payment_url="https://severpay.example/pay/77",
+        )
+        service = object.__new__(SeverPayService)
+        service.get_payment = AsyncMock(
+            return_value=(
+                True,
+                {
+                    "id": 12345,
+                    "order_id": "77",
+                    "amount": 299.0,
+                    "currency": "RUB",
+                    "status": "fail",
+                },
+            )
+        )
+
+        self.assertIsNone(await service.try_reuse_pending_payment(payment))
+
+    async def test_platega_reuses_matching_pending_transaction(self):
+        payment = SimpleNamespace(
+            payment_id=77,
+            amount=299.0,
+            currency="RUB",
+            provider_payment_id="transaction-77",
+            provider_payment_url="https://platega.example/pay/77",
+        )
+        service = object.__new__(PlategaService)
+        service.get_transaction = AsyncMock(
+            return_value=(
+                True,
+                {
+                    "id": "transaction-77",
+                    "status": "PENDING",
+                    "paymentDetails": {"amount": 299.0, "currency": "RUB"},
+                    "payload": json.dumps(
+                        {
+                            "payment_db_id": 77,
+                            "user_id": 1001,
+                            "sale_mode": "subscription@standard",
+                            "platega_variant": "sbp",
+                        }
+                    ),
+                },
+            )
+        )
+
+        url = await service.try_reuse_pending_transaction(
+            payment,
+            user_id=1001,
+            sale_mode="subscription@standard",
+            variant="sbp",
+        )
+
+        self.assertEqual(url, "https://platega.example/pay/77")
+        service.get_transaction.assert_awaited_once_with("transaction-77")
+
+    async def test_platega_does_not_reuse_other_variant(self):
+        payment = SimpleNamespace(
+            payment_id=77,
+            amount=299.0,
+            currency="RUB",
+            provider_payment_id="transaction-77",
+            provider_payment_url="https://platega.example/pay/77",
+        )
+        service = object.__new__(PlategaService)
+        service.get_transaction = AsyncMock(
+            return_value=(
+                True,
+                {
+                    "id": "transaction-77",
+                    "status": "PENDING",
+                    "paymentDetails": {"amount": 299.0, "currency": "RUB"},
+                    "payload": json.dumps(
+                        {
+                            "payment_db_id": 77,
+                            "user_id": 1001,
+                            "sale_mode": "subscription@standard",
+                            "platega_variant": "crypto",
+                        }
+                    ),
+                },
+            )
+        )
+
+        self.assertIsNone(
+            await service.try_reuse_pending_transaction(
+                payment,
+                user_id=1001,
+                sale_mode="subscription@standard",
+                variant="sbp",
+            )
+        )
+
+    async def test_freekassa_reuses_matching_new_order(self):
+        payment = SimpleNamespace(
+            payment_id=77,
+            amount=299.0,
+            currency="RUB",
+            provider_payment_id="order-hash-77",
+        )
+        service = object.__new__(FreeKassaService)
+        service.config = SimpleNamespace(PAYMENT_URL="https://freekassa.example/")
+        service.get_orders = AsyncMock(
+            return_value=(
+                True,
+                {
+                    "type": "success",
+                    "orders": [
+                        {
+                            "merchant_order_id": "77",
+                            "fk_order_id": 12345,
+                            "amount": 299.0,
+                            "currency": "RUB",
+                            "status": 0,
+                        }
+                    ],
+                },
+            )
+        )
+
+        url = await service.try_reuse_pending_order(payment)
+
+        self.assertEqual(url, "https://freekassa.example/form/12345/order-hash-77")
+        service.get_orders.assert_awaited_once_with(payment_id=77, order_status=0)
+
+    async def test_freekassa_does_not_reuse_order_with_other_amount(self):
+        payment = SimpleNamespace(
+            payment_id=77,
+            amount=299.0,
+            currency="RUB",
+            provider_payment_id="order-hash-77",
+        )
+        service = object.__new__(FreeKassaService)
+        service.config = SimpleNamespace(PAYMENT_URL="https://freekassa.example/")
+        service.get_orders = AsyncMock(
+            return_value=(
+                True,
+                {
+                    "orders": [
+                        {
+                            "merchant_order_id": "77",
+                            "fk_order_id": 12345,
+                            "amount": 199.0,
+                            "currency": "RUB",
+                            "status": 0,
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertIsNone(await service.try_reuse_pending_order(payment))
+
+    async def test_reusable_payment_response_returns_existing_payment(self):
+        payment = SimpleNamespace(payment_id=77)
+        resolver = AsyncMock(return_value="https://provider.example/pay/77")
+        spec = PaymentProviderSpec(
+            id="provider",
+            provider_key="provider",
+            label="Provider",
+            pending_status="pending_provider",
+            enabled=lambda _config: True,
+            reuse_webapp_payment=resolver,
+        )
+        ctx = WebAppPaymentContext(
+            request=SimpleNamespace(app={}),
+            session=AsyncMock(),
+            user_id=1001,
+            method="provider",
+            months=3,
+            price=299.0,
+            stars_price=None,
+            description="Subscription",
+            sale_mode="subscription@standard",
+            currency="RUB",
+        )
+
+        with patch.object(
+            billing_module.payment_dal,
+            "find_recent_pending_provider_payment",
+            AsyncMock(return_value=payment),
+        ) as find_pending:
+            response = await reusable_webapp_payment_response(ctx, spec)
+
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status, 200)
+        self.assertIn(b'"payment_id": 77', response.body)
+        resolver.assert_awaited_once_with(ctx, payment)
+        self.assertEqual(find_pending.await_args.kwargs["amount"], 299.0)
+        self.assertEqual(find_pending.await_args.kwargs["currency"], "RUB")
+        self.assertEqual(find_pending.await_args.kwargs["sale_mode"], "subscription@standard")
+        self.assertEqual(find_pending.await_args.kwargs["months"], 3)
+        self.assertEqual(find_pending.await_args.kwargs["tariff_key"], "standard")
+
+    async def test_yookassa_reuses_only_matching_pending_invoice(self):
+        payment = SimpleNamespace(
+            payment_id=77,
+            amount=299.0,
+            currency="RUB",
+            yookassa_payment_id="yk_77",
+            provider_payment_id=None,
+        )
+        service = SimpleNamespace(
+            configured=True,
+            get_payment_info=AsyncMock(
+                return_value={
+                    "id": "yk_77",
+                    "status": "pending",
+                    "paid": False,
+                    "amount_value": 299.0,
+                    "amount_currency": "RUB",
+                    "metadata": {
+                        "user_id": "1001",
+                        "payment_db_id": "77",
+                        "sale_mode": "subscription@standard",
+                    },
+                    "confirmation_url": "https://yookassa.example/pay/77",
+                }
+            ),
+        )
+        ctx = WebAppPaymentContext(
+            request=SimpleNamespace(app={"yookassa_service": service}),
+            session=AsyncMock(),
+            user_id=1001,
+            method="yookassa",
+            months=3,
+            price=299.0,
+            stars_price=None,
+            description="Subscription",
+            sale_mode="subscription@standard",
+            currency="RUB",
+        )
+
+        url = await reuse_webapp_payment(ctx, payment)
+
+        self.assertEqual(url, "https://yookassa.example/pay/77")
+        service.get_payment_info.assert_awaited_once_with("yk_77")
+
+    async def test_yookassa_does_not_reuse_invoice_with_other_sale_mode(self):
+        payment = SimpleNamespace(
+            payment_id=77,
+            amount=299.0,
+            currency="RUB",
+            yookassa_payment_id="yk_77",
+            provider_payment_id=None,
+        )
+        service = SimpleNamespace(
+            configured=True,
+            get_payment_info=AsyncMock(
+                return_value={
+                    "status": "pending",
+                    "paid": False,
+                    "amount_value": 299.0,
+                    "amount_currency": "RUB",
+                    "metadata": {
+                        "user_id": "1001",
+                        "payment_db_id": "77",
+                        "sale_mode": "traffic@standard",
+                    },
+                    "confirmation_url": "https://yookassa.example/pay/77",
+                }
+            ),
+        )
+        ctx = WebAppPaymentContext(
+            request=SimpleNamespace(app={"yookassa_service": service}),
+            session=AsyncMock(),
+            user_id=1001,
+            method="yookassa",
+            months=3,
+            price=299.0,
+            stars_price=None,
+            description="Subscription",
+            sale_mode="subscription@standard",
+            currency="RUB",
+        )
+
+        self.assertIsNone(await reuse_webapp_payment(ctx, payment))
+
     async def test_yookassa_pending_payment_refresh_processes_succeeded_provider_status(self):
         payment = SimpleNamespace(
             payment_id=42,

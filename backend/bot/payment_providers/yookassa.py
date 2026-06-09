@@ -63,6 +63,7 @@ from .shared import (
     append_hwid_renewal_note,
     build_success_message,
     create_webapp_payment_record,
+    decimal_amounts_equal,
     format_human_units,
     format_number_for_payload,
     is_traffic_sale_base,
@@ -382,6 +383,10 @@ class YooKassaService:
                         "title": pm_title,
                         "card_last4": last4_val,
                     }
+                confirmation = getattr(payment_info_yk, "confirmation", None)
+                confirmation_url = (
+                    getattr(confirmation, "confirmation_url", None) if confirmation else None
+                )
                 return {
                     "id": payment_info_yk.id,
                     "status": payment_info_yk.status,
@@ -399,6 +404,7 @@ class YooKassaService:
                     and hasattr(payment_info_yk.captured_at, "isoformat")
                     else None,
                     "payment_method": pm_payload,
+                    "confirmation_url": confirmation_url,
                     "test_mode": getattr(payment_info_yk, "test", None),
                 }
             else:
@@ -2939,6 +2945,42 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
         return payment_failed()
 
 
+async def reuse_webapp_payment(ctx: WebAppPaymentContext, payment: Any) -> Optional[str]:
+    service: YooKassaService = ctx.request.app.get("yookassa_service")
+    if not service or not service.configured:
+        return None
+
+    provider_payment_id = str(
+        getattr(payment, "yookassa_payment_id", None)
+        or getattr(payment, "provider_payment_id", None)
+        or ""
+    ).strip()
+    if not provider_payment_id:
+        return None
+
+    info = await service.get_payment_info(provider_payment_id)
+    if not info or str(info.get("status") or "").strip().lower() != "pending":
+        return None
+    if bool(info.get("paid")):
+        return None
+    if not decimal_amounts_equal(info.get("amount_value"), getattr(payment, "amount", None)):
+        return None
+    provider_currency = normalize_payment_currency_code(info.get("amount_currency"))
+    payment_currency = normalize_payment_currency_code(getattr(payment, "currency", None))
+    if provider_currency != payment_currency:
+        return None
+
+    metadata = info.get("metadata") or {}
+    expected_metadata = {
+        "user_id": str(ctx.user_id),
+        "payment_db_id": str(payment.payment_id),
+        "sale_mode": str(ctx.sale_mode),
+    }
+    if any(str(metadata.get(key) or "") != value for key, value in expected_metadata.items()):
+        return None
+    return str(info.get("confirmation_url") or "").strip() or None
+
+
 _PRESENTATION_MANIFEST = tuple(
     ProviderManifestField(
         key=key,
@@ -3073,6 +3115,7 @@ SPEC = PaymentProviderSpec(
     webhook_route=yookassa_webhook_route,
     webhook_requires_base_url=True,
     create_webapp_payment=create_webapp_payment,
+    reuse_webapp_payment=reuse_webapp_payment,
     config_class=YooKassaConfig,
     presentation_class=YooKassaPresentation,
     manifest_fields=_CONFIG_MANIFEST + _PRESENTATION_MANIFEST,

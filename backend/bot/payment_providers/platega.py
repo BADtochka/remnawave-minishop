@@ -55,6 +55,7 @@ from .shared import (
     post_json_request,
     quote_hwid_callback_parts,
     render_link_or_fail,
+    render_payment_link,
     safe_callback_answer,
 )
 
@@ -281,6 +282,82 @@ class PlategaService(HttpClientMixin):
             headers=self._auth_headers,
             log_prefix="Platega create_transaction",
         )
+
+    async def get_transaction(self, transaction_id: str) -> Tuple[bool, Dict[str, Any]]:
+        if not self.configured:
+            return False, {"message": "service_not_configured"}
+
+        transaction_id = str(transaction_id or "").strip()
+        if not transaction_id:
+            return False, {"message": "missing_transaction_id"}
+
+        session = await self._get_session()
+        try:
+            async with session.get(
+                f"{self.base_url}/transaction/{transaction_id}",
+                headers=self._auth_headers,
+            ) as response:
+                data = await response.json(content_type=None)
+                if response.status != 200 or not isinstance(data, dict):
+                    logging.warning(
+                        "Platega get_transaction failed: id=%s status=%s body=%s",
+                        transaction_id,
+                        response.status,
+                        data,
+                    )
+                    return False, {"status": response.status, "message": data}
+                return True, data
+        except Exception as exc:
+            logging.exception("Platega get_transaction request failed: id=%s", transaction_id)
+            return False, {"message": str(exc)}
+
+    async def try_reuse_pending_transaction(
+        self,
+        payment: Any,
+        *,
+        user_id: int,
+        sale_mode: str,
+        variant: str,
+    ) -> Optional[str]:
+        transaction_id = str(getattr(payment, "provider_payment_id", None) or "").strip()
+        payment_url = str(getattr(payment, "provider_payment_url", None) or "").strip()
+        if not transaction_id or not payment_url:
+            return None
+
+        success, data = await self.get_transaction(transaction_id)
+        if not success or str(data.get("status") or "").upper() != "PENDING":
+            return None
+        if str(data.get("id") or "") != transaction_id:
+            return None
+
+        details = data.get("paymentDetails") or {}
+        if not isinstance(details, dict):
+            return None
+        try:
+            if not decimal_amounts_equal(details.get("amount"), getattr(payment, "amount", None)):
+                return None
+        except (TypeError, ValueError):
+            return None
+        provider_currency = normalize_payment_currency_code(details.get("currency"))
+        payment_currency = normalize_payment_currency_code(getattr(payment, "currency", None))
+        if provider_currency != payment_currency:
+            return None
+
+        try:
+            payload = json.loads(str(data.get("payload") or ""))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+        expected = {
+            "payment_db_id": str(payment.payment_id),
+            "user_id": str(user_id),
+            "sale_mode": str(sale_mode),
+            "platega_variant": str(variant),
+        }
+        if not isinstance(payload, dict) or any(
+            str(payload.get(key) or "") != value for key, value in expected.items()
+        ):
+            return None
+        return payment_url
 
     async def webhook_route(self, request: web.Request) -> web.Response:
         if not self.configured:
@@ -519,6 +596,43 @@ async def pay_platega_callback_handler(
         hwid_quote=hwid_quote,
     )
 
+    reuse_amounts = payment_record_amounts(
+        months=parts.months,
+        sale_mode=parts.sale_mode,
+        hwid_device_count=hwid_quote.get("device_count") if hwid_quote else None,
+    )
+    reusable_payment = await payment_dal.find_recent_pending_provider_payment(
+        session,
+        user_id=callback.from_user.id,
+        provider="platega",
+        pending_status="pending_platega",
+        amount=parts.price,
+        currency=currency_code,
+        sale_mode=parts.sale_mode,
+        months=reuse_amounts.months,
+        purchased_gb=reuse_amounts.purchased_gb,
+        purchased_hwid_devices=reuse_amounts.purchased_hwid_devices,
+        tariff_key=reuse_amounts.tariff_key,
+    )
+    if reusable_payment is not None:
+        reusable_url = await platega_service.try_reuse_pending_transaction(
+            reusable_payment,
+            user_id=callback.from_user.id,
+            sale_mode=parts.sale_mode,
+            variant=platega_variant,
+        )
+        if reusable_url:
+            await render_payment_link(
+                callback,
+                translator=translator,
+                current_lang=current_lang,
+                i18n=i18n,
+                parts=parts,
+                payment_url=reusable_url,
+                log_prefix=_LOG,
+            )
+            return
+
     try:
         payment_record = await payment_dal.create_payment_record(session, record_payload)
         await session.commit()
@@ -663,6 +777,19 @@ async def create_sbp_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
 
 async def create_crypto_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
     return await _create_webapp_payment(ctx, "platega_crypto")
+
+
+async def reuse_webapp_payment(ctx: WebAppPaymentContext, payment: Any) -> Optional[str]:
+    service: PlategaService = ctx.request.app.get("platega_service")
+    if not service or not service.configured:
+        return None
+    variant = "crypto" if ctx.method == "platega_crypto" else "sbp"
+    return await service.try_reuse_pending_transaction(
+        payment,
+        user_id=ctx.user_id,
+        sale_mode=ctx.sale_mode,
+        variant=variant,
+    )
 
 
 def _platega_presentation_manifest(subsection: str, default_icon: str, prefix: str) -> tuple:
@@ -819,6 +946,7 @@ SBP_SPEC = PaymentProviderSpec(
     webhook_path=lambda source: "/webhook/platega",
     webhook_route=platega_webhook_route,
     create_webapp_payment=create_sbp_webapp_payment,
+    reuse_webapp_payment=reuse_webapp_payment,
     config_class=PlategaConfig,
     presentation_class=PlategaSbpPresentation,
     manifest_fields=_CONFIG_MANIFEST
@@ -851,6 +979,7 @@ CRYPTO_SPEC = PaymentProviderSpec(
     service_key="platega_service",
     callback_prefix="pay_platega_crypto",
     create_webapp_payment=create_crypto_webapp_payment,
+    reuse_webapp_payment=reuse_webapp_payment,
     config_class=PlategaConfig,
     presentation_class=PlategaCryptoPresentation,
     manifest_fields=_platega_presentation_manifest("Platega", "Bitcoin", "PLATEGA_CRYPTO"),

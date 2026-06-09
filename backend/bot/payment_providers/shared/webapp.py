@@ -46,6 +46,7 @@ async def finalize_webapp_link_payment(
                 payment.payment_id,
                 str(provider_payment_id),
                 new_status or payment.status,
+                provider_payment_url=payment_url,
             )
             await session.commit()
         except Exception:

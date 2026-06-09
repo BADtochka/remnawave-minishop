@@ -1068,28 +1068,44 @@ async def _create_subscription_payment(
                 "payment_amount_below_minimum",
                 "Payment amount is below the provider minimum",
             )
-        return await provider_spec.create_webapp_payment(
-            WebAppPaymentContext(
-                request=request,
-                session=session,
-                user_id=user_id,
-                method=method,
-                months=months,
-                price=price,
-                stars_price=stars_price,
-                currency=payment_currency,
-                description=description,
-                sale_mode=sale_mode,
-                traffic_gb=traffic_gb,
-                hwid_device_count=hwid_quote.get("device_count") if hwid_quote else None,
-                hwid_valid_from=hwid_quote.get("valid_from") if hwid_quote else None,
-                hwid_valid_until=hwid_quote.get("valid_until") if hwid_quote else None,
-                hwid_pricing_period_months=hwid_quote.get("pricing_period_months")
-                if hwid_quote
-                else None,
-                hwid_proration_ratio=hwid_quote.get("proration_ratio") if hwid_quote else None,
-                hwid_full_price=hwid_quote.get("full_price") if hwid_quote else None,
-            )
+        payment_context = WebAppPaymentContext(
+            request=request,
+            session=session,
+            user_id=user_id,
+            method=method,
+            months=months,
+            price=price,
+            stars_price=stars_price,
+            currency=payment_currency,
+            description=description,
+            sale_mode=sale_mode,
+            traffic_gb=traffic_gb,
+            hwid_device_count=hwid_quote.get("device_count") if hwid_quote else None,
+            hwid_valid_from=hwid_quote.get("valid_from") if hwid_quote else None,
+            hwid_valid_until=hwid_quote.get("valid_until") if hwid_quote else None,
+            hwid_pricing_period_months=hwid_quote.get("pricing_period_months")
+            if hwid_quote
+            else None,
+            hwid_proration_ratio=hwid_quote.get("proration_ratio") if hwid_quote else None,
+            hwid_full_price=hwid_quote.get("full_price") if hwid_quote else None,
         )
+        if provider_spec.reuse_webapp_payment:
+            from bot.payment_providers.shared import reusable_webapp_payment_response
+
+            try:
+                reusable_response = await reusable_webapp_payment_response(
+                    payment_context,
+                    provider_spec,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to verify reusable payment: user_id=%s provider=%s",
+                    user_id,
+                    provider_spec.provider_key,
+                )
+                reusable_response = None
+            if reusable_response is not None:
+                return reusable_response
+        return await provider_spec.create_webapp_payment(payment_context)
 
     return _json_error(400, "payment_unavailable", "Payment method unavailable")

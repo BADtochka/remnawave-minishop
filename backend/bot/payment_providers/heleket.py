@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import logging
+import time
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -54,10 +55,12 @@ from .shared import (
     notify_user_payment_failed,
     parse_payment_callback,
     payment_failed,
+    payment_record_amounts,
     payment_unavailable,
     payment_units_for_activation,
     quote_hwid_callback_parts,
     render_link_or_fail,
+    render_payment_link,
 )
 
 router = Router(name="user_subscription_payments_heleket_router")
@@ -372,6 +375,74 @@ class HeleketService(HttpClientMixin):
             logging.exception("Heleket create_payment_link: request failed.")
             return False, {"message": str(exc)}
 
+    async def get_payment_info(self, payment_uuid: str) -> Tuple[bool, Dict[str, Any]]:
+        if not self.configured:
+            return False, {"message": "service_not_configured"}
+
+        payment_uuid = str(payment_uuid or "").strip()
+        if not payment_uuid:
+            return False, {"message": "missing_payment_uuid"}
+
+        body = {"uuid": payment_uuid}
+        headers = {
+            "merchant": self.merchant_id,
+            "sign": _compute_signature(body, self.api_key),
+            "Content-Type": "application/json",
+        }
+        session = await self._get_session()
+        try:
+            async with session.post(
+                f"{self.base_url}/v1/payment/info",
+                data=_serialize_for_signature(body).encode("utf-8"),
+                headers=headers,
+            ) as response:
+                response_data = await response.json(content_type=None)
+                state = response_data.get("state") if isinstance(response_data, dict) else None
+                if response.status != 200 or state != 0:
+                    logging.warning(
+                        "Heleket get_payment_info failed: uuid=%s status=%s body=%s",
+                        payment_uuid,
+                        response.status,
+                        response_data,
+                    )
+                    return False, {"status": response.status, "message": response_data}
+                result = response_data.get("result") or {}
+                return isinstance(result, dict), result
+        except Exception as exc:
+            logging.exception("Heleket get_payment_info request failed: uuid=%s", payment_uuid)
+            return False, {"message": str(exc)}
+
+    async def try_reuse_pending_payment(self, payment: Any) -> Optional[str]:
+        payment_uuid = str(getattr(payment, "provider_payment_id", None) or "").strip()
+        if not payment_uuid:
+            return None
+
+        success, data = await self.get_payment_info(payment_uuid)
+        status = str(data.get("payment_status") or data.get("status") or "").lower()
+        if not success or status != "check" or bool(data.get("is_final")):
+            return None
+        if str(data.get("uuid") or "") != payment_uuid:
+            return None
+        if str(data.get("order_id") or "") != str(payment.payment_id):
+            return None
+        try:
+            if not decimal_amounts_equal(data.get("amount"), getattr(payment, "amount", None)):
+                return None
+            expired_at = int(data.get("expired_at") or 0)
+        except (TypeError, ValueError):
+            return None
+        if expired_at and expired_at <= int(time.time()):
+            return None
+        provider_currency = normalize_payment_currency_code(data.get("currency"))
+        payment_currency = normalize_payment_currency_code(getattr(payment, "currency", None))
+        if provider_currency != payment_currency:
+            return None
+        return (
+            str(data.get("url") or "").strip()
+            or str(getattr(payment, "provider_payment_url", None) or "").strip()
+            or None
+        )
+
     def _verify_signature(self, payload: Dict[str, Any]) -> bool:
         received = payload.get("sign")
         if not isinstance(received, str) or not received:
@@ -612,6 +683,38 @@ async def pay_heleket_callback_handler(
         hwid_quote=hwid_quote,
     )
 
+    reuse_amounts = payment_record_amounts(
+        months=parts.months,
+        sale_mode=parts.sale_mode,
+        hwid_device_count=hwid_quote.get("device_count") if hwid_quote else None,
+    )
+    reusable_payment = await payment_dal.find_recent_pending_provider_payment(
+        session,
+        user_id=callback.from_user.id,
+        provider="heleket",
+        pending_status="pending_heleket",
+        amount=parts.price,
+        currency=currency_code,
+        sale_mode=parts.sale_mode,
+        months=reuse_amounts.months,
+        purchased_gb=reuse_amounts.purchased_gb,
+        purchased_hwid_devices=reuse_amounts.purchased_hwid_devices,
+        tariff_key=reuse_amounts.tariff_key,
+    )
+    if reusable_payment is not None:
+        reusable_url = await heleket_service.try_reuse_pending_payment(reusable_payment)
+        if reusable_url:
+            await render_payment_link(
+                callback,
+                translator=translator,
+                current_lang=current_lang,
+                i18n=i18n,
+                parts=parts,
+                payment_url=reusable_url,
+                log_prefix=_LOG,
+            )
+            return
+
     try:
         payment_record = await payment_dal.create_payment_record(session, record_payload)
         await session.commit()
@@ -682,6 +785,13 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
         provider_payment_id=first_value(result, "uuid"),
         log_prefix="Heleket",
     )
+
+
+async def reuse_webapp_payment(ctx: WebAppPaymentContext, payment: Any) -> Optional[str]:
+    service: HeleketService = ctx.request.app.get("heleket_service")
+    if not service or not service.configured:
+        return None
+    return await service.try_reuse_pending_payment(payment)
 
 
 async def heleket_webhook_route(request: web.Request) -> web.Response:
@@ -887,6 +997,7 @@ SPEC = PaymentProviderSpec(
     webhook_path=lambda source: "/webhook/heleket",
     webhook_route=heleket_webhook_route,
     create_webapp_payment=create_webapp_payment,
+    reuse_webapp_payment=reuse_webapp_payment,
     emoji="🪙",
     config_class=HeleketConfig,
     presentation_class=HeleketPresentation,

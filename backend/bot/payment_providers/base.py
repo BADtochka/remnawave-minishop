@@ -127,6 +127,7 @@ ServiceFactory = Callable[[ServiceFactoryContext], Any]
 WebhookPathGetter = Callable[[Any], str]
 WebhookRoute = Callable[[Any], Awaitable[Any]]
 WebAppPaymentFactory = Callable[[WebAppPaymentContext], Awaitable[Any]]
+ReusableWebAppPaymentResolver = Callable[[WebAppPaymentContext, Any], Awaitable[Optional[str]]]
 CurrencySupportResolver = Callable[[Any], Optional[Sequence[str]]]
 PaymentAmountResolver = Callable[[Any, Any, Any], bool]
 PaymentMinimumResolver = Callable[[Any, Any], Optional[Mapping[str, Any]]]
@@ -180,6 +181,7 @@ class PaymentProviderSpec:
     webhook_route: Optional[WebhookRoute] = None
     webhook_requires_base_url: bool = False
     create_webapp_payment: Optional[WebAppPaymentFactory] = None
+    reuse_webapp_payment: Optional[ReusableWebAppPaymentResolver] = None
     requires_configured_service: bool = True
     price_source: str = "rub"
     emoji: str = "💳"

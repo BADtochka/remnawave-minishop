@@ -285,6 +285,7 @@ async def safe_store_provider_payment_id(
     payment: Payment,
     *,
     provider_payment_id: str,
+    provider_payment_url: Optional[str] = None,
     new_status: Optional[str] = None,
     log_prefix: str,
 ) -> bool:
@@ -300,6 +301,7 @@ async def safe_store_provider_payment_id(
             payment.payment_id,
             str(provider_payment_id),
             new_status or payment.status,
+            provider_payment_url=provider_payment_url,
         )
         await session.commit()
         return True
@@ -359,6 +361,7 @@ async def render_link_or_fail(
             session,
             payment,
             provider_payment_id=provider_payment_id,
+            provider_payment_url=payment_url,
             new_status=new_status,
             log_prefix=log_prefix,
         )

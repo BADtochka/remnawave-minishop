@@ -203,6 +203,7 @@ class Payment(Base):
     user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=False, index=True)
     yookassa_payment_id = Column(String, unique=True, index=True, nullable=True)
     provider_payment_id = Column(String, unique=True, nullable=True)
+    provider_payment_url = Column(String, nullable=True)
     provider = Column(String, nullable=False, default="yookassa", index=True)
     idempotence_key = Column(String, unique=True, nullable=True)
     amount = Column(Float, nullable=False)
