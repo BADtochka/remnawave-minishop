@@ -112,6 +112,33 @@
       .slice(0, 3);
   }
 
+  function currentUrlSettingsPath() {
+    if (typeof window === "undefined") return [];
+    const prefix = String(routePrefix || "").replace(/\/+$/, "");
+    const pathname = window.location.pathname;
+    const routePath =
+      prefix && pathname.toLowerCase().startsWith(`${prefix.toLowerCase()}/`)
+        ? pathname.slice(prefix.length)
+        : pathname;
+    const match = routePath.match(/^\/admin\/settings(?:\/(.*))?$/i);
+    if (!match?.[1]) return [];
+    return normalizeSettingsPath(
+      match[1].split("/").map((segment) => {
+        try {
+          return decodeURIComponent(segment);
+        } catch {
+          return segment;
+        }
+      })
+    );
+  }
+
+  function effectiveSettingsPath(path) {
+    const normalized = normalizeSettingsPath(path);
+    const fromUrl = currentUrlSettingsPath();
+    return fromUrl.length > normalized.length ? fromUrl : normalized;
+  }
+
   function settingsPathKey(path) {
     return normalizeSettingsPath(path)
       .map((part) => settingsPathToken(part))
@@ -224,6 +251,29 @@
     return { section, group, fieldGroup, anchorKey };
   }
 
+  function settingsPathAnchorKey(path, target) {
+    const [sectionSegment, subsectionSegment, fieldGroupSegment] = normalizeSettingsPath(path);
+    if (!target?.group || !fieldGroupSegment) return target?.anchorKey;
+    const sectionToken = settingsPathToken(sectionSegment);
+    const subsectionToken = compactSettingsPathToken(subsectionSegment);
+    const fieldGroupToken = compactSettingsPathToken(fieldGroupSegment);
+    if (sectionToken === "payments" && subsectionToken === "platega") {
+      if (fieldGroupToken === "crypto" || fieldGroupToken === "plategacrypto") {
+        return settingsFieldGroupAnchorKey("payments", "Platega", "platega_crypto");
+      }
+      if (
+        fieldGroupToken === "sbp" ||
+        fieldGroupToken === "card" ||
+        fieldGroupToken === "plategasbp"
+      ) {
+        return settingsFieldGroupAnchorKey("payments", "Platega", "platega_sbp");
+      }
+    }
+    const fieldGroup = findSettingsFieldGroup(target.section, target.group, fieldGroupSegment);
+    if (!fieldGroup) return target.anchorKey;
+    return settingsFieldGroupAnchorKey(target.section.id, target.group.id, fieldGroup.id);
+  }
+
   function arrayValue(value) {
     return Array.isArray(value) ? value : value ? [value] : [];
   }
@@ -277,7 +327,15 @@
   function scrollSettingsAnchorIntoView(anchorKey, behavior) {
     const element = findSettingsAnchor(anchorKey);
     if (!element) return;
-    element.scrollIntoView({ block: "start", behavior });
+    const scrollParent = scrollContainerFor(element);
+    if (scrollParent) {
+      const parentRect = scrollParent.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      const targetTop = scrollParent.scrollTop + elementRect.top - parentRect.top - 12;
+      scrollParent.scrollTo({ top: Math.max(0, targetTop), behavior });
+    } else {
+      element.scrollIntoView({ block: "start", behavior });
+    }
     if (typeof element.focus === "function") {
       try {
         element.focus({ preventScroll: true });
@@ -287,18 +345,35 @@
     }
   }
 
+  function scrollContainerFor(element) {
+    let parent = element?.parentElement || null;
+    while (parent) {
+      const style = window.getComputedStyle(parent);
+      const overflow = `${style.overflow} ${style.overflowY}`;
+      const canScroll = /(auto|scroll|overlay)/.test(overflow);
+      if (canScroll && parent.scrollHeight > parent.clientHeight) {
+        return parent;
+      }
+      parent = parent.parentElement;
+    }
+    return null;
+  }
+
   function scrollToSettingsAnchor(anchorKey) {
     if (typeof window === "undefined") return;
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         scrollSettingsAnchorIntoView(anchorKey, prefersReducedMotion() ? "auto" : "smooth");
-        window.setTimeout(() => scrollSettingsAnchorIntoView(anchorKey, "auto"), 220);
+        for (const delay of [220, 650, 1100, 1800, 2600]) {
+          window.setTimeout(() => scrollSettingsAnchorIntoView(anchorKey, "auto"), delay);
+        }
       });
     });
   }
 
   async function applySettingsPath(path) {
-    const target = resolveSettingsPath(path);
+    const resolvedPath = effectiveSettingsPath(path);
+    const target = resolveSettingsPath(resolvedPath);
     if (!target) return;
 
     settingsPathSyncing = true;
@@ -316,7 +391,7 @@
         }
       }
       await tick();
-      scrollToSettingsAnchor(target.anchorKey);
+      scrollToSettingsAnchor(settingsPathAnchorKey(resolvedPath, target));
     } finally {
       if (typeof window !== "undefined") {
         window.setTimeout(() => {

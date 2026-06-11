@@ -2064,11 +2064,12 @@
 }
 
 .admin-accordion-content[data-state="open"] {
-  animation: admin-accordion-open 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  height: auto;
+  overflow: visible;
 }
 
 .admin-accordion-content[data-state="closed"] {
-  animation: admin-accordion-close 110ms cubic-bezier(0.4, 0, 0.2, 1);
+  height: 0;
 }
 
 @keyframes admin-accordion-open {
@@ -3451,15 +3452,35 @@
 }
 
 .admin-provider-currency {
+  appearance: none;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+  width: 100%;
   min-width: 0;
   padding: 10px 12px;
   border: 1px solid var(--admin-border);
   border-radius: 8px;
   background: var(--admin-surface-2);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.admin-provider-currency:hover {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--admin-border));
+  background: color-mix(in srgb, var(--admin-surface-2) 84%, var(--accent) 8%);
+}
+
+.admin-provider-currency:focus-visible {
+  outline: 2px solid var(--admin-ring);
+  outline-offset: 2px;
 }
 
 .admin-provider-currency.is-supported {

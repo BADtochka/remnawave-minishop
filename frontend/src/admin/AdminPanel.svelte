@@ -79,7 +79,11 @@
     userTelegramProfileLink,
     userTelegramProfileLinkKind,
   } from "../lib/admin/users.js";
-  import { adminSettingsPathFromPath, stripRoutePrefix } from "../lib/webapp/routes.js";
+  import {
+    adminSettingsPathFromPath,
+    stripRoutePrefix,
+    withRoutePrefix,
+  } from "../lib/webapp/routes.js";
 
   export let api;
   export let onClose = () => {};
@@ -310,6 +314,31 @@
     usersStore.closeUser();
     paymentsStore.closePayment();
     supportStore.closeTicketView();
+    onSectionChange(next);
+  }
+
+  function openSettingsPath(path = []) {
+    const nextPath = (Array.isArray(path) ? path : [])
+      .map((segment) => String(segment || "").trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    const next = normalizeSection("settings");
+    sidebarOpen = false;
+    active = next;
+    settingsPath = nextPath;
+    usersStore.closeUser();
+    paymentsStore.closePayment();
+    supportStore.closeTicketView();
+    if (typeof window !== "undefined" && window.location.protocol !== "file:") {
+      const pathSuffix = nextPath.length ? `/${nextPath.map(encodeURIComponent).join("/")}` : "";
+      const targetPath = withRoutePrefix(`/admin/settings${pathSuffix}`, routePrefix);
+      const nextUrl = `${targetPath}${window.location.search}${window.location.hash}`;
+      if (
+        `${window.location.pathname}${window.location.search}${window.location.hash}` !== nextUrl
+      ) {
+        window.history.pushState(null, "", nextUrl);
+      }
+    }
     onSectionChange(next);
   }
 
@@ -887,7 +916,12 @@
           {/if}
 
           {#if active === "tariffs"}
-            <TariffsSection {at} {fmtMoney} {onSettingsSaved} />
+            <TariffsSection
+              {at}
+              {fmtMoney}
+              {onSettingsSaved}
+              onOpenSettingsPath={openSettingsPath}
+            />
           {/if}
 
           {#if active === "appearance"}
