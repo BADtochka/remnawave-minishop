@@ -391,6 +391,30 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             "https://status.example.com",
         )
 
+    def test_home_screen_hides_unlimited_traffic_limit_cards(self):
+        root = Path(__file__).resolve().parents[1]
+        app_source = (root / "frontend/src/App.svelte").read_text(encoding="utf-8")
+        home_source = (root / "frontend/src/webapp/screens/HomeScreen.svelte").read_text(
+            encoding="utf-8"
+        )
+        traffic_source = (root / "frontend/src/lib/webapp/traffic.js").read_text(encoding="utf-8")
+
+        self.assertIn("export function regularTrafficLimitVisible", traffic_source)
+        self.assertIn("!sub?.regular_unlimited_override", traffic_source)
+        self.assertIn("Number(sub?.traffic_limit_bytes || 0) > 0", traffic_source)
+        self.assertIn("export function premiumTrafficLimitVisible", traffic_source)
+        self.assertIn("!sub?.premium_unlimited_override", traffic_source)
+        self.assertIn("Number(sub?.premium_limit_bytes || 0) > 0", traffic_source)
+        self.assertIn("{#if regularTrafficLimitVisible(subscription)}", home_source)
+        self.assertIn(
+            "{#if premiumTrafficAvailable(subscription) "
+            "&& premiumTrafficLimitVisible(subscription)}",
+            home_source,
+        )
+        self.assertNotIn("wa_premium_unlimited", home_source)
+        self.assertIn("regularTrafficLimitVisible(subscription)", app_source)
+        self.assertIn("premiumTrafficLimitVisible(subscription)", app_source)
+
     def test_https_webapp_logo_uses_same_origin_proxy(self):
         settings = SimpleNamespace(WEBAPP_LOGO_URL="https://cdn.example.com/logo.png")
 

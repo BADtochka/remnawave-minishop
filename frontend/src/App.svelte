@@ -57,7 +57,12 @@
   import { createI18n } from "./lib/webapp/i18n.js";
   import { normalizedEmail, telegramName } from "./lib/webapp/formatters.js";
   import { activeTariffName, buildTariffCatalog } from "./lib/webapp/tariffs.js";
-  import { premiumTrafficPercent, trafficPercent } from "./lib/webapp/traffic.js";
+  import {
+    premiumTrafficLimitVisible,
+    premiumTrafficPercent,
+    regularTrafficLimitVisible,
+    trafficPercent,
+  } from "./lib/webapp/traffic.js";
   import {
     findThemeEntry,
     resolveEffectiveThemeKey,
@@ -406,12 +411,12 @@
   $: canOpenRegularTopupModal = Boolean(
     hasActiveTariffSubscription &&
     (subscription?.can_topup_regular_traffic ?? subscription?.can_topup_traffic) &&
-    Number(subscription?.traffic_limit_bytes || 0) > 0
+    regularTrafficLimitVisible(subscription)
   );
   $: canOpenPremiumTopupModal = Boolean(
     hasActiveTariffSubscription &&
     (subscription?.can_topup_premium_traffic ?? subscription?.can_topup_traffic) &&
-    Number(subscription?.premium_limit_bytes || 0) > 0
+    premiumTrafficLimitVisible(subscription)
   );
   $: activeTariffCatalogEntry =
     tariffCatalog.find((entry) => entry.key === String(subscription?.tariff_key || "").trim()) ||
@@ -1801,11 +1806,11 @@
       const canRegular =
         hasTariffSub &&
         (sub?.can_topup_regular_traffic ?? sub?.can_topup_traffic) &&
-        Number(sub?.traffic_limit_bytes || 0) > 0;
+        regularTrafficLimitVisible(sub);
       const canPremium =
         hasTariffSub &&
         (sub?.can_topup_premium_traffic ?? sub?.can_topup_traffic) &&
-        Number(sub?.premium_limit_bytes || 0) > 0;
+        premiumTrafficLimitVisible(sub);
       if (topupDeep === "regular" && canRegular) {
         billingStore.openTopupModal("regular", payload.payment_methods?.[0]?.id || "");
         stripTopupQueryFromUrl();
