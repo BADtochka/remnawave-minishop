@@ -45,7 +45,7 @@ jobs:
             image: remnawave-minishop-frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Full history + tags: the Dockerfile's version-builder stage runs
           # `git describe --tags` against the copied .git tree.
