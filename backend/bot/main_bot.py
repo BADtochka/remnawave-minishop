@@ -11,6 +11,7 @@ from bot.app.factories.build_services import build_core_services
 from bot.app.web.web_server import build_and_start_web_app
 from bot.infra.redis import close_redis
 from bot.middlewares.i18n import JsonI18n
+from bot.plugins import PluginContext, run_setup
 from bot.routers import build_root_router
 from bot.services.locale_override_service import load_locale_overrides
 from bot.utils.message_queue import init_queue_manager
@@ -86,8 +87,12 @@ async def _run_telegram_startup_step(
             return False
 
 
-async def register_all_routers(dp: Dispatcher, settings: Settings):
-    dp.include_router(build_root_router(settings))
+async def register_all_routers(
+    dp: Dispatcher,
+    settings: Settings,
+    plugin_context: Optional[PluginContext] = None,
+):
+    dp.include_router(build_root_router(settings, plugin_context))
     logging.info("All application routers registered.")
 
 
@@ -309,6 +314,16 @@ async def run_bot(settings_param: Settings):
     dp["panel_service"] = services["panel_service"]
     dp["async_session_factory"] = local_async_session_factory
 
+    plugin_context = PluginContext(
+        settings=settings_param,
+        session_factory=local_async_session_factory,
+        bot=bot,
+        i18n=i18n_instance,
+        dispatcher=dp,
+        services=services,
+    )
+    run_setup(plugin_context)
+
     # Wrap startup/shutdown handlers to satisfy aiogram event signature (no args passed)
     async def _on_startup_wrapper():
         await on_startup_configured(dp)
@@ -319,7 +334,7 @@ async def run_bot(settings_param: Settings):
     dp.startup.register(_on_startup_wrapper)
     dp.shutdown.register(_on_shutdown_wrapper)
 
-    await register_all_routers(dp, settings_param)
+    await register_all_routers(dp, settings_param, plugin_context)
 
     if not settings_param.WEBHOOK_BASE_URL:
         logging.error("WEBHOOK_BASE_URL is required. Polling mode is disabled. Exiting.")
@@ -346,6 +361,7 @@ async def run_bot(settings_param: Settings):
             settings_param,
             local_async_session_factory,
             after_webhooks_started=_after_webhooks_started,
+            plugin_context=plugin_context,
         )
 
     main_tasks = [asyncio.create_task(web_server_task(), name="AIOHTTPServerTask")]

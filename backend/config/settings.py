@@ -1297,6 +1297,17 @@ class Settings(BaseSettings):
             and str(self.TELEMETRY_API_KEY or "").strip()
         )
 
+    PLUGINS_ENABLED: bool = Field(
+        default=True,
+        description="Discover and load extension plugins from the minishop.plugins entry points.",
+    )
+    PLUGINS_STRICT: bool = Field(
+        default=False,
+        description=(
+            "Treat plugin load/setup errors as fatal instead of logging and skipping the plugin."
+        ),
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore", populate_by_name=True
     )
