@@ -494,6 +494,10 @@
     }
     void broadcastStore.loadCounts();
     void healthStore.loadHealth();
+    // Feature flags arrive with the settings manifest; without this eager
+    // load, feature-gated sections stay hidden until the admin happens to
+    // open a section that fetches settings on its own.
+    void settingsStore.loadSettings();
     const healthTimer =
       typeof window !== "undefined"
         ? window.setInterval(() => void healthStore.loadHealth(), 5 * 60 * 1000)
