@@ -378,8 +378,23 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             PRIVACY_POLICY_URL="https://example.com/privacy",
             USER_AGREEMENT_URL="https://example.com/agreement",
         )
+        i18n = SimpleNamespace(
+            locales_data={
+                "en": {
+                    "menu_support_button": "Support",
+                    "menu_server_status_button": "Server status",
+                    "admin_settings_title": "Admin settings",
+                }
+            },
+            base_locales_data={"en": {}},
+            reload_overrides_from_file=lambda: None,
+        )
         request = SimpleNamespace(
-            app={"settings": settings, "webapp_settings_cache": {"ts": 0.0, "data": {}}},
+            app={
+                "settings": settings,
+                "webapp_settings_cache": {"ts": 0.0, "data": {}},
+                "i18n": i18n,
+            },
             query={},
         )
 
@@ -390,6 +405,9 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             request.app["webapp_settings_cache"]["data"]["server_status_url"],
             "https://status.example.com",
         )
+        self.assertEqual(payload["i18n"]["en"]["menu_server_status_button"], "Server status")
+        self.assertEqual(payload["i18n"]["en"]["menu_support_button"], "Support")
+        self.assertNotIn("admin_settings_title", payload["i18n"]["en"])
 
     def test_home_screen_hides_unlimited_traffic_limit_cards(self):
         root = Path(__file__).resolve().parents[1]

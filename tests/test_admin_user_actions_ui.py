@@ -2,7 +2,6 @@ import json
 import re
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 USER_DETAIL = REPO_ROOT / "frontend/src/admin/sections/UserDetailModal.svelte"
 ADMIN_CSS = REPO_ROOT / "frontend/src/styles/admin.css"
