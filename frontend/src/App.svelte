@@ -206,6 +206,8 @@
   let adminBundleApi = null;
   let adminBundlePromise = null;
   let adminBundleError = "";
+  let adminAssetsPrefetched = false;
+  let adminAssetsPrefetchHandle = null;
   let adminMountTarget = null;
   let adminMountHandle = null;
   let adminMountedTarget = null;
@@ -859,15 +861,19 @@
           adminActiveSection = isDocsDemo
             ? initialAdminSectionFromLocation()
             : adminSectionFromPath(routePathnameFromLocation(), routePrefix);
+          cancelAdminAssetsPrefetch();
+          activeTab = "settings";
+          screen = "admin";
           const pathAtStart = window.location.pathname;
           void Promise.all([ensureI18nScope("admin"), ensureAdminBundle()])
-            .then(() => {
+            .catch(() => {
               if (sectionFromPath(routePathnameFromLocation(), routePrefix) !== "admin") return;
               if (window.location.pathname !== pathAtStart) return;
-              activeTab = "settings";
-              screen = "admin";
-            })
-            .catch(() => {
+              if (screen === "admin") {
+                activeTab = "settings";
+                screen = "settings";
+                syncAppSectionPath("settings", true);
+              }
               showToast(t("wa_unavailable"));
             });
           return;
@@ -909,6 +915,7 @@
       supportStore.closePolling();
       stopPendingActivationWatch();
       clearLanguageClickGuard();
+      cancelAdminAssetsPrefetch();
       syncBodyScrollLock(false);
       destroyAdminMount();
     };
@@ -1062,6 +1069,51 @@
       if (!fallbackSrc || src === fallbackSrc) throw error;
       await appendScriptOnce(id, fallbackSrc);
     }
+  }
+
+  function appendPrefetchOnce(id, href, asType) {
+    if (typeof document === "undefined" || !href || document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "prefetch";
+    link.href = href;
+    if (asType) link.as = asType;
+    document.head.appendChild(link);
+  }
+
+  function prefetchAdminAssets() {
+    if (adminAssetsPrefetched || adminBundleApi || adminBundlePromise) return;
+    adminAssetsPrefetched = true;
+    const cssHref = resolveWebappAssetPath(CFG.adminCssAsset, "subscription_webapp_admin.css");
+    const jsSrc = resolveWebappAssetPath(CFG.adminJsAsset, "subscription_webapp_admin.js");
+    appendPrefetchOnce("subscription-webapp-admin-css-prefetch", cssHref, "style");
+    appendPrefetchOnce("subscription-webapp-admin-js-prefetch", jsSrc, "script");
+    void ensureI18nScope("admin");
+  }
+
+  function scheduleAdminAssetsPrefetch(adminAllowed = isAdmin) {
+    if (!adminAllowed || adminAssetsPrefetched || adminBundleApi || adminBundlePromise) return;
+    if (typeof window === "undefined") return;
+    const run = () => {
+      adminAssetsPrefetchHandle = null;
+      if (!isAdmin || screen === "admin") return;
+      prefetchAdminAssets();
+    };
+    if ("requestIdleCallback" in window) {
+      adminAssetsPrefetchHandle = window.requestIdleCallback(run, { timeout: 3000 });
+    } else {
+      adminAssetsPrefetchHandle = window.setTimeout(run, 1200);
+    }
+  }
+
+  function cancelAdminAssetsPrefetch() {
+    if (adminAssetsPrefetchHandle === null || typeof window === "undefined") return;
+    if ("cancelIdleCallback" in window && typeof adminAssetsPrefetchHandle === "number") {
+      window.cancelIdleCallback(adminAssetsPrefetchHandle);
+    } else {
+      window.clearTimeout(adminAssetsPrefetchHandle);
+    }
+    adminAssetsPrefetchHandle = null;
   }
 
   function readAdminBundleApi() {
@@ -1730,14 +1782,19 @@
     const initialAdminSection =
       section === "admin" ? preservedAdminSection || initialAdminSectionFromLocation() : null;
     if (section === "admin" && payload.user?.is_admin) {
+      cancelAdminAssetsPrefetch();
+      adminActiveSection = initialAdminSection || "stats";
+      activeTab = "settings";
+      screen = "admin";
+      mode = "app";
       try {
         await ensureI18nScope("admin");
         await ensureAdminBundle();
-        adminActiveSection = initialAdminSection || "stats";
       } catch (_error) {
         void _error;
         section = "settings";
         activeTab = "settings";
+        screen = "settings";
         showToast(t("wa_unavailable"));
       }
     }
@@ -1754,6 +1811,9 @@
           : section;
     screen = section;
     mode = "app";
+    if (payload.user?.is_admin && section !== "admin") {
+      scheduleAdminAssetsPrefetch(Boolean(payload.user?.is_admin));
+    }
     if (payload.settings?.support_tickets_enabled !== false) {
       if (typeof payload.support_unread_count !== "undefined") {
         supportStore.hydrateUnread(payload.support_unread_count);
@@ -2275,18 +2335,23 @@
     const nextAdminSection = normalizeAdminSection(
       adminActiveSection || adminSectionFromPath(routePathnameFromLocation(), routePrefix)
     );
+    cancelAdminAssetsPrefetch();
+    activeTab = "settings";
+    screen = "admin";
+    adminActiveSection = nextAdminSection;
+    syncAppSectionPath("admin", false, adminActiveSection);
     try {
       await ensureI18nScope("admin");
       await ensureAdminBundle();
     } catch (_error) {
       void _error;
+      if (screen === "admin") {
+        screen = "settings";
+        activeTab = "settings";
+        syncAppSectionPath("settings");
+      }
       showToast(t("wa_unavailable"));
-      return;
     }
-    activeTab = "settings";
-    screen = "admin";
-    adminActiveSection = nextAdminSection;
-    syncAppSectionPath("admin", false, adminActiveSection);
   }
 
   function closeAdminPanel() {

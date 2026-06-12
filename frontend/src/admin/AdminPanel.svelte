@@ -492,7 +492,6 @@
     if (typeof window !== "undefined") {
       window.addEventListener("popstate", onPopState);
     }
-    void broadcastStore.loadCounts();
     void healthStore.loadHealth();
     // Feature flags arrive with the settings manifest; without this eager
     // load, feature-gated sections stay hidden until the admin happens to
