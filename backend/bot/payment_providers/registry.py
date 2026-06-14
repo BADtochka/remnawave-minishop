@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 from . import (
+    cloudpayments,
     cryptopay,
     freekassa,
     heleket,
@@ -34,6 +35,7 @@ PAYMENT_PROVIDER_SPECS: tuple[PaymentProviderSpec, ...] = (
     heleket.SPEC,
     paykilla.SPEC,
     lava.SPEC,
+    cloudpayments.SPEC,
 )
 
 
