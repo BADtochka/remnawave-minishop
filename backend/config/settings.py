@@ -219,6 +219,12 @@ class Settings(BaseSettings):
     PANEL_DEVICES_CACHE_TTL_SECONDS: int = Field(default=5)
     PANEL_ALL_USERS_CACHE_TTL_SECONDS: int = Field(default=5)
     PANEL_ALL_USERS_PAGE_SIZE: int = Field(default=1000)
+    # Courtesy delay between consecutive /users pages when fetching the full
+    # panel user list. The panel caps page size at 1000, so large deployments
+    # page many times (100k users -> 100 pages); at the default 0.1s that is
+    # ~10s of pure waiting per full sync. Operators with a panel that tolerates
+    # faster polling can lower this (0 disables the delay entirely).
+    PANEL_ALL_USERS_PAGE_DELAY_SECONDS: float = Field(default=0.1)
     PANEL_API_TOTAL_TIMEOUT_SECONDS: float = Field(default=25)
     PANEL_API_CONNECT_TIMEOUT_SECONDS: float = Field(default=8)
     PANEL_API_SOCK_CONNECT_TIMEOUT_SECONDS: float = Field(default=8)

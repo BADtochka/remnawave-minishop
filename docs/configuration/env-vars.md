@@ -68,6 +68,7 @@ proxy/Docker gateway и может отклонить валидный webhook. 
 | `PANEL_DEVICES_CACHE_TTL_SECONDS` | TTL кеша устройств пользователя Remnawave. |
 | `PANEL_ALL_USERS_CACHE_TTL_SECONDS` | TTL кеша полных сканов пользователей Remnawave. |
 | `PANEL_ALL_USERS_PAGE_SIZE` | Размер страницы Remnawave `/users`. |
+| `PANEL_ALL_USERS_PAGE_DELAY_SECONDS` | Пауза между страницами при полном скане `/users` (по умолчанию `0.1`). На крупных панелях (100k+ пользователей) это десятки секунд ожидания за синк; можно снизить или выставить `0`, если панель выдерживает более частые запросы. |
 | `PANEL_API_TOTAL_TIMEOUT_SECONDS` | Общий timeout запроса к Remnawave API. |
 | `PANEL_API_CONNECT_TIMEOUT_SECONDS` | Timeout получения соединения с Remnawave API. |
 | `PANEL_API_SOCK_CONNECT_TIMEOUT_SECONDS` | Timeout TCP/TLS-подключения к Remnawave API. |
