@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import List, Optional
 from unittest.mock import AsyncMock, patch
 
+from bot.handlers.user.subscription import core as subscription_core
 from bot.payment_providers.shared import RecurringChargeResult
 from bot.services.subscription_service_impl.renewal import RenewalMixin
 
@@ -335,6 +336,28 @@ class ChargeRenewalHappyPathTests(unittest.IsolatedAsyncioTestCase):
             months=1,
             currency="rub",
         )
+
+
+class AutoRenewControlVisibilityTests(unittest.TestCase):
+    def test_visible_for_enabled_yookassa_subscription_even_when_service_inactive(self):
+        service = _FakeRecurringService(configured=True, recurring_active=False)
+        subscription_service = SimpleNamespace(recurring_provider_services={"yookassa": service})
+        sub = SimpleNamespace(provider="yookassa", auto_renew_enabled=True)
+
+        self.assertTrue(subscription_core._auto_renew_control_visible(subscription_service, sub))
+
+    def test_visible_for_yookassa_when_shared_recurring_service_is_active(self):
+        service = _FakeRecurringService(configured=True, recurring_active=True)
+        subscription_service = SimpleNamespace(recurring_provider_services={"yookassa": service})
+        sub = SimpleNamespace(provider="yookassa", auto_renew_enabled=False)
+
+        self.assertTrue(subscription_core._auto_renew_control_visible(subscription_service, sub))
+
+    def test_hidden_for_non_recurring_provider(self):
+        subscription_service = SimpleNamespace(recurring_provider_services={})
+        sub = SimpleNamespace(provider="freekassa", auto_renew_enabled=True)
+
+        self.assertFalse(subscription_core._auto_renew_control_visible(subscription_service, sub))
 
 
 if __name__ == "__main__":  # pragma: no cover

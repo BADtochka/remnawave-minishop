@@ -1,8 +1,20 @@
 # ruff: noqa: F401,F403,F405,I001
 from ._runtime import *  # noqa: F403,F405
 
-from bot.app.web.webapp.auth import _trial_telegram_required_reason
-from bot.app.web.webapp.common import _invalidate_webapp_user_caches
+from bot.app.web.webapp.auth import _require_user_id, _trial_telegram_required_reason
+from bot.app.web.webapp.assets import _enforce_webapp_rate_limit, _get_cached_webapp_settings
+from bot.app.web.webapp.common import (
+    _invalidate_webapp_user_caches,
+    _json_error,
+    _normalize_language,
+    _read_json,
+    _validate_model_payload,
+)
+from bot.app.web.webapp.payloads import (
+    WebAppAutoRenewPayload,
+    WebAppPaymentCreatePayload,
+    WebAppTariffChangePayload,
+)
 from bot.infra import events
 from db.dal import message_log_dal
 
