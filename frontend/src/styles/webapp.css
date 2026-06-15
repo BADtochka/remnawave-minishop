@@ -332,14 +332,11 @@ a {
 }
 
 .auto-renew-state > span {
-  display: flex;
+  display: block;
   min-width: 0;
-  align-items: baseline;
-  gap: 5px;
 }
 
-.auto-renew-state strong,
-.auto-renew-state small {
+.auto-renew-state strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -348,11 +345,6 @@ a {
 .auto-renew-state strong {
   font-size: 12px;
   line-height: 1.1;
-}
-
-.auto-renew-state small {
-  color: var(--muted);
-  font-size: 10px;
 }
 
 .auto-renew-action {

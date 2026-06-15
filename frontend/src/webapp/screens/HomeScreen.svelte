@@ -199,7 +199,6 @@
     .join(" ");
   $: autoRenewVisible = Boolean(subscription?.active && subscription?.auto_renew_available);
   $: autoRenewEnabled = Boolean(subscription?.auto_renew_enabled);
-  $: autoRenewProviderLabel = String(subscription?.auto_renew_provider_label || "").trim();
 
   onMount(() => {
     const countdownTimer = window.setInterval(() => {
@@ -284,9 +283,6 @@
                 <strong>
                   {autoRenewEnabled ? t("wa_auto_renew_enabled") : t("wa_auto_renew_disabled")}
                 </strong>
-                {#if autoRenewProviderLabel}
-                  <small>{autoRenewProviderLabel}</small>
-                {/if}
               </span>
             </div>
             <Button
