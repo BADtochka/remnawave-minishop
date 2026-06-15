@@ -37,6 +37,7 @@ from .base import (
     provider_runtime_enabled,
 )
 from .shared import (
+    PAYMENT_STATUS_PENDING_FINALIZATION,
     HttpClientMixin,
     PaymentSuccessRequest,
     build_payment_record_payload,
@@ -444,7 +445,7 @@ class FreeKassaService(HttpClientMixin):
                     session=session,
                     payment_db_id=payment.payment_id,
                     provider_payment_id=resolved_provider_id,
-                    new_status="succeeded",
+                    new_status=PAYMENT_STATUS_PENDING_FINALIZATION,
                 )
                 await session.commit()
             except Exception:

@@ -93,6 +93,10 @@ class PaymentWebhookNotificationTests(IsolatedAsyncioTestCase):
         async def emit(name, payload):
             order.append(("emit", name, payload))
 
+        async def update_status(_session, _payment_id, status):
+            order.append(("status", status))
+            return payment
+
         session = AsyncMock()
         session.commit = AsyncMock(side_effect=commit)
         payment = SimpleNamespace(
@@ -130,6 +134,10 @@ class PaymentWebhookNotificationTests(IsolatedAsyncioTestCase):
         with (
             patch("bot.payment_providers.shared.success.events.emit", AsyncMock(side_effect=emit)),
             patch(
+                "bot.payment_providers.shared.success.payment_dal.update_payment_status_by_db_id",
+                AsyncMock(side_effect=update_status),
+            ) as update_status_mock,
+            patch(
                 "bot.payment_providers.shared.success.prepare_config_links",
                 AsyncMock(return_value=("link", "https://example.test/sub")),
             ),
@@ -162,8 +170,10 @@ class PaymentWebhookNotificationTests(IsolatedAsyncioTestCase):
         self.assertEqual(activation_kwargs["tariff_key"], "premium")
         referral_kwargs = referral_service.apply_referral_bonuses_for_payment.await_args.kwargs
         self.assertEqual(referral_kwargs["tariff_key"], "premium")
-        self.assertEqual(order[0], "commit")
-        emitted_names = [item[1] for item in order[1:]]
+        update_status_mock.assert_awaited_once_with(session, 12, "succeeded")
+        self.assertEqual(order[0], ("status", "succeeded"))
+        self.assertEqual(order[1], "commit")
+        emitted_names = [item[1] for item in order[2:]]
         self.assertIn("payment.succeeded", emitted_names)
         self.assertIn("subscription.extended", emitted_names)
         self.assertIn("referral.bonus_granted", emitted_names)

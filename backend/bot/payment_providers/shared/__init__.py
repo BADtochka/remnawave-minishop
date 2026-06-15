@@ -61,6 +61,7 @@ from .recurring import (
     service_supports_recurring,
 )
 from .success import (
+    PAYMENT_STATUS_PENDING_FINALIZATION,
     PaymentSuccessOutcome,
     PaymentSuccessRequest,
     SuccessMessage,
@@ -83,6 +84,7 @@ __all__ = [
     "HttpClientMixin",
     "PaymentCallbackParts",
     "PaymentRecordAmounts",
+    "PAYMENT_STATUS_PENDING_FINALIZATION",
     "PaymentSuccessOutcome",
     "PaymentSuccessRequest",
     "RecurringChargeContext",

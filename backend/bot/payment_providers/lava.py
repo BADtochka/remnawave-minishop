@@ -32,6 +32,7 @@ from .base import (
     provider_runtime_enabled,
 )
 from .shared import (
+    PAYMENT_STATUS_PENDING_FINALIZATION,
     HttpClientMixin,
     PaymentSuccessRequest,
     build_payment_record_payload,
@@ -443,7 +444,7 @@ class LavaService(HttpClientMixin):
                         session,
                         payment.payment_id,
                         resolved_provider_id,
-                        "succeeded",
+                        PAYMENT_STATUS_PENDING_FINALIZATION,
                     )
                     await session.commit()
                 except Exception:

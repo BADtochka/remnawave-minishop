@@ -26,6 +26,7 @@ from .common import (
 
 _TRAFFIC_MODES = {"traffic", "traffic_package", "topup", "premium_topup"}
 _HWID_DEVICE_MODES = {"hwid_device", "hwid_devices", "hwid_devices_renewal"}
+PAYMENT_STATUS_PENDING_FINALIZATION = "succeeded_pending_finalization"
 
 
 def is_traffic_sale_base(sale_base: str) -> bool:
@@ -305,6 +306,11 @@ async def finalize_successful_payment(
                 skip_if_active_before_payment=False,
                 tariff_key=effective_tariff_key,
             )
+        await payment_dal.update_payment_status_by_db_id(
+            req.session,
+            req.payment.payment_id,
+            "succeeded",
+        )
         await req.session.commit()
     except Exception:
         await req.session.rollback()

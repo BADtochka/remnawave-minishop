@@ -376,7 +376,12 @@ def test_webhook_success_finalizes_payment(monkeypatch):
 
     assert response.status == 200
     assert json.loads(response.body) == {"code": 0}
-    update_mock.assert_awaited_once_with(session, 88, "tx-1", "succeeded")
+    update_mock.assert_awaited_once_with(
+        session,
+        88,
+        "tx-1",
+        cloudpayments.PAYMENT_STATUS_PENDING_FINALIZATION,
+    )
     finalize_mock.assert_awaited_once()
 
 
