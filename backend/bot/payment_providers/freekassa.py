@@ -655,6 +655,7 @@ async def pay_fk_callback_handler(
         api_success=success,
         payment_url=location,
         provider_payment_id=provider_identifier,
+        provider_response=response_data,
         lead_text=lead_text,
         log_prefix=_LOG,
     )
@@ -713,6 +714,7 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
         api_success=success,
         payment_url=first_value(response_data, "location") if success else None,
         provider_payment_id=first_value(response_data, "orderHash", "orderId"),
+        provider_response=response_data,
         log_prefix="FreeKassa",
     )
 

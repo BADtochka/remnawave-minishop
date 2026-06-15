@@ -2453,6 +2453,11 @@ async def payment_method_bind(
         bind_only=True,
     )
     if not resp or not resp.get("confirmation_url"):
+        logging.error(
+            "YooKassa bind-card payment creation failed for user %s. Response: %s",
+            callback.from_user.id,
+            resp,
+        )
         await callback.answer(_("error_payment_gateway"), show_alert=True)
         return
     await callback.message.edit_text(
@@ -2961,6 +2966,14 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
         )
         payment_url = response.get("confirmation_url") if response else None
         if not payment_url:
+            logger.error(
+                "YooKassa WebApp payment creation failed for payment %s "
+                "(user_id=%s, has_provider_payment_id=%s, response=%s).",
+                payment.payment_id,
+                ctx.user_id,
+                bool(response and response.get("id")),
+                response,
+            )
             await mark_payment_failed_creation(ctx.session, payment.payment_id)
             return payment_failed()
 
