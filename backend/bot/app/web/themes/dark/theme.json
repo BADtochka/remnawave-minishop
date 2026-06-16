@@ -97,18 +97,7 @@
       "shadow_soft": "0 6px 18px rgba(15, 23, 42, 0.06)",
       "shadow_strong": "0 18px 44px rgba(15, 23, 42, 0.12)",
       "shadow_popover": "0 14px 28px rgba(15, 23, 42, 0.12)",
-      "inset_highlight": "rgba(255, 255, 255, 0.75)",
-      "admin_bg": "#f7f8fb",
-      "admin_surface": "#ffffff",
-      "admin_surface_2": "#f1f5f9",
-      "admin_elev": "#e8edf3",
-      "admin_border": "rgba(15, 23, 42, 0.1)",
-      "admin_border_strong": "rgba(15, 23, 42, 0.18)",
-      "admin_text": "#0f172a",
-      "admin_muted": "#64748b",
-      "admin_dim": "#64748b",
-      "admin_chart_stroke": "#065f46",
-      "admin_chart_fill": "rgba(6, 95, 70, 0.22)"
+      "inset_highlight": "rgba(255, 255, 255, 0.75)"
     }
   },
   "tokens": {

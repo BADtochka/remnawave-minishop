@@ -15,6 +15,19 @@ logger = logging.getLogger(__name__)
 ColorScheme = Literal["light", "dark"]
 DEFAULT_WEBAPP_THEME_KEY = "dark"
 LEGACY_LIGHT_THEME_KEY = "light"
+DEFAULT_THEME_ADMIN_TOKEN_KEYS = {
+    "admin_bg",
+    "admin_surface",
+    "admin_surface_2",
+    "admin_elev",
+    "admin_border",
+    "admin_border_strong",
+    "admin_text",
+    "admin_muted",
+    "admin_dim",
+    "admin_chart_stroke",
+    "admin_chart_fill",
+}
 
 
 class ThemeTokens(BaseModel):
@@ -608,6 +621,24 @@ def write_webapp_theme_dir(
             logger.warning("Could not delete removed webapp theme descriptor %s: %s", path, exc)
 
 
+def _strip_default_theme_admin_tokens(theme_data: Dict[str, Any]) -> bool:
+    """Remove legacy default-theme admin palette overrides."""
+    changed = False
+    token_sets: List[Dict[str, Any]] = []
+    tokens = theme_data.get("tokens")
+    if isinstance(tokens, dict):
+        token_sets.append(tokens)
+    variants = theme_data.get("variants")
+    if isinstance(variants, dict):
+        token_sets.extend(value for value in variants.values() if isinstance(value, dict))
+    for token_set in token_sets:
+        for key in DEFAULT_THEME_ADMIN_TOKEN_KEYS:
+            if key in token_set:
+                token_set.pop(key, None)
+                changed = True
+    return changed
+
+
 def ensure_webapp_core_themes(
     config: WebappThemesConfig, primary_accent: str
 ) -> tuple[WebappThemesConfig, bool]:
@@ -662,6 +693,9 @@ def ensure_webapp_core_themes(
             if existing.get("css_file"):
                 existing.pop("css_file", None)
                 changed = True
+
+        if builtin_key == DEFAULT_WEBAPP_THEME_KEY and _strip_default_theme_admin_tokens(existing):
+            changed = True
 
         tokens = existing.setdefault("tokens", {})
         builtin_tokens = builtin_data.get("tokens", {})

@@ -139,8 +139,6 @@ const DEFAULT_THEME_VARIANTS = {
     radius: "8px",
     font_family: "Inter, Arial, sans-serif",
     mono_font_family: '"JetBrains Mono", Consolas, monospace',
-    admin_chart_stroke: "#00fe7a",
-    admin_chart_fill: "rgba(0,254,122,0.16)",
   },
   light: {
     color_scheme: "light",
@@ -162,8 +160,6 @@ const DEFAULT_THEME_VARIANTS = {
     radius: "8px",
     font_family: "Inter, Arial, sans-serif",
     mono_font_family: '"JetBrains Mono", Consolas, monospace',
-    admin_chart_stroke: "#10b981",
-    admin_chart_fill: "rgba(16,185,129,0.14)",
   },
 };
 

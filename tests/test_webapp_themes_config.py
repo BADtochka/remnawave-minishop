@@ -310,6 +310,39 @@ class WebappThemesConfigTests(unittest.TestCase):
         self.assertEqual(tokens.bg, "#f7f8fb")
         self.assertEqual(tokens.accent, "#abc123")
 
+    def test_core_merge_strips_default_theme_admin_tokens(self):
+        cfg = WebappThemesConfig(
+            default_theme="dark",
+            themes=[
+                {
+                    "key": "dark",
+                    "enabled": True,
+                    "default": True,
+                    "active_variant": "light",
+                    "tokens": {
+                        "color_scheme": "dark",
+                        "admin_bg": "#000000",
+                    },
+                    "variants": {
+                        "light": {
+                            "color_scheme": "light",
+                            "bg": "#ffffff",
+                            "admin_surface": "#ffffff",
+                            "admin_chart_fill": "rgba(0, 0, 0, 0.1)",
+                        }
+                    },
+                }
+            ],
+        )
+
+        merged, changed = ensure_webapp_core_themes(cfg, "#abc123")
+        dark = merged.theme_by_key("dark")
+
+        self.assertTrue(changed)
+        self.assertIsNone(dark.tokens.admin_bg)
+        self.assertIsNone(dark.variants["light"].admin_surface)
+        self.assertIsNone(dark.variants["light"].admin_chart_fill)
+
     def test_effective_accent_uses_default_theme_token(self):
         cfg = WebappThemesConfig(
             default_theme="custom",

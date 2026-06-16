@@ -16,7 +16,11 @@
   import { Switch } from "$components/ui/primitives.js";
   import { getContext, onDestroy, onMount } from "svelte";
 
-  import { localizedThemeName } from "$lib/webapp/themeStyle.js";
+  import {
+    firstFontFamily,
+    localizedThemeName,
+    writeThemePreviewDraft,
+  } from "$lib/webapp/themeStyle.js";
 
   export let at;
   export let currentLang = "ru";
@@ -37,31 +41,52 @@
     "WEBAPP_ENABLED",
   ]);
   const DEFAULT_THEME_KEY = "dark";
+  const DEFAULT_THEME_VARIANTS = ["dark", "light"];
   const VARIANT_LABELS = {
     dark: "Dark",
     light: "Light",
   };
+  const SANS_FALLBACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+  const MONO_FALLBACK =
+    'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+  const GOOGLE_SANS_FONTS = [
+    "Roboto",
+    "Nunito",
+    "Open Sans",
+    "Montserrat",
+    "Rubik",
+    "Lato",
+    "Ubuntu",
+    "Noto Sans",
+    "PT Sans",
+    "IBM Plex Sans",
+    "Mulish",
+    "Exo 2",
+    "Manrope",
+    "Inter",
+  ];
+  const GOOGLE_MONO_FONTS = [
+    "JetBrains Mono",
+    "Fira Code",
+    "Roboto Mono",
+    "Source Code Pro",
+    "IBM Plex Mono",
+    "Space Mono",
+  ];
+  const quoteFontFamily = (family) =>
+    /^[A-Za-z0-9_-]+$/.test(String(family || "")) ? family : `"${family}"`;
+  const googleSansFontStack = (family) => `${quoteFontFamily(family)}, ${SANS_FALLBACK}`;
+  const googleMonoFontStack = (family) => `${quoteFontFamily(family)}, ${MONO_FALLBACK}`;
   const FONT_OPTIONS = [
-    {
-      value: "",
-      label: "System",
-    },
+    { value: "", label: "System" },
     {
       value: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
       label: "System UI",
     },
-    {
-      value: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      label: "Inter",
-    },
-    {
-      value: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      label: "Manrope",
-    },
-    {
-      value: '"JetBrains Mono", "Fira Code", monospace',
-      label: "JetBrains Mono",
-    },
+    ...GOOGLE_SANS_FONTS.map((family) => ({
+      value: googleSansFontStack(family),
+      label: family,
+    })),
     {
       value: '"Press Start 2P", "JetBrains Mono", monospace',
       label: "Pixel",
@@ -69,10 +94,11 @@
   ];
   const MONO_FONT_OPTIONS = [
     { value: "", label: "Default mono" },
-    { value: '"JetBrains Mono", "Fira Code", monospace', label: "JetBrains Mono" },
-    { value: '"Fira Code", "JetBrains Mono", monospace', label: "Fira Code" },
-    { value: '"Roboto Mono", "JetBrains Mono", monospace', label: "Roboto Mono" },
     { value: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", label: "System mono" },
+    ...GOOGLE_MONO_FONTS.map((family) => ({
+      value: googleMonoFontStack(family),
+      label: family,
+    })),
   ];
   const DEFAULT_THEME_PRESETS = {
     dark: [
@@ -228,52 +254,45 @@
   };
   const TOKEN_GROUPS = [
     {
+      titleKey: "appearance_token_group_brand",
       title: "Brand",
       icon: Paintbrush,
       items: [
-        ["accent", "Accent"],
-        ["bg", "Background"],
-        ["panel", "Card"],
-        ["panel_2", "Muted card"],
-        ["panel_3", "Elevated"],
+        ["accent", "appearance_token_accent", "Accent"],
+        ["bg", "appearance_token_bg", "Background"],
+        ["panel", "appearance_token_panel", "Card"],
+        ["panel_2", "appearance_token_panel_2", "Muted card"],
+        ["panel_3", "appearance_token_panel_3", "Elevated"],
       ],
     },
     {
+      titleKey: "appearance_token_group_text_borders",
       title: "Text and borders",
       icon: Sliders,
       items: [
-        ["text", "Text"],
-        ["muted", "Muted"],
-        ["dim", "Dim"],
-        ["border", "Border"],
-        ["border_strong", "Strong border"],
+        ["text", "appearance_token_text", "Text"],
+        ["muted", "appearance_token_muted", "Muted"],
+        ["dim", "appearance_token_dim", "Dim"],
+        ["border", "appearance_token_border", "Border"],
+        ["border_strong", "appearance_token_border_strong", "Strong border"],
       ],
     },
     {
+      titleKey: "appearance_token_group_states",
       title: "States",
       icon: Sparkles,
       items: [
-        ["success", "Success"],
-        ["warning", "Warning"],
-        ["danger", "Danger"],
-        ["info", "Info"],
+        ["success", "appearance_token_success", "Success"],
+        ["warning", "appearance_token_warning", "Warning"],
+        ["danger", "appearance_token_danger", "Danger"],
+        ["info", "appearance_token_info", "Info"],
       ],
     },
   ];
-  const ADMIN_TOKEN_KEYS = [
-    "admin_bg",
-    "admin_surface",
-    "admin_surface_2",
-    "admin_elev",
-    "admin_border",
-    "admin_border_strong",
-    "admin_text",
-    "admin_muted",
-    "admin_dim",
-  ];
 
   $: ({ settingsSections, settingsLoading, settingsDirty, settingsSaving } = $settingsStore);
-  $: ({ themesCatalog, themesLoading, themesDir, themesSaving } = $themesStore);
+  $: ({ themesCatalog, savedThemesCatalog, themesLoading, themesDir, themesSaving, themesDirty } =
+    $themesStore);
   $: appearanceFields =
     settingsSections.find((section) => section.id === "appearance")?.fields || [];
   $: fieldMap = new Map(appearanceFields.map((field) => [field.key, field]));
@@ -304,6 +323,7 @@
   $: dirtyCount = Object.keys(settingsDirty || {}).filter((key) =>
     isAppearanceSettingKey(key)
   ).length;
+  $: appearanceDirtyCount = dirtyCount + (themesDirty ? 1 : 0);
   $: appearanceDirtyKeys = Object.keys(settingsDirty || {}).filter((key) =>
     isAppearanceSettingKey(key)
   );
@@ -319,12 +339,10 @@
   );
   $: customThemes = visibleThemes.filter((theme) => theme.key !== DEFAULT_THEME_KEY);
   $: defaultThemeIsCurrent = activeKey === DEFAULT_THEME_KEY;
-  $: defaultAdminPaletteDetached = ADMIN_TOKEN_KEYS.some((key) =>
-    Boolean(String(defaultTokens?.[key] || "").trim())
-  );
 
   let logoFileInput;
   let faviconFileInput;
+  let customGoogleFontName = "";
   let logoSourceUrl = "";
   let faviconSourceUrl = "";
   let logoPreviewNonce = 0;
@@ -456,6 +474,95 @@
     return tokens?.[tokenKey] ?? "";
   }
 
+  function normalizedCompareValue(value) {
+    return String(value ?? "").trim();
+  }
+
+  function savedThemeByKey(key) {
+    return (savedThemesCatalog.themes || []).find((theme) => theme.key === key) || null;
+  }
+
+  function themeFingerprint(theme) {
+    return JSON.stringify(theme || null);
+  }
+
+  function isThemeDirty(theme) {
+    if (!theme) return false;
+    const savedTheme = savedThemeByKey(theme.key);
+    if (!savedTheme) return false;
+    return themeFingerprint(theme) !== themeFingerprint(savedTheme);
+  }
+
+  function themeTokenValue(theme, tokenKey, variant = null) {
+    if (!theme) return "";
+    if (theme.key === DEFAULT_THEME_KEY) {
+      return themesStore.resolveThemeTokens(theme, variant || defaultVariant)?.[tokenKey] ?? "";
+    }
+    return theme.tokens?.[tokenKey] ?? "";
+  }
+
+  function isThemeTokenDirty(theme, tokenKey, variant = null) {
+    if (!theme) return false;
+    const savedTheme = savedThemeByKey(theme.key);
+    if (!savedTheme) return false;
+    return (
+      normalizedCompareValue(themeTokenValue(theme, tokenKey, variant)) !==
+      normalizedCompareValue(themeTokenValue(savedTheme, tokenKey, variant))
+    );
+  }
+
+  function isThemePropertyDirty(theme, property) {
+    if (!theme) return false;
+    const savedTheme = savedThemeByKey(theme.key);
+    if (!savedTheme) return false;
+    return (
+      normalizedCompareValue(theme?.[property]) !== normalizedCompareValue(savedTheme?.[property])
+    );
+  }
+
+  function isDefaultTokenDirty(tokenKey) {
+    return isThemeTokenDirty(defaultTheme, tokenKey, defaultVariant);
+  }
+
+  function isDefaultVariantDirty() {
+    return isThemePropertyDirty(defaultTheme, "active_variant");
+  }
+
+  function isThemeHomeLogoScaleDirty(theme, mode, variant = null) {
+    if (!theme) return false;
+    const savedTheme = savedThemeByKey(theme.key);
+    if (!savedTheme) return false;
+    return (
+      Number(themesStore.resolveThemeHomeLogoScale(theme, mode, variant)) !==
+      Number(themesStore.resolveThemeHomeLogoScale(savedTheme, mode, variant))
+    );
+  }
+
+  function fontItemsWithCurrent(items, value) {
+    if (!value || items.some((item) => item.value === value)) return items;
+    return [
+      {
+        value,
+        label: `${at("appearance_font_custom_current", {}, "Custom")}: ${
+          firstFontFamily(value) || value
+        }`,
+      },
+      ...items,
+    ];
+  }
+
+  function customGoogleFontStack(kind = "sans") {
+    const family = String(customGoogleFontName || "").trim();
+    if (!family) return "";
+    return kind === "mono" ? googleMonoFontStack(family) : googleSansFontStack(family);
+  }
+
+  function applyCustomGoogleFont(tokenKey, kind = "sans") {
+    const stack = customGoogleFontStack(kind);
+    if (!stack) return;
+    setDefaultFont(tokenKey, stack);
+  }
+
   function setDefaultVariantFromSwitch(checked) {
     themesStore.setDefaultThemeVariant(checked ? "light" : "dark");
   }
@@ -488,32 +595,14 @@
   }
 
   function setDefaultFont(tokenKey, value) {
-    setDefaultToken(tokenKey, value);
+    for (const variant of DEFAULT_THEME_VARIANTS) {
+      themesStore.setThemeToken(DEFAULT_THEME_KEY, tokenKey, value, { variant });
+    }
   }
 
   function applyDefaultPreset(preset) {
     if (!preset?.tokens) return;
     themesStore.applyThemePreset(DEFAULT_THEME_KEY, defaultVariant, preset.tokens);
-  }
-
-  function setDefaultAdminPaletteDetached(enabled) {
-    if (enabled) {
-      themesStore.applyThemePreset(DEFAULT_THEME_KEY, defaultVariant, {
-        admin_bg: defaultTokenValue("bg") || null,
-        admin_surface: defaultTokenValue("panel") || null,
-        admin_surface_2: defaultTokenValue("panel_2") || null,
-        admin_elev: defaultTokenValue("panel_3") || null,
-        admin_border: defaultTokenValue("border") || null,
-        admin_border_strong: defaultTokenValue("border_strong") || null,
-        admin_text: defaultTokenValue("text") || null,
-        admin_muted: defaultTokenValue("muted") || null,
-        admin_dim: defaultTokenValue("dim") || null,
-      });
-      return;
-    }
-    for (const key of ADMIN_TOKEN_KEYS) {
-      themesStore.resetThemeToken(DEFAULT_THEME_KEY, key, { variant: defaultVariant });
-    }
   }
 
   function defaultHomeLogoScale(mode, theme = defaultTheme, variant = defaultVariant) {
@@ -660,16 +749,50 @@
     selectTheme(theme);
   }
 
+  function clonePreviewCatalog(catalog = themesCatalog) {
+    return JSON.parse(JSON.stringify(catalog || { default_theme: DEFAULT_THEME_KEY, themes: [] }));
+  }
+
+  function previewCatalogForDefaultVariant(variant) {
+    const nextVariant = normalizeVariant(variant);
+    const catalog = clonePreviewCatalog();
+    catalog.default_theme = DEFAULT_THEME_KEY;
+    catalog.themes = (catalog.themes || []).map((theme) => {
+      if (theme.key === DEFAULT_THEME_KEY) {
+        return { ...theme, default: true, active_variant: nextVariant };
+      }
+      return { ...theme, default: false };
+    });
+    return catalog;
+  }
+
+  function themePreviewUrl(themeKey) {
+    const url = new URL(window.location.href);
+    const docsRuntimeIndex = url.pathname.indexOf("/demo/runtime");
+    if (docsRuntimeIndex >= 0) {
+      url.pathname = `${url.pathname.slice(0, docsRuntimeIndex)}/demo/runtime/app/`;
+    } else {
+      const adminPathIndex = url.pathname.lastIndexOf("/admin");
+      const basePath = adminPathIndex >= 0 ? url.pathname.slice(0, adminPathIndex) : "";
+      url.pathname = `${basePath}/home`;
+    }
+    url.searchParams.set("theme_preview", themeKey);
+    url.searchParams.delete("screen");
+    url.searchParams.delete("admin_section");
+    url.hash = "";
+    return url.toString();
+  }
+
   function previewTheme(event, theme) {
     event.stopPropagation();
-    const url = `/home?theme_preview=${encodeURIComponent(theme.key)}`;
-    window.open(url, "_blank", "noopener");
+    writeThemePreviewDraft(clonePreviewCatalog(), theme.key);
+    window.open(themePreviewUrl(theme.key), "_blank", "noopener");
   }
 
   function previewDefaultVariant(event, variant) {
     event.stopPropagation();
-    const previewKey = normalizeVariant(variant) === "light" ? "light" : DEFAULT_THEME_KEY;
-    window.open(`/home?theme_preview=${encodeURIComponent(previewKey)}`, "_blank", "noopener");
+    writeThemePreviewDraft(previewCatalogForDefaultVariant(variant), DEFAULT_THEME_KEY);
+    window.open(themePreviewUrl(DEFAULT_THEME_KEY), "_blank", "noopener");
   }
 
   onMount(() => {
@@ -694,9 +817,13 @@
           <small>{at("appearance_brand_sub", {}, "Загрузите логотип файлом или по ссылке")}</small>
         </div>
         <div class="admin-editor-section-actions">
-          {#if dirtyCount}
+          {#if appearanceDirtyCount}
             <AdminBadge variant="warning">
-              {at("settings_dirty_count", { count: dirtyCount }, `Изменений: ${dirtyCount}`)}
+              {at(
+                "settings_dirty_count",
+                { count: appearanceDirtyCount },
+                `Изменений: ${appearanceDirtyCount}`
+              )}
             </AdminBadge>
           {/if}
           <AdminButton
@@ -877,421 +1004,567 @@
             )}
           </AdminEmptyState>
         {:else}
-          {#if defaultTheme}
-            <section class="default-theme-editor">
-              <div class="default-theme-head">
-                <div>
-                  <div class="default-theme-title">
-                    <Paintbrush size={17} />
-                    <strong>{at("appearance_default_theme_title", {}, "Default theme")}</strong>
-                    {#if defaultThemeIsCurrent}
-                      <AdminBadge variant="success"
-                        >{at("status_current", {}, "Current")}</AdminBadge
+          <section class="appearance-theme-section">
+            <header class="appearance-theme-section-head">
+              <div>
+                <h4>{at("appearance_default_theme_title", {}, "Тема по-умолчанию")}</h4>
+                <small>
+                  {at(
+                    "appearance_default_theme_section_sub",
+                    {},
+                    "Базовая тема приложения: темный и светлый режимы, цвета, шрифты и логотип."
+                  )}
+                </small>
+              </div>
+              {#if isThemeDirty(defaultTheme)}
+                <AdminBadge variant="warning">
+                  {at("settings_badge_dirty", {}, "Изменено")}
+                </AdminBadge>
+              {/if}
+            </header>
+            {#if defaultTheme}
+              <section class="default-theme-editor" class:is-dirty={isThemeDirty(defaultTheme)}>
+                <div class="default-theme-head">
+                  <div>
+                    <div class="default-theme-title">
+                      <Paintbrush size={17} />
+                      <strong
+                        >{at("appearance_default_theme_title", {}, "Тема по-умолчанию")}</strong
                       >
-                    {/if}
-                    <AdminBadge>{defaultVariantTitle(defaultVariant)}</AdminBadge>
-                  </div>
-                  <small>{themeDescription(defaultTheme)}</small>
-                </div>
-                <div class="default-theme-actions">
-                  <label class="appearance-switch appearance-mode-switch">
-                    <span>{at("appearance_default_dark", {}, "Dark")}</span>
-                    <Switch.Root
-                      checked={defaultVariant === "light"}
-                      onCheckedChange={setDefaultVariantFromSwitch}
-                      class="admin-switch-root"
-                    >
-                      <Switch.Thumb class="admin-switch-thumb" />
-                    </Switch.Root>
-                    <span>{at("appearance_default_light", {}, "Light")}</span>
-                  </label>
-                  <AdminButton
-                    size="sm"
-                    variant="ghost"
-                    onclick={(event) => previewDefaultVariant(event, defaultVariant)}
-                  >
-                    <ExternalLink size={13} />
-                    {at("appearance_preview_theme", {}, "Preview")}
-                  </AdminButton>
-                </div>
-              </div>
-
-              <div class="appearance-preset-row" aria-label="Default theme presets">
-                {#each DEFAULT_THEME_PRESETS[defaultVariant] || [] as preset (preset.id)}
-                  <button
-                    type="button"
-                    class="appearance-preset-btn"
-                    onclick={() => applyDefaultPreset(preset)}
-                  >
-                    <span style={`background:${preset.swatch}`}></span>
-                    {preset.label}
-                  </button>
-                {/each}
-              </div>
-
-              <div class="default-theme-grid">
-                <section class="default-theme-panel">
-                  <h4><Type size={15} /> {at("appearance_typography", {}, "Typography")}</h4>
-                  <div class="appearance-select-grid">
-                    <label>
-                      <span>{at("appearance_font_ui", {}, "Interface")}</span>
-                      <AdminSelect
-                        class="appearance-select"
-                        value={defaultTokenValue("font_sans", defaultTokens) || ""}
-                        items={FONT_OPTIONS}
-                        placeholder="System"
-                        onValueChange={(value) => setDefaultFont("font_sans", value)}
-                      />
-                    </label>
-                    <label>
-                      <span>{at("appearance_font_brand", {}, "Brand")}</span>
-                      <AdminSelect
-                        class="appearance-select"
-                        value={defaultTokenValue("font_logo", defaultTokens) || ""}
-                        items={FONT_OPTIONS}
-                        placeholder="System"
-                        onValueChange={(value) => setDefaultFont("font_logo", value)}
-                      />
-                    </label>
-                    <label>
-                      <span>{at("appearance_font_mono", {}, "Mono")}</span>
-                      <AdminSelect
-                        class="appearance-select"
-                        value={defaultTokenValue("font_mono", defaultTokens) || ""}
-                        items={MONO_FONT_OPTIONS}
-                        placeholder="Default mono"
-                        onValueChange={(value) => setDefaultFont("font_mono", value)}
-                      />
-                    </label>
-                  </div>
-                </section>
-
-                <section class="default-theme-panel">
-                  <h4><Sliders size={15} /> {at("appearance_shape_logo", {}, "Shape and logo")}</h4>
-                  <div class="appearance-logo-scale-row appearance-default-scale-row">
-                    <span class="appearance-logo-scale-label">Radius</span>
-                    <RangeInput
-                      class="appearance-logo-scale-range"
-                      min="4"
-                      max="28"
-                      step="1"
-                      ariaLabel="Radius"
-                      value={radiusNumber(defaultTokens)}
-                      onValueChange={setDefaultRadius}
-                    />
-                    <span class="appearance-logo-scale-value">
-                      <Input
-                        class="input"
-                        type="number"
-                        min="4"
-                        max="28"
-                        step="1"
-                        value={radiusNumber(defaultTokens)}
-                        oninput={(event) => setDefaultRadius(event.currentTarget.value)}
-                      />
-                      px
-                    </span>
-                  </div>
-                  <div class="appearance-logo-scale-row appearance-default-scale-row">
-                    <span class="appearance-logo-scale-label">Desktop logo</span>
-                    <RangeInput
-                      class="appearance-logo-scale-range"
-                      min="50"
-                      max="300"
-                      step="5"
-                      ariaLabel="Desktop logo scale"
-                      value={defaultHomeLogoScale("desktop", defaultTheme, defaultVariant)}
-                      onValueChange={(value) => setDefaultHomeLogoScale("desktop", value)}
-                    />
-                    <span class="appearance-logo-scale-value">
-                      <Input
-                        class="input"
-                        type="number"
-                        min="50"
-                        max="300"
-                        step="5"
-                        value={defaultHomeLogoScale("desktop", defaultTheme, defaultVariant)}
-                        oninput={(event) =>
-                          setDefaultHomeLogoScale("desktop", event.currentTarget.value)}
-                      />
-                      %
-                    </span>
-                  </div>
-                  <div class="appearance-logo-scale-row appearance-default-scale-row">
-                    <span class="appearance-logo-scale-label">Mobile logo</span>
-                    <RangeInput
-                      class="appearance-logo-scale-range"
-                      min="50"
-                      max="300"
-                      step="5"
-                      ariaLabel="Mobile logo scale"
-                      value={defaultHomeLogoScale("mobile", defaultTheme, defaultVariant)}
-                      onValueChange={(value) => setDefaultHomeLogoScale("mobile", value)}
-                    />
-                    <span class="appearance-logo-scale-value">
-                      <Input
-                        class="input"
-                        type="number"
-                        min="50"
-                        max="300"
-                        step="5"
-                        value={defaultHomeLogoScale("mobile", defaultTheme, defaultVariant)}
-                        oninput={(event) =>
-                          setDefaultHomeLogoScale("mobile", event.currentTarget.value)}
-                      />
-                      %
-                    </span>
-                  </div>
-                </section>
-              </div>
-
-              <div class="default-theme-token-grid">
-                {#each TOKEN_GROUPS as group (group.title)}
-                  <section class="default-theme-panel">
-                    <h4><svelte:component this={group.icon} size={15} /> {group.title}</h4>
-                    <div class="appearance-token-list">
-                      {#each group.items as item (item[0])}
-                        {@const tokenKey = item[0]}
-                        {@const tokenLabel = item[1]}
-                        <label class="appearance-token-control">
-                          <span>{tokenLabel}</span>
-                          <ColorInput
-                            class="admin-color"
-                            value={pickerHex(defaultTokenValue(tokenKey, defaultTokens))}
-                            ariaLabel={tokenLabel}
-                            onclick={() => openDefaultColorPicker(tokenKey)}
-                            oninput={(event) =>
-                              setDefaultColorToken(tokenKey, event.currentTarget.value)}
-                          />
-                          <Input
-                            class="input appearance-color-text"
-                            type="text"
-                            placeholder="not set"
-                            value={defaultTokenValue(tokenKey, defaultTokens) || ""}
-                            oninput={(event) =>
-                              setDefaultToken(tokenKey, event.currentTarget.value)}
-                          />
-                          <AdminButton
-                            class="appearance-token-reset"
-                            size="sm"
-                            variant="ghost"
-                            onclick={() => resetDefaultToken(tokenKey)}
-                          >
-                            <RefreshCw size={12} />
-                          </AdminButton>
-                        </label>
-                      {/each}
-                    </div>
-                  </section>
-                {/each}
-
-                <section class="default-theme-panel">
-                  <h4>
-                    <Sliders size={15} />
-                    {at("appearance_admin_palette", {}, "Admin palette")}
-                  </h4>
-                  <label class="appearance-switch">
-                    <Switch.Root
-                      checked={defaultAdminPaletteDetached}
-                      onCheckedChange={setDefaultAdminPaletteDetached}
-                      class="admin-switch-root"
-                    >
-                      <Switch.Thumb class="admin-switch-thumb" />
-                    </Switch.Root>
-                    <span
-                      >{at(
-                        "appearance_admin_palette_detached",
-                        {},
-                        "Customize admin separately"
-                      )}</span
-                    >
-                  </label>
-                  {#if defaultAdminPaletteDetached}
-                    <div class="appearance-token-list">
-                      {#each [["admin_bg", "Admin bg"], ["admin_surface", "Admin card"], ["admin_surface_2", "Admin muted"], ["admin_text", "Admin text"], ["admin_muted", "Admin muted text"]] as item (item[0])}
-                        {@const tokenKey = item[0]}
-                        {@const tokenLabel = item[1]}
-                        <label class="appearance-token-control">
-                          <span>{tokenLabel}</span>
-                          <ColorInput
-                            class="admin-color"
-                            value={pickerHex(defaultTokenValue(tokenKey, defaultTokens))}
-                            ariaLabel={tokenLabel}
-                            onclick={() => openDefaultColorPicker(tokenKey)}
-                            oninput={(event) =>
-                              setDefaultColorToken(tokenKey, event.currentTarget.value)}
-                          />
-                          <Input
-                            class="input appearance-color-text"
-                            type="text"
-                            placeholder="inherits"
-                            value={defaultTokenValue(tokenKey, defaultTokens) || ""}
-                            oninput={(event) =>
-                              setDefaultToken(tokenKey, event.currentTarget.value)}
-                          />
-                          <AdminButton
-                            class="appearance-token-reset"
-                            size="sm"
-                            variant="ghost"
-                            onclick={() => resetDefaultToken(tokenKey)}
-                          >
-                            <RefreshCw size={12} />
-                          </AdminButton>
-                        </label>
-                      {/each}
-                    </div>
-                  {/if}
-                </section>
-              </div>
-            </section>
-          {/if}
-
-          {#if customThemes.length}
-            <div class="admin-theme-grid">
-              {#each customThemes as theme (theme.key)}
-                {@const isCurrent = theme.key === activeKey}
-                <div
-                  role="button"
-                  tabindex={themesSaving ? -1 : 0}
-                  class="admin-theme-card"
-                  class:is-current={isCurrent}
-                  class:is-disabled={theme.enabled === false}
-                  aria-pressed={isCurrent}
-                  aria-disabled={themesSaving}
-                  onclick={(event) => selectTheme(theme, event)}
-                  onkeydown={(event) => handleThemeKeydown(event, theme)}
-                >
-                  <span class="admin-theme-card-main">
-                    <span class="admin-theme-card-title">
-                      <strong>{themeTitle(theme)}</strong>
-                      {#if isCurrent}
+                      {#if defaultThemeIsCurrent}
                         <AdminBadge variant="success"
-                          >{at("status_current", {}, "Текущая")}</AdminBadge
+                          >{at("status_current", {}, "Current")}</AdminBadge
                         >
                       {/if}
-                    </span>
-                    <small>{theme.key}</small>
-                  </span>
-                  <span class="admin-theme-card-meta">
-                    <FileText size={15} />
-                    <span>{themeDescription(theme)}</span>
-                  </span>
-                  <label class="admin-theme-card-option appearance-color-row">
-                    <span>{at("appearance_theme_accent", {}, "Accent")}</span>
-                    <ColorInput
-                      class={`admin-color${!isThemeAccentSet(theme) ? " is-empty" : ""}`}
-                      value={pickerHex(theme.tokens?.accent)}
-                      ariaLabel={at("appearance_theme_accent", {}, "Accent")}
-                      title={isThemeAccentSet(theme)
-                        ? theme.tokens?.accent
-                        : at("appearance_theme_accent_empty", {}, "Не задан")}
-                      onclick={() => openThemeAccentPicker(theme)}
-                      oninput={(event) => setThemeAccent(theme, event.currentTarget.value)}
-                    />
-                    <Input
-                      class="input appearance-color-text"
-                      type="text"
-                      placeholder={at("appearance_theme_accent_placeholder", {}, "Не задан")}
-                      value={theme.tokens?.accent || ""}
-                      oninput={(event) => setThemeAccent(theme, event.currentTarget.value)}
-                    />
-                  </label>
-                  <label class="admin-theme-card-option">
-                    <Checkbox
-                      checked={theme.use_in_admin !== false}
-                      disabled={themesSaving}
-                      ariaLabel={at("themes_use_in_admin", {}, "Use in admin")}
-                      onCheckedChange={(checked) => toggleAdminTheme(theme, checked)}
-                    />
-                    <span>{at("themes_use_in_admin", {}, "Использовать в админке")}</span>
-                  </label>
-                  <div class="admin-theme-card-option appearance-logo-scale-row">
-                    <span class="appearance-logo-scale-label"
-                      >{at(
-                        "appearance_theme_home_logo_scale_desktop",
-                        {},
-                        "Логотип на десктопе"
-                      )}</span
-                    >
-                    <RangeInput
-                      class="appearance-logo-scale-range"
-                      min="50"
-                      max="300"
-                      step="5"
-                      ariaLabel={at(
-                        "appearance_theme_home_logo_scale_desktop",
-                        {},
-                        "Desktop logo scale"
-                      )}
-                      value={homeLogoScale(theme, "desktop")}
-                      onValueChange={(value) => setThemeHomeLogoScale(theme, "desktop", value)}
-                    />
-                    <span class="appearance-logo-scale-value">
-                      <Input
-                        class="input"
-                        type="number"
-                        min="50"
-                        max="300"
-                        step="5"
-                        value={homeLogoScale(theme, "desktop")}
-                        oninput={(event) =>
-                          setThemeHomeLogoScale(theme, "desktop", event.currentTarget.value)}
-                      />
-                      %
-                    </span>
+                      <AdminBadge>{defaultVariantTitle(defaultVariant)}</AdminBadge>
+                      {#if isDefaultVariantDirty()}
+                        <AdminBadge variant="warning"
+                          >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                        >
+                      {/if}
+                    </div>
+                    <small>{themeDescription(defaultTheme)}</small>
                   </div>
-                  <div class="admin-theme-card-option appearance-logo-scale-row">
-                    <span class="appearance-logo-scale-label"
-                      >{at(
-                        "appearance_theme_home_logo_scale_mobile",
-                        {},
-                        "Логотип на мобильных"
-                      )}</span
-                    >
-                    <RangeInput
-                      class="appearance-logo-scale-range"
-                      min="50"
-                      max="300"
-                      step="5"
-                      ariaLabel={at(
-                        "appearance_theme_home_logo_scale_mobile",
-                        {},
-                        "Mobile logo scale"
-                      )}
-                      value={homeLogoScale(theme, "mobile")}
-                      onValueChange={(value) => setThemeHomeLogoScale(theme, "mobile", value)}
-                    />
-                    <span class="appearance-logo-scale-value">
-                      <Input
-                        class="input"
-                        type="number"
-                        min="50"
-                        max="300"
-                        step="5"
-                        value={homeLogoScale(theme, "mobile")}
-                        oninput={(event) =>
-                          setThemeHomeLogoScale(theme, "mobile", event.currentTarget.value)}
-                      />
-                      %
-                    </span>
-                  </div>
-                  <div class="appearance-theme-actions">
+                  <div class="default-theme-actions">
+                    <label class="appearance-switch appearance-mode-switch">
+                      <span>{at("appearance_default_dark", {}, "Dark")}</span>
+                      <Switch.Root
+                        checked={defaultVariant === "light"}
+                        onCheckedChange={setDefaultVariantFromSwitch}
+                        class="admin-switch-root"
+                      >
+                        <Switch.Thumb class="admin-switch-thumb" />
+                      </Switch.Root>
+                      <span>{at("appearance_default_light", {}, "Light")}</span>
+                    </label>
                     <AdminButton
                       size="sm"
                       variant="ghost"
-                      onclick={(event) => previewTheme(event, theme)}
+                      onclick={(event) => previewDefaultVariant(event, defaultVariant)}
                     >
                       <ExternalLink size={13} />
-                      {at("appearance_preview_theme", {}, "Предпросмотр")}
+                      {at("appearance_preview_theme", {}, "Preview")}
                     </AdminButton>
                   </div>
-                  <span class="admin-theme-card-check" aria-hidden="true">
-                    {#if isCurrent}<Check size={18} />{/if}
-                  </span>
                 </div>
-              {/each}
-            </div>
-          {/if}
+
+                <div class="appearance-preset-row" aria-label="Default theme presets">
+                  {#each DEFAULT_THEME_PRESETS[defaultVariant] || [] as preset (preset.id)}
+                    <button
+                      type="button"
+                      class="appearance-preset-btn"
+                      onclick={() => applyDefaultPreset(preset)}
+                    >
+                      <span style={`background:${preset.swatch}`}></span>
+                      {preset.label}
+                    </button>
+                  {/each}
+                </div>
+
+                <div class="default-theme-grid">
+                  <section class="default-theme-panel">
+                    <h4><Type size={15} /> {at("appearance_typography", {}, "Typography")}</h4>
+                    <div class="appearance-select-grid">
+                      <label class:is-dirty={isDefaultTokenDirty("font_sans")}>
+                        <span>
+                          {at("appearance_font_ui", {}, "Interface")}
+                          {#if isDefaultTokenDirty("font_sans")}
+                            <AdminBadge variant="warning"
+                              >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                            >
+                          {/if}
+                        </span>
+                        <AdminSelect
+                          class="appearance-select"
+                          value={defaultTokenValue("font_sans", defaultTokens) || ""}
+                          items={fontItemsWithCurrent(
+                            FONT_OPTIONS,
+                            defaultTokenValue("font_sans", defaultTokens) || ""
+                          )}
+                          placeholder="System"
+                          onValueChange={(value) => setDefaultFont("font_sans", value)}
+                        />
+                      </label>
+                      <label class:is-dirty={isDefaultTokenDirty("font_logo")}>
+                        <span>
+                          {at("appearance_font_brand", {}, "Brand")}
+                          {#if isDefaultTokenDirty("font_logo")}
+                            <AdminBadge variant="warning"
+                              >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                            >
+                          {/if}
+                        </span>
+                        <AdminSelect
+                          class="appearance-select"
+                          value={defaultTokenValue("font_logo", defaultTokens) || ""}
+                          items={fontItemsWithCurrent(
+                            FONT_OPTIONS,
+                            defaultTokenValue("font_logo", defaultTokens) || ""
+                          )}
+                          placeholder="System"
+                          onValueChange={(value) => setDefaultFont("font_logo", value)}
+                        />
+                      </label>
+                      <label class:is-dirty={isDefaultTokenDirty("font_mono")}>
+                        <span>
+                          {at("appearance_font_mono", {}, "Mono")}
+                          {#if isDefaultTokenDirty("font_mono")}
+                            <AdminBadge variant="warning"
+                              >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                            >
+                          {/if}
+                        </span>
+                        <AdminSelect
+                          class="appearance-select"
+                          value={defaultTokenValue("font_mono", defaultTokens) || ""}
+                          items={fontItemsWithCurrent(
+                            MONO_FONT_OPTIONS,
+                            defaultTokenValue("font_mono", defaultTokens) || ""
+                          )}
+                          placeholder="Default mono"
+                          onValueChange={(value) => setDefaultFont("font_mono", value)}
+                        />
+                      </label>
+                    </div>
+                    <div class="appearance-custom-font-row">
+                      <Input
+                        class="input"
+                        type="text"
+                        placeholder={at("appearance_font_google_placeholder", {}, "Nunito Sans")}
+                        bind:value={customGoogleFontName}
+                        aria-label={at("appearance_font_google_custom", {}, "Google Font family")}
+                      />
+                      <AdminButton
+                        size="sm"
+                        onclick={() => applyCustomGoogleFont("font_sans")}
+                        disabled={!customGoogleFontName.trim()}
+                      >
+                        <Type size={12} />
+                        {at("appearance_font_apply_ui", {}, "Interface")}
+                      </AdminButton>
+                      <AdminButton
+                        size="sm"
+                        onclick={() => applyCustomGoogleFont("font_logo")}
+                        disabled={!customGoogleFontName.trim()}
+                      >
+                        <Type size={12} />
+                        {at("appearance_font_apply_brand", {}, "Brand")}
+                      </AdminButton>
+                      <AdminButton
+                        size="sm"
+                        onclick={() => applyCustomGoogleFont("font_mono", "mono")}
+                        disabled={!customGoogleFontName.trim()}
+                      >
+                        <Type size={12} />
+                        {at("appearance_font_apply_mono", {}, "Mono")}
+                      </AdminButton>
+                    </div>
+                  </section>
+
+                  <section class="default-theme-panel">
+                    <h4>
+                      <Sliders size={15} />
+                      {at("appearance_shape_logo", {}, "Shape and logo")}
+                    </h4>
+                    <div
+                      class="appearance-logo-scale-row appearance-default-scale-row"
+                      class:is-dirty={isDefaultTokenDirty("radius")}
+                    >
+                      <span class="appearance-logo-scale-label">
+                        {at("appearance_radius", {}, "Radius")}
+                        {#if isDefaultTokenDirty("radius")}
+                          <AdminBadge variant="warning"
+                            >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                          >
+                        {/if}
+                      </span>
+                      <RangeInput
+                        class="appearance-logo-scale-range"
+                        min="4"
+                        max="28"
+                        step="1"
+                        ariaLabel={at("appearance_radius", {}, "Radius")}
+                        value={radiusNumber(defaultTokens)}
+                        onValueChange={setDefaultRadius}
+                      />
+                      <span class="appearance-logo-scale-value">
+                        <Input
+                          class="input"
+                          type="number"
+                          min="4"
+                          max="28"
+                          step="1"
+                          value={radiusNumber(defaultTokens)}
+                          oninput={(event) => setDefaultRadius(event.currentTarget.value)}
+                        />
+                        px
+                      </span>
+                    </div>
+                    <div
+                      class="appearance-logo-scale-row appearance-default-scale-row"
+                      class:is-dirty={isThemeHomeLogoScaleDirty(
+                        defaultTheme,
+                        "desktop",
+                        defaultVariant
+                      )}
+                    >
+                      <span class="appearance-logo-scale-label">
+                        {at("appearance_logo_desktop", {}, "Desktop logo")}
+                        {#if isThemeHomeLogoScaleDirty(defaultTheme, "desktop", defaultVariant)}
+                          <AdminBadge variant="warning"
+                            >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                          >
+                        {/if}
+                      </span>
+                      <RangeInput
+                        class="appearance-logo-scale-range"
+                        min="50"
+                        max="300"
+                        step="5"
+                        ariaLabel={at("appearance_logo_desktop", {}, "Desktop logo")}
+                        value={defaultHomeLogoScale("desktop", defaultTheme, defaultVariant)}
+                        onValueChange={(value) => setDefaultHomeLogoScale("desktop", value)}
+                      />
+                      <span class="appearance-logo-scale-value">
+                        <Input
+                          class="input"
+                          type="number"
+                          min="50"
+                          max="300"
+                          step="5"
+                          value={defaultHomeLogoScale("desktop", defaultTheme, defaultVariant)}
+                          oninput={(event) =>
+                            setDefaultHomeLogoScale("desktop", event.currentTarget.value)}
+                        />
+                        %
+                      </span>
+                    </div>
+                    <div
+                      class="appearance-logo-scale-row appearance-default-scale-row"
+                      class:is-dirty={isThemeHomeLogoScaleDirty(
+                        defaultTheme,
+                        "mobile",
+                        defaultVariant
+                      )}
+                    >
+                      <span class="appearance-logo-scale-label">
+                        {at("appearance_logo_mobile", {}, "Mobile logo")}
+                        {#if isThemeHomeLogoScaleDirty(defaultTheme, "mobile", defaultVariant)}
+                          <AdminBadge variant="warning"
+                            >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                          >
+                        {/if}
+                      </span>
+                      <RangeInput
+                        class="appearance-logo-scale-range"
+                        min="50"
+                        max="300"
+                        step="5"
+                        ariaLabel={at("appearance_logo_mobile", {}, "Mobile logo")}
+                        value={defaultHomeLogoScale("mobile", defaultTheme, defaultVariant)}
+                        onValueChange={(value) => setDefaultHomeLogoScale("mobile", value)}
+                      />
+                      <span class="appearance-logo-scale-value">
+                        <Input
+                          class="input"
+                          type="number"
+                          min="50"
+                          max="300"
+                          step="5"
+                          value={defaultHomeLogoScale("mobile", defaultTheme, defaultVariant)}
+                          oninput={(event) =>
+                            setDefaultHomeLogoScale("mobile", event.currentTarget.value)}
+                        />
+                        %
+                      </span>
+                    </div>
+                  </section>
+                </div>
+
+                <div class="default-theme-token-grid">
+                  {#each TOKEN_GROUPS as group (group.title)}
+                    <section class="default-theme-panel">
+                      <h4>
+                        <svelte:component this={group.icon} size={15} />
+                        {at(group.titleKey, {}, group.title)}
+                      </h4>
+                      <div class="appearance-token-list">
+                        {#each group.items as item (item[0])}
+                          {@const tokenKey = item[0]}
+                          {@const tokenLabel = at(item[1], {}, item[2])}
+                          <label
+                            class="appearance-token-control"
+                            class:is-dirty={isDefaultTokenDirty(tokenKey)}
+                          >
+                            <span>
+                              {tokenLabel}
+                              {#if isDefaultTokenDirty(tokenKey)}
+                                <AdminBadge variant="warning"
+                                  >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                                >
+                              {/if}
+                            </span>
+                            <ColorInput
+                              class="admin-color"
+                              value={pickerHex(defaultTokenValue(tokenKey, defaultTokens))}
+                              ariaLabel={tokenLabel}
+                              onclick={() => openDefaultColorPicker(tokenKey)}
+                              oninput={(event) =>
+                                setDefaultColorToken(tokenKey, event.currentTarget.value)}
+                            />
+                            <Input
+                              class="input appearance-color-text"
+                              type="text"
+                              placeholder={at("appearance_token_empty", {}, "not set")}
+                              value={defaultTokenValue(tokenKey, defaultTokens) || ""}
+                              oninput={(event) =>
+                                setDefaultToken(tokenKey, event.currentTarget.value)}
+                            />
+                            <AdminButton
+                              class="appearance-token-reset"
+                              size="sm"
+                              variant="ghost"
+                              onclick={() => resetDefaultToken(tokenKey)}
+                            >
+                              <RefreshCw size={12} />
+                            </AdminButton>
+                          </label>
+                        {/each}
+                      </div>
+                    </section>
+                  {/each}
+                </div>
+              </section>
+            {:else}
+              <AdminEmptyState>
+                {at("themes_catalog_empty", {}, "Каталог тем пуст. Обновите список тем.")}
+              </AdminEmptyState>
+            {/if}
+          </section>
+
+          <section class="appearance-theme-section">
+            <header class="appearance-theme-section-head">
+              <div>
+                <h4>{at("appearance_custom_themes_title", {}, "Кастомные темы")}</h4>
+                <small>
+                  {at(
+                    "appearance_custom_themes_sub",
+                    {},
+                    "Отдельные темы из каталога: выбор активной темы, акцент, логотип и применение в админке."
+                  )}
+                </small>
+              </div>
+              {#if customThemes.some((theme) => isThemeDirty(theme))}
+                <AdminBadge variant="warning">
+                  {at("settings_badge_dirty", {}, "Изменено")}
+                </AdminBadge>
+              {/if}
+            </header>
+
+            {#if customThemes.length}
+              <div class="admin-theme-grid">
+                {#each customThemes as theme (theme.key)}
+                  {@const isCurrent = theme.key === activeKey}
+                  <div
+                    role="button"
+                    tabindex={themesSaving ? -1 : 0}
+                    class="admin-theme-card"
+                    class:is-current={isCurrent}
+                    class:is-disabled={theme.enabled === false}
+                    class:is-dirty={isThemeDirty(theme)}
+                    aria-pressed={isCurrent}
+                    aria-disabled={themesSaving}
+                    onclick={(event) => selectTheme(theme, event)}
+                    onkeydown={(event) => handleThemeKeydown(event, theme)}
+                  >
+                    <span class="admin-theme-card-main">
+                      <span class="admin-theme-card-title">
+                        <strong>{themeTitle(theme)}</strong>
+                        {#if isCurrent}
+                          <AdminBadge variant="success"
+                            >{at("status_current", {}, "Текущая")}</AdminBadge
+                          >
+                        {/if}
+                      </span>
+                      <small>{theme.key}</small>
+                    </span>
+                    <span class="admin-theme-card-meta">
+                      <FileText size={15} />
+                      <span>{themeDescription(theme)}</span>
+                    </span>
+                    <label
+                      class="admin-theme-card-option appearance-color-row"
+                      class:is-dirty={isThemeTokenDirty(theme, "accent")}
+                    >
+                      <span>
+                        {at("appearance_theme_accent", {}, "Accent")}
+                        {#if isThemeTokenDirty(theme, "accent")}
+                          <AdminBadge variant="warning"
+                            >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                          >
+                        {/if}
+                      </span>
+                      <ColorInput
+                        class={`admin-color${!isThemeAccentSet(theme) ? " is-empty" : ""}`}
+                        value={pickerHex(theme.tokens?.accent)}
+                        ariaLabel={at("appearance_theme_accent", {}, "Accent")}
+                        title={isThemeAccentSet(theme)
+                          ? theme.tokens?.accent
+                          : at("appearance_theme_accent_empty", {}, "Не задан")}
+                        onclick={() => openThemeAccentPicker(theme)}
+                        oninput={(event) => setThemeAccent(theme, event.currentTarget.value)}
+                      />
+                      <Input
+                        class="input appearance-color-text"
+                        type="text"
+                        placeholder={at("appearance_theme_accent_placeholder", {}, "Не задан")}
+                        value={theme.tokens?.accent || ""}
+                        oninput={(event) => setThemeAccent(theme, event.currentTarget.value)}
+                      />
+                    </label>
+                    <label
+                      class="admin-theme-card-option"
+                      class:is-dirty={isThemePropertyDirty(theme, "use_in_admin")}
+                    >
+                      <Checkbox
+                        checked={theme.use_in_admin !== false}
+                        disabled={themesSaving}
+                        ariaLabel={at("themes_use_in_admin", {}, "Use in admin")}
+                        onCheckedChange={(checked) => toggleAdminTheme(theme, checked)}
+                      />
+                      <span>
+                        {at("themes_use_in_admin", {}, "Использовать в админке")}
+                        {#if isThemePropertyDirty(theme, "use_in_admin")}
+                          <AdminBadge variant="warning"
+                            >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                          >
+                        {/if}
+                      </span>
+                    </label>
+                    <div
+                      class="admin-theme-card-option appearance-logo-scale-row"
+                      class:is-dirty={isThemeHomeLogoScaleDirty(theme, "desktop")}
+                    >
+                      <span class="appearance-logo-scale-label"
+                        >{at("appearance_theme_home_logo_scale_desktop", {}, "Логотип на десктопе")}
+                        {#if isThemeHomeLogoScaleDirty(theme, "desktop")}
+                          <AdminBadge variant="warning"
+                            >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                          >
+                        {/if}
+                      </span>
+                      <RangeInput
+                        class="appearance-logo-scale-range"
+                        min="50"
+                        max="300"
+                        step="5"
+                        ariaLabel={at(
+                          "appearance_theme_home_logo_scale_desktop",
+                          {},
+                          "Desktop logo scale"
+                        )}
+                        value={homeLogoScale(theme, "desktop")}
+                        onValueChange={(value) => setThemeHomeLogoScale(theme, "desktop", value)}
+                      />
+                      <span class="appearance-logo-scale-value">
+                        <Input
+                          class="input"
+                          type="number"
+                          min="50"
+                          max="300"
+                          step="5"
+                          value={homeLogoScale(theme, "desktop")}
+                          oninput={(event) =>
+                            setThemeHomeLogoScale(theme, "desktop", event.currentTarget.value)}
+                        />
+                        %
+                      </span>
+                    </div>
+                    <div
+                      class="admin-theme-card-option appearance-logo-scale-row"
+                      class:is-dirty={isThemeHomeLogoScaleDirty(theme, "mobile")}
+                    >
+                      <span class="appearance-logo-scale-label"
+                        >{at("appearance_theme_home_logo_scale_mobile", {}, "Логотип на мобильных")}
+                        {#if isThemeHomeLogoScaleDirty(theme, "mobile")}
+                          <AdminBadge variant="warning"
+                            >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                          >
+                        {/if}
+                      </span>
+                      <RangeInput
+                        class="appearance-logo-scale-range"
+                        min="50"
+                        max="300"
+                        step="5"
+                        ariaLabel={at(
+                          "appearance_theme_home_logo_scale_mobile",
+                          {},
+                          "Mobile logo scale"
+                        )}
+                        value={homeLogoScale(theme, "mobile")}
+                        onValueChange={(value) => setThemeHomeLogoScale(theme, "mobile", value)}
+                      />
+                      <span class="appearance-logo-scale-value">
+                        <Input
+                          class="input"
+                          type="number"
+                          min="50"
+                          max="300"
+                          step="5"
+                          value={homeLogoScale(theme, "mobile")}
+                          oninput={(event) =>
+                            setThemeHomeLogoScale(theme, "mobile", event.currentTarget.value)}
+                        />
+                        %
+                      </span>
+                    </div>
+                    <div class="appearance-theme-actions">
+                      <AdminButton
+                        size="sm"
+                        variant="ghost"
+                        onclick={(event) => previewTheme(event, theme)}
+                      >
+                        <ExternalLink size={13} />
+                        {at("appearance_preview_theme", {}, "Предпросмотр")}
+                      </AdminButton>
+                    </div>
+                    <span class="admin-theme-card-check" aria-hidden="true">
+                      {#if isCurrent}<Check size={18} />{/if}
+                    </span>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <AdminEmptyState>
+                {at(
+                  "appearance_custom_themes_empty",
+                  {},
+                  "Кастомных тем пока нет. Добавьте отдельную тему в каталог, если нужно выйти за рамки темы по-умолчанию."
+                )}
+              </AdminEmptyState>
+            {/if}
+          </section>
         {/if}
       </div>
     </article>
@@ -1415,6 +1688,38 @@
     gap: 14px;
   }
 
+  .appearance-theme-section {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .appearance-theme-section + .appearance-theme-section {
+    padding-top: 14px;
+    border-top: 1px solid var(--admin-border);
+  }
+
+  .appearance-theme-section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .appearance-theme-section-head h4 {
+    margin: 0;
+    color: var(--admin-text);
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .appearance-theme-section-head small {
+    display: block;
+    margin-top: 4px;
+    color: var(--admin-muted);
+    font-size: 12px;
+  }
+
   .default-theme-editor {
     display: grid;
     gap: 14px;
@@ -1422,6 +1727,11 @@
     border-radius: 8px;
     background: color-mix(in srgb, var(--admin-surface-2) 34%, transparent);
     padding: 14px;
+  }
+
+  .default-theme-editor.is-dirty {
+    border-color: color-mix(in srgb, var(--warning, #f5b84b) 42%, var(--admin-border));
+    background: color-mix(in srgb, var(--warning, #f5b84b) 5%, var(--admin-surface-2));
   }
 
   .default-theme-head {
@@ -1543,6 +1853,35 @@
     font-size: 12px;
   }
 
+  .appearance-select-grid label > span,
+  .appearance-token-control > span,
+  .appearance-logo-scale-label,
+  .admin-theme-card-option > span {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .appearance-select-grid label.is-dirty,
+  .appearance-token-control.is-dirty,
+  .appearance-logo-scale-row.is-dirty,
+  .admin-theme-card-option.is-dirty {
+    color: color-mix(in srgb, var(--warning, #f5b84b) 78%, var(--admin-text));
+  }
+
+  .appearance-custom-font-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) repeat(3, max-content);
+    gap: 8px;
+    align-items: center;
+  }
+
+  .appearance-custom-font-row :global(.admin-btn) {
+    min-height: 34px;
+    padding-inline: 10px;
+  }
+
   :global(.appearance-select) {
     width: 100%;
     min-height: 34px;
@@ -1609,6 +1948,10 @@
   .admin-theme-card.is-current {
     border-color: var(--accent);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 44%, transparent);
+  }
+
+  .admin-theme-card.is-dirty {
+    border-color: color-mix(in srgb, var(--warning, #f5b84b) 42%, var(--admin-border));
   }
 
   .admin-theme-card.is-disabled {
@@ -1765,6 +2108,14 @@
 
     .default-theme-grid,
     .default-theme-token-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .appearance-theme-section-head {
+      display: grid;
+    }
+
+    .appearance-custom-font-row {
       grid-template-columns: 1fr;
     }
 

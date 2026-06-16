@@ -8,13 +8,29 @@ const HOME_LOGO_SCALE_TOKEN = {
   desktop: "home_logo_scale_desktop",
   mobile: "home_logo_scale_mobile",
 };
+const HOME_LOGO_SCALE_STEP = 5;
 const DEFAULT_THEME_KEY = "dark";
 const THEME_VARIANTS = new Set(["dark", "light"]);
+const DEFAULT_ADMIN_TOKEN_KEYS = new Set([
+  "admin_bg",
+  "admin_surface",
+  "admin_surface_2",
+  "admin_elev",
+  "admin_border",
+  "admin_border_strong",
+  "admin_text",
+  "admin_muted",
+  "admin_dim",
+  "admin_chart_stroke",
+  "admin_chart_fill",
+]);
 
 function normalizeHomeLogoScale(scale) {
   if (String(scale ?? "").trim() === "") scale = 100;
   const numeric = Number(scale);
-  return Number.isFinite(numeric) ? Math.min(300, Math.max(50, Math.round(numeric))) : 100;
+  if (!Number.isFinite(numeric)) return 100;
+  const rounded = Math.round(numeric / HOME_LOGO_SCALE_STEP) * HOME_LOGO_SCALE_STEP;
+  return Math.min(300, Math.max(50, rounded));
 }
 
 function normalizeThemeVariant(variant) {
@@ -45,6 +61,66 @@ function resolveThemeHomeLogoScale(theme, mode = "desktop", variant = null) {
 function normalizeTokenValue(value) {
   const text = String(value ?? "").trim();
   return text || null;
+}
+
+function normalizeLogoScaleTokens(tokens) {
+  if (!tokens || typeof tokens !== "object") return tokens;
+  const nextTokens = { ...tokens };
+  const desktopScale = normalizeHomeLogoScale(
+    nextTokens.home_logo_scale_desktop ?? nextTokens.home_logo_scale ?? 100
+  );
+  const mobileScale = normalizeHomeLogoScale(
+    nextTokens.home_logo_scale_mobile ?? nextTokens.home_logo_scale ?? 100
+  );
+  delete nextTokens.home_logo_scale;
+  delete nextTokens.home_logo_scale_desktop;
+  delete nextTokens.home_logo_scale_mobile;
+  if (desktopScale !== 100) nextTokens.home_logo_scale_desktop = desktopScale;
+  if (mobileScale !== 100) nextTokens.home_logo_scale_mobile = mobileScale;
+  return nextTokens;
+}
+
+function normalizeThemeCatalogEntry(theme) {
+  if (!theme) return theme;
+  const stripTokens = (tokens) => {
+    if (!tokens || typeof tokens !== "object") return tokens;
+    const nextTokens = { ...tokens };
+    if (theme.key === DEFAULT_THEME_KEY) {
+      for (const key of DEFAULT_ADMIN_TOKEN_KEYS) {
+        delete nextTokens[key];
+      }
+    }
+    return normalizeLogoScaleTokens(nextTokens);
+  };
+  const variants = theme.variants && typeof theme.variants === "object" ? theme.variants : {};
+  return {
+    ...theme,
+    tokens: stripTokens(theme.tokens || {}),
+    variants: Object.fromEntries(
+      Object.entries(variants).map(([variant, tokens]) => [variant, stripTokens(tokens)])
+    ),
+  };
+}
+
+function normalizeThemeCatalog(catalog) {
+  const nextCatalog = cloneCatalog(catalog);
+  nextCatalog.default_theme = nextCatalog.default_theme || DEFAULT_THEME_KEY;
+  nextCatalog.themes = (nextCatalog.themes || []).map(normalizeThemeCatalogEntry);
+  return nextCatalog;
+}
+
+function catalogFingerprint(catalog) {
+  return JSON.stringify(normalizeThemeCatalog(catalog));
+}
+
+function withCatalogState(state, nextCatalog) {
+  const themesCatalog = normalizeThemeCatalog(nextCatalog);
+  const savedThemesCatalog = normalizeThemeCatalog(state.savedThemesCatalog);
+  return {
+    ...state,
+    themesCatalog,
+    themesDirty: catalogFingerprint(themesCatalog) !== catalogFingerprint(savedThemesCatalog),
+  };
 }
 
 function setTokenOnTheme(theme, tokenKey, value, options = {}) {
@@ -99,6 +175,8 @@ function updateThemeInCatalog(catalog, key, updater) {
 export function createThemesStore({ api, onThemesSaved, flash, at }) {
   const state = writable({
     themesCatalog: { default_theme: "dark", themes: [] },
+    savedThemesCatalog: { default_theme: "dark", themes: [] },
+    themesDirty: false,
     themesDir: "",
     themesLoading: false,
     themesSaving: false,
@@ -109,9 +187,12 @@ export function createThemesStore({ api, onThemesSaved, flash, at }) {
     try {
       const data = await api("/admin/themes");
       if (data?.ok) {
+        const catalog = normalizeThemeCatalog(data.catalog);
         state.update((s) => ({
           ...s,
-          themesCatalog: cloneCatalog(data.catalog),
+          themesCatalog: catalog,
+          savedThemesCatalog: cloneCatalog(catalog),
+          themesDirty: false,
           themesDir: data.themes_dir || "",
         }));
       } else {
@@ -126,8 +207,8 @@ export function createThemesStore({ api, onThemesSaved, flash, at }) {
     const silent = Boolean(options.silent);
     let catalog = null;
     state.update((s) => {
-      catalog = cloneCatalog(s.themesCatalog);
-      return { ...s, themesSaving: true };
+      catalog = normalizeThemeCatalog(s.themesCatalog);
+      return { ...s, themesCatalog: catalog, themesSaving: true };
     });
     try {
       const data = await api("/admin/themes", {
@@ -135,9 +216,12 @@ export function createThemesStore({ api, onThemesSaved, flash, at }) {
         body: JSON.stringify({ catalog }),
       });
       if (data?.ok) {
+        const savedCatalog = normalizeThemeCatalog(data.catalog);
         state.update((s) => ({
           ...s,
-          themesCatalog: cloneCatalog(data.catalog),
+          themesCatalog: savedCatalog,
+          savedThemesCatalog: cloneCatalog(savedCatalog),
+          themesDirty: false,
           themesDir: data.themes_dir || s.themesDir,
         }));
         if (!silent) flash(at("themes_saved", {}, "Темы сохранены"));
@@ -249,24 +333,22 @@ export function createThemesStore({ api, onThemesSaved, flash, at }) {
   }
 
   function setCurrentTheme(key) {
-    state.update((s) => ({
-      ...s,
-      themesCatalog: {
+    state.update((s) =>
+      withCatalogState(s, {
         ...s.themesCatalog,
         default_theme: key,
         themes: (s.themesCatalog.themes || []).map((theme) => ({
           ...theme,
           default: theme.key === key,
         })),
-      },
-    }));
+      })
+    );
   }
 
   function setDefaultThemeVariant(variant) {
     const nextVariant = normalizeThemeVariant(variant);
-    state.update((s) => ({
-      ...s,
-      themesCatalog: {
+    state.update((s) =>
+      withCatalogState(s, {
         ...s.themesCatalog,
         default_theme: DEFAULT_THEME_KEY,
         themes: (s.themesCatalog.themes || []).map((theme) => {
@@ -275,32 +357,30 @@ export function createThemesStore({ api, onThemesSaved, flash, at }) {
           }
           return { ...theme, default: false };
         }),
-      },
-    }));
+      })
+    );
   }
 
   function togglePrimaryAccent(key, enabled) {
-    state.update((s) => ({
-      ...s,
-      themesCatalog: {
+    state.update((s) =>
+      withCatalogState(s, {
         ...s.themesCatalog,
         themes: (s.themesCatalog.themes || []).map((theme) =>
           theme.key === key ? { ...theme, use_primary_accent: Boolean(enabled) } : theme
         ),
-      },
-    }));
+      })
+    );
   }
 
   function toggleAdminUse(key, enabled) {
-    state.update((s) => ({
-      ...s,
-      themesCatalog: {
+    state.update((s) =>
+      withCatalogState(s, {
         ...s.themesCatalog,
         themes: (s.themesCatalog.themes || []).map((theme) =>
           theme.key === key ? { ...theme, use_in_admin: Boolean(enabled) } : theme
         ),
-      },
-    }));
+      })
+    );
   }
 
   function setThemeAccent(key, accent) {
@@ -308,59 +388,64 @@ export function createThemesStore({ api, onThemesSaved, flash, at }) {
   }
 
   function setThemeToken(key, tokenKey, value, options = {}) {
-    state.update((s) => ({
-      ...s,
-      themesCatalog: updateThemeInCatalog(s.themesCatalog, key, (theme) =>
-        setTokenOnTheme(theme, tokenKey, value, options)
-      ),
-    }));
+    state.update((s) =>
+      withCatalogState(
+        s,
+        updateThemeInCatalog(s.themesCatalog, key, (theme) =>
+          setTokenOnTheme(theme, tokenKey, value, options)
+        )
+      )
+    );
   }
 
   function resetThemeToken(key, tokenKey, options = {}) {
-    state.update((s) => ({
-      ...s,
-      themesCatalog: updateThemeInCatalog(s.themesCatalog, key, (theme) =>
-        resetTokenOnTheme(theme, tokenKey, options)
-      ),
-    }));
+    state.update((s) =>
+      withCatalogState(
+        s,
+        updateThemeInCatalog(s.themesCatalog, key, (theme) =>
+          resetTokenOnTheme(theme, tokenKey, options)
+        )
+      )
+    );
   }
 
   function applyThemePreset(key, variant, tokens) {
     const normalizedVariant = normalizeThemeVariant(variant);
     const nextTokens = tokens && typeof tokens === "object" ? tokens : {};
-    state.update((s) => ({
-      ...s,
-      themesCatalog: updateThemeInCatalog(s.themesCatalog, key, (theme) => {
-        if (theme.key === DEFAULT_THEME_KEY) {
+    state.update((s) =>
+      withCatalogState(
+        s,
+        updateThemeInCatalog(s.themesCatalog, key, (theme) => {
+          if (theme.key === DEFAULT_THEME_KEY) {
+            return {
+              ...theme,
+              active_variant: normalizedVariant,
+              variants: {
+                ...(theme.variants || {}),
+                [normalizedVariant]: {
+                  ...((theme.variants || {})[normalizedVariant] || {}),
+                  ...nextTokens,
+                },
+              },
+            };
+          }
           return {
             ...theme,
-            active_variant: normalizedVariant,
-            variants: {
-              ...(theme.variants || {}),
-              [normalizedVariant]: {
-                ...((theme.variants || {})[normalizedVariant] || {}),
-                ...nextTokens,
-              },
+            tokens: {
+              ...(theme.tokens || {}),
+              ...nextTokens,
             },
           };
-        }
-        return {
-          ...theme,
-          tokens: {
-            ...(theme.tokens || {}),
-            ...nextTokens,
-          },
-        };
-      }),
-    }));
+        })
+      )
+    );
   }
 
   function setThemeHomeLogoScale(key, mode, scale) {
     const normalizedMode = mode === "mobile" ? "mobile" : "desktop";
     const nextScale = normalizeHomeLogoScale(scale);
-    state.update((s) => ({
-      ...s,
-      themesCatalog: {
+    state.update((s) =>
+      withCatalogState(s, {
         ...s.themesCatalog,
         themes: (s.themesCatalog.themes || []).map((theme) => {
           if (theme.key !== key) return theme;
@@ -388,8 +473,8 @@ export function createThemesStore({ api, onThemesSaved, flash, at }) {
             ),
           };
         }),
-      },
-    }));
+      })
+    );
   }
 
   return {

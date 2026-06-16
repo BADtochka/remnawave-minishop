@@ -65,7 +65,10 @@
   } from "./lib/webapp/traffic.js";
   import {
     findThemeEntry,
+    materializeThemesCatalog,
+    readThemePreviewDraft,
     resolveEffectiveThemeKey,
+    syncThemeGoogleFonts,
     themeCssHref,
     themeEntryToInlineStyle,
     themeRootClass,
@@ -157,6 +160,7 @@
     ...(injectedConfig || {}),
   };
   const themePreviewKey = String(CFG.themePreviewKey || query.get("theme_preview") || "").trim();
+  const themePreviewDraft = readThemePreviewDraft(themePreviewKey);
   const I18N = injectedI18n || {};
   let telegramSdkStatus = "idle";
   let telegramMiniAppInitData = "";
@@ -446,8 +450,10 @@
       premiumTrafficPercent(subscription) >= TRAFFIC_TOPUP_UNLOCK_PERCENT)
   );
   $: user = data?.user || {};
-  $: themesCatalog = data?.themes_catalog ||
+  $: rawThemesCatalog = themePreviewDraft?.catalog ||
+    data?.themes_catalog ||
     CFG.themesCatalog || { default_theme: "dark", themes: [] };
+  $: themesCatalog = materializeThemesCatalog(rawThemesCatalog);
   $: previewThemeAllowed = Boolean(themePreviewKey && (!data?.user || user?.is_admin));
   $: previewThemeEntry = previewThemeAllowed
     ? findThemeEntry(themesCatalog, themePreviewKey)
@@ -470,6 +476,7 @@
     const bg = effectiveThemeEntry.tokens.bg;
     if (bg) document.body.style.backgroundColor = bg;
   }
+  $: syncThemeGoogleFonts(effectiveThemeEntry);
   $: isAdmin = Boolean(user?.is_admin);
   $: if (screen === "admin" && !isAdmin) {
     screen = "settings";
