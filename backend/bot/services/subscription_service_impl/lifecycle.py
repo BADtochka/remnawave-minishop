@@ -68,9 +68,7 @@ class SubscriptionLifecycleMixin:
         if not raw_expire_at:
             return False
         try:
-            panel_expire_at = datetime.fromisoformat(
-                str(raw_expire_at).replace("Z", "+00:00")
-            )
+            panel_expire_at = datetime.fromisoformat(str(raw_expire_at).replace("Z", "+00:00"))
         except (TypeError, ValueError):
             logging.warning(
                 "Panel update returned unparsable expireAt=%r for expected expiry %s.",

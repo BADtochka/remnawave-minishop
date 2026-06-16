@@ -385,16 +385,19 @@ class RefereeBonusTests(unittest.IsolatedAsyncioTestCase):
         subscription_service.extend_active_subscription_days = AsyncMock()
         service, _bot = _make_service(settings=settings, subscription_service=subscription_service)
 
-        with patch(
-            "bot.services.referral_service.user_dal.get_user_by_id",
-            AsyncMock(
-                side_effect=lambda session, uid: (
-                    _make_user(uid, referred_by_id=1) if uid == 42 else _make_user(uid)
-                )
+        with (
+            patch(
+                "bot.services.referral_service.user_dal.get_user_by_id",
+                AsyncMock(
+                    side_effect=lambda session, uid: (
+                        _make_user(uid, referred_by_id=1) if uid == 42 else _make_user(uid)
+                    )
+                ),
             ),
-        ), patch(
-            "bot.services.referral_service.subscription_dal.get_active_subscription_by_user_id",
-            AsyncMock(return_value=None),
+            patch(
+                "bot.services.referral_service.subscription_dal.get_active_subscription_by_user_id",
+                AsyncMock(return_value=None),
+            ),
         ):
             result = await service.apply_referral_bonuses_for_payment(
                 session=AsyncMock(),

@@ -34,7 +34,7 @@ def test_shell_installer_downloads_raw_files_and_runs_import_in_container():
 
     assert script.startswith("#!/bin/sh")
     raw_github_template = (
-        "printf 'https://raw.githubusercontent.com/%s/%s/%s' \"$repo\" \"$ref\" \"$path\""
+        'printf \'https://raw.githubusercontent.com/%s/%s/%s\' "$repo" "$ref" "$path"'
     )
     assert raw_github_template in script
     assert "git clone" not in script

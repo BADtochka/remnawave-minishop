@@ -276,10 +276,9 @@ async def finalize_successful_payment(
         int(float(req.months)) if is_subscription else int(float(req.traffic_amount or req.months))
     )
     traffic_gb_for_activation = float(req.traffic_amount or req.months) if is_traffic else None
-    effective_tariff_key = (
-        str(getattr(req.payment, "tariff_key", "") or "").strip()
-        or sale_mode_tariff_key(req.sale_mode)
-    )
+    effective_tariff_key = str(
+        getattr(req.payment, "tariff_key", "") or ""
+    ).strip() or sale_mode_tariff_key(req.sale_mode)
     activation_extra_kwargs = dict(req.activation_extra_kwargs or {})
     if effective_tariff_key and "tariff_key" not in activation_extra_kwargs:
         activation_extra_kwargs["tariff_key"] = effective_tariff_key
