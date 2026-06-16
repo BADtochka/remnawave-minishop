@@ -12,6 +12,7 @@ from . import (
     platega,
     severpay,
     stars,
+    stripe,
     wata,
     yookassa,
 )
@@ -36,6 +37,7 @@ PAYMENT_PROVIDER_SPECS: tuple[PaymentProviderSpec, ...] = (
     paykilla.SPEC,
     lava.SPEC,
     cloudpayments.SPEC,
+    stripe.SPEC,
 )
 
 

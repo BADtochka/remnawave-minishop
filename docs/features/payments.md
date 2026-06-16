@@ -46,6 +46,7 @@ reverse proxy должен прокидывать `X-Forwarded-For`, а его I
 | PayKilla | `WEBHOOK_BASE_URL` + `/webhook/paykilla` | Указывается в PayKilla Dashboard -> Settings -> Webhooks; включите события оплаты инвойсов. |
 | LAVA | `WEBHOOK_BASE_URL` + `/webhook/lava` | Передается автоматически как `hookUrl` при создании счета; можно также указать в кабинете LAVA Business. |
 | CloudPayments | `WEBHOOK_BASE_URL` + `/webhook/cloudpayments` | Укажите как адрес уведомлений Pay и Fail в кабинете CloudPayments. При IP-фильтрации заполните `CLOUDPAYMENTS_TRUSTED_IPS`. |
+| Stripe | `WEBHOOK_BASE_URL` + `/webhook/stripe` | Configure this endpoint in Stripe Dashboard and enable `checkout.session.completed`, `checkout.session.expired`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled`. |
 | Telegram Stars | Отдельный платежный webhook не нужен | Stars-события приходят через webhook Telegram-бота: `WEBHOOK_BASE_URL` + `/tg/webhook`. |
 
 После настройки сделайте тестовый платеж и проверьте, что в логах `backend` видно входящий `POST` на нужный путь. Если провайдер сообщает, что адрес недоступен, сначала проверьте DNS/HTTPS и reverse proxy для `WEBHOOK_BASE_URL`, затем убедитесь, что путь начинается ровно с `/webhook/...` без `/api`, `/auth` и frontend-домена.
@@ -297,6 +298,31 @@ CloudPayments используется для оплат картами чере
 ### Справочник
 
 - [CloudPayments](../configuration/env-vars.md#cloudpayments)
+
+## Stripe
+
+Stripe uses Checkout Sessions for hosted payment links and PaymentIntents for
+app-managed auto-renewal.
+
+### Integration notes
+
+- Configure `WEBHOOK_BASE_URL` + `/webhook/stripe` in Stripe Dashboard.
+- Enable events: `checkout.session.completed`, `checkout.session.expired`,
+  `payment_intent.succeeded`, `payment_intent.payment_failed`,
+  `payment_intent.canceled`.
+- Set `STRIPE_WEBHOOK_SECRET` from the endpoint signing secret (`whsec_...`).
+- With `STRIPE_RECURRING_ENABLED=true`, Checkout is created with
+  `payment_intent_data[setup_future_usage]=off_session`; successful webhooks
+  save `customer` + `payment_method`, and auto-renew creates an off-session
+  PaymentIntent.
+- Stripe Billing Subscriptions are not used by Minishop. Subscription duration,
+  HWID renewal, cancellation and retry behavior stay in the bot lifecycle.
+- Use `STRIPE_SUPPORTED_CURRENCIES` to restrict payment buttons to currencies
+  supported by your Stripe account and enabled payment methods.
+
+### Справочник
+
+- [Stripe](../configuration/env-vars.md#stripe)
 
 ## Telegram Stars
 
