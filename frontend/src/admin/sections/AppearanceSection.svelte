@@ -733,8 +733,24 @@
     themesStore.setThemeHomeLogoScale(theme.key, mode, value);
   }
 
+  function activateDefaultTheme() {
+    if (!themesSaving) themesStore.setCurrentTheme(DEFAULT_THEME_KEY);
+  }
+
   function isThemeControlTarget(target) {
     return target?.closest?.("button,input,label,.admin-theme-card-option,.ui-range-input");
+  }
+
+  function selectDefaultTheme(event = null) {
+    if (isThemeControlTarget(event?.target)) return;
+    activateDefaultTheme();
+  }
+
+  function handleDefaultThemeKeydown(event) {
+    if (isThemeControlTarget(event?.target)) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    activateDefaultTheme();
   }
 
   function selectTheme(theme, event = null) {
@@ -1023,7 +1039,18 @@
               {/if}
             </header>
             {#if defaultTheme}
-              <section class="default-theme-editor" class:is-dirty={isThemeDirty(defaultTheme)}>
+              <section
+                role="button"
+                tabindex={themesSaving ? -1 : 0}
+                class="default-theme-editor"
+                class:is-current={defaultThemeIsCurrent}
+                class:is-disabled={themesSaving}
+                class:is-dirty={isThemeDirty(defaultTheme)}
+                aria-pressed={defaultThemeIsCurrent}
+                aria-disabled={themesSaving}
+                onclick={(event) => selectDefaultTheme(event)}
+                onkeydown={(event) => handleDefaultThemeKeydown(event)}
+              >
                 <div class="default-theme-head">
                   <div>
                     <div class="default-theme-title">
@@ -1042,10 +1069,28 @@
                           >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
                         >
                       {/if}
+                      {#if defaultThemeIsCurrent}
+                        <span class="default-theme-check" aria-hidden="true">
+                          <Check size={18} />
+                        </span>
+                      {/if}
                     </div>
                     <small>{themeDescription(defaultTheme)}</small>
                   </div>
                   <div class="default-theme-actions">
+                    {#if !defaultThemeIsCurrent}
+                      <AdminButton
+                        size="sm"
+                        onclick={(event) => {
+                          event.stopPropagation();
+                          activateDefaultTheme();
+                        }}
+                        disabled={themesSaving}
+                      >
+                        <Check size={13} />
+                        {at("appearance_use_default_theme", {}, "Выбрать тему по-умолчанию")}
+                      </AdminButton>
+                    {/if}
                     <label class="appearance-switch appearance-mode-switch">
                       <span>{at("appearance_default_dark", {}, "Dark")}</span>
                       <Switch.Root
@@ -1365,7 +1410,7 @@
           <section class="appearance-theme-section">
             <header class="appearance-theme-section-head">
               <div>
-                <h4>{at("appearance_custom_themes_title", {}, "Кастомные темы")}</h4>
+                <h4>{at("appearance_custom_themes_title", {}, "Пользовательские темы")}</h4>
                 <small>
                   {at(
                     "appearance_custom_themes_sub",
@@ -1560,7 +1605,7 @@
                 {at(
                   "appearance_custom_themes_empty",
                   {},
-                  "Кастомных тем пока нет. Добавьте отдельную тему в каталог, если нужно выйти за рамки темы по-умолчанию."
+                  "Пользовательских тем пока нет. Добавьте отдельную тему в каталог, если нужно выйти за рамки темы по-умолчанию."
                 )}
               </AdminEmptyState>
             {/if}
@@ -1721,17 +1766,41 @@
   }
 
   .default-theme-editor {
+    position: relative;
     display: grid;
     gap: 14px;
     border: 1px solid var(--admin-border);
     border-radius: 8px;
     background: color-mix(in srgb, var(--admin-surface-2) 34%, transparent);
+    color: var(--admin-text);
+    cursor: pointer;
     padding: 14px;
+  }
+
+  .default-theme-editor:hover {
+    border-color: var(--admin-border-strong);
+    background: color-mix(in srgb, var(--admin-surface-2) 58%, transparent);
+  }
+
+  .default-theme-editor:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+    outline-offset: 2px;
+  }
+
+  .default-theme-editor.is-current {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 4%, var(--admin-surface-2));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 44%, transparent);
   }
 
   .default-theme-editor.is-dirty {
     border-color: color-mix(in srgb, var(--warning, #f5b84b) 42%, var(--admin-border));
     background: color-mix(in srgb, var(--warning, #f5b84b) 5%, var(--admin-surface-2));
+  }
+
+  .default-theme-editor.is-disabled {
+    cursor: default;
+    opacity: 0.58;
   }
 
   .default-theme-head {
@@ -1752,6 +1821,16 @@
   .default-theme-title strong {
     font-size: 15px;
     line-height: 1.2;
+  }
+
+  .default-theme-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    color: var(--accent);
   }
 
   .default-theme-head small {

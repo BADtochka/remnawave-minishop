@@ -327,6 +327,7 @@ input {
   --home-logo-scale-effective: var(--home-logo-scale-mobile, var(--home-logo-scale, 1));
   min-height: 100dvh;
   background: var(--bg, #02070b) !important;
+  font-family: var(--font-sans);
 }
 
 :root {
