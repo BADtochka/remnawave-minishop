@@ -2,8 +2,50 @@ import { DEV_MOCK } from "./previewMock.js";
 import { DEMO_DATASET } from "./demoDataset.js";
 import SETTINGS_MANIFEST_SECTIONS from "./settingsManifest.generated.json";
 import { withDemoAvatar, withDemoAvatarDetail, withDemoAvatarTicket } from "./demoAvatars.js";
+import { readJsonScript } from "./browser.js";
 
 const DEMO_LANGUAGE_STORAGE_KEY = "rw_minishop_demo_language";
+const DEMO_I18N_SCRIPT_ID = "i18n";
+const DEMO_TRANSLATION_GROUP_RULES = [
+  ["admin_appearance_", "admin_appearance"],
+  ["admin_translations_", "admin_translations"],
+  ["admin_settings_field_payment_", "admin_settings_payments"],
+  ["admin_settings_field_freekassa_", "admin_settings_payments"],
+  ["admin_settings_field_cryptomus_", "admin_settings_payments"],
+  ["admin_settings_field_yookassa_", "admin_settings_payments"],
+  ["admin_settings_field_cloudpayments_", "admin_settings_payments"],
+  ["admin_settings_field_platega_", "admin_settings_payments"],
+  ["admin_settings_field_tbank_", "admin_settings_payments"],
+  ["admin_settings_field_subscription_", "admin_settings_subscriptions"],
+  ["admin_settings_field_autorenew_", "admin_settings_subscriptions"],
+  ["admin_settings_field_trial_", "admin_settings_subscriptions"],
+  ["admin_settings_field_stars_", "admin_settings_subscriptions"],
+  ["admin_settings_field_", "admin_settings"],
+  ["admin_settings_", "admin_settings"],
+  ["admin_health_", "admin_settings_notifications"],
+  ["admin_support_", "admin_support"],
+  ["admin_tariff", "admin_tariffs"],
+  ["admin_payment", "admin_payments"],
+  ["admin_promo", "admin_promos_marketing"],
+  ["admin_ads_", "admin_promos_marketing"],
+  ["admin_broadcast_", "admin_promos_marketing"],
+  ["admin_user", "admin_users"],
+  ["admin_log", "admin_logs"],
+  ["admin_export", "admin_logs"],
+  ["admin_stats_", "admin_dashboard"],
+  ["admin_nav_", "admin_navigation"],
+  ["admin_section_", "admin_navigation"],
+  ["admin_", "admin_misc"],
+  ["wa_", "webapp"],
+  ["telegram_", "bot_menu"],
+  ["subscription_", "subscriptions"],
+  ["trial_", "subscriptions"],
+  ["autorenew_", "subscriptions"],
+  ["payment_", "payments"],
+  ["referral_", "referrals_promos"],
+  ["email_", "emails"],
+  ["user_", "auth_security"],
+];
 
 function defaultClone(value) {
   try {
@@ -11,6 +53,96 @@ function defaultClone(value) {
   } catch {
     return JSON.parse(JSON.stringify(value));
   }
+}
+
+function readDemoI18nMessages() {
+  if (typeof document === "undefined") return {};
+  const payload = readJsonScript(DEMO_I18N_SCRIPT_ID);
+  return payload && typeof payload === "object" ? payload : {};
+}
+
+function translationValue(base, fallback) {
+  const effective = base || fallback || "";
+  return {
+    base: base || "",
+    fallback: fallback || "",
+    effective,
+    override: "",
+    overridden: false,
+    updated_at: null,
+    updated_by: null,
+  };
+}
+
+function messageFor(messages, lang, key) {
+  const value = messages?.[lang]?.[key];
+  return typeof value === "string" ? value : "";
+}
+
+function createLocaleTranslationItem(key, messages, languages) {
+  const fallback =
+    messageFor(messages, "ru", key) ||
+    Object.values(messages || {})
+      .map((bucket) => (bucket && typeof bucket === "object" ? bucket[key] : ""))
+      .find((value) => typeof value === "string" && value.length) ||
+    key;
+  const values = {};
+  for (const language of languages || []) {
+    const code = language?.code;
+    if (!code) continue;
+    values[code] = translationValue(messageFor(messages, code, key) || fallback, fallback);
+  }
+  if (!values.ru) values.ru = translationValue(fallback, fallback);
+  if (!values.en)
+    values.en = translationValue(messageFor(messages, "en", key) || fallback, fallback);
+  return {
+    key,
+    audience: key.startsWith("admin_") ? "internal" : "user",
+    values,
+  };
+}
+
+function targetTranslationGroup(groups, key) {
+  const exact = DEMO_TRANSLATION_GROUP_RULES.find(([prefix]) => key.startsWith(prefix));
+  const groupId = exact?.[1] || "common";
+  return (
+    (groups || []).find((group) => group.id === groupId) ||
+    (groups || []).find((group) => group.id === "common") ||
+    (groups || [])[0]
+  );
+}
+
+function withCurrentLocaleTranslations(payload) {
+  const messages = readDemoI18nMessages();
+  const groups = payload?.groups || [];
+  if (!groups.length || !messages || !Object.keys(messages).length) return payload;
+
+  const existingKeys = new Set(
+    groups.flatMap((group) => (group.items || []).map((item) => item.key))
+  );
+  const localeKeys = new Set();
+  for (const bucket of Object.values(messages)) {
+    if (!bucket || typeof bucket !== "object") continue;
+    for (const key of Object.keys(bucket)) localeKeys.add(key);
+  }
+
+  for (const key of Array.from(localeKeys).sort()) {
+    if (existingKeys.has(key)) continue;
+    const group = targetTranslationGroup(groups, key);
+    if (!group) continue;
+    group.items = group.items || [];
+    group.items.push(createLocaleTranslationItem(key, messages, payload.languages || []));
+    existingKeys.add(key);
+  }
+
+  for (const group of groups) {
+    group.items = (group.items || []).sort((a, b) => String(a.key).localeCompare(String(b.key)));
+  }
+  return payload;
+}
+
+function demoTranslationsPayload(clone = defaultClone) {
+  return withCurrentLocaleTranslations(clone(DEMO_DATASET.translations || {}));
 }
 
 let demoPromosState = null;
@@ -1200,7 +1332,7 @@ function demoApiResponse(path, cleanPath, options, context) {
     return { ok: true, applied: 1, reverted: 0, file_written: false };
   }
   if (cleanPath === "/admin/translations") {
-    return { ok: true, ...clone(DEMO_DATASET.translations) };
+    return { ok: true, ...demoTranslationsPayload(clone) };
   }
 
   if (cleanPath === "/admin/support/stats") return { ok: true, stats: demoSupportCounts() };
@@ -1980,7 +2112,7 @@ export async function mockApi(path, options = {}, context = {}) {
     return { ok: true, applied: 1, reverted: 0, file_written: true };
   }
   if (path === "/admin/translations") {
-    return {
+    return withCurrentLocaleTranslations({
       ok: true,
       path: "data/locales-overrides.json",
       override_count: 1,
@@ -2046,7 +2178,7 @@ export async function mockApi(path, options = {}, context = {}) {
           ],
         },
       ],
-    };
+    });
   }
   if (path === "/admin/settings")
     return {
