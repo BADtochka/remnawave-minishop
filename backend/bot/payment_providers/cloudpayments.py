@@ -511,12 +511,10 @@ class CloudPaymentsService(HttpClientMixin):
         if trusted and not ip_in_allowlist(client_ip, trusted):
             logging.warning(
                 "CloudPayments webhook denied from unauthorized IP source "
-                "(client_ip=%s remote=%s x_forwarded_for=%s trusted_ips=%s trusted_proxies=%s).",
+                "(client_ip=%s remote=%s x_forwarded_for=%s).",
                 client_ip,
                 request.remote,
                 request.headers.get("X-Forwarded-For"),
-                trusted,
-                self.settings.trusted_proxies,
             )
             return web.json_response({"code": 13}, status=403)
 
