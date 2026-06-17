@@ -582,23 +582,17 @@ class StripeService(HttpClientMixin):
     ) -> None:
         if not self.recurring_active:
             return
-        customer_id = str(
-            payment_intent.get("customer") or fallback_customer_id or ""
-        ).strip()
+        customer_id = str(payment_intent.get("customer") or fallback_customer_id or "").strip()
         payment_method_id = str(payment_intent.get("payment_method") or "").strip()
         if not customer_id or not payment_method_id:
             return
         payment_method_payload = await self.retrieve_payment_method(payment_method_id)
         card = (
-            payment_method_payload.get("card")
-            if isinstance(payment_method_payload, dict)
-            else None
+            payment_method_payload.get("card") if isinstance(payment_method_payload, dict) else None
         ) or {}
         card_last4 = card.get("last4")
         card_network = card.get("brand") or (
-            payment_method_payload.get("type")
-            if isinstance(payment_method_payload, dict)
-            else None
+            payment_method_payload.get("type") if isinstance(payment_method_payload, dict) else None
         )
         await user_billing_dal.upsert_user_payment_method(
             session,

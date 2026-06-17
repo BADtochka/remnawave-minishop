@@ -50,7 +50,11 @@ def _make_service(**config_overrides) -> StripeService:
 class _FakeResponse:
     def __init__(self, status=200, payload=None):
         self.status = status
-        self._payload = payload if payload is not None else {"id": "cs_test_1", "url": "https://checkout.stripe.com/c/pay/cs_test_1"}
+        self._payload = (
+            payload
+            if payload is not None
+            else {"id": "cs_test_1", "url": "https://checkout.stripe.com/c/pay/cs_test_1"}
+        )
 
     async def text(self):
         return json.dumps(self._payload)
