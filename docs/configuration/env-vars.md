@@ -220,7 +220,7 @@ proxy/Docker gateway и может отклонить валидный webhook. 
 
 | Переменная | Назначение |
 | --- | --- |
-| `PAYMENT_METHODS_ORDER` | Порядок кнопок оплаты: `severpay,wata,freekassa,platega,yookassa,stars,cryptopay,heleket,paykilla,lava,cloudpayments`. |
+| `PAYMENT_METHODS_ORDER` | Порядок кнопок оплаты: `severpay,wata,freekassa,platega,yookassa,stars,cryptopay,heleket,paykilla,lava,cloudpayments,stripe`. |
 | `SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED` | Показывать описание подписки перед выбором срока. |
 | `SUBSCRIPTION_PURCHASE_DESCRIPTION_RU` / `SUBSCRIPTION_PURCHASE_DESCRIPTION_EN` | Локализованное описание подписки. |
 | `PAYMENT_REQUEST_TIMEOUT_SECONDS` | Общий таймаут одного API-запроса к платёжному провайдеру, в секундах. По умолчанию `20`. |
@@ -316,6 +316,12 @@ PAYMENT_CLOUDPAYMENTS_WEBAPP_ICON
 PAYMENT_CLOUDPAYMENTS_TELEGRAM_LABEL_RU
 PAYMENT_CLOUDPAYMENTS_TELEGRAM_LABEL_EN
 PAYMENT_CLOUDPAYMENTS_TELEGRAM_EMOJI
+PAYMENT_STRIPE_WEBAPP_LABEL_RU
+PAYMENT_STRIPE_WEBAPP_LABEL_EN
+PAYMENT_STRIPE_WEBAPP_ICON
+PAYMENT_STRIPE_TELEGRAM_LABEL_RU
+PAYMENT_STRIPE_TELEGRAM_LABEL_EN
+PAYMENT_STRIPE_TELEGRAM_EMOJI
 ```
 
 ### YooKassa
@@ -459,6 +465,30 @@ CloudPayments принимает оплату картами через Orders A
 | `CLOUDPAYMENTS_RECURRING_ENABLED` | Включает списания по сохранённому CloudPayments `Token` для автопродления подписок. |
 | `CLOUDPAYMENTS_VERIFY_WEBHOOK_SIGNATURE` | Проверять заголовок `Content-HMAC` у уведомлений. |
 | `CLOUDPAYMENTS_TRUSTED_IPS` | Необязательный список доверенных IP webhook-источников. |
+
+### Stripe
+
+Stripe creates hosted Checkout Sessions and confirms app-managed auto-renewal
+with off-session PaymentIntents. Configure webhook endpoint:
+`WEBHOOK_BASE_URL` + `/webhook/stripe`.
+
+Recommended Stripe events: `checkout.session.completed`,
+`checkout.session.expired`, `payment_intent.succeeded`,
+`payment_intent.payment_failed`, `payment_intent.canceled`.
+
+| Переменная | Назначение |
+| --- | --- |
+| `STRIPE_ENABLED` | Включает Stripe. |
+| `STRIPE_SECRET_KEY` | Secret API key from Stripe Dashboard. |
+| `STRIPE_WEBHOOK_SECRET` | Endpoint signing secret (`whsec_...`) for `Stripe-Signature` verification. |
+| `STRIPE_BASE_URL` | Stripe API base URL, default `https://api.stripe.com`. |
+| `STRIPE_RETURN_URL` | Success return URL after Checkout. If empty, the bot link is used. |
+| `STRIPE_CANCEL_URL` | Cancel return URL after Checkout. If empty, `STRIPE_RETURN_URL` is used. |
+| `STRIPE_PAYMENT_METHOD_TYPES` | Comma-separated Checkout payment method types, default `card`. |
+| `STRIPE_SUPPORTED_CURRENCIES` | Optional comma-separated presentment currencies allowed in UI. Empty means no local filter. |
+| `STRIPE_RECURRING_ENABLED` | Saves Checkout payment methods for off-session auto-renewal. |
+| `STRIPE_VERIFY_WEBHOOK_SIGNATURE` | Verify `Stripe-Signature` with `STRIPE_WEBHOOK_SECRET`. |
+| `STRIPE_WEBHOOK_TOLERANCE_SECONDS` | Allowed clock skew for webhook signatures, default `300`. |
 
 ## Тарифы и legacy-цены
 

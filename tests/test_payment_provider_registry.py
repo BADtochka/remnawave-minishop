@@ -70,6 +70,7 @@ _PROVIDER_MODULES = {
     "paykilla": "PaykillaService",
     "lava": "LavaService",
     "cloudpayments": "CloudPaymentsService",
+    "stripe": "StripeService",
 }
 
 
@@ -120,9 +121,11 @@ def test_yookassa_provider_keeps_autorenew_entrypoints_local():
 def test_recurring_provider_registry_includes_saved_method_providers():
     yookassa_service = SimpleNamespace()
     cloudpayments_service = SimpleNamespace()
+    stripe_service = SimpleNamespace()
     services = {
         "yookassa_service": yookassa_service,
         "cloudpayments_service": cloudpayments_service,
+        "stripe_service": stripe_service,
         "wata_service": SimpleNamespace(),
     }
 
@@ -130,8 +133,10 @@ def test_recurring_provider_registry_includes_saved_method_providers():
 
     assert recurring["yookassa"] is yookassa_service
     assert recurring["cloudpayments"] is cloudpayments_service
+    assert recurring["stripe"] is stripe_service
     assert "wata" not in recurring
     assert provider_supports_recurring("cloudpayments")
+    assert provider_supports_recurring("stripe")
 
 
 def test_every_payment_method_has_registry_driven_webapp_creator():
@@ -153,6 +158,7 @@ def test_service_keys_and_statuses_come_from_provider_specs():
         "paykilla_service",
         "lava_service",
         "cloudpayments_service",
+        "stripe_service",
     }
     assert set(pending_statuses()) >= {
         "pending",
@@ -167,6 +173,7 @@ def test_service_keys_and_statuses_come_from_provider_specs():
         "pending_paykilla",
         "pending_lava",
         "pending_cloudpayments",
+        "pending_stripe",
     }
 
 

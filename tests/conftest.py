@@ -32,6 +32,8 @@ def _isolate_provider_env(monkeypatch):
                 "LAVA_",
                 "CRYPTOPAY_",
                 "YOOKASSA_",
+                "CLOUDPAYMENTS_",
+                "STRIPE_",
                 "PAYMENT_FREEKASSA_",
                 "PAYMENT_PLATEGA_",
                 "PAYMENT_SEVERPAY_",
@@ -40,6 +42,8 @@ def _isolate_provider_env(monkeypatch):
                 "PAYMENT_LAVA_",
                 "PAYMENT_CRYPTOPAY_",
                 "PAYMENT_YOOKASSA_",
+                "PAYMENT_CLOUDPAYMENTS_",
+                "PAYMENT_STRIPE_",
                 "PAYMENT_STARS_",
             )
         ):

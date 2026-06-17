@@ -38,6 +38,7 @@ _PROVIDER_ENV_PREFIXES = (
     "LAVA_",
     "CRYPTOPAY_",
     "CLOUDPAYMENTS_",
+    "STRIPE_",
     "YOOKASSA_",
     "STARS_",
 )
@@ -116,6 +117,10 @@ class BuildServicesWiringTests(unittest.TestCase):
             getattr(subscription, "recurring_provider_services", {}).get("cloudpayments"),
             services["cloudpayments_service"],
         )
+        self.assertIs(
+            getattr(subscription, "recurring_provider_services", {}).get("stripe"),
+            services["stripe_service"],
+        )
 
     def test_panel_webhook_service_can_reach_subscription_service(self):
         """The 24h pre-expiry handler in panel_webhook_service.handle_event
@@ -187,6 +192,7 @@ class BuildServicesWiringTests(unittest.TestCase):
             "paykilla_service",
             "lava_service",
             "cloudpayments_service",
+            "stripe_service",
         }
         self.assertEqual(set(services), expected_keys)
 
