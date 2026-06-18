@@ -1,5 +1,14 @@
 <script>
-  import { Activity, Radio, Server, TrendingDown, TrendingUp, Zap } from "$components/ui/icons.js";
+  import {
+    Activity,
+    FileText,
+    Radio,
+    Server,
+    TrendingDown,
+    TrendingUp,
+    User,
+    Zap,
+  } from "$components/ui/icons.js";
   import { getContext, onMount } from "svelte";
 
   import { fmtTrafficBytes } from "../../lib/admin/format.js";
@@ -10,6 +19,7 @@
     AdminDashboardGrid,
     AdminDashboardStack,
     AdminBadge,
+    AdminButton,
     AdminEmptyState,
     AdminRevenueChart,
     AdminRevenueCustomRangePopover,
@@ -29,7 +39,9 @@
   export let fmtDateShort = (value) => value;
   export let fmtMoney = (value) => value;
   export let paymentStatusVariant = () => "muted";
+  export let onOpenUserCard = () => {};
 
+  const paymentsStore = getContext("paymentsStore");
   const statsStore = getContext("statsStore");
 
   $: ({ stats, statsError, statsLoading } = $statsStore);
@@ -1205,8 +1217,37 @@
               <tbody>
                 {#each recentPayments as p (p.payment_id)}
                   <tr>
-                    <td class="admin-cell-id" data-label="ID">#{p.payment_id}</td>
-                    <td data-label={at("user", {}, "Пользователь")}>{p.user_label || p.user_id}</td>
+                    <td class="admin-cell-id" data-label="ID">
+                      <AdminButton
+                        class="admin-payment-id-btn"
+                        variant="ghost"
+                        size="sm"
+                        title={at("payment_detail_open", {}, "Открыть платеж")}
+                        aria-label={at("payment_detail_open", {}, "Открыть платеж")}
+                        onclick={() => paymentsStore.openPayment(p)}
+                      >
+                        <FileText size={14} />
+                        #{p.payment_id}
+                      </AdminButton>
+                    </td>
+                    <td
+                      class="admin-cell-user-with-action"
+                      data-label={at("user", {}, "Пользователь")}
+                    >
+                      <span class="admin-payments-user-cell">
+                        <AdminButton
+                          class="admin-payments-user-btn"
+                          variant="ghost"
+                          size="icon"
+                          title={at("payments_open_user", {}, "Открыть карточку пользователя")}
+                          aria-label={at("payments_open_user", {}, "Открыть карточку пользователя")}
+                          onclick={() => onOpenUserCard(p.user_id)}
+                        >
+                          <User size={14} />
+                        </AdminButton>
+                        <span class="admin-payments-user-name">{p.user_label || p.user_id}</span>
+                      </span>
+                    </td>
                     <td class="admin-cell-mono" data-label={at("payments_col_user_id", {}, "ID")}>
                       {p.user_id != null && p.user_id !== "" ? p.user_id : "—"}
                     </td>
@@ -1245,3 +1286,45 @@
     </Card.Root>
   </AdminDashboardStack>
 {/if}
+
+<style>
+  .admin-payments-user-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .admin-payments-user-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-cell-user-with-action :global(.admin-payments-user-btn.admin-btn) {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
+    flex-shrink: 0;
+    padding: 0;
+    border-radius: 7px;
+  }
+
+  .admin-cell-user-with-action :global(.admin-payments-user-btn svg) {
+    width: 14px;
+    height: 14px;
+  }
+
+  .admin-cell-id :global(.admin-payment-id-btn.admin-btn) {
+    height: 28px;
+    min-height: 28px;
+    padding: 0 8px;
+    gap: 6px;
+    border-radius: 7px;
+    color: var(--admin-text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+</style>
