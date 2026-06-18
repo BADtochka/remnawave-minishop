@@ -100,6 +100,7 @@
     { value: "DAY", label: "DAY" },
     { value: "WEEK", label: "WEEK" },
     { value: "MONTH", label: "MONTH" },
+    { value: "MONTH_ROLLING", label: "MONTH_ROLLING" },
   ];
   const PROVIDER_FALLBACK_LABELS = {
     cryptopay: "CryptoPay",

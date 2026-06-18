@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, ValidationError, computed_field, field_va
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from config.tariffs_config import TariffsConfig, load_tariffs_config
+from config.traffic_strategy import normalize_traffic_limit_strategy
 from config.webapp_themes_config import (
     WebappThemesConfig,
     resolved_webapp_themes_catalog,
@@ -1255,6 +1256,11 @@ class Settings(BaseSettings):
         if value not in {"auto", "live", "dry_run"}:
             raise ValueError("PANEL_WRITE_MODE must be one of: auto, live, dry_run")
         return value
+
+    @field_validator("USER_TRAFFIC_STRATEGY", "TRIAL_TRAFFIC_STRATEGY", mode="before")
+    @classmethod
+    def normalize_panel_traffic_strategy(cls, v):
+        return normalize_traffic_limit_strategy(v)
 
     # Notification types
     LOG_NEW_USERS: bool = Field(

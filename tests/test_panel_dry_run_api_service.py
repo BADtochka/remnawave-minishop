@@ -49,6 +49,18 @@ class PanelDryRunApiServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result)
         service._request_once.assert_not_awaited()
 
+    async def test_update_user_details_accepts_month_rolling_strategy(self):
+        service = PanelDryRunApiService(_settings())
+        service._request_once = AsyncMock()
+
+        result = await service.update_user_details_on_panel(
+            "user-uuid",
+            {"trafficLimitBytes": 1024, "trafficLimitStrategy": "MONTH_ROLLING"},
+        )
+
+        self.assertEqual(result["trafficLimitStrategy"], "MONTH_ROLLING")
+        service._request_once.assert_not_awaited()
+
     async def test_remote_validation_blocks_missing_panel_user(self):
         service = PanelDryRunApiService(_settings(PANEL_DRY_RUN_VALIDATE_REMOTE=True))
         service._request_once = AsyncMock(

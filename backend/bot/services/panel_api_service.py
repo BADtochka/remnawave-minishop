@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.utils.ttl_cache import AsyncTTLCache
 from config.settings import Settings
+from config.traffic_strategy import normalize_traffic_limit_strategy
 from db.dal import panel_sync_dal
 from db.models import PanelSyncStatus
 
@@ -702,7 +703,9 @@ class PanelApiService:
             "username": username_on_panel,
             "status": status.upper(),
             "expireAt": expire_at_iso,
-            "trafficLimitStrategy": default_traffic_limit_strategy.upper(),
+            "trafficLimitStrategy": normalize_traffic_limit_strategy(
+                default_traffic_limit_strategy
+            ),
             "trafficLimitBytes": default_traffic_limit_bytes,
         }
         hwid_limit_value = hwid_device_limit
@@ -750,6 +753,10 @@ class PanelApiService:
     ) -> Optional[Dict[str, Any]]:
         if "uuid" not in update_payload:
             update_payload["uuid"] = user_uuid
+        if "trafficLimitStrategy" in update_payload:
+            update_payload["trafficLimitStrategy"] = normalize_traffic_limit_strategy(
+                update_payload.get("trafficLimitStrategy")
+            )
 
         full_response = await self._request(
             "PATCH", "/users", json=update_payload, log_full_response=log_response

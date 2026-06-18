@@ -322,7 +322,7 @@ class PanelIdentityMixin:
             payload["status"] = status
         if traffic_limit_bytes is not None:
             payload["trafficLimitBytes"] = traffic_limit_bytes
-            payload["trafficLimitStrategy"] = (
+            payload["trafficLimitStrategy"] = normalize_traffic_limit_strategy(
                 traffic_limit_strategy or self.settings.USER_TRAFFIC_STRATEGY
             )
         if hwid_device_limit is not None:

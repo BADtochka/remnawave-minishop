@@ -7,6 +7,10 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from config.settings import Settings
+from config.traffic_strategy import (
+    REMNAWAVE_TRAFFIC_LIMIT_STRATEGIES,
+    canonical_traffic_limit_strategy,
+)
 
 from .panel_api_service import PanelApiService
 
@@ -20,7 +24,7 @@ _INTERNAL_SQUAD_BULK_RE = re.compile(
     r"(?P<action>add-users|remove-users)$"
 )
 _LIVE_POST_ENDPOINTS = frozenset({"/system/tools/happ/encrypt"})
-_KNOWN_TRAFFIC_STRATEGIES = frozenset({"NO_RESET", "DAY", "WEEK", "MONTH"})
+_KNOWN_TRAFFIC_STRATEGIES = REMNAWAVE_TRAFFIC_LIMIT_STRATEGIES
 
 # Constant path templates for intercepted endpoints. The logged path is rebuilt
 # from these literals (never from the raw endpoint) so user/squad UUIDs and any
@@ -383,8 +387,11 @@ class PanelDryRunApiService(PanelApiService):
                 "trafficLimitStrategy",
                 validation,
             )
-            if strategy and strategy.upper() not in _KNOWN_TRAFFIC_STRATEGIES:
+            normalized_strategy = canonical_traffic_limit_strategy(strategy)
+            if strategy and normalized_strategy not in _KNOWN_TRAFFIC_STRATEGIES:
                 validation.add(f"trafficLimitStrategy {strategy!r} is not supported.")
+            elif strategy:
+                payload["trafficLimitStrategy"] = normalized_strategy
         if "hwidDeviceLimit" in payload:
             self._validate_non_negative_int(
                 payload.get("hwidDeviceLimit"),
