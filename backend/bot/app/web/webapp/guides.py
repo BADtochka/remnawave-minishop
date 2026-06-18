@@ -9,9 +9,10 @@ from config.subscription_guides_config import (
 
 PANEL_DEFAULT_SUBPAGE_CONFIG_UUID = "00000000-0000-0000-0000-000000000000"
 SUBSCRIPTION_GUIDES_CACHE_ERROR_TTL_SECONDS = 30
-SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS = 30
+SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS = 300
 SUBSCRIPTION_GUIDES_RESOLVED_CACHE_MAX_ITEMS = 512
-SUBSCRIPTION_GUIDES_PUBLIC_CACHE_TTL_SECONDS = 60
+SUBSCRIPTION_GUIDES_PUBLIC_CACHE_TTL_SECONDS = 300
+SUBSCRIPTION_GUIDES_BROWSER_CACHE_CONTROL = "private, max-age=60"
 
 
 class _PanelSubscriptionPageConfigUnavailable(SubscriptionGuidesConfigError):
@@ -26,8 +27,12 @@ def _subscription_guides_json_response(
     payload: Dict[str, Any],
     *,
     status: int = 200,
+    cache_control: Optional[str] = None,
 ) -> web.Response:
-    return web.json_response(payload, status=status, dumps=_subscription_guides_json_dumps)
+    response = web.json_response(payload, status=status, dumps=_subscription_guides_json_dumps)
+    if cache_control:
+        response.headers["Cache-Control"] = cache_control
+    return response
 
 
 async def warm_subscription_guides_config(app: web.Application) -> None:
@@ -53,7 +58,12 @@ async def subscription_guides_route(request: web.Request) -> web.Response:
     }
     if status.get("error"):
         payload["error"] = status["error"]
-    return _subscription_guides_json_response({"ok": True, **payload})
+    return _subscription_guides_json_response(
+        {"ok": True, **payload},
+        cache_control=SUBSCRIPTION_GUIDES_BROWSER_CACHE_CONTROL
+        if status.get("enabled")
+        else None,
+    )
 
 
 async def public_subscription_guides_route(request: web.Request) -> web.Response:
@@ -93,7 +103,12 @@ async def public_subscription_guides_route(request: web.Request) -> web.Response
     }
     if status.get("error"):
         payload["error"] = status["error"]
-    return _subscription_guides_json_response({"ok": True, **payload})
+    return _subscription_guides_json_response(
+        {"ok": True, **payload},
+        cache_control=SUBSCRIPTION_GUIDES_BROWSER_CACHE_CONTROL
+        if status.get("enabled")
+        else None,
+    )
 
 
 async def _subscription_guides_status_shared(app: web.Application) -> Dict[str, Any]:

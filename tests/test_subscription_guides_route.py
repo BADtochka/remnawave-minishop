@@ -79,6 +79,7 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(body["enabled"])
         self.assertEqual(body["source"], "panel")
         self.assertEqual(body["config"]["version"], "1")
+        self.assertEqual(response.headers["Cache-Control"], "private, max-age=60")
         panel_service.get_subscription_page_config_list.assert_awaited_once()
         panel_service.get_subscription_page_config_by_uuid.assert_awaited_once_with(default_uuid)
 
@@ -524,6 +525,7 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
 
         body = json.loads(response.text)
         self.assertTrue(body["enabled"])
+        self.assertEqual(response.headers["Cache-Control"], "private, max-age=60")
         self.assertEqual(body["subscription"]["config_link"], "https://sb.example.test/share-short")
         self.assertEqual(
             body["subscription"]["share_url"],

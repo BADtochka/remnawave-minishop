@@ -87,6 +87,7 @@
   const TELEGRAM_LINK_PENDING_TTL_MS = 10 * 60 * 1000;
   const TELEGRAM_LINK_ACTION_TRIAL = "trial";
   const TELEGRAM_LINK_ACTION_REFERRAL_WELCOME = "referral_welcome";
+  const PUBLIC_INSTALL_PRELOAD_KEY = "__RW_PUBLIC_INSTALL_PRELOAD__";
   import {
     activationPaymentFailed,
     createActivationHandoff,
@@ -1757,6 +1758,13 @@
             options?.adminSection || adminActiveSection || initialAdminSectionFromLocation()
           )
         : null;
+    const currentQuery = currentSearchParams();
+    const routeSection = preserveView
+      ? preservedSection
+      : MOCK && currentQuery.get("screen")
+        ? normalizeSection(currentQuery.get("screen"))
+        : sectionFromPath(routePathnameFromLocation(), routePrefix);
+    const installGuidesPromise = routeSection === "install" ? installGuidesStore.load() : null;
     const payload = await api(options?.fresh ? "/me?fresh=1" : "/me");
     if (!payload.ok) throw new Error(payload.error || "load_failed");
     data = payload;
@@ -1768,12 +1776,7 @@
       renewHwidDevices: true,
       selectedMethod: payload.payment_methods?.[0]?.id || "",
     }));
-    const currentQuery = currentSearchParams();
-    let section = preserveView
-      ? preservedSection
-      : MOCK && currentQuery.get("screen")
-        ? normalizeSection(currentQuery.get("screen"))
-        : sectionFromPath(routePathnameFromLocation(), routePrefix);
+    let section = routeSection;
     if (section === "admin" && !payload.user?.is_admin) section = "settings";
     if (section === "devices" && !payload.settings?.my_devices_enabled) section = "home";
     if (section === "support" && payload.settings?.support_tickets_enabled === false) {
@@ -1845,7 +1848,7 @@
       await devicesStore.loadDevices(true, true);
     }
     if (section === "install") {
-      await installGuidesStore.load();
+      await (installGuidesPromise || installGuidesStore.load());
     } else if (payload.settings?.subscription_guides_enabled && payload.subscription?.active) {
       void installGuidesStore.load();
     }
@@ -1914,6 +1917,19 @@
     return payload;
   }
 
+  async function loadPublicInstallGuides(shareToken) {
+    const path = installGuidesStore.publicPath(shareToken);
+    const preload = typeof window !== "undefined" ? window[PUBLIC_INSTALL_PRELOAD_KEY] : null;
+    if (preload?.path === path && preload.promise) {
+      const payload = await preload.promise;
+      if (payload) {
+        window[PUBLIC_INSTALL_PRELOAD_KEY] = null;
+        return installGuidesStore.hydrate(path, payload);
+      }
+    }
+    return installGuidesStore.loadPublic(shareToken, true);
+  }
+
   async function loadPublicInstall(shareToken) {
     mode = "publicInstall";
     screen = "install";
@@ -1923,7 +1939,7 @@
       install_share_token: shareToken,
       share_url: typeof window !== "undefined" ? `${window.location.origin}/s/${shareToken}` : "",
     };
-    const response = await installGuidesStore.loadPublic(shareToken, true);
+    const response = await loadPublicInstallGuides(shareToken);
     publicInstallSubscription = response?.subscription || publicInstallSubscription;
   }
 

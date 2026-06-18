@@ -1153,6 +1153,19 @@ def _apply_webapp_head_metadata(html_text: str, page_title: str, favicon_url: st
     return _replace_webapp_favicon(html_text, _favicon_head_markup(favicon_url))
 
 
+def _webapp_shell_preload_markup(js_asset_name: str, share_token: str = "") -> str:
+    js_href = "/" + quote(str(js_asset_name or "").lstrip("/"), safe="/.-_")
+    lines = [f'<link rel="preload" href="{js_href}" as="script">']
+    normalized_share_token = subscription_dal.normalize_install_share_token(share_token)
+    if normalized_share_token:
+        fetch_href = f"/api/subscription-guides/public/{quote(normalized_share_token, safe='')}"
+        lines.append(
+            f'<link rel="preload" href="{fetch_href}" as="fetch" '
+            'crossorigin="use-credentials" fetchpriority="high">'
+        )
+    return "\n".join(lines)
+
+
 async def index_route(request: web.Request) -> web.Response:
     settings: Settings = request.app["settings"]
     if not settings.WEBAPP_ENABLED:
@@ -1173,6 +1186,12 @@ async def index_route(request: web.Request) -> web.Response:
         f'href="/{css_asset_name}"',
         1,
     )
+    preload_markup = _webapp_shell_preload_markup(
+        js_asset_name,
+        str(getattr(request, "match_info", {}).get("share_token") or ""),
+    )
+    if preload_markup:
+        html = html.replace("</head>", f"{preload_markup}\n</head>", 1)
     initial_theme_markup = _initial_theme_head_markup(request, initial_theme, primary_color)
     if initial_theme_markup:
         html = html.replace("</head>", f"{initial_theme_markup}\n</head>", 1)

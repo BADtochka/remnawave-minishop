@@ -219,8 +219,8 @@ class Settings(BaseSettings):
     PANEL_USER_CACHE_TTL_SECONDS: int = Field(default=5)
     PANEL_DEVICES_CACHE_TTL_SECONDS: int = Field(default=5)
     SUBSCRIPTION_GUIDES_CONFIG_CACHE_TTL_SECONDS: int = Field(default=300)
-    SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS: int = Field(default=30)
-    SUBSCRIPTION_GUIDES_PUBLIC_CACHE_TTL_SECONDS: int = Field(default=60)
+    SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS: int = Field(default=300)
+    SUBSCRIPTION_GUIDES_PUBLIC_CACHE_TTL_SECONDS: int = Field(default=300)
     PANEL_ALL_USERS_CACHE_TTL_SECONDS: int = Field(default=5)
     PANEL_ALL_USERS_PAGE_SIZE: int = Field(default=1000)
     # Courtesy delay between consecutive /users pages when fetching the full

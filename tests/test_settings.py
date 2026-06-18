@@ -139,8 +139,8 @@ class SettingsTests(unittest.TestCase):
         )
         self.assertEqual(settings.SUBSCRIPTION_PAGE_CONFIG_JSON, "")
         self.assertEqual(settings.SUBSCRIPTION_GUIDES_CONFIG_CACHE_TTL_SECONDS, 300)
-        self.assertEqual(settings.SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS, 30)
-        self.assertEqual(settings.SUBSCRIPTION_GUIDES_PUBLIC_CACHE_TTL_SECONDS, 60)
+        self.assertEqual(settings.SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS, 300)
+        self.assertEqual(settings.SUBSCRIPTION_GUIDES_PUBLIC_CACHE_TTL_SECONDS, 300)
 
     def test_deprecated_webapp_appearance_env_values_are_ignored(self):
         settings = Settings(
