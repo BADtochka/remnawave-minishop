@@ -9,6 +9,7 @@
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
   import { FileText, User } from "$components/ui/icons.js";
+  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
 
   export let at = (key) => key;
   export let fmtDate = (value) => value;
@@ -17,9 +18,11 @@
   export let onOpenUserCard = () => {};
 
   const paymentsStore = getContext("paymentsStore");
+  const paymentsTable = createAdminDatatable();
   const PAYMENTS_PAGE_SIZE = 25;
 
   $: ({ payments, paymentsTotal, paymentsPage, paymentsLoading } = $paymentsStore);
+  $: syncAdminDatatable(paymentsTable, payments);
 
   $: paymentsPageCount = Math.max(1, Math.ceil(Number(paymentsTotal || 0) / PAYMENTS_PAGE_SIZE));
 
@@ -95,7 +98,7 @@
       rows={8}
       widths={["48px", "148px", "88px", "72px", "72px", "78px", "82px", "140px", "72px", "96px"]}
     />
-  {:else if !payments.length}
+  {:else if !paymentsTable.rows.length}
     <AdminEmptyState tone="card"
       ><span class="admin-muted">{at("payments_empty", {}, "Нет платежей")}</span></AdminEmptyState
     >
@@ -116,7 +119,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each payments as p}
+        {#each paymentsTable.rows as p (p.payment_id)}
           <tr>
             <td class="admin-cell-id" data-label="ID">
               <AdminButton

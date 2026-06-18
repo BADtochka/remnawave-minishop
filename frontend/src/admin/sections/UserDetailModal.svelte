@@ -26,6 +26,7 @@
     UsersRound,
   } from "$components/ui/icons.js";
   import { getContext } from "svelte";
+  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
 
   export let at;
   export let fmtDate;
@@ -105,6 +106,8 @@
 
   const usersStore = getContext("usersStore");
   const tariffsStore = getContext("tariffsStore");
+  const userLogsTable = createAdminDatatable();
+  const userReferralsTable = createAdminDatatable();
 
   function tariffLabel(tariff) {
     return (
@@ -202,6 +205,8 @@
     userLogsLoaded,
     userLogsPageSize,
   } = $usersStore);
+  $: syncAdminDatatable(userLogsTable, userLogs);
+  $: syncAdminDatatable(userReferralsTable, userReferrals);
 
   $: userLogsPageCount = Math.max(
     1,
@@ -848,7 +853,7 @@
                     rows={6}
                     widths={["140px", "140px", "60%"]}
                   />
-                {:else if !userLogs.length}
+                {:else if !userLogsTable.rows.length}
                   <AdminEmptyState tone="card">
                     <span class="admin-muted">{at("logs_empty", {}, "Записей нет")}</span>
                   </AdminEmptyState>
@@ -862,7 +867,7 @@
                       </tr>
                     </thead>
                     <tbody>
-                      {#each userLogs as entry (entry.log_id)}
+                      {#each userLogsTable.rows as entry (entry.log_id)}
                         <tr>
                           <td data-label={at("date", {}, "Дата")}>{fmtDate(entry.timestamp)}</td>
                           <td class="admin-cell-mono" data-label={at("event", {}, "Событие")}>
@@ -1542,7 +1547,7 @@
         rows={5}
         widths={["42%", "18%", "26%", "14%"]}
       />
-    {:else if !userReferrals.length}
+    {:else if !userReferralsTable.rows.length}
       <AdminEmptyState tone="card">
         <span class="admin-muted"
           >{at("user_invitees_empty", {}, "Пользователь пока никого не пригласил")}</span
@@ -1560,7 +1565,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each userReferrals as invitee (invitee.user_id)}
+            {#each userReferralsTable.rows as invitee (invitee.user_id)}
               <tr>
                 <td data-label={at("user_col_user", {}, "Пользователь")}>
                   <span class="admin-referral-user-cell">
