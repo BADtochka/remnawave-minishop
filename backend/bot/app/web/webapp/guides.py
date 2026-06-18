@@ -199,10 +199,26 @@ async def _subscription_guides_status_from_panel_short_uuid(
             raise SubscriptionGuidesConfigError(
                 f"Panel subscription page config for subscription {short_uuid} is unavailable"
             )
-        config = validate_panel_subscription_guides_config(
-            detail,
-            allow_default_when_missing=True,
-        )
+        config_uuid = _panel_subpage_config_uuid(detail)
+        if config_uuid:
+            get_config_by_uuid = getattr(
+                panel_service, "get_subscription_page_config_by_uuid", None
+            )
+            if not callable(get_config_by_uuid):
+                raise SubscriptionGuidesConfigError(
+                    "Panel service cannot load subscription page config by UUID"
+                )
+            detail = await get_config_by_uuid(config_uuid)
+            if detail is None:
+                raise SubscriptionGuidesConfigError(
+                    f"Panel subscription page config {config_uuid} is unavailable"
+                )
+            config = validate_panel_subscription_guides_config(detail)
+        else:
+            config = validate_panel_subscription_guides_config(
+                detail,
+                allow_default_when_missing=True,
+            )
     except Exception as exc:
         logger.warning(
             "Failed to load resolved subscription guides config from Remnawave Panel: %s",
@@ -211,6 +227,19 @@ async def _subscription_guides_status_from_panel_short_uuid(
         return {"enabled": False, "config": None, "source": "panel", "error": str(exc)}
 
     return {"enabled": True, "config": config, "source": "panel", "error": None}
+
+
+def _panel_subpage_config_uuid(payload: Any) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    value = str(payload.get("subpageConfigUuid") or "").strip()
+    if value:
+        return value
+    for key in ("response", "data", "result"):
+        nested = _panel_subpage_config_uuid(payload.get(key))
+        if nested:
+            return nested
+    return ""
 
 
 async def _default_panel_subscription_page_config_uuid(panel_service: Any) -> str:

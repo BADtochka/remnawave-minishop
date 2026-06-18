@@ -84,6 +84,7 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_uses_resolved_panel_config_for_active_user_subscription(self):
         default_uuid = "00000000-0000-0000-0000-000000000000"
+        custom_uuid = "11111111-1111-1111-1111-111111111111"
         resolved_config = json.loads(default_subscription_guides_config_text())
         resolved_config["platforms"]["windows"]["apps"][0]["name"] = "External Squad App"
         panel_service = SimpleNamespace(
@@ -95,12 +96,14 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
                 }
             ),
             get_subscription_page_config_by_short_uuid=AsyncMock(
-                return_value={"config": resolved_config}
+                return_value={"subpageConfigUuid": custom_uuid, "webpageAllowed": True}
             ),
             get_subscription_page_config_list=AsyncMock(
                 return_value={"configs": [{"uuid": default_uuid, "viewPosition": 1}]}
             ),
-            get_subscription_page_config_by_uuid=AsyncMock(),
+            get_subscription_page_config_by_uuid=AsyncMock(
+                return_value={"uuid": custom_uuid, "config": resolved_config}
+            ),
         )
         request = self._request(self._settings(), panel_service)
         db_user = SimpleNamespace(panel_user_uuid="panel-user")
@@ -127,8 +130,8 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
         call = panel_service.get_subscription_page_config_by_short_uuid.await_args
         self.assertEqual(call.args, ("user-short",))
         self.assertEqual(call.kwargs["request_headers"]["host"], "app.example.test")
+        panel_service.get_subscription_page_config_by_uuid.assert_awaited_once_with(custom_uuid)
         panel_service.get_subscription_page_config_list.assert_not_called()
-        panel_service.get_subscription_page_config_by_uuid.assert_not_called()
 
     async def test_admin_json_override_takes_priority_over_panel(self):
         admin_config = json.loads(default_subscription_guides_config_text())
@@ -250,6 +253,7 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_public_route_returns_resolved_config_and_subscription_payload(self):
         default_uuid = "00000000-0000-0000-0000-000000000000"
+        custom_uuid = "11111111-1111-1111-1111-111111111111"
         share_token = "8f559061460e8fede78ef18dce887236"
         panel_config = json.loads(default_subscription_guides_config_text())
         panel_config["platforms"]["windows"]["apps"][0]["name"] = "Shared App"
@@ -260,10 +264,13 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
                 return_value={"configs": [{"uuid": default_uuid, "viewPosition": 1}]}
             ),
             get_subscription_page_config_by_uuid=AsyncMock(
-                return_value={"uuid": default_uuid, "config": panel_config}
+                side_effect=lambda uuid: {
+                    "uuid": uuid,
+                    "config": resolved_config if uuid == custom_uuid else panel_config,
+                }
             ),
             get_subscription_page_config_by_short_uuid=AsyncMock(
-                return_value={"config": resolved_config}
+                return_value={"subpageConfigUuid": custom_uuid, "webpageAllowed": True}
             ),
             get_user_by_uuid=AsyncMock(
                 return_value={
@@ -305,8 +312,8 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
         call = panel_service.get_subscription_page_config_by_short_uuid.await_args
         self.assertEqual(call.args, ("share-short",))
         self.assertEqual(call.kwargs["request_headers"]["host"], "app.example.test")
+        panel_service.get_subscription_page_config_by_uuid.assert_awaited_once_with(custom_uuid)
         panel_service.get_subscription_page_config_list.assert_not_called()
-        panel_service.get_subscription_page_config_by_uuid.assert_not_called()
         windows_apps = [app["name"] for app in body["config"]["platforms"]["windows"]["apps"]]
         self.assertIn("Shared External App", windows_apps)
 
