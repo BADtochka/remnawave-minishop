@@ -479,6 +479,61 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
         windows_apps = [app["name"] for app in body["config"]["platforms"]["windows"]["apps"]]
         self.assertIn("Shared External App", windows_apps)
 
+    async def test_public_route_caches_active_subscription_payload(self):
+        default_uuid = "00000000-0000-0000-0000-000000000000"
+        custom_uuid = "11111111-1111-1111-1111-111111111111"
+        share_token = "8f559061460e8fede78ef18dce887236"
+        resolved_config = json.loads(default_subscription_guides_config_text())
+        panel_service = SimpleNamespace(
+            get_subscription_page_config_list=AsyncMock(
+                return_value={"configs": [{"uuid": default_uuid, "viewPosition": 1}]}
+            ),
+            get_subscription_page_config_by_uuid=AsyncMock(
+                return_value={"uuid": custom_uuid, "config": resolved_config}
+            ),
+            get_subscription_page_config_by_short_uuid=AsyncMock(
+                return_value={"subpageConfigUuid": custom_uuid, "webpageAllowed": True}
+            ),
+            get_user_by_uuid=AsyncMock(
+                return_value={
+                    "shortUuid": "share-short",
+                    "subscriptionUrl": "https://sb.example.test/share-short",
+                    "username": "demo",
+                }
+            ),
+        )
+        request = self._request(
+            self._settings(SUBSCRIPTION_MINI_APP_URL="https://app.example.test/app"),
+            panel_service,
+            match_info={"share_token": share_token},
+        )
+        local_sub = SimpleNamespace(
+            panel_user_uuid="panel-user",
+            install_share_token=share_token,
+            is_active=True,
+            end_date=datetime.now(timezone.utc) + timedelta(days=3),
+        )
+        get_sub = AsyncMock(return_value=local_sub)
+
+        with patch.object(
+            guides.subscription_dal,
+            "get_subscription_by_install_share_token",
+            get_sub,
+        ):
+            response = await guides.public_subscription_guides_route(request)
+            second_response = await guides.public_subscription_guides_route(request)
+
+        body = json.loads(response.text)
+        second_body = json.loads(second_response.text)
+        self.assertTrue(body["enabled"])
+        self.assertTrue(second_body["enabled"])
+        self.assertEqual(body["subscription"], second_body["subscription"])
+        get_sub.assert_awaited_once_with(unittest.mock.ANY, share_token)
+        panel_service.get_user_by_uuid.assert_awaited_once_with("panel-user")
+        panel_service.get_subscription_page_config_by_short_uuid.assert_awaited_once()
+        panel_service.get_subscription_page_config_by_uuid.assert_awaited_once_with(custom_uuid)
+        panel_service.get_subscription_page_config_list.assert_not_called()
+
     async def test_public_route_rejects_unknown_share_token_without_loading_config(self):
         share_token = "8f559061460e8fede78ef18dce887236"
         panel_service = SimpleNamespace(

@@ -1846,6 +1846,8 @@
     }
     if (section === "install") {
       await installGuidesStore.load();
+    } else if (payload.settings?.subscription_guides_enabled && payload.subscription?.active) {
+      void installGuidesStore.load();
     }
     if (section === "support") {
       if (initialSupportTicketId)

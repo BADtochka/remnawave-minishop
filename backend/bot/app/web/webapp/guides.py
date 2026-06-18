@@ -11,6 +11,7 @@ PANEL_DEFAULT_SUBPAGE_CONFIG_UUID = "00000000-0000-0000-0000-000000000000"
 SUBSCRIPTION_GUIDES_CACHE_ERROR_TTL_SECONDS = 30
 SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS = 30
 SUBSCRIPTION_GUIDES_RESOLVED_CACHE_MAX_ITEMS = 512
+SUBSCRIPTION_GUIDES_PUBLIC_CACHE_TTL_SECONDS = 60
 
 
 class _PanelSubscriptionPageConfigUnavailable(SubscriptionGuidesConfigError):
@@ -62,7 +63,7 @@ async def public_subscription_guides_route(request: web.Request) -> web.Response
     if not share_token:
         return web.json_response({"ok": False, "error": "invalid_share_token"}, status=404)
 
-    subscription = await _public_subscription_payload(request, share_token)
+    subscription = await _public_subscription_payload_cached(request, share_token)
     if not subscription.get("active"):
         return _subscription_guides_json_response(
             {
@@ -607,7 +608,54 @@ async def _active_panel_subscription_context_for_user(
     }
 
 
-async def _public_subscription_payload(
+async def _public_subscription_payload_cached(
+    request: web.Request,
+    share_token: str,
+) -> Dict[str, Any]:
+    settings: Settings = request.app["settings"]
+    ttl_seconds = max(
+        0,
+        int(
+            getattr(
+                settings,
+                "SUBSCRIPTION_GUIDES_PUBLIC_CACHE_TTL_SECONDS",
+                SUBSCRIPTION_GUIDES_PUBLIC_CACHE_TTL_SECONDS,
+            )
+            or 0
+        ),
+    )
+    if ttl_seconds <= 0:
+        return await _public_subscription_payload_uncached(request, share_token)
+
+    cache = request.app.setdefault("subscription_guides_public_subscription_cache", {})
+    lock: asyncio.Lock = request.app.setdefault(
+        "subscription_guides_public_subscription_lock",
+        asyncio.Lock(),
+    )
+    key = (
+        str(share_token or "").strip(),
+        _public_subscription_payload_fingerprint(request),
+    )
+    now = time.monotonic()
+
+    cached = cache.get(key)
+    if cached is not None and now - float(cached.get("ts", 0.0)) < ttl_seconds:
+        return dict(cached["payload"])
+
+    async with lock:
+        now = time.monotonic()
+        cached = cache.get(key)
+        if cached is not None and now - float(cached.get("ts", 0.0)) < ttl_seconds:
+            return dict(cached["payload"])
+
+        payload = await _public_subscription_payload_uncached(request, share_token)
+        if payload.get("active"):
+            cache[key] = {"payload": dict(payload), "ts": time.monotonic()}
+            _prune_subscription_guides_public_subscription_cache(cache)
+        return payload
+
+
+async def _public_subscription_payload_uncached(
     request: web.Request,
     share_token: str,
 ) -> Dict[str, Any]:
@@ -649,6 +697,21 @@ async def _public_subscription_payload(
         if local_sub
         else "",
     }
+
+
+def _public_subscription_payload_fingerprint(request: web.Request) -> Tuple[str, ...]:
+    settings: Settings = request.app["settings"]
+    headers = request.headers
+    host = headers.get("X-Forwarded-Host") or headers.get("Host") or request.host
+    proto = headers.get("X-Forwarded-Proto") or request.scheme or "https"
+    return (
+        str(getattr(settings, "SUBSCRIPTION_MINI_APP_URL", "") or "").strip(),
+        str(getattr(settings, "PANEL_API_URL", "") or "").strip(),
+        str(getattr(settings, "CRYPT4_REDIRECT_URL", "") or "").strip(),
+        str(bool(getattr(settings, "CRYPT4_ENABLED", False))),
+        str(host or "").strip().lower(),
+        str(proto or "").strip().lower(),
+    )
 
 
 def _panel_service_from_app(app: web.Application) -> Any:
@@ -767,6 +830,12 @@ def _prune_subscription_guides_resolved_cache(cache: Dict[Any, Any]) -> None:
 
 
 def _prune_subscription_guides_panel_config_cache(cache: Dict[Any, Any]) -> None:
+    overflow = len(cache) - SUBSCRIPTION_GUIDES_RESOLVED_CACHE_MAX_ITEMS
+    for key in list(cache.keys())[: max(0, overflow)]:
+        cache.pop(key, None)
+
+
+def _prune_subscription_guides_public_subscription_cache(cache: Dict[Any, Any]) -> None:
     overflow = len(cache) - SUBSCRIPTION_GUIDES_RESOLVED_CACHE_MAX_ITEMS
     for key in list(cache.keys())[: max(0, overflow)]:
         cache.pop(key, None)
