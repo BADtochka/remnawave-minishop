@@ -1,4 +1,5 @@
 <script>
+  import { QueryClient } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
     Check,
@@ -165,10 +166,20 @@
     onToast(text);
   }
 
+  const adminQueryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        gcTime: 10 * 60 * 1000,
+        retry: false,
+        staleTime: 60 * 1000,
+      },
+    },
+  });
+
   const adsStore = createAdsStore({ api, onToast: flash, at });
   const backupsStore = createBackupsStore({ api, onToast: flash, at });
   const broadcastStore = createBroadcastStore({ api, onToast: flash, at });
-  const healthStore = createHealthStore({ api, at });
+  const healthStore = createHealthStore({ api, at, queryClient: adminQueryClient });
   const logsStore = createLogsStore({ api, at });
   const paymentsStore = createPaymentsStore({ api, onToast: flash, at, routePrefix });
   const promosStore = createPromosStore({ api, onToast: flash, at });
@@ -473,6 +484,7 @@
   }
 
   onMount(() => {
+    adminQueryClient.mount();
     reduceMotion = readReduceMotion();
     let motionMql = null;
     const onMotionChange = () => {
@@ -510,6 +522,7 @@
       }
       if (typeof window !== "undefined") window.removeEventListener("popstate", onPopState);
       if (healthTimer !== null) window.clearInterval(healthTimer);
+      adminQueryClient.unmount();
       clearAdminLanguageClickGuard();
     };
   });
