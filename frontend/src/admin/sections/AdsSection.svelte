@@ -12,7 +12,11 @@
     AdminTable,
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
-  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
+  import {
+    createAdminDatatable,
+    syncAdminDatatable,
+    watchAdminDatatable,
+  } from "../../lib/admin/datatables.js";
 
   export let at;
   export let fmtMoney;
@@ -20,10 +24,13 @@
   const ADS_PAGE_SIZE = 10;
   const adsStore = getContext("adsStore");
   const adsTable = createAdminDatatable([], { rowsPerPage: ADS_PAGE_SIZE });
+  const adsSignal = watchAdminDatatable(adsTable);
 
   $: ({ ads, adsLoading, adCreateOpen, adDraft } = $adsStore);
-  $: syncAdminDatatable(adsTable, ads);
-  $: if (adsTable.currentPage > adsTable.pageCount) adsTable.setPage(adsTable.pageCount || 1);
+  $: {
+    syncAdminDatatable(adsTable, ads);
+    if (adsTable.currentPage > (adsTable.pageCount || 1)) adsTable.setPage(adsTable.pageCount || 1);
+  }
   $: adHeaders = [
     at("id", {}, "ID"),
     at("ads_col_source", {}, "Источник"),
@@ -67,7 +74,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each adsTable.rows as ad (ad.id)}
+        {#each $adsSignal.rows as ad (ad.id)}
           <tr>
             <td class="admin-cell-id" data-label={at("id", {}, "ID")}>#{ad.id}</td>
             <td data-label={at("ads_col_source", {}, "Источник")}>{ad.source}</td>

@@ -1,5 +1,6 @@
 <script>
   import { ArrowRight, ChevronLeft, ChevronRight } from "$components/ui/icons.js";
+  import { watchAdminDatatable } from "$lib/admin/datatables.js";
   import AdminButton from "./AdminButton.svelte";
 
   export let meta = "";
@@ -24,9 +25,13 @@
 
   let jumpValue = "";
 
-  $: tablePage = table ? Number(table.currentPage || 1) - 1 : null;
-  $: tablePageCount = table ? Number(table.pageCount || 0) : null;
-  $: tableTotal = table ? table.rowCount?.total : total;
+  // Bridge the runes-based handler into a store so paging re-renders this
+  // legacy component (direct reads of table.* are untracked by Svelte).
+  $: tableSignal = watchAdminDatatable(table);
+  $: liveTable = $tableSignal;
+  $: tablePage = liveTable ? Number(liveTable.currentPage || 1) - 1 : null;
+  $: tablePageCount = liveTable ? Number(liveTable.pageCount || 0) : null;
+  $: tableTotal = liveTable ? liveTable.rowCount?.total : total;
   $: normalizedPage = Number(table ? tablePage : page);
   $: normalizedPageCount = Math.max(1, Math.ceil(Number(table ? tablePageCount : pageCount) || 1));
   $: hasPageNavigation =

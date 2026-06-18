@@ -21,8 +21,8 @@
   import { Tooltip } from "$components/ui/primitives.js";
   import {
     createAdminDatatable,
-    datatablePageToAdminPage,
     syncAdminDatatable,
+    watchAdminDatatable,
   } from "../../lib/admin/datatables.js";
 
   export let at = (key) => key;
@@ -30,12 +30,12 @@
 
   const BACKUPS_PAGE_SIZE = 10;
   const backupsTable = createAdminDatatable([], { rowsPerPage: BACKUPS_PAGE_SIZE });
+  const backupsSignal = watchAdminDatatable(backupsTable);
   const backupsStore = getContext("backupsStore");
 
   let selectedName = "";
   let restoreDatabase = true;
   let restoreCompose = false;
-  let backupsPage = 0;
   let fileInput = null;
 
   $: ({
@@ -48,11 +48,19 @@
     lastRestore,
   } = $backupsStore);
   $: totalArchives = archives?.length || 0;
-  $: syncAdminDatatable(backupsTable, archives || []);
-  $: backupsPageCount = Math.max(1, backupsTable.pageCount || 1);
-  $: if (backupsTable.currentPage > backupsPageCount) backupsTable.setPage(backupsPageCount);
-  $: backupsPage = datatablePageToAdminPage(backupsTable);
-  $: backupsPageStart = backupsPage * BACKUPS_PAGE_SIZE;
+  $: {
+    syncAdminDatatable(backupsTable, archives || []);
+    if (backupsTable.currentPage > (backupsTable.pageCount || 1))
+      backupsTable.setPage(backupsTable.pageCount || 1);
+  }
+  $: backupsMeta = (() => {
+    const { start, end, total } = $backupsSignal.rowCount;
+    return at(
+      "backups_pagination_meta",
+      { from: start, to: end, total },
+      `${start}-${end} / ${total}`
+    );
+  })();
   $: if (!selectedName && archives?.length) {
     selectedName = archives[0].name;
     backupsTable.setPage(1);
@@ -114,15 +122,6 @@
 
   function warningsText(warnings) {
     return (warnings || []).filter(Boolean).join("\n");
-  }
-
-  function paginationMeta() {
-    const end = Math.min(backupsPageStart + backupsTable.rows.length, totalArchives);
-    return at(
-      "backups_pagination_meta",
-      { from: backupsPageStart + 1, to: end, total: totalArchives },
-      `${backupsPageStart + 1}-${end} / ${totalArchives}`
-    );
   }
 
   async function uploadSelectedFile(event) {
@@ -280,7 +279,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each backupsTable.rows as archive (archive.name)}
+            {#each $backupsSignal.rows as archive (archive.name)}
               <tr class:is-selected={archive.name === selectedName}>
                 <td data-label={at("select", {}, "Выбрать")}>
                   <RadioGroupItem
@@ -342,7 +341,7 @@
       </RadioGroup>
       {#if totalArchives > BACKUPS_PAGE_SIZE}
         <AdminPagination
-          meta={paginationMeta()}
+          meta={backupsMeta}
           table={backupsTable}
           pageLabel={at("page_short", {}, "Стр.")}
           ofLabel={at("pagination_of", {}, "из")}

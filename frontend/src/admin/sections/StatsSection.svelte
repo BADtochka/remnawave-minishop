@@ -24,7 +24,11 @@
     inclusiveDaySpan,
     sliceLastDays,
   } from "../../lib/admin/revenueSeriesAgg.js";
-  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
+  import {
+    createAdminDatatable,
+    syncAdminDatatable,
+    watchAdminDatatable,
+  } from "../../lib/admin/datatables.js";
 
   export let at;
   export let fmtDate = (value) => value;
@@ -58,6 +62,7 @@
   const recentPaymentsTable = createAdminDatatable([], {
     rowsPerPage: RECENT_PAYMENTS_PAGE_SIZE,
   });
+  const recentPaymentsSignal = watchAdminDatatable(recentPaymentsTable);
 
   /** @type {"preset" | "custom"} */
   let revenueRangeMode = "preset";
@@ -130,10 +135,12 @@
     at("status", {}, ""),
     at("date", {}, ""),
   ];
-  $: syncAdminDatatable(recentPaymentsTable, stats?.recent_payments || []);
+  $: {
+    syncAdminDatatable(recentPaymentsTable, stats?.recent_payments || []);
+    if (recentPaymentsTable.currentPage > (recentPaymentsTable.pageCount || 1))
+      recentPaymentsTable.setPage(recentPaymentsTable.pageCount || 1);
+  }
   $: recentPaymentsTotal = (stats?.recent_payments || []).length;
-  $: if (recentPaymentsTable.currentPage > recentPaymentsTable.pageCount)
-    recentPaymentsTable.setPage(recentPaymentsTable.pageCount || 1);
 
   function parsePanelSystem(panel) {
     const system = panel?.system;
@@ -1133,7 +1140,7 @@
               rows={5}
               widths={["48px", "120px", "78px", "82px", "72px", "96px"]}
             />
-          {:else if recentPaymentsTable.rows.length}
+          {:else if recentPaymentsTotal}
             <AdminTable>
               <thead>
                 <tr>
@@ -1146,7 +1153,7 @@
                 </tr>
               </thead>
               <tbody>
-                {#each recentPaymentsTable.rows as p (p.payment_id)}
+                {#each $recentPaymentsSignal.rows as p (p.payment_id)}
                   <tr>
                     <td class="admin-cell-id" data-label={at("id", {}, "")}>#{p.payment_id}</td>
                     <td data-label={at("user", {}, "")}>{p.user_label || p.user_id}</td>
