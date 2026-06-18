@@ -3716,6 +3716,36 @@
   width: min(980px, calc(100vw - 32px));
 }
 
+.admin-tariff-dialog > .dialog-head,
+.admin-tariff-dialog > .dialog-body-scroll,
+.admin-tariff-dialog .dialog-body-scroll > .scroll-area__viewport,
+.admin-tariff-dialog .admin-tabs-root,
+.admin-tariff-dialog .admin-tabs-list,
+.admin-tariff-dialog .admin-tabs-content,
+.admin-tariff-dialog .admin-editor-section,
+.admin-tariff-dialog .admin-row-editor {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-tariff-dialog .dialog-body-scroll > .scroll-area__viewport > div {
+  box-sizing: border-box;
+  inline-size: 100% !important;
+  min-inline-size: 0 !important;
+  max-inline-size: 100% !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.admin-tariff-dialog .admin-tabs-list {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
 .admin-editor-section {
   display: grid;
   gap: 10px;
@@ -4047,6 +4077,7 @@
 
   .admin-tariff-dialog .admin-tabs-list {
     width: 100%;
+    max-width: 100%;
   }
 
   .admin-tariff-dialog .admin-tabs-trigger {
@@ -4094,6 +4125,7 @@
   }
 
   .admin-row-editor-line:not(.admin-row-editor-header) {
+    min-width: 0;
     padding: 10px;
     border: 1px solid var(--admin-border);
     border-radius: 8px;
@@ -4104,6 +4136,7 @@
     width: 100%;
     height: 28px;
     min-height: 28px;
+    cursor: grab;
     border: 1px dashed var(--admin-border);
     border-radius: 7px;
     background: color-mix(in srgb, var(--admin-muted) 8%, transparent);

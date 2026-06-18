@@ -44,7 +44,7 @@
     return {
       axis: "y",
       disabled: dragDisabled,
-      position: { x: 0, y: 0 },
+      position: dragActive ? undefined : { x: 0, y: 0 },
       threshold: { distance: 5 },
       ignoreMultitouch: true,
       defaultClass: "ui-sortable-neodrag",
@@ -130,6 +130,11 @@
     dropIndex = null;
     rowRects = [];
   }
+
+  function handleHandlePointerDown(event) {
+    if (dragDisabled) return;
+    event.preventDefault();
+  }
 </script>
 
 <div
@@ -154,6 +159,7 @@
         aria-label={handleLabel}
         aria-grabbed={dragIndex === index}
         title={handleLabel}
+        on:pointerdown={handleHandlePointerDown}
         on:keydown={(event) => handleHandleKeydown(event, index)}
       >
         <GripVertical size={14} />
@@ -186,6 +192,24 @@
       box-shadow 160ms ease,
       opacity 160ms ease,
       transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .ui-sortable.is-drag-active {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .ui-sortable.is-drag-active :global(input),
+  .ui-sortable.is-drag-active :global(textarea),
+  .ui-sortable.is-drag-active :global(select) {
+    pointer-events: none;
+  }
+
+  .ui-sortable.is-drag-active .ui-sortable-item {
+    transition:
+      background-color 120ms ease,
+      box-shadow 120ms ease,
+      opacity 120ms ease;
   }
 
   .ui-sortable-item.is-dragging {
@@ -228,11 +252,17 @@
     color: var(--admin-muted, inherit);
     cursor: grab;
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
     transition:
       background-color 160ms ease,
       color 160ms ease,
       transform 160ms ease,
       box-shadow 160ms ease;
+  }
+
+  .ui-sortable-handle :global(svg) {
+    pointer-events: none;
   }
 
   .ui-sortable-handle:hover {
@@ -249,6 +279,10 @@
   .ui-sortable-handle:active {
     cursor: grabbing;
     transform: scale(0.94);
+  }
+
+  .ui-sortable.is-drag-active .ui-sortable-handle {
+    cursor: grabbing;
   }
 
   .ui-sortable-handle:disabled {
