@@ -54,7 +54,13 @@
       </span>
       <ChevronsUpDown size={16} />
     </Select.Trigger>
-    <Select.Content class="language-select-content" side="bottom" align="end" sideOffset={6}>
+    <Select.Content
+      class="language-select-content"
+      side="bottom"
+      align="end"
+      sideOffset={6}
+      trapFocus={false}
+    >
       <Select.Viewport class="language-select-viewport">
         {#each options as option (option.value)}
           <Select.Item value={option.value} label={option.label} class="language-select-item">

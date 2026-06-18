@@ -368,6 +368,7 @@
             side="bottom"
             align="start"
             sideOffset={6}
+            trapFocus={false}
           >
             <Select.Viewport class="install-platform-viewport">
               {#each platforms as platform}

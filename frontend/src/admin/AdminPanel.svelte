@@ -659,7 +659,13 @@
               </span>
               <ChevronsUpDown size={14} />
             </Select.Trigger>
-            <Select.Content class="language-select-content" side="top" align="start" sideOffset={8}>
+            <Select.Content
+              class="language-select-content"
+              side="top"
+              align="start"
+              sideOffset={8}
+              trapFocus={false}
+            >
               <Select.Viewport class="language-select-viewport">
                 {#each languageOptions as option (option.value)}
                   <Select.Item
