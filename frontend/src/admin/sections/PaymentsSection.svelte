@@ -225,12 +225,6 @@
     height: 14px;
   }
 
-  .admin-cell-traffic-gb {
-    font-size: 12px;
-    white-space: nowrap;
-    color: var(--admin-muted);
-  }
-
   .admin-cell-id :global(.admin-payment-id-btn.admin-btn) {
     height: 28px;
     min-height: 28px;

@@ -1417,6 +1417,12 @@
   font-size: 12px;
 }
 
+.admin-table td.admin-cell-traffic-gb {
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--admin-muted);
+}
+
 .admin-table td.admin-cell-id {
   color: var(--admin-muted);
   font-family: var(--font-mono);

@@ -11,7 +11,6 @@
     AdminDashboardStack,
     AdminBadge,
     AdminEmptyState,
-    AdminPagination,
     AdminRevenueChart,
     AdminRevenueCustomRangePopover,
     AdminSectionHeader,
@@ -24,11 +23,6 @@
     inclusiveDaySpan,
     sliceLastDays,
   } from "../../lib/admin/revenueSeriesAgg.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
 
   export let at;
   export let fmtDate = (value) => value;
@@ -58,11 +52,6 @@
   const REVENUE_CHART_MAX_CSS_HEIGHT = 204;
 
   const REVENUE_PRESET_DAYS = [7, 14, 30, 90, 180, 365];
-  const RECENT_PAYMENTS_PAGE_SIZE = 5;
-  const recentPaymentsTable = createAdminDatatable([], {
-    rowsPerPage: RECENT_PAYMENTS_PAGE_SIZE,
-  });
-  const recentPaymentsSignal = watchAdminDatatable(recentPaymentsTable);
 
   /** @type {"preset" | "custom"} */
   let revenueRangeMode = "preset";
@@ -128,19 +117,65 @@
       ? inclusiveDaySpan(revenueCustomIso.from, revenueCustomIso.to)
       : 0;
   $: recentPaymentHeaders = [
-    at("id", {}, ""),
-    at("user", {}, ""),
-    at("amount", {}, ""),
-    at("provider", {}, ""),
-    at("status", {}, ""),
-    at("date", {}, ""),
+    at("id", {}, "ID"),
+    at("user", {}, "Пользователь"),
+    at("payments_col_user_id", {}, "ID"),
+    at("payments_col_traffic_regular", {}, "Основной трафик"),
+    at("payments_col_traffic_premium", {}, "Премиум"),
+    at("amount", {}, "Сумма"),
+    at("provider", {}, "Провайдер"),
+    at("description", {}, "Описание"),
+    at("status", {}, "Статус"),
+    at("date", {}, "Дата"),
   ];
-  $: {
-    syncAdminDatatable(recentPaymentsTable, stats?.recent_payments || []);
-    if (recentPaymentsTable.currentPage > (recentPaymentsTable.pageCount || 1))
-      recentPaymentsTable.setPage(recentPaymentsTable.pageCount || 1);
+  $: recentPayments = (stats?.recent_payments || []).slice(0, 10);
+
+  /** @param {number|null|undefined} v */
+  function formatTrafficGbCell(v) {
+    if (v == null || v === "") return "—";
+    const n = Number(v);
+    if (Number.isNaN(n)) return "—";
+    let s;
+    if (Math.abs(n - Math.round(n)) < 1e-9) {
+      s = String(Math.round(n));
+    } else {
+      s = String(Math.round(n * 100) / 100);
+    }
+    return `${s} GB`;
   }
-  $: recentPaymentsTotal = (stats?.recent_payments || []).length;
+
+  /** @param {number|null|undefined} v */
+  function formatGbAmountPlain(v) {
+    if (v == null || v === "") return "";
+    const n = Number(v);
+    if (Number.isNaN(n)) return "";
+    if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+    return String(Math.round(n * 100) / 100);
+  }
+
+  /** @param {Record<string, unknown>} p */
+  function paymentDescriptionDisplay(p) {
+    const r = p.traffic_regular_gb;
+    const pr = p.traffic_premium_gb;
+    if (r != null && pr == null) {
+      const gb = formatGbAmountPlain(r);
+      return at(
+        "payments_desc_traffic_package_regular",
+        { gb },
+        `Пакет трафика ${gb} ГБ (обычный)`
+      );
+    }
+    if (pr != null && r == null) {
+      const gb = formatGbAmountPlain(pr);
+      return at(
+        "payments_desc_traffic_package_premium",
+        { gb },
+        `Пакет трафика ${gb} ГБ (премиум)`
+      );
+    }
+    const raw = p.description && String(p.description).trim();
+    return raw || "—";
+  }
 
   function parsePanelSystem(panel) {
     const system = panel?.system;
@@ -667,16 +702,23 @@
     <Card.Root>
       <Card.Header class="admin-cn-card-header--lead">
         <span class="admin-skeleton admin-skeleton-line" style="width:44%;height:14px"></span>
-        <span
-          class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"
-          style="width:30%;margin-top:8px"
-        ></span>
       </Card.Header>
       <Card.Content class="admin-cn-card-content--flush">
         <AdminTableSkeleton
           headers={recentPaymentHeaders}
           rows={5}
-          widths={["48px", "120px", "78px", "82px", "72px", "96px"]}
+          widths={[
+            "48px",
+            "148px",
+            "88px",
+            "72px",
+            "72px",
+            "78px",
+            "82px",
+            "140px",
+            "72px",
+            "96px",
+          ]}
         />
       </Card.Content>
     </Card.Root>
@@ -1124,13 +1166,6 @@
         <Card.Title class="admin-cn-card-title--section"
           >{at("stats_recent_payments", {}, "")}</Card.Title
         >
-        <Card.Description
-          >{at(
-            "stats_records_count",
-            { count: (stats.recent_payments || []).length },
-            ""
-          )}</Card.Description
-        >
       </Card.Header>
       <Card.Content class="admin-cn-card-content--flush">
         <div class="admin-table-wrap">
@@ -1138,48 +1173,68 @@
             <AdminTableSkeleton
               headers={recentPaymentHeaders}
               rows={5}
-              widths={["48px", "120px", "78px", "82px", "72px", "96px"]}
+              widths={[
+                "48px",
+                "148px",
+                "88px",
+                "72px",
+                "72px",
+                "78px",
+                "82px",
+                "140px",
+                "72px",
+                "96px",
+              ]}
             />
-          {:else if recentPaymentsTotal}
+          {:else if recentPayments.length}
             <AdminTable>
               <thead>
                 <tr>
-                  <th>{at("id", {}, "")}</th>
-                  <th>{at("user", {}, "")}</th>
-                  <th>{at("amount", {}, "")}</th>
-                  <th>{at("provider", {}, "")}</th>
-                  <th>{at("status", {}, "")}</th>
-                  <th>{at("date", {}, "")}</th>
+                  <th>{at("id", {}, "ID")}</th>
+                  <th>{at("user", {}, "Пользователь")}</th>
+                  <th>{at("payments_col_user_id", {}, "ID")}</th>
+                  <th>{at("payments_col_traffic_regular", {}, "Основной трафик")}</th>
+                  <th>{at("payments_col_traffic_premium", {}, "Премиум")}</th>
+                  <th>{at("amount", {}, "Сумма")}</th>
+                  <th>{at("provider", {}, "Провайдер")}</th>
+                  <th>{at("description", {}, "Описание")}</th>
+                  <th>{at("status", {}, "Статус")}</th>
+                  <th>{at("date", {}, "Дата")}</th>
                 </tr>
               </thead>
               <tbody>
-                {#each $recentPaymentsSignal.rows as p (p.payment_id)}
+                {#each recentPayments as p (p.payment_id)}
                   <tr>
-                    <td class="admin-cell-id" data-label={at("id", {}, "")}>#{p.payment_id}</td>
-                    <td data-label={at("user", {}, "")}>{p.user_label || p.user_id}</td>
-                    <td data-label={at("amount", {}, "")}>{fmtMoney(p.amount, p.currency)}</td>
-                    <td data-label={at("provider", {}, "")}>{p.provider}</td>
-                    <td data-label={at("status", {}, "")}>
+                    <td class="admin-cell-id" data-label="ID">#{p.payment_id}</td>
+                    <td data-label={at("user", {}, "Пользователь")}>{p.user_label || p.user_id}</td>
+                    <td class="admin-cell-mono" data-label={at("payments_col_user_id", {}, "ID")}>
+                      {p.user_id != null && p.user_id !== "" ? p.user_id : "—"}
+                    </td>
+                    <td
+                      class="admin-cell-traffic-gb"
+                      data-label={at("payments_col_traffic_regular", {}, "Основной трафик")}
+                    >
+                      {formatTrafficGbCell(p.traffic_regular_gb)}
+                    </td>
+                    <td
+                      class="admin-cell-traffic-gb"
+                      data-label={at("payments_col_traffic_premium", {}, "Премиум")}
+                    >
+                      {formatTrafficGbCell(p.traffic_premium_gb)}
+                    </td>
+                    <td data-label={at("amount", {}, "Сумма")}>{fmtMoney(p.amount, p.currency)}</td>
+                    <td data-label={at("provider", {}, "Провайдер")}>{p.provider}</td>
+                    <td class="admin-cell-wrap" data-label={at("description", {}, "Описание")}
+                      >{paymentDescriptionDisplay(p)}</td
+                    >
+                    <td data-label={at("status", {}, "Статус")}>
                       <AdminBadge variant={paymentStatusVariant(p.status)}>{p.status}</AdminBadge>
                     </td>
-                    <td data-label={at("date", {}, "")}>{fmtDate(p.created_at)}</td>
+                    <td data-label={at("date", {}, "Дата")}>{fmtDate(p.created_at)}</td>
                   </tr>
                 {/each}
               </tbody>
             </AdminTable>
-            {#if recentPaymentsTotal > RECENT_PAYMENTS_PAGE_SIZE}
-              <AdminPagination
-                table={recentPaymentsTable}
-                pageLabel={at("page_short", {}, "Стр.")}
-                ofLabel={at("pagination_of", {}, "из")}
-                totalLabel={at("total", {}, "Всего")}
-                jumpLabel={at("page_short", {}, "Стр.")}
-                jumpAriaLabel={at("pagination_jump_aria", {}, "Перейти к странице")}
-                goLabel={at("pagination_go", {}, "Перейти")}
-                prevLabel={at("back", {}, "Назад")}
-                nextLabel={at("next", {}, "Далее")}
-              />
-            {/if}
           {:else}
             <AdminEmptyState tone="card"
               ><span class="admin-muted">{at("no_data", {}, "")}</span></AdminEmptyState
