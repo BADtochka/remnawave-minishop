@@ -82,6 +82,36 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
         panel_service.get_subscription_page_config_list.assert_awaited_once()
         panel_service.get_subscription_page_config_by_uuid.assert_awaited_once_with(default_uuid)
 
+    async def test_route_returns_compact_utf8_config_payload(self):
+        default_uuid = "00000000-0000-0000-0000-000000000000"
+        panel_config = json.loads(default_subscription_guides_config_text())
+        panel_config["svgLibrary"]["UnusedIcon"] = (
+            '<svg viewBox="0 0 1 1"><path d="M0 0h1v1H0z"/></svg>'
+        )
+        panel_config["baseTranslations"]["installationGuideHeader"]["ru"] = "Инструкция"
+        panel_service = SimpleNamespace(
+            get_subscription_page_config_list=AsyncMock(
+                return_value={"configs": [{"uuid": default_uuid, "viewPosition": 1}]}
+            ),
+            get_subscription_page_config_by_uuid=AsyncMock(
+                return_value={"uuid": default_uuid, "config": panel_config}
+            ),
+        )
+        request = self._request(self._settings(), panel_service)
+
+        with self._auth_patch():
+            response = await guides.subscription_guides_route(request)
+
+        body = json.loads(response.text)
+        self.assertTrue(body["enabled"])
+        self.assertIn("Инструкция", response.text)
+        self.assertNotIn("\\u0418", response.text)
+        self.assertNotIn("UnusedIcon", body["config"]["svgLibrary"])
+        self.assertIn(
+            body["config"]["platforms"]["windows"]["svgIconKey"],
+            body["config"]["svgLibrary"],
+        )
+
     async def test_uses_resolved_panel_config_for_active_user_subscription(self):
         default_uuid = "00000000-0000-0000-0000-000000000000"
         custom_uuid = "11111111-1111-1111-1111-111111111111"
