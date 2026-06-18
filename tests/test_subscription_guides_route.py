@@ -383,6 +383,67 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
         panel_service.get_subscription_page_config_list.assert_awaited_once()
         panel_service.get_subscription_page_config_by_uuid.assert_awaited_once_with(default_uuid)
 
+    async def test_missing_subpage_config_uses_panel_default_config(self):
+        default_uuid = "00000000-0000-0000-0000-000000000000"
+        default_config = json.loads(default_subscription_guides_config_text())
+        windows_apps = json.loads(
+            json.dumps(default_config["platforms"]["windows"]["apps"][:3])
+        )
+        for app, name in zip(windows_apps, ("INCY", "Happ", "Throne")):
+            app["name"] = name
+        default_config["platforms"]["windows"]["apps"] = windows_apps
+        panel_service = SimpleNamespace(
+            get_user_by_uuid=AsyncMock(
+                return_value={
+                    "shortUuid": "user-short",
+                    "subscriptionUrl": "https://sb.example.test/user-short",
+                    "externalSquadUuid": None,
+                }
+            ),
+            get_subscription_page_config_by_short_uuid=AsyncMock(
+                return_value={"subpageConfigUuid": None, "webpageAllowed": False}
+            ),
+            get_subscription_page_config_list=AsyncMock(
+                return_value={
+                    "configs": [
+                        {"uuid": default_uuid, "name": "Default", "viewPosition": 1},
+                        {
+                            "uuid": "461ff225-4e46-4828-b48f-655b91ba4d49",
+                            "name": "ExternalSquadSubPage",
+                            "viewPosition": 3,
+                        },
+                    ]
+                }
+            ),
+            get_subscription_page_config_by_uuid=AsyncMock(
+                return_value={"uuid": default_uuid, "config": default_config}
+            ),
+        )
+        request = self._request(self._settings(), panel_service)
+        db_user = SimpleNamespace(panel_user_uuid="panel-user")
+        local_sub = SimpleNamespace(panel_subscription_uuid="user-short")
+
+        with (
+            self._auth_patch(),
+            patch.object(guides.user_dal, "get_user_by_id", AsyncMock(return_value=db_user)),
+            patch.object(
+                guides.subscription_dal,
+                "get_active_subscription_by_user_id",
+                AsyncMock(return_value=local_sub),
+            ),
+        ):
+            response = await guides.subscription_guides_route(request)
+
+        body = json.loads(response.text)
+        self.assertTrue(body["enabled"])
+        self.assertEqual(body["source"], "panel")
+        windows_apps = [app["name"] for app in body["config"]["platforms"]["windows"]["apps"]]
+        self.assertEqual(windows_apps, ["INCY", "Happ", "Throne"])
+        panel_service.get_subscription_page_config_by_short_uuid.assert_awaited_once()
+        panel_service.get_user_by_uuid.assert_awaited_once_with("panel-user")
+        panel_service.get_subscription_page_config_list.assert_awaited_once()
+        panel_service.get_subscription_page_config_by_uuid.assert_awaited_once_with(default_uuid)
+
     async def test_panel_config_is_cached_for_multiple_users(self):
         default_uuid = "00000000-0000-0000-0000-000000000000"
         panel_config = json.loads(default_subscription_guides_config_text())

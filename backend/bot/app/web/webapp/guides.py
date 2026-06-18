@@ -315,10 +315,18 @@ async def _subscription_guides_status_from_panel_short_uuid(
                 config_uuid,
             )
         else:
-            config = validate_panel_subscription_guides_config(
-                detail,
-                allow_default_when_missing=True,
-            )
+            try:
+                config = validate_panel_subscription_guides_config(detail)
+            except SubscriptionGuidesConfigError:
+                panel_default = await _subscription_guides_status_from_panel_config(
+                    app,
+                    settings,
+                )
+                if not panel_default.get("enabled"):
+                    raise SubscriptionGuidesConfigError(
+                        str(panel_default.get("error") or "Panel default config is unavailable")
+                    )
+                config = panel_default["config"]
     except Exception as exc:
         logger.warning(
             "Failed to load resolved subscription guides config from Remnawave Panel: %s",
