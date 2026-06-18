@@ -1,11 +1,12 @@
 <script>
+  import { draggable } from "@neodrag/svelte";
   import { flip } from "svelte/animate";
   import { cubicOut } from "svelte/easing";
   import { cn } from "$lib/utils.js";
   import { GripVertical } from "./icons.js";
 
   // Reusable drag-to-reorder list. bits-ui / shadcn-svelte have no sortable
-  // primitive, so this wraps native HTML5 drag & drop with a grip handle.
+  // primitive, so this layers @neodrag pointer gestures over a grip handle.
   // Each item is rendered through the default (scoped) slot, which receives
   // `item`, `index` and `dragging`. The slot content fills the row alongside
   // the leading drag handle, so pass a grid `class` whose first column matches
@@ -19,9 +20,12 @@
   export { className as class };
   export let containerClass = "";
 
+  let containerEl;
   let dragIndex = null;
   let dropIndex = null;
+  let rowRects = [];
   $: dragActive = dragIndex !== null;
+  $: dragDisabled = disabled || !items?.length || items.length < 2;
 
   const flipConfig = {
     duration(distance) {
@@ -36,47 +40,104 @@
     easing: cubicOut,
   };
 
-  function handleDragStart(event, index) {
-    if (disabled) {
-      event.preventDefault();
-      return;
-    }
+  function dragOptions(index) {
+    return {
+      axis: "y",
+      disabled: dragDisabled,
+      position: { x: 0, y: 0 },
+      threshold: { distance: 5 },
+      ignoreMultitouch: true,
+      defaultClass: "ui-sortable-neodrag",
+      defaultClassDragging: "ui-sortable-neodragging",
+      defaultClassDragged: "ui-sortable-neodragged",
+      transform: ({ offsetY, rootNode }) => {
+        const row = rowForNode(rootNode);
+        if (!row) return;
+        row.style.transform =
+          dragIndex === index ? `translate3d(0, ${offsetY}px, 0) scale(0.992)` : "";
+      },
+      onDragStart: (data) => startPointerDrag(index, data),
+      onDrag: updatePointerDrag,
+      onDragEnd: finishPointerDrag,
+    };
+  }
+
+  function snapshotRows() {
+    rowRects = Array.from(containerEl?.querySelectorAll(".ui-sortable-item") || []).map(
+      (node, index) => {
+        const rect = node.getBoundingClientRect();
+        return {
+          index,
+          midY: rect.top + rect.height / 2,
+        };
+      }
+    );
+  }
+
+  function targetIndexFromPointer(clientY) {
+    if (!rowRects.length) return dragIndex ?? 0;
+    const target = rowRects.find((row) => clientY < row.midY);
+    return target ? target.index : rowRects.length - 1;
+  }
+
+  function startPointerDrag(index, data) {
+    if (dragDisabled) return;
     dragIndex = index;
     dropIndex = index;
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = "move";
-      // Firefox requires data to be set for a drag to start.
-      event.dataTransfer.setData("text/plain", String(index));
-      const dragRow = event.currentTarget?.closest?.(".ui-sortable-item");
-      if (dragRow) {
-        const rect = dragRow.getBoundingClientRect();
-        event.dataTransfer.setDragImage(dragRow, 18, rect.height / 2);
-      }
+    snapshotRows();
+    const row = rowForNode(data.rootNode);
+    if (row) row.style.zIndex = "2";
+  }
+
+  function updatePointerDrag(data) {
+    if (dragIndex === null) return;
+    const nextIndex = targetIndexFromPointer(data.event.clientY);
+    if (dropIndex !== nextIndex) dropIndex = nextIndex;
+  }
+
+  function rowForNode(node) {
+    return node?.closest?.(".ui-sortable-item") || null;
+  }
+
+  function clearDraggedNode(node) {
+    const row = rowForNode(node);
+    if (!row) return;
+    row.style.transform = "";
+    row.style.zIndex = "";
+  }
+
+  function finishPointerDrag(data) {
+    const from = dragIndex;
+    const to = dropIndex;
+    clearDraggedNode(data.rootNode);
+    reset();
+    if (!dragDisabled && from !== null && to !== null && from !== to) {
+      onReorder(from, to);
     }
   }
 
-  function handleDragOver(event, index) {
-    if (dragIndex === null) return;
+  function handleHandleKeydown(event, index) {
+    if (dragDisabled) return;
+    const direction = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
+    if (!direction) return;
     event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-    if (dropIndex !== index) dropIndex = index;
-  }
-
-  function handleDrop(event, index) {
-    if (dragIndex === null) return;
-    event.preventDefault();
-    if (dragIndex !== index) onReorder(dragIndex, index);
-    dragIndex = null;
-    dropIndex = null;
+    const nextIndex = Math.min(Math.max(0, index + direction), items.length - 1);
+    if (nextIndex !== index) onReorder(index, nextIndex);
   }
 
   function reset() {
     dragIndex = null;
     dropIndex = null;
+    rowRects = [];
   }
 </script>
 
-<div class={cn("ui-sortable", containerClass)} class:is-drag-active={dragActive} role="list">
+<div
+  bind:this={containerEl}
+  class={cn("ui-sortable", containerClass)}
+  class:is-drag-active={dragActive}
+  role="list"
+>
   {#each items as item, index (getKey(item, index))}
     <div
       class={cn("ui-sortable-item", className)}
@@ -84,19 +145,16 @@
       class:is-drop-target={dropIndex === index && dragIndex !== index}
       role="listitem"
       animate:flip={flipConfig}
-      on:dragover={(event) => handleDragOver(event, index)}
-      on:drop={(event) => handleDrop(event, index)}
-      on:dragend={reset}
     >
       <button
+        use:draggable={dragOptions(index)}
         type="button"
         class="ui-sortable-handle"
-        draggable={!disabled}
-        {disabled}
+        disabled={dragDisabled}
         aria-label={handleLabel}
         aria-grabbed={dragIndex === index}
         title={handleLabel}
-        on:dragstart={(event) => handleDragStart(event, index)}
+        on:keydown={(event) => handleHandleKeydown(event, index)}
       >
         <GripVertical size={14} />
       </button>
