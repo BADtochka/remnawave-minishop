@@ -14,7 +14,8 @@
     "lint:js:fix": "eslint src scripts --fix",
     "format": "prettier --write \"src/**/*.{js,svelte}\" \"scripts/**/*.mjs\"",
     "format:check": "prettier --check \"src/**/*.{js,svelte}\" \"scripts/**/*.mjs\"",
-    "check": "npm run lint && npm run format:check",
+    "check:svelte": "svelte-check --tsconfig ./jsconfig.json",
+    "check": "npm run lint && npm run check:svelte && npm run format:check",
     "fix": "npm run format && npm run lint:js:fix"
   },
   "devDependencies": {
@@ -35,9 +36,11 @@
     "prettier": "^3.7.4",
     "prettier-plugin-svelte": "^3.4.0",
     "svelte": "^5.56.0",
+    "svelte-check": "^4.6.0",
     "svelte-eslint-parser": "^1.4.1",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "4.3.0",
+    "typescript": "^6.0.3",
     "uplot": "^1.6.32",
     "vite": "^8.0.16"
   },

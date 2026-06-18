@@ -7,7 +7,7 @@
     "preview:docs": "npm --prefix docs-site run preview",
     "sync:docs": "npm --prefix docs-site run sync:docs",
     "lint:py": "python -m ruff check .",
-    "lint:js": "npm --prefix frontend run lint",
+    "lint:js": "npm --prefix frontend run lint && npm --prefix frontend run check:svelte",
     "lint": "npm run lint:py && npm run lint:js",
     "format:py": "python -m ruff format .",
     "format:js": "npm --prefix frontend run format",
