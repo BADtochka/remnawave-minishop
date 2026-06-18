@@ -180,6 +180,91 @@ class SubscriptionGuidesRouteTests(unittest.IsolatedAsyncioTestCase):
         panel_service.get_subscription_page_config_by_uuid.assert_awaited_once_with(custom_uuid)
         panel_service.get_subscription_page_config_list.assert_not_called()
 
+    async def test_resolved_panel_config_is_cached_for_same_short_uuid(self):
+        custom_uuid = "11111111-1111-1111-1111-111111111111"
+        resolved_config = json.loads(default_subscription_guides_config_text())
+        resolved_config["platforms"]["windows"]["apps"][0]["name"] = "Cached External App"
+        panel_service = SimpleNamespace(
+            get_user_by_uuid=AsyncMock(
+                return_value={
+                    "shortUuid": "user-short",
+                    "subscriptionUrl": "https://sb.example.test/user-short",
+                }
+            ),
+            get_subscription_page_config_by_short_uuid=AsyncMock(
+                return_value={"subpageConfigUuid": custom_uuid, "webpageAllowed": True}
+            ),
+            get_subscription_page_config_by_uuid=AsyncMock(
+                return_value={"uuid": custom_uuid, "config": resolved_config}
+            ),
+            get_subscription_page_config_list=AsyncMock(),
+        )
+        request = self._request(self._settings(), panel_service)
+        db_user = SimpleNamespace(panel_user_uuid="panel-user")
+        local_sub = SimpleNamespace(panel_subscription_uuid="user-short")
+
+        with (
+            self._auth_patch(),
+            patch.object(guides.user_dal, "get_user_by_id", AsyncMock(return_value=db_user)),
+            patch.object(
+                guides.subscription_dal,
+                "get_active_subscription_by_user_id",
+                AsyncMock(return_value=local_sub),
+            ),
+        ):
+            response = await guides.subscription_guides_route(request)
+            second_response = await guides.subscription_guides_route(request)
+
+        body = json.loads(response.text)
+        second_body = json.loads(second_response.text)
+        self.assertTrue(body["enabled"])
+        self.assertTrue(second_body["enabled"])
+        windows_apps = [app["name"] for app in body["config"]["platforms"]["windows"]["apps"]]
+        self.assertIn("Cached External App", windows_apps)
+        self.assertEqual(body["config"], second_body["config"])
+        panel_service.get_user_by_uuid.assert_not_called()
+        panel_service.get_subscription_page_config_by_short_uuid.assert_awaited_once()
+        panel_service.get_subscription_page_config_by_uuid.assert_awaited_once_with(custom_uuid)
+        panel_service.get_subscription_page_config_list.assert_not_called()
+
+    async def test_panel_config_uuid_cache_is_shared_between_short_uuids(self):
+        custom_uuid = "11111111-1111-1111-1111-111111111111"
+        resolved_config = json.loads(default_subscription_guides_config_text())
+        resolved_config["platforms"]["windows"]["apps"][0]["name"] = "Shared Config App"
+        panel_service = SimpleNamespace(
+            get_subscription_page_config_by_short_uuid=AsyncMock(
+                return_value={"subpageConfigUuid": custom_uuid, "webpageAllowed": True}
+            ),
+            get_subscription_page_config_by_uuid=AsyncMock(
+                return_value={"uuid": custom_uuid, "config": resolved_config}
+            ),
+            get_subscription_page_config_list=AsyncMock(),
+        )
+        request = self._request(self._settings(), panel_service)
+
+        first = await guides._subscription_guides_status_from_panel_short_uuid_cached(
+            request.app,
+            request.app["settings"],
+            "short-one",
+            panel_user_uuid="panel-user-one",
+            request_headers={"host": "app.example.test"},
+        )
+        second = await guides._subscription_guides_status_from_panel_short_uuid_cached(
+            request.app,
+            request.app["settings"],
+            "short-two",
+            panel_user_uuid="panel-user-two",
+            request_headers={"host": "app.example.test"},
+        )
+
+        self.assertTrue(first["enabled"])
+        self.assertTrue(second["enabled"])
+        windows_apps = [app["name"] for app in second["config"]["platforms"]["windows"]["apps"]]
+        self.assertIn("Shared Config App", windows_apps)
+        self.assertEqual(panel_service.get_subscription_page_config_by_short_uuid.await_count, 2)
+        panel_service.get_subscription_page_config_by_uuid.assert_awaited_once_with(custom_uuid)
+        panel_service.get_subscription_page_config_list.assert_not_called()
+
     async def test_admin_json_override_takes_priority_over_panel(self):
         admin_config = json.loads(default_subscription_guides_config_text())
         panel_service = SimpleNamespace(get_subscription_page_config_by_uuid=AsyncMock())

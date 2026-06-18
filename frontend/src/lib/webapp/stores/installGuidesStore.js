@@ -2,6 +2,7 @@ import { writable } from "svelte/store";
 
 export function createInstallGuidesStore({ api, t, showToast }) {
   let inFlight = null;
+  let loadedPath = "";
   const state = writable({
     enabled: false,
     config: null,
@@ -19,7 +20,7 @@ export function createInstallGuidesStore({ api, t, showToast }) {
       snapshot = s;
       return s;
     });
-    if (!force && snapshot?.loaded) return snapshot;
+    if (!force && snapshot?.loaded && loadedPath === path) return snapshot;
     const promise = (async () => {
       state.update((s) => ({
         ...s,
@@ -38,6 +39,7 @@ export function createInstallGuidesStore({ api, t, showToast }) {
           loading: false,
           loaded: true,
         };
+        loadedPath = path;
         state.set(next);
         return next;
       } catch (error) {
@@ -53,6 +55,7 @@ export function createInstallGuidesStore({ api, t, showToast }) {
           loading: false,
           loaded: true,
         };
+        loadedPath = path;
         state.set(next);
         return next;
       } finally {
@@ -74,6 +77,7 @@ export function createInstallGuidesStore({ api, t, showToast }) {
 
   function reset() {
     inFlight = null;
+    loadedPath = "";
     state.set({
       enabled: false,
       config: null,

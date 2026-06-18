@@ -899,7 +899,7 @@
           supportStore.loadList();
           supportStore.startPolling({ includeList: true });
         }
-        if (nextSection === "install") installGuidesStore.load(true);
+        if (nextSection === "install") installGuidesStore.load();
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -1845,7 +1845,7 @@
       await devicesStore.loadDevices(true, true);
     }
     if (section === "install") {
-      await installGuidesStore.load(true);
+      await installGuidesStore.load();
     }
     if (section === "support") {
       if (initialSupportTicketId)
@@ -2270,7 +2270,7 @@
     activeTab = "home";
     screen = "install";
     syncAppSectionPath("install");
-    installGuidesStore.load(true);
+    installGuidesStore.load();
   }
 
   function goInvite() {

@@ -9,6 +9,12 @@ from config.subscription_guides_config import (
 
 PANEL_DEFAULT_SUBPAGE_CONFIG_UUID = "00000000-0000-0000-0000-000000000000"
 SUBSCRIPTION_GUIDES_CACHE_ERROR_TTL_SECONDS = 30
+SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS = 30
+SUBSCRIPTION_GUIDES_RESOLVED_CACHE_MAX_ITEMS = 512
+
+
+class _PanelSubscriptionPageConfigUnavailable(SubscriptionGuidesConfigError):
+    pass
 
 
 async def warm_subscription_guides_config(app: web.Application) -> None:
@@ -16,6 +22,10 @@ async def warm_subscription_guides_config(app: web.Application) -> None:
         await _subscription_guides_status_shared(app)
     except Exception as exc:
         logger.warning("Failed to warm subscription guides config: %s", exc)
+    try:
+        await _warm_panel_subscription_page_configs(app)
+    except Exception as exc:
+        logger.warning("Failed to warm panel subscription page configs: %s", exc)
 
 
 async def subscription_guides_route(request: web.Request) -> web.Response:
@@ -117,7 +127,7 @@ async def _subscription_guides_status_for_request(
         resolved_panel_user_uuid = str(context.get("panel_user_uuid") or "").strip()
 
     if short_uuid:
-        panel_status = await _subscription_guides_status_from_panel_short_uuid(
+        panel_status = await _subscription_guides_status_from_panel_short_uuid_cached(
             request.app,
             settings,
             short_uuid,
@@ -166,21 +176,89 @@ async def _subscription_guides_status_from_panel_config(
         if not config_uuid:
             config_uuid = await _default_panel_subscription_page_config_uuid(panel_service)
         config_uuid = config_uuid or PANEL_DEFAULT_SUBPAGE_CONFIG_UUID
-        detail = await panel_service.get_subscription_page_config_by_uuid(config_uuid)
-        if detail is None and config_uuid != PANEL_DEFAULT_SUBPAGE_CONFIG_UUID:
-            detail = await panel_service.get_subscription_page_config_by_uuid(
-                PANEL_DEFAULT_SUBPAGE_CONFIG_UUID
+        try:
+            config = await _panel_subscription_page_config_by_uuid_cached(
+                app,
+                settings,
+                config_uuid,
             )
-        if detail is None:
-            raise SubscriptionGuidesConfigError(
-                f"Panel subscription page config {config_uuid} is unavailable"
+        except _PanelSubscriptionPageConfigUnavailable:
+            if config_uuid == PANEL_DEFAULT_SUBPAGE_CONFIG_UUID:
+                raise
+            config = await _panel_subscription_page_config_by_uuid_cached(
+                app,
+                settings,
+                PANEL_DEFAULT_SUBPAGE_CONFIG_UUID,
             )
-        config = validate_panel_subscription_guides_config(detail)
     except (SubscriptionGuidesConfigError, Exception) as exc:
         logger.warning("Failed to load subscription guides config from Remnawave Panel: %s", exc)
         return {"enabled": False, "config": None, "source": "panel", "error": str(exc)}
 
     return {"enabled": True, "config": config, "source": "panel", "error": None}
+
+
+async def _subscription_guides_status_from_panel_short_uuid_cached(
+    app: web.Application,
+    settings: Settings,
+    short_uuid: str,
+    *,
+    panel_user_uuid: Optional[str] = None,
+    request_headers: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    ttl_seconds = max(
+        0,
+        int(
+            getattr(
+                settings,
+                "SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS",
+                SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS,
+            )
+            or 0
+        ),
+    )
+    if ttl_seconds <= 0:
+        return await _subscription_guides_status_from_panel_short_uuid(
+            app,
+            settings,
+            short_uuid,
+            panel_user_uuid=panel_user_uuid,
+            request_headers=request_headers,
+        )
+
+    cache = app.setdefault("subscription_guides_resolved_config_cache", {})
+    lock: asyncio.Lock = app.setdefault(
+        "subscription_guides_resolved_config_lock",
+        asyncio.Lock(),
+    )
+    key = (
+        _subscription_guides_settings_fingerprint(settings),
+        str(short_uuid or "").strip(),
+        str(panel_user_uuid or "").strip(),
+        _subscription_guides_request_headers_fingerprint(request_headers or {}),
+    )
+    now = time.monotonic()
+
+    cached = cache.get(key)
+    if cached is not None and now - float(cached.get("ts", 0.0)) < ttl_seconds:
+        return cached["status"]
+
+    async with lock:
+        now = time.monotonic()
+        cached = cache.get(key)
+        if cached is not None and now - float(cached.get("ts", 0.0)) < ttl_seconds:
+            return cached["status"]
+
+        status = await _subscription_guides_status_from_panel_short_uuid(
+            app,
+            settings,
+            short_uuid,
+            panel_user_uuid=panel_user_uuid,
+            request_headers=request_headers,
+        )
+        if status.get("enabled"):
+            cache[key] = {"status": status, "ts": time.monotonic()}
+            _prune_subscription_guides_resolved_cache(cache)
+        return status
 
 
 async def _subscription_guides_status_from_panel_short_uuid(
@@ -214,19 +292,11 @@ async def _subscription_guides_status_from_panel_short_uuid(
                 panel_user_uuid,
             )
         if config_uuid:
-            get_config_by_uuid = getattr(
-                panel_service, "get_subscription_page_config_by_uuid", None
+            config = await _panel_subscription_page_config_by_uuid_cached(
+                app,
+                settings,
+                config_uuid,
             )
-            if not callable(get_config_by_uuid):
-                raise SubscriptionGuidesConfigError(
-                    "Panel service cannot load subscription page config by UUID"
-                )
-            detail = await get_config_by_uuid(config_uuid)
-            if detail is None:
-                raise SubscriptionGuidesConfigError(
-                    f"Panel subscription page config {config_uuid} is unavailable"
-                )
-            config = validate_panel_subscription_guides_config(detail)
         else:
             config = validate_panel_subscription_guides_config(
                 detail,
@@ -240,6 +310,71 @@ async def _subscription_guides_status_from_panel_short_uuid(
         return {"enabled": False, "config": None, "source": "panel", "error": str(exc)}
 
     return {"enabled": True, "config": config, "source": "panel", "error": None}
+
+
+async def _panel_subscription_page_config_by_uuid_cached(
+    app: web.Application,
+    settings: Settings,
+    config_uuid: str,
+) -> Dict[str, Any]:
+    config_uuid = str(config_uuid or "").strip()
+    if not config_uuid:
+        raise SubscriptionGuidesConfigError("Panel subscription page config UUID is empty")
+
+    ttl_seconds = max(
+        0,
+        int(
+            getattr(
+                settings,
+                "SUBSCRIPTION_GUIDES_CONFIG_CACHE_TTL_SECONDS",
+                300,
+            )
+            or 0
+        ),
+    )
+    if ttl_seconds <= 0:
+        return await _load_panel_subscription_page_config_by_uuid(app, config_uuid)
+
+    cache = app.setdefault("subscription_guides_panel_config_cache", {})
+    lock: asyncio.Lock = app.setdefault(
+        "subscription_guides_panel_config_lock",
+        asyncio.Lock(),
+    )
+    key = (_subscription_guides_settings_fingerprint(settings), config_uuid)
+    now = time.monotonic()
+
+    cached = cache.get(key)
+    if cached is not None and now - float(cached.get("ts", 0.0)) < ttl_seconds:
+        return cached["config"]
+
+    async with lock:
+        now = time.monotonic()
+        cached = cache.get(key)
+        if cached is not None and now - float(cached.get("ts", 0.0)) < ttl_seconds:
+            return cached["config"]
+
+        config = await _load_panel_subscription_page_config_by_uuid(app, config_uuid)
+        cache[key] = {"config": config, "ts": time.monotonic()}
+        _prune_subscription_guides_panel_config_cache(cache)
+        return config
+
+
+async def _load_panel_subscription_page_config_by_uuid(
+    app: web.Application,
+    config_uuid: str,
+) -> Dict[str, Any]:
+    panel_service = _panel_service_from_app(app)
+    get_config_by_uuid = getattr(panel_service, "get_subscription_page_config_by_uuid", None)
+    if not callable(get_config_by_uuid):
+        raise SubscriptionGuidesConfigError(
+            "Panel service cannot load subscription page config by UUID"
+        )
+    detail = await get_config_by_uuid(config_uuid)
+    if detail is None:
+        raise _PanelSubscriptionPageConfigUnavailable(
+            f"Panel subscription page config {config_uuid} is unavailable"
+        )
+    return validate_panel_subscription_guides_config(detail)
 
 
 def _panel_subpage_config_uuid(payload: Any) -> str:
@@ -286,11 +421,11 @@ async def _default_panel_subscription_page_config_uuid(panel_service: Any) -> st
     if not callable(get_list):
         return ""
     payload = await get_list()
-    configs = (payload or {}).get("configs")
-    if not isinstance(configs, list):
+    configs = _panel_subscription_page_config_items(payload)
+    if not configs:
         return ""
 
-    candidates: list[Dict[str, Any]] = [item for item in configs if isinstance(item, dict)]
+    candidates: list[Dict[str, Any]] = configs
     for item in candidates:
         uuid = str(item.get("uuid") or "").strip()
         if uuid == PANEL_DEFAULT_SUBPAGE_CONFIG_UUID:
@@ -302,6 +437,64 @@ async def _default_panel_subscription_page_config_uuid(panel_service: Any) -> st
         if uuid:
             return uuid
     return ""
+
+
+async def _warm_panel_subscription_page_configs(app: web.Application) -> None:
+    settings: Settings = app["settings"]
+    if not _subscription_guides_should_try_resolved_panel_config(settings):
+        return
+
+    panel_service = _panel_service_from_app(app)
+    get_list = getattr(panel_service, "get_subscription_page_config_list", None)
+    if not callable(get_list):
+        return
+
+    payload = await get_list()
+    configs = _panel_subscription_page_config_items(payload)
+    config_uuids = [
+        str(item.get("uuid") or "").strip()
+        for item in configs
+        if str(item.get("uuid") or "").strip()
+    ]
+    if not config_uuids:
+        return
+
+    seen: set[str] = set()
+    warmed_uuids: list[str] = []
+    tasks = []
+    for config_uuid in config_uuids:
+        if config_uuid in seen:
+            continue
+        seen.add(config_uuid)
+        warmed_uuids.append(config_uuid)
+        tasks.append(
+            _panel_subscription_page_config_by_uuid_cached(app, settings, config_uuid)
+        )
+    if tasks:
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for config_uuid, result in zip(warmed_uuids, results):
+            if isinstance(result, Exception):
+                logger.debug(
+                    "Failed to warm panel subscription page config %s: %s",
+                    config_uuid,
+                    result,
+                )
+
+
+def _panel_subscription_page_config_items(payload: Any) -> list[Dict[str, Any]]:
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    if not isinstance(payload, dict):
+        return []
+    for key in ("configs", "items", "subscriptionPageConfigs", "subpageConfigs"):
+        items = payload.get(key)
+        if isinstance(items, list):
+            return [item for item in items if isinstance(item, dict)]
+    for key in ("response", "data", "result"):
+        items = _panel_subscription_page_config_items(payload.get(key))
+        if items:
+            return items
+    return []
 
 
 async def _active_panel_subscription_context_for_user(
@@ -488,6 +681,26 @@ def _subscription_guides_settings_fingerprint(settings: Settings) -> Tuple[Any, 
         str(getattr(settings, "PANEL_API_URL", "") or ""),
         bool(getattr(settings, "PANEL_API_KEY", "") or ""),
     )
+
+
+def _subscription_guides_request_headers_fingerprint(headers: Dict[str, str]) -> Tuple[str, ...]:
+    return (
+        str(headers.get("host") or "").strip().lower(),
+        str(headers.get("x-forwarded-host") or "").strip().lower(),
+        str(headers.get("x-forwarded-proto") or "").strip().lower(),
+    )
+
+
+def _prune_subscription_guides_resolved_cache(cache: Dict[Any, Any]) -> None:
+    overflow = len(cache) - SUBSCRIPTION_GUIDES_RESOLVED_CACHE_MAX_ITEMS
+    for key in list(cache.keys())[: max(0, overflow)]:
+        cache.pop(key, None)
+
+
+def _prune_subscription_guides_panel_config_cache(cache: Dict[Any, Any]) -> None:
+    overflow = len(cache) - SUBSCRIPTION_GUIDES_RESOLVED_CACHE_MAX_ITEMS
+    for key in list(cache.keys())[: max(0, overflow)]:
+        cache.pop(key, None)
 
 
 def _local_subscription_is_publicly_active(subscription: Any) -> bool:

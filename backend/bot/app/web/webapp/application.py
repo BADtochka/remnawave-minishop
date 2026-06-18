@@ -27,6 +27,10 @@ def create_subscription_webapp_application(
     app["webapp_settings_cache"] = {"ts": 0.0, "data": {}}
     app["subscription_guides_config_cache"] = {"fingerprint": None, "status": None}
     app["subscription_guides_config_lock"] = asyncio.Lock()
+    app["subscription_guides_panel_config_cache"] = {}
+    app["subscription_guides_panel_config_lock"] = asyncio.Lock()
+    app["subscription_guides_resolved_config_cache"] = {}
+    app["subscription_guides_resolved_config_lock"] = asyncio.Lock()
     app["webapp_rate_limit_buckets"] = {}
     app["webapp_rate_limit_lock"] = asyncio.Lock()
 
