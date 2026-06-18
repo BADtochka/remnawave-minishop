@@ -22,7 +22,9 @@
 
   let containerEl;
   let dragIndex = null;
+  let dropSlot = null;
   let dropIndex = null;
+  let dragResetToken = 0;
   let rowRects = [];
   $: dragActive = dragIndex !== null;
   $: dragDisabled = disabled || !items?.length || items.length < 2;
@@ -46,7 +48,6 @@
       disabled: dragDisabled,
       position: dragActive ? undefined : { x: 0, y: 0 },
       threshold: { distance: 5 },
-      ignoreMultitouch: true,
       defaultClass: "ui-sortable-neodrag",
       defaultClassDragging: "ui-sortable-neodragging",
       defaultClassDragged: "ui-sortable-neodragged",
@@ -74,25 +75,39 @@
     );
   }
 
-  function targetIndexFromPointer(clientY) {
+  function slotFromPointer(clientY) {
     if (!rowRects.length) return dragIndex ?? 0;
     const target = rowRects.find((row) => clientY < row.midY);
-    return target ? target.index : rowRects.length - 1;
+    return target ? target.index : rowRects.length;
+  }
+
+  function targetIndexFromSlot(slot) {
+    if (dragIndex === null || !rowRects.length) return null;
+    const nextIndex = slot > dragIndex ? slot - 1 : slot;
+    return Math.min(Math.max(nextIndex, 0), rowRects.length - 1);
+  }
+
+  function updateDropTarget(clientY) {
+    const nextSlot = slotFromPointer(clientY);
+    const nextIndex = targetIndexFromSlot(nextSlot);
+    if (dropSlot !== nextSlot) dropSlot = nextSlot;
+    if (dropIndex !== nextIndex) dropIndex = nextIndex;
   }
 
   function startPointerDrag(index, data) {
     if (dragDisabled) return;
     dragIndex = index;
+    dropSlot = index;
     dropIndex = index;
     snapshotRows();
+    updateDropTarget(data.event.clientY);
     const row = rowForNode(data.rootNode);
     if (row) row.style.zIndex = "2";
   }
 
   function updatePointerDrag(data) {
     if (dragIndex === null) return;
-    const nextIndex = targetIndexFromPointer(data.event.clientY);
-    if (dropIndex !== nextIndex) dropIndex = nextIndex;
+    updateDropTarget(data.event.clientY);
   }
 
   function rowForNode(node) {
@@ -110,8 +125,9 @@
     const from = dragIndex;
     const to = dropIndex;
     clearDraggedNode(data.rootNode);
-    reset();
-    if (!dragDisabled && from !== null && to !== null && from !== to) {
+    const shouldReorder = !dragDisabled && from !== null && to !== null && from !== to;
+    reset({ remount: true });
+    if (shouldReorder) {
       onReorder(from, to);
     }
   }
@@ -125,15 +141,26 @@
     if (nextIndex !== index) onReorder(index, nextIndex);
   }
 
-  function reset() {
+  function reset({ remount = false } = {}) {
     dragIndex = null;
+    dropSlot = null;
     dropIndex = null;
     rowRects = [];
+    if (remount) dragResetToken += 1;
   }
 
-  function handleHandlePointerDown(event) {
-    if (dragDisabled) return;
-    event.preventDefault();
+  function cancelPointerDrag(event) {
+    clearDraggedNode(event.currentTarget);
+    reset({ remount: true });
+  }
+
+  function isDropSlot(index) {
+    if (dragIndex === null || dropIndex === null || dropIndex === dragIndex) return false;
+    return dropSlot === index || (dropSlot === items.length && index === items.length - 1);
+  }
+
+  function isDropAfter(index) {
+    return isDropSlot(index) && dropSlot === items.length && index === items.length - 1;
   }
 </script>
 
@@ -147,23 +174,26 @@
     <div
       class={cn("ui-sortable-item", className)}
       class:is-dragging={dragIndex === index}
-      class:is-drop-target={dropIndex === index && dragIndex !== index}
+      class:is-drop-target={isDropSlot(index)}
+      class:is-drop-after={isDropAfter(index)}
       role="listitem"
       animate:flip={flipConfig}
     >
-      <button
-        use:draggable={dragOptions(index)}
-        type="button"
-        class="ui-sortable-handle"
-        disabled={dragDisabled}
-        aria-label={handleLabel}
-        aria-grabbed={dragIndex === index}
-        title={handleLabel}
-        on:pointerdown={handleHandlePointerDown}
-        on:keydown={(event) => handleHandleKeydown(event, index)}
-      >
-        <GripVertical size={14} />
-      </button>
+      {#key dragResetToken}
+        <button
+          use:draggable={dragOptions(index)}
+          type="button"
+          class="ui-sortable-handle"
+          disabled={dragDisabled}
+          aria-label={handleLabel}
+          aria-grabbed={dragIndex === index}
+          title={handleLabel}
+          on:pointercancel={cancelPointerDrag}
+          on:keydown={(event) => handleHandleKeydown(event, index)}
+        >
+          <GripVertical size={14} />
+        </button>
+      {/key}
       <slot {item} {index} dragging={dragIndex === index} />
     </div>
   {/each}
@@ -237,6 +267,11 @@
     background: var(--sortable-drop-line);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--sortable-accent) 16%, transparent);
     pointer-events: none;
+  }
+
+  .ui-sortable-item.is-drop-after::before {
+    top: auto;
+    bottom: -6px;
   }
 
   .ui-sortable-handle {
