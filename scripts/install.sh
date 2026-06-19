@@ -144,6 +144,7 @@ print_help() {
   MINISHOP_IMAGE_TAG        тег Docker image ($DEFAULT_IMAGE_TAG)
   REMNASHOP_SOURCE_DSN      DSN базы Remnashop для миграции
   REMNASHOP_SOURCE_ENV_FILE путь к .env Remnashop для переноса настроек
+  REMNASHOP_SOURCE_SCHEMA   PostgreSQL schema базы Remnashop (public)
   LEGACY_TGSHOP_SOURCE_DSN  DSN старого remnawave-tg-shop для dump/restore
 
 Мастер интерактивный: он не перезаписывает файлы без подтверждения.
@@ -252,9 +253,9 @@ confirm() {
     label="$1"
     default="${2:-0}"
     if [ "$default" = "1" ]; then
-        suffix="Да/нет"
+        suffix="Y/n"
     else
-        suffix="да/Нет"
+        suffix="y/N"
     fi
     while :; do
         printf '%s [%s]: ' "$label" "$suffix"
@@ -276,7 +277,7 @@ confirm() {
                 return 1
                 ;;
             *)
-                warn "Ответьте y/n или да/нет."
+                warn "Ответьте y или n."
                 ;;
         esac
     done
@@ -2009,6 +2010,89 @@ summary_path.write_text(
 PY
 }
 
+print_remnashop_import_summary() {
+    summary_path="$1"
+    mode="${2:-dry-run}"
+    [ -f "$summary_path" ] || return 0
+    command -v python3 >/dev/null 2>&1 || return 0
+    python3 - "$summary_path" "$mode" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+summary_path = Path(sys.argv[1])
+mode = sys.argv[2]
+summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+
+def section(name):
+    value = summary.get(name)
+    return value if isinstance(value, dict) else {}
+
+
+def count_values(name, keys):
+    data = section(name)
+    total = 0
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            total += int(value)
+    return total
+
+
+def changed_count(name, primary_keys, fallback_keys=()):
+    total = count_values(name, primary_keys)
+    if total:
+        return total
+    return count_values(name, fallback_keys)
+
+
+tariff_data = section("tariffs")
+provider_data = section("payment_provider_settings")
+users = changed_count("users", ("created", "updated"), ("profile_preserved",))
+subscriptions = count_values("subscriptions", ("created", "updated"))
+payments = count_values("payments", ("created", "updated"))
+tariffs = int(tariff_data.get("generated") or 0)
+tariff_map = int(tariff_data.get("auto_map_entries") or 0)
+providers = int(provider_data.get("providers_mapped") or 0)
+settings = count_values(
+    "settings",
+    (
+        "overrides_written",
+        "admin_overrides_written",
+        "notification_overrides_written",
+        "source_env_overrides_written",
+    ),
+)
+warnings = summary.get("warnings")
+warnings_count = len(warnings) if isinstance(warnings, list) else 0
+
+if mode == "dry-run":
+    print("Dry-run прошел успешно: запись в базу Minishop еще не выполнялась.")
+    title = "План импорта"
+else:
+    print("Импорт применен успешно.")
+    title = "Итог импорта"
+
+print(f"{title}:")
+print(f"- Пользователи: {users}")
+print(f"- Подписки: {subscriptions}")
+print(f"- Платежи: {payments}")
+print(f"- Тарифы: {tariffs}")
+print(f"- Автосопоставления тарифов: {tariff_map}")
+print(f"- Платежные провайдеры: {providers}")
+print(f"- Настройки: {settings}")
+if warnings_count:
+    print(f"- Предупреждения: {warnings_count}; они не блокируют импорт, подробности сохранены в summary JSON.")
+else:
+    print("- Предупреждения: нет.")
+PY
+    info "Summary JSON сохранен: $summary_path"
+    [ -f "$summary_path.raw" ] && info "Полный raw-вывод importer сохранен: $summary_path.raw"
+}
+
 notify_remnashop_migration_success() {
     summary_path="$1"
     [ -f "$summary_path" ] || {
@@ -2261,6 +2345,7 @@ PY
 run_import_command() {
     dry="$1"
     summary_output_path="${2:-}"
+    show_raw_output="${3:-1}"
     set -- run --rm -T \
         --user 0:0 \
         -v "$IMPORTER_PATH:/app/backend/scripts/import_legacy.py:ro"
@@ -2288,8 +2373,13 @@ run_import_command() {
         mkdir -p "$(dirname "$summary_output_path")"
         raw_output="$summary_output_path.raw"
         if (cd "$TARGET_DIR" && run_compose "$@" < /dev/null) > "$raw_output" 2>&1; then
-            cat "$raw_output"
-            extract_import_summary "$raw_output" "$summary_output_path" || true
+            summary_extracted=0
+            if extract_import_summary "$raw_output" "$summary_output_path"; then
+                summary_extracted=1
+            fi
+            if [ "$show_raw_output" = "1" ] || [ "$summary_extracted" != "1" ]; then
+                cat "$raw_output"
+            fi
             return 0
         fi
         status=$?
@@ -2442,8 +2532,8 @@ run_remnashop_migration() {
     fi
     prompt_value "DSN PostgreSQL базы Remnashop" "$detected_source_dsn" 1 0 ""
     SOURCE_DSN="$PROMPT_VALUE"
-    prompt_value "Schema источника" "public" 1 0 ""
-    SOURCE_SCHEMA="$PROMPT_VALUE"
+    SOURCE_SCHEMA="${REMNASHOP_SOURCE_SCHEMA:-public}"
+    info "Schema источника Remnashop: $SOURCE_SCHEMA. Для другой schema задайте REMNASHOP_SOURCE_SCHEMA перед запуском."
     detected_source_env=$(detect_remnashop_env_file || true)
     if [ -n "$detected_source_env" ]; then
         info "Нашел .env Remnashop и подставил путь по умолчанию."
@@ -2498,19 +2588,22 @@ run_remnashop_migration() {
     connect_local_source_db_to_target_network
 
     section "Dry-run импорт"
-    if ! run_import_command 1; then
+    mkdir -p "$TARGET_DIR/$INSTALL_STATE_DIR"
+    DRY_RUN_SUMMARY_PATH="$TARGET_DIR/$INSTALL_STATE_DIR/remnashop-dry-run-summary.json"
+    if ! run_import_command 1 "$DRY_RUN_SUMMARY_PATH" 0; then
         fail "Dry-run не прошел. Исправьте подключение или настройки перед импортом."
         return 1
     fi
-    if ! confirm "Применить эту миграцию по-настоящему?" 0; then
+    print_remnashop_import_summary "$DRY_RUN_SUMMARY_PATH" "dry-run"
+    if ! confirm "Применить эту миграцию по-настоящему?" 1; then
         warn "Миграция не применена."
         return 0
     fi
 
     section "Применение импорта"
-    mkdir -p "$TARGET_DIR/$INSTALL_STATE_DIR"
     APPLY_SUMMARY_PATH="$TARGET_DIR/$INSTALL_STATE_DIR/remnashop-apply-summary.json"
-    run_import_command 0 "$APPLY_SUMMARY_PATH" || return 1
+    run_import_command 0 "$APPLY_SUMMARY_PATH" 0 || return 1
+    print_remnashop_import_summary "$APPLY_SUMMARY_PATH" "apply"
     configure_egames_panel_webhook || return 1
     telegram_bot_profile_checklist
     telegram_oauth_checklist

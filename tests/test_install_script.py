@@ -23,6 +23,7 @@ def test_shell_installer_help_does_not_require_python():
 
     assert "MINISHOP_INSTALL_REPO" in result.stdout
     assert "dry-run" in result.stdout
+    assert "REMNASHOP_SOURCE_SCHEMA" in result.stdout
     assert "LEGACY_TGSHOP_SOURCE_DSN" in result.stdout
 
 
@@ -273,3 +274,22 @@ def test_shell_installer_hides_low_level_oauth_and_required_stack_prompts():
     assert "Запустить Docker Compose stack перед импортом из Remnashop?" not in script
     assert "Импорту из Remnashop нужна целевая база stack. Импорт пропущен." not in script
     assert "Запускаю Docker Compose stack перед импортом из Remnashop" in script
+
+
+def test_shell_installer_summarizes_remnashop_dry_run_and_hides_source_schema_prompt():
+    script = INSTALL_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'suffix="Y/n"' in script
+    assert 'suffix="y/N"' in script
+    assert "Да/нет" not in script
+    assert "да/Нет" not in script
+    assert "Ответьте y или n." in script
+    assert 'SOURCE_SCHEMA="${REMNASHOP_SOURCE_SCHEMA:-public}"' in script
+    assert 'prompt_value "Schema источника"' not in script
+    assert "remnashop-dry-run-summary.json" in script
+    assert 'run_import_command 1 "$DRY_RUN_SUMMARY_PATH" 0' in script
+    assert "summary_extracted=1" in script
+    assert 'confirm "Применить эту миграцию по-настоящему?" 1' in script
+    assert "print_remnashop_import_summary" in script
+    assert "Dry-run прошел успешно" in script
+    assert "Полный raw-вывод importer сохранен" in script
