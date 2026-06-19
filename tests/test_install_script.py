@@ -100,7 +100,7 @@ def test_shell_installer_checks_dns_and_can_prepare_nginx_certificates():
     script = INSTALL_SCRIPT.read_text(encoding="utf-8")
 
     assert "check_public_dns_records" in script
-    assert "Проверить A-records для WEBHOOK_HOST и MINIAPP_HOST сейчас?" in script
+    assert "Проверить A-записи для WEBHOOK_HOST и MINIAPP_HOST сейчас?" in script
     assert "configure_nginx_certificates" in script
     assert "Настройка сертификатов Nginx" in script
     assert "Certbot Cloudflare DNS-01" in script
@@ -157,7 +157,7 @@ def test_shell_installer_refreshes_importer_without_prompting_inside_command_sub
 
     assert "Use cached importer" not in script
     assert 'download_to "$url" "$tmp"' in script
-    assert 'Backup importer сохранен' in script
+    assert "Бэкап скрипта импорта сохранен" in script
 
 
 def test_shell_installer_connects_local_remnashop_db_container_for_import():
@@ -182,9 +182,15 @@ def test_shell_installer_supports_legacy_tgshop_volume_and_dsn_paths():
 def test_shell_installer_only_prepares_data_mount_not_runtime_content():
     script = INSTALL_SCRIPT.read_text(encoding="utf-8")
 
+    assert "Подготовка каталога data" in script
     assert 'data_dir="$TARGET_DIR/data"' in script
     assert 'mkdir -p "$data_dir"' in script
-    assert 'chown "$APP_UID:$APP_GID" "$data_dir"' in script
+    assert 'chown -R "$APP_UID:$APP_GID" "$data_dir"' in script
+    assert "Контейнеры Minishop пишут runtime-файлы" in script
+    assert "Обновить владельца $data_dir на $APP_UID:$APP_GID" in script
+    assert 'confirm "Обновить владельца $data_dir на $APP_UID:$APP_GID для записи из контейнеров?" 1' in script
+    assert "Adjust $data_dir owner" not in script
+    assert "already exists" not in script
     assert "data_dir/themes" not in script
     assert "webapp-logo" not in script
     assert "webapp-emoji" not in script
@@ -236,8 +242,8 @@ def test_shell_installer_autodetects_egames_panel_credentials():
     assert "FRONT_END_DOMAIN" in script
     assert "WEBHOOK_SECRET_HEADER" in script
     assert "select token from api_tokens" in script
-    assert "Нашел API key Remnawave Panel" in script
-    assert "Нашел Cookie header eGames reverse proxy" in script
+    assert "Нашел API-ключ Remnawave Panel" in script
+    assert "Нашел заголовок Cookie обратного прокси eGames" in script
 
 
 def test_shell_installer_prefills_remnashop_telegram_settings():
@@ -273,7 +279,7 @@ def test_shell_installer_hides_low_level_oauth_and_required_stack_prompts():
     assert "Telegram OAuth request access (пусто/write/phone)" not in script
     assert "Запустить Docker Compose stack перед импортом из Remnashop?" not in script
     assert "Импорту из Remnashop нужна целевая база stack. Импорт пропущен." not in script
-    assert "Запускаю Docker Compose stack перед импортом из Remnashop" in script
+    assert "Запускаю Docker Compose стек перед импортом из Remnashop" in script
 
 
 def test_shell_installer_summarizes_remnashop_dry_run_and_hides_source_schema_prompt():
@@ -291,5 +297,5 @@ def test_shell_installer_summarizes_remnashop_dry_run_and_hides_source_schema_pr
     assert "summary_extracted=1" in script
     assert 'confirm "Применить эту миграцию по-настоящему?" 1' in script
     assert "print_remnashop_import_summary" in script
-    assert "Dry-run прошел успешно" in script
-    assert "Полный raw-вывод importer сохранен" in script
+    assert "Проверка без записи прошла успешно" in script
+    assert "Полный сырой вывод скрипта импорта сохранен" in script

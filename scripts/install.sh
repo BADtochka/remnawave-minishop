@@ -141,14 +141,14 @@ print_help() {
   MINISHOP_INSTALL_DIR      папка установки ($DEFAULT_INSTALL_DIR)
   MINISHOP_INSTALL_REPO     GitHub репозиторий ($DEFAULT_REPO)
   MINISHOP_INSTALL_REF      ветка/тег/ref ($DEFAULT_REF)
-  MINISHOP_IMAGE_TAG        тег Docker image ($DEFAULT_IMAGE_TAG)
+  MINISHOP_IMAGE_TAG        тег Docker-образа ($DEFAULT_IMAGE_TAG)
   REMNASHOP_SOURCE_DSN      DSN базы Remnashop для миграции
   REMNASHOP_SOURCE_ENV_FILE путь к .env Remnashop для переноса настроек
-  REMNASHOP_SOURCE_SCHEMA   PostgreSQL schema базы Remnashop (public)
-  LEGACY_TGSHOP_SOURCE_DSN  DSN старого remnawave-tg-shop для dump/restore
+  REMNASHOP_SOURCE_SCHEMA   схема PostgreSQL базы Remnashop (public)
+  LEGACY_TGSHOP_SOURCE_DSN  DSN старого remnawave-tg-shop для дампа/восстановления
 
 Мастер интерактивный: он не перезаписывает файлы без подтверждения.
-Импорт из Remnashop всегда сначала запускается в dry-run режиме.
+Импорт из Remnashop всегда сначала запускается в режиме проверки без записи (dry-run).
 Документация по установке: $DOCS_SETUP_URL
 Документация по миграции из Remnashop: $DOCS_REMNASHOP_URL
 EOF
@@ -624,10 +624,10 @@ write_downloaded_file() {
     target_path="$2"
     mkdir -p "$(dirname "$target_path")"
     if [ -e "$target_path" ]; then
-        if confirm "$target_path уже существует. Перезаписать, предварительно сохранив backup?" 0; then
+        if confirm "$target_path уже существует. Перезаписать, предварительно сохранив бэкап?" 0; then
             backup=$(backup_path "$target_path")
             cp "$target_path" "$backup"
-            info "Backup файла $target_path сохранен как $(basename "$backup")"
+            info "Бэкап файла $target_path сохранен как $(basename "$backup")"
         else
             warn "Оставляю существующий файл $target_path"
             rm -f "$source_path"
@@ -668,7 +668,7 @@ choose_profile() {
         "1. Caddy HTTPS - отдельный сервер, автоматические сертификаты." \
         "2. Nginx HTTPS - свои сертификаты или помощник Certbot." \
         "3. Pangolin / Newt - без входящих портов, публичные маршруты в Pangolin." \
-        "4. Без proxy / внешний TLS - прямые HTTP-порты или свой TLS-терминатор." \
+        "4. Без прокси / внешний TLS - прямые HTTP-порты или свой TLS-терминатор." \
         "5. Уже установленная Remnawave через eGames - использовать ее Nginx/TLS." || return 1
     case "$CHOICE_VALUE" in
         1) PROFILE_KEY="caddy" ;;
@@ -713,7 +713,7 @@ prompt_common_env() {
     section "Основные настройки .env"
     prompt_value "Имя Docker Compose проекта" "$(env_get COMPOSE_PROJECT_NAME remnawave-minishop)" 0 0 ""
     COMPOSE_PROJECT_NAME_VALUE="$PROMPT_VALUE"
-    prompt_value "Тег Docker image" "$(env_get IMAGE_TAG "$DEFAULT_IMAGE_TAG")" 0 0 ""
+    prompt_value "Тег Docker-образа" "$(env_get IMAGE_TAG "$DEFAULT_IMAGE_TAG")" 0 0 ""
     IMAGE_TAG_VALUE="$PROMPT_VALUE"
     detected_bot_token=$(env_get BOT_TOKEN "")
     detected_bot_token_prefilled=0
@@ -794,9 +794,9 @@ prompt_common_env() {
     fi
     [ -n "$detected_panel_api_key" ] || detected_panel_api_key="change_me"
     if [ "$detected_panel_api_key" != "change_me" ]; then
-        info "Нашел API key Remnawave Panel и подставил его по умолчанию."
+        info "Нашел API-ключ Remnawave Panel и подставил его по умолчанию."
     fi
-    prompt_value "API key Remnawave Panel" "$detected_panel_api_key" 0 1 "" "$detected_panel_api_key_prefilled"
+    prompt_value "API-ключ Remnawave Panel" "$detected_panel_api_key" 0 1 "" "$detected_panel_api_key_prefilled"
     PANEL_API_KEY_VALUE="$PROMPT_VALUE"
     detected_panel_api_cookie=$(env_get PANEL_API_COOKIE "")
     detected_panel_api_cookie_prefilled=0
@@ -807,9 +807,9 @@ prompt_common_env() {
         [ -n "$detected_panel_api_cookie" ] && detected_panel_api_cookie_prefilled=1
     fi
     if [ -n "$detected_panel_api_cookie" ]; then
-        info "Нашел Cookie header eGames reverse proxy и подставил его по умолчанию."
+        info "Нашел заголовок Cookie обратного прокси eGames и подставил его по умолчанию."
     fi
-    prompt_value "Cookie header reverse proxy Remnawave (если нужен)" "$detected_panel_api_cookie" 0 1 "" "$detected_panel_api_cookie_prefilled"
+    prompt_value "Заголовок Cookie обратного прокси Remnawave (если нужен)" "$detected_panel_api_cookie" 0 1 "" "$detected_panel_api_cookie_prefilled"
     PANEL_API_COOKIE_VALUE="$PROMPT_VALUE"
     existing_panel_webhook_secret=$(env_get PANEL_WEBHOOK_SECRET "")
     existing_panel_webhook_secret_prefilled=0
@@ -820,20 +820,20 @@ prompt_common_env() {
         [ -n "$existing_panel_webhook_secret" ] && existing_panel_webhook_secret_prefilled=1
     fi
     if [ -n "$existing_panel_webhook_secret" ]; then
-        info "Нашел webhook secret Remnawave Panel и подставил его по умолчанию."
+        info "Нашел webhook-секрет Remnawave Panel и подставил его по умолчанию."
     fi
     if [ -z "$existing_panel_webhook_secret" ]; then
         existing_panel_webhook_secret=$(secret_hex 24)
     fi
-    prompt_value "Webhook secret Remnawave Panel" "$existing_panel_webhook_secret" 0 1 "" "$existing_panel_webhook_secret_prefilled"
+    prompt_value "Webhook-секрет Remnawave Panel" "$existing_panel_webhook_secret" 0 1 "" "$existing_panel_webhook_secret_prefilled"
     PANEL_WEBHOOK_SECRET_VALUE="$PROMPT_VALUE"
 
-    prompt_value "Telegram OAuth client ID (пусто = ID бота)" "$(env_get TELEGRAM_OAUTH_CLIENT_ID '')" 0 0 ""
+    prompt_value "Идентификатор клиента Telegram OAuth (пусто = ID бота)" "$(env_get TELEGRAM_OAUTH_CLIENT_ID '')" 0 0 ""
     TELEGRAM_OAUTH_CLIENT_ID_VALUE="$PROMPT_VALUE"
-    prompt_value "Telegram OAuth client secret из BotFather Web Login (пусто = пропустить browser OAuth)" "$(env_get TELEGRAM_OAUTH_CLIENT_SECRET '')" 0 1 ""
+    prompt_value "Секрет клиента Telegram OAuth из BotFather Web Login (пусто = пропустить OAuth в браузере)" "$(env_get TELEGRAM_OAUTH_CLIENT_SECRET '')" 0 1 ""
     TELEGRAM_OAUTH_CLIENT_SECRET_VALUE="$PROMPT_VALUE"
     TELEGRAM_OAUTH_REQUEST_ACCESS_VALUE="$(env_get TELEGRAM_OAUTH_REQUEST_ACCESS write)"
-    info "Telegram OAuth request access: $TELEGRAM_OAUTH_REQUEST_ACCESS_VALUE."
+    info "Параметр Telegram OAuth request_access: $TELEGRAM_OAUTH_REQUEST_ACCESS_VALUE. Значение write позволяет боту написать пользователю после входа через Web Login."
 
     case "$PROFILE_KEY" in
         caddy|nginx|newt|egames)
@@ -857,7 +857,7 @@ prompt_common_env() {
             PANGOLIN_ENDPOINT_VALUE="$PROMPT_VALUE"
             prompt_value "Newt ID" "$(env_get NEWT_ID '')" 1 0 ""
             NEWT_ID_VALUE="$PROMPT_VALUE"
-            prompt_value "Newt secret" "$(env_get NEWT_SECRET '')" 1 1 ""
+            prompt_value "Секрет Newt" "$(env_get NEWT_SECRET '')" 1 1 ""
             NEWT_SECRET_VALUE="$PROMPT_VALUE"
             ;;
         no-proxy)
@@ -1004,10 +1004,10 @@ render_env_file() {
 }
 
 write_env_file() {
-    section "Review .env"
+    section "Проверка .env"
     display_env_summary
-    if ! confirm "Write .env now?" 1; then
-        warn "Skipped .env write."
+    if ! confirm "Записать .env сейчас?" 1; then
+        warn "Запись .env пропущена."
         return 0
     fi
     tmp="$TARGET_DIR/.env.tmp.$$"
@@ -1015,14 +1015,26 @@ write_env_file() {
     if [ -e "$ENV_PATH" ]; then
         backup=$(backup_path "$ENV_PATH")
         cp "$ENV_PATH" "$backup"
-        info "Backed up $ENV_PATH to $(basename "$backup")"
+        info "Бэкап $ENV_PATH сохранен как $(basename "$backup")"
     fi
     mv "$tmp" "$ENV_PATH"
-    ok "Wrote $ENV_PATH"
+    ok "Файл $ENV_PATH записан."
+}
+
+adjust_data_mount_permissions() {
+    data_dir="$1"
+    if command -v chown >/dev/null 2>&1; then
+        if ! chown -R "$APP_UID:$APP_GID" "$data_dir" 2>/dev/null; then
+            warn "Не удалось выполнить chown для $data_dir. Выполните вручную: sudo chown -R $APP_UID:$APP_GID $data_dir"
+        else
+            ok "Владелец $data_dir обновлен на $APP_UID:$APP_GID."
+        fi
+    fi
+    chmod u+rwx "$data_dir" 2>/dev/null || true
 }
 
 prepare_data_mount() {
-    section "Prepare data mount"
+    section "Подготовка каталога data"
     data_dir="$TARGET_DIR/data"
     created=0
     if [ ! -d "$data_dir" ]; then
@@ -1030,25 +1042,18 @@ prepare_data_mount() {
         created=1
     fi
 
+    info "Контейнеры Minishop пишут runtime-файлы в $data_dir от пользователя $APP_UID:$APP_GID."
+    info "Если владелец другой, могут не сохраняться бэкапы, тарифы, загрузки и другие данные приложения."
+
     if [ "$created" = "1" ]; then
-        if command -v chown >/dev/null 2>&1; then
-            if ! chown "$APP_UID:$APP_GID" "$data_dir" 2>/dev/null; then
-                warn "Не удалось выполнить chown для $data_dir. Выполните вручную: sudo chown $APP_UID:$APP_GID data"
-            fi
-        fi
-        chmod u+rwx "$data_dir" 2>/dev/null || true
-        ok "Created writable $data_dir"
+        adjust_data_mount_permissions "$data_dir"
+        ok "Каталог $data_dir создан и подготовлен для записи из контейнеров."
         return 0
     fi
 
-    info "$data_dir already exists."
-    if confirm "Adjust $data_dir owner to $APP_UID:$APP_GID for container writes?" 0; then
-        if command -v chown >/dev/null 2>&1; then
-            if ! chown "$APP_UID:$APP_GID" "$data_dir" 2>/dev/null; then
-                warn "Не удалось выполнить chown для $data_dir. Выполните вручную: sudo chown $APP_UID:$APP_GID data"
-            fi
-        fi
-        chmod u+rwx "$data_dir" 2>/dev/null || true
+    info "Каталог $data_dir уже существует."
+    if confirm "Обновить владельца $data_dir на $APP_UID:$APP_GID для записи из контейнеров?" 1; then
+        adjust_data_mount_permissions "$data_dir"
     fi
 }
 
@@ -1135,7 +1140,7 @@ check_public_dns_records() {
     [ -n "$hosts" ] || return 0
 
     section "Проверка DNS"
-    if ! confirm "Проверить A-records для WEBHOOK_HOST и MINIAPP_HOST сейчас?" 1; then
+    if ! confirm "Проверить A-записи для WEBHOOK_HOST и MINIAPP_HOST сейчас?" 1; then
         warn "Проверка DNS пропущена."
         return 0
     fi
@@ -1151,7 +1156,7 @@ check_public_dns_records() {
     printf '%s\n' "$hosts" | while IFS= read -r host; do
         records=$(resolve_ipv4_records "$host" || true)
         if [ -z "$records" ]; then
-            warn "У $host не видно A-record."
+            warn "У $host не видно A-записи."
             printf '%s\n' "$host" >> "$TARGET_DIR/$INSTALL_STATE_DIR/dns-preflight-warnings.tmp"
             continue
         fi
@@ -1171,7 +1176,7 @@ check_public_dns_records() {
         dns_ok=0
     fi
     if [ "$dns_ok" = "0" ]; then
-        warn "Сертификаты и публичные webhook могут не заработать, пока DNS не указывает на этот сервер или proxy перед ним."
+        warn "Сертификаты и публичные webhook могут не заработать, пока DNS не указывает на этот сервер или прокси перед ним."
         if ! confirm "Продолжить несмотря на предупреждение?" 0; then
             return 1
         fi
@@ -1270,7 +1275,7 @@ install_nginx_certbot_deploy_hook() {
     } > "$tmp"
     mv "$tmp" "$hook"
     chmod 700 "$hook" 2>/dev/null || true
-    ok "Установлен certbot deploy hook: $hook"
+    ok "Установлен deploy hook certbot: $hook"
 }
 
 configure_nginx_certificates() {
@@ -1421,18 +1426,18 @@ run_compose() {
 
 start_stack() {
     pull="${1:-1}"
-    section "Запуск Docker stack"
+    section "Запуск Docker Compose стека"
     require_docker || return 1
     if [ "$pull" = "1" ]; then
         (cd "$TARGET_DIR" && run_compose pull) || return 1
     fi
     (cd "$TARGET_DIR" && run_compose up -d) || return 1
     (cd "$TARGET_DIR" && run_compose ps) || true
-    ok "Команда stack выполнена."
+    ok "Команда запуска стека выполнена."
 }
 
 validate_stack() {
-    section "Проверка stack"
+    section "Проверка стека"
     require_docker || return 1
     (cd "$TARGET_DIR" && run_compose ps) || true
     (cd "$TARGET_DIR" && run_compose logs --tail 80 migrate) || true
@@ -1585,7 +1590,7 @@ is_egames_profile() {
 
 configure_egames_reverse_proxy() {
     is_egames_profile || return 0
-    section "Настройка reverse proxy eGames"
+    section "Настройка обратного прокси eGames"
     require_docker || return 1
 
     detected_nginx_conf=$(detect_egames_nginx_conf || true)
@@ -1604,7 +1609,7 @@ configure_egames_reverse_proxy() {
     webhook_host="${WEBHOOK_HOST_VALUE:-$(env_get WEBHOOK_HOST '')}"
     miniapp_host="${MINIAPP_HOST_VALUE:-$(env_get MINIAPP_HOST '')}"
     if [ -z "$webhook_host" ] || [ -z "$miniapp_host" ]; then
-        fail "Для настройки eGames reverse proxy нужны WEBHOOK_HOST и MINIAPP_HOST."
+        fail "Для настройки обратного прокси eGames нужны WEBHOOK_HOST и MINIAPP_HOST."
         return 1
     fi
 
@@ -1701,7 +1706,7 @@ EOF
             docker exec "$nginx_container" nginx -s reload || docker restart "$nginx_container" >/dev/null
             ok "Маршруты eGames Nginx настроены: $webhook_host -> 127.0.0.1:$backend_port и $miniapp_host -> 127.0.0.1:$frontend_port"
         else
-            warn "Проверка nginx config не прошла; восстанавливаю $backup"
+            warn "Проверка конфига Nginx не прошла; восстанавливаю $backup"
             cp "$backup" "$nginx_conf"
             docker restart "$nginx_container" >/dev/null || true
             return 1
@@ -1759,7 +1764,7 @@ telegram_bot_profile_checklist() {
     title=$(env_get WEBAPP_TITLE "remnawave-minishop")
     [ -n "$bot_token" ] || return 0
     section "Профиль Telegram бота"
-    info "Installer не меняет отображаемое имя и short description Telegram бота."
+    info "Мастер установки не меняет отображаемое имя и короткое описание Telegram-бота."
     if [ -n "$title" ]; then
         info "Можно оставить текущие имя/описание в BotFather или вручную упомянуть там: $title"
     fi
@@ -1771,9 +1776,9 @@ telegram_oauth_checklist() {
     [ -n "$miniapp_url" ] || miniapp_url="https://${MINIAPP_HOST_VALUE:-$(env_get MINIAPP_HOST app.example.com)}/"
     oauth_secret=$(env_get TELEGRAM_OAUTH_CLIENT_SECRET "")
     if [ -z "$oauth_secret" ]; then
-        warn "Telegram OAuth client secret пустой. Настройка BotFather Web Login/OIDC недоступна через Bot API."
+        warn "Секрет клиента Telegram OAuth пустой. Настройка BotFather Web Login/OIDC недоступна через Bot API."
     else
-        ok "Telegram OAuth client secret есть в .env."
+        ok "Секрет клиента Telegram OAuth есть в .env."
     fi
     info "В BotFather укажите Mini App URL/domain: $miniapp_url"
     info "В BotFather Web Login / OpenID Connect разрешите:"
@@ -1800,7 +1805,7 @@ copy_volume_if_safe() {
             fail "Исходный Docker volume не найден: $source_volume"
             return 1
         fi
-        warn "Пропускаю $source_volume: исходный volume не найден."
+        warn "Пропускаю $source_volume: исходный Docker volume не найден."
         return 0
     fi
 
@@ -1809,20 +1814,20 @@ copy_volume_if_safe() {
             fail "Целевой Docker volume не найден: $target_volume"
             return 1
         fi
-        warn "Пропускаю $target_volume: целевой volume не был создан этим профилем."
+        warn "Пропускаю $target_volume: целевой Docker volume не был создан этим профилем."
         return 0
     fi
 
     if ! volume_is_empty "$target_volume"; then
         if [ "$required" = "1" ]; then
-            warn "Целевой volume $target_volume уже не пустой."
-            warn "Возможно, миграция уже была выполнена или stack уже стартовал с пустой базой."
-            if confirm "Продолжить без копирования старого database volume?" 0; then
+            warn "Целевой Docker volume $target_volume уже не пустой."
+            warn "Возможно, миграция уже была выполнена или стек уже стартовал с пустой базой."
+            if confirm "Продолжить без копирования старого Docker volume базы данных?" 0; then
                 return 0
             fi
             return 1
         fi
-        warn "Пропускаю $target_volume: целевой volume уже не пустой."
+        warn "Пропускаю $target_volume: целевой Docker volume уже не пустой."
         return 0
     fi
 
@@ -1883,10 +1888,10 @@ download_importer() {
     if [ -f "$importer" ]; then
         backup=$(backup_path "$importer")
         cp "$importer" "$backup"
-        info "Backup importer сохранен как $(basename "$backup")" >&2
+        info "Бэкап скрипта импорта сохранен как $(basename "$backup")" >&2
     fi
     mv "$tmp" "$importer"
-    ok "Importer сохранен в cache: $importer" >&2
+    ok "Скрипт импорта сохранен в кэше: $importer" >&2
     printf '%s' "$importer"
 }
 
@@ -1933,20 +1938,20 @@ connect_local_source_db_to_target_network() {
 
     target_network="$(target_compose_project)_remnawave-shop"
     if ! docker network inspect "$target_network" >/dev/null 2>&1; then
-        warn "Целевая Docker network $target_network не найдена; source container $source_host не подключен автоматически."
+        warn "Целевая Docker-сеть $target_network не найдена; исходный контейнер $source_host не подключен автоматически."
         return 0
     fi
 
     if docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$source_host" | grep -Fx "$target_network" >/dev/null 2>&1; then
-        ok "Source container $source_host уже подключен к $target_network."
+        ok "Исходный контейнер $source_host уже подключен к $target_network."
         return 0
     fi
 
     docker network connect "$target_network" "$source_host" || {
-        warn "Не удалось подключить source container $source_host к $target_network. Dry-run может упасть, если backend его не видит."
+        warn "Не удалось подключить исходный контейнер $source_host к $target_network. Проверка без записи может завершиться ошибкой, если сервис backend его не видит."
         return 0
     }
-    ok "Source container $source_host подключен к $target_network для импорта Remnashop."
+    ok "Исходный контейнер $source_host подключен к $target_network для импорта Remnashop."
 }
 
 remnashop_webhook_checklist() {
@@ -1961,7 +1966,7 @@ remnashop_webhook_checklist() {
     printf '  Remnawave Panel -> WEBHOOK_URL: %s/webhook/panel\n' "$base_url"
     panel_secret=$(env_get PANEL_WEBHOOK_SECRET "")
     if [ -n "$panel_secret" ]; then
-        printf '  Remnawave Panel -> webhook secret: %s\n' "$(mask_secret "$panel_secret")"
+        printf '  Remnawave Panel -> webhook-секрет: %s\n' "$(mask_secret "$panel_secret")"
     else
         warn "PANEL_WEBHOOK_SECRET пустой; задайте его в Minishop и Remnawave Panel."
     fi
@@ -1979,7 +1984,7 @@ extract_import_summary() {
     output_path="$1"
     summary_path="$2"
     command -v python3 >/dev/null 2>&1 || {
-        warn "python3 not found; could not save migration summary JSON."
+        warn "python3 не найден; не удалось сохранить JSON-итог миграции."
         return 1
     }
     python3 - "$output_path" "$summary_path" <<'PY'
@@ -2001,7 +2006,7 @@ for line in output_path.read_text(encoding="utf-8", errors="replace").splitlines
     if isinstance(decoded, dict) and decoded.get("source") == "remnashop":
         summary = decoded
 if summary is None:
-    raise SystemExit("No Remnashop summary JSON found in importer output")
+    raise SystemExit("JSON-итог Remnashop не найден в выводе скрипта импорта")
 summary_path.parent.mkdir(parents=True, exist_ok=True)
 summary_path.write_text(
     json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -2070,7 +2075,7 @@ warnings = summary.get("warnings")
 warnings_count = len(warnings) if isinstance(warnings, list) else 0
 
 if mode == "dry-run":
-    print("Dry-run прошел успешно: запись в базу Minishop еще не выполнялась.")
+    print("Проверка без записи прошла успешно: база Minishop еще не менялась.")
     title = "План импорта"
 else:
     print("Импорт применен успешно.")
@@ -2085,27 +2090,27 @@ print(f"- Автосопоставления тарифов: {tariff_map}")
 print(f"- Платежные провайдеры: {providers}")
 print(f"- Настройки: {settings}")
 if warnings_count:
-    print(f"- Предупреждения: {warnings_count}; они не блокируют импорт, подробности сохранены в summary JSON.")
+    print(f"- Предупреждения: {warnings_count}; они не блокируют импорт, подробности сохранены в JSON-итоге.")
 else:
     print("- Предупреждения: нет.")
 PY
-    info "Summary JSON сохранен: $summary_path"
-    [ -f "$summary_path.raw" ] && info "Полный raw-вывод importer сохранен: $summary_path.raw"
+    info "JSON-итог сохранен: $summary_path"
+    [ -f "$summary_path.raw" ] && info "Полный сырой вывод скрипта импорта сохранен: $summary_path.raw"
 }
 
 notify_remnashop_migration_success() {
     summary_path="$1"
     [ -f "$summary_path" ] || {
-        warn "Migration summary was not saved; skipping Telegram success notification."
+        warn "JSON-итог миграции не сохранен; пропускаю Telegram-уведомление об успешной миграции."
         return 0
     }
     command -v python3 >/dev/null 2>&1 || {
-        warn "python3 not found; skipping Telegram success notification."
+        warn "python3 не найден; пропускаю Telegram-уведомление об успешной миграции."
         return 0
     }
     bot_token=$(env_get BOT_TOKEN "")
     [ -n "$bot_token" ] || {
-        warn "BOT_TOKEN is empty; skipping Telegram success notification."
+        warn "BOT_TOKEN пустой; пропускаю Telegram-уведомление об успешной миграции."
         return 0
     }
 
@@ -2216,8 +2221,8 @@ lines.extend(
     [
         "",
         "Дальнейшие шаги:",
-        "- Имя и short description Telegram-бота installer не менял. Если нужно, меняйте их вручную в BotFather.",
-        "- Старые команды Remnashop очищаются при старте backend; Minishop оставляет только свои команды.",
+        "- Имя и короткое описание Telegram-бота мастер установки не менял. Если нужно, меняйте их вручную в BotFather.",
+        "- Старые команды Remnashop очищаются при старте сервиса backend; Minishop оставляет только свои команды.",
     ]
 )
 if miniapp_url:
@@ -2227,16 +2232,16 @@ if miniapp_url:
 else:
     lines.append("- В BotFather укажите Mini App URL/domain из MINIAPP_PUBLIC_URL.")
 if oauth_secret:
-    lines.append("- TELEGRAM_OAUTH_CLIENT_SECRET заполнен; после BotFather-проверки перезапустите backend.")
+    lines.append("- TELEGRAM_OAUTH_CLIENT_SECRET заполнен; после проверки в BotFather перезапустите backend.")
 else:
     lines.append(
-        "- TELEGRAM_OAUTH_CLIENT_SECRET пустой: если нужен browser OAuth, создайте Web Login/OIDC client в BotFather, заполните secret и перезапустите backend."
+        "- TELEGRAM_OAUTH_CLIENT_SECRET пустой: если нужен OAuth в браузере, создайте Web Login/OIDC клиент в BotFather, заполните секрет и перезапустите backend."
     )
 if webhook_base_url:
-    lines.append(f"- Telegram webhook: {webhook_base_url.rstrip('/')}/tg/webhook, он ставится backend автоматически.")
-    lines.append(f"- Remnawave Panel webhook: {webhook_base_url.rstrip('/')}/webhook/panel.")
+    lines.append(f"- Telegram webhook: {webhook_base_url.rstrip('/')}/tg/webhook, сервис backend ставит его автоматически.")
+    lines.append(f"- Webhook Remnawave Panel: {webhook_base_url.rstrip('/')}/webhook/panel.")
 if payment_actions:
-    lines.append("- Проверьте webhook URL у платежных провайдеров:")
+    lines.append("- Проверьте URL webhook у платежных провайдеров:")
     for action in payment_actions[:8]:
         provider = action.get("provider") or "provider"
         new_url = action.get("new_url") or ""
@@ -2402,12 +2407,12 @@ reset_target_compose_database() {
 
 create_pre_migration_backup() {
     label="$1"
-    if ! confirm "Сделать backup текущего Minishop перед миграцией? Это позволит откатить целевую базу и конфиги." 1; then
-        warn "Backup перед миграцией пропущен по вашему выбору."
+    if ! confirm "Сделать бэкап текущего Minishop перед миграцией? Это позволит откатить целевую базу и конфиги." 1; then
+        warn "Бэкап перед миграцией пропущен по вашему выбору."
         return 0
     fi
 
-    section "Backup перед миграцией"
+    section "Бэкап перед миграцией"
     require_docker || return 1
     stamp=$(date -u '+%Y%m%d-%H%M%S')
     backup_dir="$TARGET_DIR/backups/pre-${label}-migration-$stamp"
@@ -2423,13 +2428,13 @@ create_pre_migration_backup() {
 
     if (cd "$TARGET_DIR" && compose exec -T postgres sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1); then
         if (cd "$TARGET_DIR" && compose exec -T postgres sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl') > "$backup_dir/dumps/minishop-postgres.sql"; then
-            ok "Dump PostgreSQL сохранен: $backup_dir/dumps/minishop-postgres.sql"
+            ok "Дамп PostgreSQL сохранен: $backup_dir/dumps/minishop-postgres.sql"
         else
-            warn "Не удалось сохранить dump PostgreSQL. Backup конфигов сохранен, но откат базы будет недоступен."
+            warn "Не удалось сохранить дамп PostgreSQL. Бэкап конфигов сохранен, но откат базы будет недоступен."
             rm -f "$backup_dir/dumps/minishop-postgres.sql"
         fi
     else
-        warn "PostgreSQL целевого stack пока недоступен; сохраняю только конфиги."
+        warn "PostgreSQL целевого стека пока недоступен; сохраняю только конфиги."
     fi
 
     cat > "$backup_dir/restore.sh" <<EOF
@@ -2464,12 +2469,12 @@ if [ -f "\$BACKUP_DIR/dumps/minishop-postgres.sql" ]; then
   compose_cmd exec -T postgres sh -lc 'psql -U "\$POSTGRES_USER" -d "\$POSTGRES_DB" -v ON_ERROR_STOP=1' < "\$BACKUP_DIR/dumps/minishop-postgres.sql"
 fi
 compose_cmd up -d
-echo "Откат из backup завершен: \$BACKUP_DIR"
+echo "Откат из бэкапа завершен: \$BACKUP_DIR"
 EOF
     chmod 700 "$backup_dir/restore.sh" 2>/dev/null || true
 
     cat > "$backup_dir/README.md" <<EOF
-# Backup перед миграцией
+# Бэкап перед миграцией
 
 Создан: $(date -u '+%Y-%m-%dT%H:%M:%SZ')
 Целевой каталог: $TARGET_DIR
@@ -2479,9 +2484,9 @@ EOF
 
     $backup_dir/restore.sh
 
-Backup содержит копии основных файлов деплоя и, если PostgreSQL был доступен, logical dump целевой базы Minishop.
+Бэкап содержит копии основных файлов деплоя и, если PostgreSQL был доступен, логический дамп целевой базы Minishop.
 EOF
-    ok "Backup перед миграцией сохранен: $backup_dir"
+    ok "Бэкап перед миграцией сохранен: $backup_dir"
 }
 
 choose_legacy_source() {
@@ -2496,7 +2501,7 @@ choose_legacy_source() {
     info "Документация по миграции из Remnashop: $DOCS_REMNASHOP_URL"
     choose "Откуда мигрировать данные" "$default_source" "1|2|3" \
         "1. Remnashop - пользователи, подписки, платежи, тарифы, промокоды и настройки провайдеров." \
-        "2. Старый remnawave-tg-shop - перенос совместимой базы/volume." \
+        "2. Старый remnawave-tg-shop - перенос совместимой базы или Docker volume." \
         "3. Не мигрировать данные" || return 1
     case "$CHOICE_VALUE" in
         1) LEGACY_SOURCE="remnashop" ;;
@@ -2514,10 +2519,10 @@ ensure_github_source_for_importer() {
 
 run_remnashop_migration() {
     section "Миграция из Remnashop"
-    info "Сначала будет dry-run без записи данных. Документация: $DOCS_REMNASHOP_URL"
+    info "Сначала будет проверка без записи данных. Документация: $DOCS_REMNASHOP_URL"
     ENV_PATH="$TARGET_DIR/.env"
     if [ ! -f "$ENV_PATH" ]; then
-        fail ".env не найден. Сначала установите stack или сгенерируйте конфигурацию."
+        fail ".env не найден. Сначала установите стек или сгенерируйте конфигурацию."
         return 1
     fi
     ensure_github_source_for_importer || return 1
@@ -2533,7 +2538,7 @@ run_remnashop_migration() {
     prompt_value "DSN PostgreSQL базы Remnashop" "$detected_source_dsn" 1 0 ""
     SOURCE_DSN="$PROMPT_VALUE"
     SOURCE_SCHEMA="${REMNASHOP_SOURCE_SCHEMA:-public}"
-    info "Schema источника Remnashop: $SOURCE_SCHEMA. Для другой schema задайте REMNASHOP_SOURCE_SCHEMA перед запуском."
+    info "Схема PostgreSQL источника Remnashop: $SOURCE_SCHEMA. Для другой схемы задайте REMNASHOP_SOURCE_SCHEMA перед запуском."
     detected_source_env=$(detect_remnashop_env_file || true)
     if [ -n "$detected_source_env" ]; then
         info "Нашел .env Remnashop и подставил путь по умолчанию."
@@ -2543,7 +2548,7 @@ run_remnashop_migration() {
     if [ -n "$SOURCE_ENV_PATH" ]; then
         source_env_dir=$(dirname "$SOURCE_ENV_PATH")
         if [ ! -d "$source_env_dir" ]; then
-            fail "Каталог source .env не найден: $source_env_dir"
+            fail "Каталог .env источника не найден: $source_env_dir"
             return 1
         fi
         SOURCE_ENV_PATH=$(cd "$source_env_dir" && pwd)/$(basename "$SOURCE_ENV_PATH")
@@ -2554,32 +2559,32 @@ run_remnashop_migration() {
     fi
 
     choose "Целевая база Minishop" "1" "1|2" \
-        "1. База текущего Docker Compose stack (рекомендуется)." \
-        "2. Ввести target DSN вручную." || return 1
+        "1. База текущего Docker Compose стека (рекомендуется)." \
+        "2. Ввести целевой DSN вручную." || return 1
     if [ "$CHOICE_VALUE" = "1" ]; then
         TARGET_DSN="$(local_target_dsn)"
-        info "Target DSN указывает на postgres service текущего Compose stack."
+        info "Целевой DSN указывает на сервис postgres текущего Docker Compose стека."
         create_pre_migration_backup remnashop || return 1
         if confirm "Сбросить целевую базу Minishop перед импортом? Это удалит текущие данные Minishop." 0; then
             reset_target_compose_database || return 1
         fi
     else
-        warn "Для ручного target DSN автоматический backup целевой базы не выполняется."
-        prompt_value "Target PostgreSQL DSN" "" 1 0 ""
+        warn "Для ручного целевого DSN автоматический бэкап целевой базы не выполняется."
+        prompt_value "Целевой PostgreSQL DSN" "" 1 0 ""
         TARGET_DSN="$PROMPT_VALUE"
     fi
 
-    prompt_value "Путь к JSON map тарифов (пусто = пропустить)" "" 0 0 ""
+    prompt_value "Путь к JSON-карте тарифов (пусто = пропустить)" "" 0 0 ""
     TARIFF_MAP_PATH="$PROMPT_VALUE"
     if [ -n "$TARIFF_MAP_PATH" ]; then
         tariff_map_dir=$(dirname "$TARIFF_MAP_PATH")
         if [ ! -d "$tariff_map_dir" ]; then
-            fail "Каталог tariff map не найден: $tariff_map_dir"
+            fail "Каталог JSON-карты тарифов не найден: $tariff_map_dir"
             return 1
         fi
         TARIFF_MAP_PATH=$(cd "$tariff_map_dir" && pwd)/$(basename "$TARIFF_MAP_PATH")
         if [ ! -f "$TARIFF_MAP_PATH" ]; then
-            fail "Tariff map не найден: $TARIFF_MAP_PATH"
+            fail "JSON-карта тарифов не найдена: $TARIFF_MAP_PATH"
             return 1
         fi
     fi
@@ -2587,11 +2592,11 @@ run_remnashop_migration() {
     IMPORTER_PATH="$(download_importer)" || return 1
     connect_local_source_db_to_target_network
 
-    section "Dry-run импорт"
+    section "Проверка импорта без записи"
     mkdir -p "$TARGET_DIR/$INSTALL_STATE_DIR"
     DRY_RUN_SUMMARY_PATH="$TARGET_DIR/$INSTALL_STATE_DIR/remnashop-dry-run-summary.json"
     if ! run_import_command 1 "$DRY_RUN_SUMMARY_PATH" 0; then
-        fail "Dry-run не прошел. Исправьте подключение или настройки перед импортом."
+        fail "Проверка без записи не прошла. Исправьте подключение или настройки перед импортом."
         return 1
     fi
     print_remnashop_import_summary "$DRY_RUN_SUMMARY_PATH" "dry-run"
@@ -2616,24 +2621,24 @@ run_remnashop_migration() {
 }
 
 run_target_schema_migrations() {
-    section "Применение schema migrations целевого stack"
+    section "Применение миграций схемы целевого стека"
     require_docker || return 1
     (cd "$TARGET_DIR" && run_compose run --rm migrate) || return 1
-    ok "Schema migrations выполнены."
+    ok "Миграции схемы выполнены."
 }
 
 prepare_compose_without_starting_apps() {
-    section "Подготовка целевого Compose stack"
+    section "Подготовка целевого Docker Compose стека"
     require_docker || return 1
     (cd "$TARGET_DIR" && run_compose up --no-start) || return 1
 }
 
 run_tgshop_volume_migration() {
-    section "Миграция volume старого remnawave-tg-shop"
-    warn "Этот путь копирует старый PostgreSQL Docker volume в новый volume Minishop."
-    warn "Старые volumes не удаляются; сохраните их до проверки нового stack."
+    section "Миграция Docker volume старого remnawave-tg-shop"
+    warn "Этот путь копирует старый PostgreSQL Docker volume в новый Docker volume Minishop."
+    warn "Старые Docker volumes не удаляются; сохраните их до проверки нового стека."
 
-    if confirm "Остановить известные старые/текущие контейнеры перед копированием volumes?" 1; then
+    if confirm "Остановить известные старые/текущие контейнеры перед копированием томов Docker?" 1; then
         stop_known_legacy_containers || return 1
         (cd "$TARGET_DIR" && run_compose down) || true
     fi
@@ -2643,20 +2648,20 @@ run_tgshop_volume_migration() {
     copy_volume_if_safe "$OLD_TGSHOP_CADDY_DATA_VOLUME" "$NEW_MINISHOP_CADDY_DATA_VOLUME" 0 || return 1
     copy_volume_if_safe "$OLD_TGSHOP_CADDY_CONFIG_VOLUME" "$NEW_MINISHOP_CADDY_CONFIG_VOLUME" 0 || return 1
 
-    if confirm "Запустить новый stack и применить schema changes сейчас?" 1; then
+    if confirm "Запустить новый стек и применить миграции схемы сейчас?" 1; then
         start_stack 0 || return 1
         (cd "$TARGET_DIR" && run_compose logs --tail 120 migrate) || true
     else
-        warn "Stack подготовлен, но не запущен. Позже выполните docker compose up -d."
+        warn "Стек подготовлен, но не запущен. Позже выполните docker compose up -d."
     fi
 }
 
 run_tgshop_dsn_migration() {
     section "DSN-миграция старого remnawave-tg-shop"
-    warn "Этот путь делает dump старой PostgreSQL базы, восстанавливает его в целевую Compose PostgreSQL и запускает schema migrations Minishop."
-    warn "Целевая база будет удалена и создана заново перед restore."
+    warn "Этот путь делает дамп старой PostgreSQL базы, восстанавливает его в целевую PostgreSQL базу Compose и запускает миграции схемы Minishop."
+    warn "Целевая база будет удалена и создана заново перед восстановлением."
 
-    if ! confirm "Заменить целевую базу dump'ом источника?" 0; then
+    if ! confirm "Заменить целевую базу дампом источника?" 0; then
         warn "Миграция не применена."
         return 0
     fi
@@ -2679,7 +2684,7 @@ run_tgshop_dsn_migration() {
     (cd "$TARGET_DIR" && run_compose exec -T postgres sh -c \
         'dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"') || return 1
 
-    section "Dump и restore старой базы"
+    section "Дамп и восстановление старой базы"
     (cd "$TARGET_DIR" && run_compose run --rm --no-deps \
         -e "SOURCE_DSN=$SOURCE_DSN" \
         -e "TARGET_DSN=$TARGET_DSN" \
@@ -2687,7 +2692,7 @@ run_tgshop_dsn_migration() {
         'pg_dump --clean --if-exists --no-owner --no-privileges "$SOURCE_DSN" | psql "$TARGET_DSN"') || return 1
 
     run_target_schema_migrations || return 1
-    if confirm "Запустить полный stack сейчас?" 1; then
+    if confirm "Запустить полный стек сейчас?" 1; then
         start_stack 0 || return 1
     fi
 }
@@ -2696,14 +2701,14 @@ run_remnawave_tg_shop_migration() {
     section "Миграция старого remnawave-tg-shop"
     ENV_PATH="$TARGET_DIR/.env"
     if [ ! -f "$ENV_PATH" ]; then
-        fail ".env не найден. Сначала установите stack или сгенерируйте конфигурацию."
+        fail ".env не найден. Сначала установите стек или сгенерируйте конфигурацию."
         return 1
     fi
     require_docker || return 1
 
     choose "Способ миграции" "1" "1|2|3" \
-        "1. Скопировать старые Docker volumes на этом сервере (рекомендуется для старых compose install)." \
-        "2. Сделать dump из source PostgreSQL DSN и восстановить в этот compose stack." \
+        "1. Скопировать старые Docker volumes на этом сервере (рекомендуется для старых compose-установок)." \
+        "2. Сделать дамп из исходного PostgreSQL DSN и восстановить в этот compose-стек." \
         "3. Пропустить миграцию" || return 1
     case "$CHOICE_VALUE" in
         1) run_tgshop_volume_migration ;;
@@ -2770,12 +2775,12 @@ install_flow() {
             run_selected_legacy_migration
             ;;
         remnashop)
-            info "Запускаю Docker Compose stack перед импортом из Remnashop: importer использует целевую базу Minishop."
+            info "Запускаю Docker Compose стек перед импортом из Remnashop: скрипт импорта использует целевую базу Minishop."
             start_stack || return 1
             run_selected_legacy_migration
             ;;
         *)
-            if confirm "Запустить Docker Compose stack сейчас?" 1; then
+            if confirm "Запустить Docker Compose стек сейчас?" 1; then
                 start_stack || return 1
             fi
             ;;
@@ -2814,7 +2819,7 @@ main_menu() {
             "2. Установить новый remnawave-minishop и мигрировать данные из другого бота." \
             "3. Мигрировать данные в уже установленный remnawave-minishop." \
             "4. Только скачать/обновить файлы деплоя." \
-            "5. Проверить текущий stack." \
+            "5. Проверить текущий стек." \
             "6. Выйти." || return 1
         case "$CHOICE_VALUE" in
             1) install_flow 0 ;;
