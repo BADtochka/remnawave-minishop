@@ -31,16 +31,24 @@ sh install.sh
 
 Wizard работает через меню с цифрами и подтверждениями `y/n`. Он умеет:
 
-- скачать выбранный compose-профиль (`Caddy`, `Nginx`, `Pangolin/Newt` или `no-proxy`);
+- работать полностью на русском языке и по умолчанию предлагать папку
+  `/opt/remnawave-minishop`;
+- скачать выбранный compose-профиль (`Caddy`, `Nginx`, `Pangolin/Newt`, `no-proxy` или профиль существующего eGames reverse proxy);
 - сгенерировать минимальный `.env`, включая пароли и стабильные secrets;
+- проверить A-записи `WEBHOOK_HOST` и `MINIAPP_HOST` перед выпуском TLS;
+- для Nginx выпустить сертификаты через Certbot Cloudflare DNS-01 или standalone
+  HTTP-01, либо принять уже разложенные файлы `ssl/<hostname>/`;
 - сохранить backup существующих файлов перед перезаписью;
-- подготовить writable `data/` для файлов приложения;
+- подготовить writable `data/` для файлов приложения и при необходимости
+  обновить владельца каталога на пользователя контейнеров `10001:10001`;
 - запустить `docker compose pull && docker compose up -d`;
 - проверить текущий стек через `docker compose ps` и логи `migrate`;
 - запустить миграцию из поддерживаемых ботов: Remnashop и старый
   `remnawave-tg-shop`;
 
-Для тестирования другой ветки или форка задайте источник перед запуском:
+Wizard не спрашивает repository/ref в обычном сценарии. По умолчанию он берет
+`3252a8/remnawave-minishop` и ref `main`; для тестирования другой ветки, тега
+или форка задайте источник перед запуском:
 
 ```bash
 MINISHOP_INSTALL_REPO=3252a8/remnawave-minishop \
@@ -48,12 +56,19 @@ MINISHOP_INSTALL_REF=main \
 sh install.sh
 ```
 
-Миграция Remnashop в wizard сначала запускает `dry-run`, показывает JSON-сводку
-и только после отдельного подтверждения применяет изменения в целевую БД. Если
+Миграция Remnashop в wizard сначала запускает проверку без записи (`dry-run`),
+показывает короткую сводку и сохраняет полный JSON/raw-вывод в `.installer/`.
+Если выбрана текущая compose-БД, wizard предлагает сделать бэкап целевой БД и
+основных файлов деплоя в `backups/pre-remnashop-migration-*` с `restore.sh`.
+После успешной проверки подтверждение применения имеет дефолт `Y`: Enter
+применит миграцию, `n` остановит ее без записи. Если
 указать старый Remnashop `.env`, wizard передаст importer-у `APP_CRYPT_KEY`,
 Remnawave API settings и поддерживаемые payment provider settings из таблицы
-`payment_gateways`. После применения wizard печатает новые webhook URL для
-Remnawave Panel и платежных провайдеров.
+`payment_gateways`. После применения wizard обновляет совместимые настройки,
+перезапускает `backend`, `worker` и `frontend`, для профиля eGames делает
+`nginx -t` и reload/restart eGames Nginx, отправляет Telegram-уведомление
+админам/лог-чату и в самом конце печатает новые webhook URL для Remnawave Panel,
+Telegram и платежных провайдеров.
 Миграция со старого `remnawave-tg-shop` работает как upgrade совместимой БД:
 либо копирует старый Docker volume, либо делает `pg_dump` по source DSN,
 восстанавливает дамп в целевую compose-БД и запускает сервис `migrate`.
@@ -82,6 +97,7 @@ Remnawave Panel и платежных провайдеров.
 | [`deploy/examples/nginx`](https://github.com/3252a8/remnawave-minishop/tree/main/deploy/examples/nginx) | Уже используете Nginx и готовы положить TLS-сертификаты рядом с примером. |
 | [`deploy/examples/newt`](https://github.com/3252a8/remnawave-minishop/tree/main/deploy/examples/newt) | Публикуете сервисы через Pangolin/Newt без входящих портов на сервере приложения. |
 | [`deploy/examples/no-proxy`](https://github.com/3252a8/remnawave-minishop/tree/main/deploy/examples/no-proxy) | Нужно напрямую открыть HTTP-порты backend/frontend или проверить стек за внешним TLS-терминатором. |
+| `Уже установленная Remnawave через eGames - использовать ее Nginx/TLS` в wizard | Remnawave Panel уже стоит на этом же хосте через [`eGamesAPI/remnawave-reverse-proxy`](https://github.com/eGamesAPI/remnawave-reverse-proxy); wizard использует no-proxy compose, добавляет backend/Mini App маршруты в найденный `nginx.conf` eGames и после миграции перечитывает Nginx. |
 
 ## Caddy (рекомендуемый вариант)
 
@@ -498,6 +514,7 @@ APP_ENV_FILE=.env.dev docker compose --env-file .env.dev up -d --build
 `PANEL_WRITE_MODE=live` можно поставить только для отдельной тестовой Remnawave
 Panel, потому что этот режим реально меняет пользователей панели.
 
-Если второй стек запускается на том же хосте, дополнительно разведите
-`WEB_SERVER_PORT` и `FRONTEND_PORT`. Если production на другом сервере, локальные
-порты можно оставить стандартными.
+Если второй стек запускается на том же хосте, дополнительно разведите порты:
+для корневого compose используйте `WEB_SERVER_PORT` и `FRONTEND_PORT`, а для
+production examples без встроенного TLS - `WEB_SERVER_BIND` и `FRONTEND_BIND`.
+Если production на другом сервере, локальные порты можно оставить стандартными.

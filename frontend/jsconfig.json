@@ -1,9 +1,12 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["vite/client"],
     "paths": {
-      "$lib/*": ["src/lib/*"],
-      "$components/*": ["src/lib/components/*"]
+      "$lib/*": ["./src/lib/*"],
+      "$components/*": ["./src/lib/components/*"]
     }
   },
   "include": ["src/**/*"]

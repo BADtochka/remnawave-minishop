@@ -409,6 +409,37 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["i18n"]["en"]["menu_support_button"], "Support")
         self.assertNotIn("admin_settings_title", payload["i18n"]["en"])
 
+    def test_webapp_shell_preload_markup_includes_public_guide_fetch(self):
+        token = "8f559061460e8fede78ef18dce887236"
+
+        markup = webapp_assets._webapp_shell_preload_markup(
+            "subscription_webapp.min.abcdef12.js",
+            token,
+        )
+        install_markup = webapp_assets._webapp_shell_preload_markup(
+            "subscription_webapp.min.abcdef12.js"
+        )
+
+        self.assertIn('href="/subscription_webapp.min.abcdef12.js"', markup)
+        self.assertIn('as="script"', markup)
+        self.assertIn(f'href="/api/subscription-guides/public/{token}"', markup)
+        self.assertIn('as="fetch"', markup)
+        self.assertIn('crossorigin="use-credentials"', markup)
+        self.assertNotIn("/api/subscription-guides/public/", install_markup)
+
+    def test_frontend_starts_public_install_preload_before_mount(self):
+        main_source = Path("frontend/src/main.js").read_text(encoding="utf-8")
+        app_source = Path("frontend/src/App.svelte").read_text(encoding="utf-8")
+        store_source = Path("frontend/src/lib/webapp/stores/installGuidesStore.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("__RW_PUBLIC_INSTALL_PRELOAD__", main_source)
+        self.assertIn("startPublicInstallPreload();", main_source)
+        self.assertIn("loadPublicInstallGuides", app_source)
+        self.assertIn("installGuidesStore.hydrate", app_source)
+        self.assertIn("hydrate,", store_source)
+
     def test_home_screen_hides_unlimited_traffic_limit_cards(self):
         root = Path(__file__).resolve().parents[1]
         app_source = (root / "frontend/src/App.svelte").read_text(encoding="utf-8")

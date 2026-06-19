@@ -19,17 +19,23 @@
     Upload,
   } from "$components/ui/icons.js";
   import { Tooltip } from "$components/ui/primitives.js";
+  import {
+    createAdminDatatable,
+    syncAdminDatatable,
+    watchAdminDatatable,
+  } from "../../lib/admin/datatables.js";
 
   export let at = (key) => key;
   export let fmtDate = (value) => value;
 
   const BACKUPS_PAGE_SIZE = 10;
+  const backupsTable = createAdminDatatable([], { rowsPerPage: BACKUPS_PAGE_SIZE });
+  const backupsSignal = watchAdminDatatable(backupsTable);
   const backupsStore = getContext("backupsStore");
 
   let selectedName = "";
   let restoreDatabase = true;
   let restoreCompose = false;
-  let backupsPage = 0;
   let fileInput = null;
 
   $: ({
@@ -42,17 +48,26 @@
     lastRestore,
   } = $backupsStore);
   $: totalArchives = archives?.length || 0;
-  $: backupsPageCount = Math.max(1, Math.ceil(totalArchives / BACKUPS_PAGE_SIZE));
-  $: if (backupsPage > backupsPageCount - 1) backupsPage = backupsPageCount - 1;
-  $: backupsPageStart = backupsPage * BACKUPS_PAGE_SIZE;
-  $: pagedArchives = (archives || []).slice(backupsPageStart, backupsPageStart + BACKUPS_PAGE_SIZE);
+  $: {
+    syncAdminDatatable(backupsTable, archives || []);
+    if (backupsTable.currentPage > (backupsTable.pageCount || 1))
+      backupsTable.setPage(backupsTable.pageCount || 1);
+  }
+  $: backupsMeta = (() => {
+    const { start, end, total } = $backupsSignal.rowCount;
+    return at(
+      "backups_pagination_meta",
+      { from: start, to: end, total },
+      `${start}-${end} / ${total}`
+    );
+  })();
   $: if (!selectedName && archives?.length) {
     selectedName = archives[0].name;
-    backupsPage = 0;
+    backupsTable.setPage(1);
   }
   $: if (selectedName && archives?.length && !archives.some((item) => item.name === selectedName)) {
     selectedName = archives[0].name;
-    backupsPage = 0;
+    backupsTable.setPage(1);
   }
   $: selectedArchive = (archives || []).find((item) => item.name === selectedName) || null;
   $: if (selectedArchive && restoreDatabase && !selectedArchive.has_database)
@@ -102,24 +117,11 @@
 
   function focusArchivePage(name) {
     const index = (archives || []).findIndex((item) => item.name === name);
-    if (index >= 0) backupsPage = Math.floor(index / BACKUPS_PAGE_SIZE);
-  }
-
-  function setBackupsPage(page) {
-    backupsPage = Math.min(Math.max(0, Number(page) || 0), backupsPageCount - 1);
+    if (index >= 0) backupsTable.setPage(Math.floor(index / BACKUPS_PAGE_SIZE) + 1);
   }
 
   function warningsText(warnings) {
     return (warnings || []).filter(Boolean).join("\n");
-  }
-
-  function paginationMeta() {
-    const end = Math.min(backupsPageStart + pagedArchives.length, totalArchives);
-    return at(
-      "backups_pagination_meta",
-      { from: backupsPageStart + 1, to: end, total: totalArchives },
-      `${backupsPageStart + 1}-${end} / ${totalArchives}`
-    );
   }
 
   async function uploadSelectedFile(event) {
@@ -277,7 +279,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each pagedArchives as archive (archive.name)}
+            {#each $backupsSignal.rows as archive (archive.name)}
               <tr class:is-selected={archive.name === selectedName}>
                 <td data-label={at("select", {}, "Выбрать")}>
                   <RadioGroupItem
@@ -339,9 +341,8 @@
       </RadioGroup>
       {#if totalArchives > BACKUPS_PAGE_SIZE}
         <AdminPagination
-          meta={paginationMeta()}
-          page={backupsPage}
-          pageCount={backupsPageCount}
+          meta={backupsMeta}
+          table={backupsTable}
           pageLabel={at("page_short", {}, "Стр.")}
           ofLabel={at("pagination_of", {}, "из")}
           jumpLabel={at("page_short", {}, "Стр.")}
@@ -349,7 +350,6 @@
           goLabel={at("pagination_go", {}, "Перейти")}
           prevLabel={at("pagination_prev", {}, "Назад")}
           nextLabel={at("pagination_next", {}, "Далее")}
-          onPageChange={setBackupsPage}
         />
       {/if}
     {/if}

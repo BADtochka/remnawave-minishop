@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, ValidationError, computed_field, field_va
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from config.tariffs_config import TariffsConfig, load_tariffs_config
+from config.traffic_strategy import normalize_traffic_limit_strategy
 from config.webapp_themes_config import (
     WebappThemesConfig,
     resolved_webapp_themes_catalog,
@@ -217,6 +218,9 @@ class Settings(BaseSettings):
     WEBAPP_DEVICES_CACHE_TTL_SECONDS: int = Field(default=5)
     PANEL_USER_CACHE_TTL_SECONDS: int = Field(default=5)
     PANEL_DEVICES_CACHE_TTL_SECONDS: int = Field(default=5)
+    SUBSCRIPTION_GUIDES_CONFIG_CACHE_TTL_SECONDS: int = Field(default=300)
+    SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS: int = Field(default=300)
+    SUBSCRIPTION_GUIDES_PUBLIC_CACHE_TTL_SECONDS: int = Field(default=300)
     PANEL_ALL_USERS_CACHE_TTL_SECONDS: int = Field(default=5)
     PANEL_ALL_USERS_PAGE_SIZE: int = Field(default=1000)
     # Courtesy delay between consecutive /users pages when fetching the full
@@ -335,7 +339,7 @@ class Settings(BaseSettings):
     STARS_ADMIN_ONLY_ENABLED: bool = Field(default=False)
     PAYMENT_METHODS_ORDER: Optional[str] = Field(
         default=None,
-        description="Comma-separated list of payment methods to show (e.g., severpay,wata,freekassa,yookassa,platega,stars,cryptopay,heleket,paykilla,lava,cloudpayments,stripe)",  # noqa: E501
+        description="Comma-separated list of payment methods to show (e.g., severpay,wata,freekassa,yookassa,platega,stars,cryptopay,heleket,paykilla,lava,pally,cloudpayments,stripe)",  # noqa: E501
     )
     SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED: bool = Field(
         default=True,
@@ -484,6 +488,7 @@ class Settings(BaseSettings):
     )
     PANEL_API_URL: Optional[str] = None
     PANEL_API_KEY: Optional[str] = None
+    PANEL_API_COOKIE: Optional[str] = None
     USER_TRAFFIC_LIMIT_GB: Optional[float] = Field(default=0.0)
     USER_TRAFFIC_STRATEGY: str = Field(default="NO_RESET")
     USER_SQUAD_UUIDS: Optional[str] = Field(
@@ -1057,12 +1062,14 @@ class Settings(BaseSettings):
             "platega_crypto",
             "severpay",
             "wata",
+            "wata_crypto",
             "yookassa",
             "stars",
             "cryptopay",
             "heleket",
             "paykilla",
             "lava",
+            "pally",
             "cloudpayments",
             "stripe",
         ]
@@ -1216,6 +1223,7 @@ class Settings(BaseSettings):
         "SMTP_FALLBACK_PORTS",
         "BACKUP_COMPOSE_SOURCE_DIR",
         "BACKUP_COMPOSE_RESTORE_DIR",
+        "PANEL_API_COOKIE",
         mode="before",
     )
     @classmethod
@@ -1254,6 +1262,11 @@ class Settings(BaseSettings):
         if value not in {"auto", "live", "dry_run"}:
             raise ValueError("PANEL_WRITE_MODE must be one of: auto, live, dry_run")
         return value
+
+    @field_validator("USER_TRAFFIC_STRATEGY", "TRIAL_TRAFFIC_STRATEGY", mode="before")
+    @classmethod
+    def normalize_panel_traffic_strategy(cls, v):
+        return normalize_traffic_limit_strategy(v)
 
     # Notification types
     LOG_NEW_USERS: bool = Field(

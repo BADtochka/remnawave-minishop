@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.utils.ttl_cache import AsyncTTLCache
 from config.settings import Settings
+from config.traffic_strategy import normalize_traffic_limit_strategy
 from db.dal import panel_sync_dal
 from db.models import PanelSyncStatus
 
@@ -25,6 +26,7 @@ _ENDPOINT_LOG_LABELS = (
     "/users/by-username",
     "/users/by-email",
     "/users",
+    "/external-squads",
     "/subscriptions/subpage-config",
     "/subscription-page-configs",
     "/hwid/devices/delete",
@@ -66,6 +68,7 @@ class PanelApiService:
         self.settings = settings
         self.base_url = settings.PANEL_API_URL
         self.api_key = settings.PANEL_API_KEY
+        self.api_cookie = getattr(settings, "PANEL_API_COOKIE", None)
         self._session: Optional[aiohttp.ClientSession] = None
         self.default_client_ip = "127.0.0.1"
         # Cache slow-changing reference data fetched from the panel. Errors and
@@ -89,6 +92,14 @@ class PanelApiService:
             ttl_seconds=max(0, int(getattr(settings, "PANEL_DEVICES_CACHE_TTL_SECONDS", 5) or 0)),
             settings=settings,
             namespace="panel:devices",
+        )
+        self._external_squads_cache: AsyncTTLCache = AsyncTTLCache(
+            ttl_seconds=max(
+                0,
+                int(getattr(settings, "PANEL_EXTERNAL_SQUADS_CACHE_TTL_SECONDS", 300) or 0),
+            ),
+            settings=settings,
+            namespace="panel:external_squads",
         )
         self._all_users_cache: AsyncTTLCache = AsyncTTLCache(
             ttl_seconds=max(
@@ -169,6 +180,8 @@ class PanelApiService:
         }
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        if self.api_cookie:
+            headers["Cookie"] = str(self.api_cookie).strip()
         return headers
 
     def _is_transient_error(self, result: Optional[Dict[str, Any]]) -> bool:
@@ -702,7 +715,9 @@ class PanelApiService:
             "username": username_on_panel,
             "status": status.upper(),
             "expireAt": expire_at_iso,
-            "trafficLimitStrategy": default_traffic_limit_strategy.upper(),
+            "trafficLimitStrategy": normalize_traffic_limit_strategy(
+                default_traffic_limit_strategy
+            ),
             "trafficLimitBytes": default_traffic_limit_bytes,
         }
         hwid_limit_value = hwid_device_limit
@@ -750,6 +765,10 @@ class PanelApiService:
     ) -> Optional[Dict[str, Any]]:
         if "uuid" not in update_payload:
             update_payload["uuid"] = user_uuid
+        if "trafficLimitStrategy" in update_payload:
+            update_payload["trafficLimitStrategy"] = normalize_traffic_limit_strategy(
+                update_payload.get("trafficLimitStrategy")
+            )
 
         full_response = await self._request(
             "PATCH", "/users", json=update_payload, log_full_response=log_response
@@ -881,6 +900,30 @@ class PanelApiService:
         logging.error(
             f"Failed to get subscription page config {config_uuid} from panel. Response: {response_data}"  # noqa: E501
         )
+        return None
+
+    async def get_external_squad(self, squad_uuid: str) -> Optional[Dict[str, Any]]:
+        squad_uuid = str(squad_uuid or "").strip()
+        if not squad_uuid:
+            return None
+        if self._external_squads_cache.ttl_seconds <= 0:
+            return await self._get_external_squad_uncached(squad_uuid)
+        return await self._external_squads_cache.get_or_load(
+            f"detail:{squad_uuid}",
+            lambda: self._get_external_squad_uncached(squad_uuid),
+        )
+
+    async def _get_external_squad_uncached(self, squad_uuid: str) -> Optional[Dict[str, Any]]:
+        response_data = await self._request(
+            "GET",
+            f"/external-squads/{squad_uuid}",
+            log_full_response=False,
+        )
+        if response_data and not response_data.get("error") and "response" in response_data:
+            response = response_data.get("response")
+            if isinstance(response, dict):
+                return response
+        logging.error("Failed to get external squad %s. Response: %s", squad_uuid, response_data)
         return None
 
     async def get_user_devices(self, user_uuid: str) -> Optional[List[Dict[str, Any]]]:

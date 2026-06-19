@@ -2,6 +2,7 @@ import { writable } from "svelte/store";
 
 export function createInstallGuidesStore({ api, t, showToast }) {
   let inFlight = null;
+  let loadedPath = "";
   const state = writable({
     enabled: false,
     config: null,
@@ -12,6 +13,25 @@ export function createInstallGuidesStore({ api, t, showToast }) {
     loaded: false,
   });
 
+  function stateFromResponse(response) {
+    return {
+      enabled: Boolean(response?.enabled),
+      config: response?.config || null,
+      source: response?.source || null,
+      subscription: response?.subscription || null,
+      error: response?.error || "",
+      loading: false,
+      loaded: true,
+    };
+  }
+
+  function applyResponse(path, response) {
+    const next = stateFromResponse(response);
+    loadedPath = path;
+    state.set(next);
+    return next;
+  }
+
   async function fetchGuides(path, force = false) {
     if (inFlight?.path === path) return inFlight.promise;
     let snapshot;
@@ -19,7 +39,7 @@ export function createInstallGuidesStore({ api, t, showToast }) {
       snapshot = s;
       return s;
     });
-    if (!force && snapshot?.loaded) return snapshot;
+    if (!force && snapshot?.loaded && loadedPath === path) return snapshot;
     const promise = (async () => {
       state.update((s) => ({
         ...s,
@@ -29,16 +49,7 @@ export function createInstallGuidesStore({ api, t, showToast }) {
       }));
       try {
         const response = await api(path);
-        const next = {
-          enabled: Boolean(response?.enabled),
-          config: response?.config || null,
-          source: response?.source || null,
-          subscription: response?.subscription || null,
-          error: response?.error || "",
-          loading: false,
-          loaded: true,
-        };
-        state.set(next);
+        const next = applyResponse(path, response);
         return next;
       } catch (error) {
         const message =
@@ -53,6 +64,7 @@ export function createInstallGuidesStore({ api, t, showToast }) {
           loading: false,
           loaded: true,
         };
+        loadedPath = path;
         state.set(next);
         return next;
       } finally {
@@ -67,13 +79,23 @@ export function createInstallGuidesStore({ api, t, showToast }) {
     return fetchGuides("/subscription-guides", force);
   }
 
-  async function loadPublic(shareToken, force = false) {
+  function publicPath(shareToken) {
     const encoded = encodeURIComponent(String(shareToken || ""));
-    return fetchGuides(`/subscription-guides/public/${encoded}`, force);
+    return `/subscription-guides/public/${encoded}`;
+  }
+
+  async function loadPublic(shareToken, force = false) {
+    return fetchGuides(publicPath(shareToken), force);
+  }
+
+  function hydrate(path, response) {
+    inFlight = null;
+    return applyResponse(path, response);
   }
 
   function reset() {
     inFlight = null;
+    loadedPath = "";
     state.set({
       enabled: false,
       config: null,
@@ -91,6 +113,8 @@ export function createInstallGuidesStore({ api, t, showToast }) {
     update: state.update,
     load,
     loadPublic,
+    hydrate,
+    publicPath,
     reset,
   };
 }

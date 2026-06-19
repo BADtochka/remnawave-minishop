@@ -4,6 +4,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 USER_DETAIL = REPO_ROOT / "frontend/src/admin/sections/UserDetailModal.svelte"
+STATS_SECTION = REPO_ROOT / "frontend/src/admin/sections/StatsSection.svelte"
+ADMIN_PANEL = REPO_ROOT / "frontend/src/admin/AdminPanel.svelte"
 ADMIN_CSS = REPO_ROOT / "frontend/src/styles/admin.css"
 USERS_STORE = REPO_ROOT / "frontend/src/lib/admin/stores/usersStore.js"
 
@@ -128,3 +130,29 @@ def test_user_action_saves_refresh_details_without_reopening_modal():
     assert "resetPremium: false" in action_block
     assert "resetRegular: false" in action_block
     assert "resetHwid: false" in action_block
+
+
+def test_stats_recent_payments_open_payment_and_user_cards():
+    source = STATS_SECTION.read_text(encoding="utf-8")
+    table_start = source.index("{#each recentPayments as p (p.payment_id)}")
+    table_end = source.index("{/each}", table_start)
+    table_block = source[table_start:table_end]
+
+    assert "paymentsStore.openPayment(p)" in table_block
+    assert "onOpenUserCard(p.user_id)" in table_block
+    assert "payment_detail_open" in table_block
+    assert "payments_open_user" in table_block
+    assert "admin-payment-id-btn" in source
+    assert "admin-payments-user-btn" in source
+
+
+def test_stats_recent_payment_user_button_stays_in_current_section():
+    source = ADMIN_PANEL.read_text(encoding="utf-8")
+
+    assert "onOpenUserCard={openSectionUserCard}" in source
+    assert re.search(
+        r'\$: openSectionUserCard\s*=\s*active === "payments"\s*\?\s*openPaymentUserCard'
+        r'\s*:\s*active === "logs"\s*\?\s*openLogsUserCard\s*:\s*openUserCard;',
+        source,
+        re.S,
+    )

@@ -14,17 +14,21 @@ curl -fsSL https://gitlab.com/3252a8/remnawave-minishop/-/raw/main/scripts/insta
 sh install.sh
 ```
 
-В меню выберите `Install new stack and run migration` для нового
-сервера или `Run migration only`, если compose-папка уже готова. Затем
-выберите источник `Old remnawave-tg-shop`.
+Wizard полностью русскоязычный. В главном меню выберите
+`Установить новый remnawave-minishop и мигрировать данные из другого бота` для
+нового сервера или `Мигрировать данные в уже установленный remnawave-minishop`,
+если compose-папка уже готова. Затем выберите источник
+`Старый remnawave-tg-shop`.
 
 Wizard поддерживает два способа переноса:
 
-- `Copy old Docker volumes` - для старого compose-стека на том же Docker host.
+- `Скопировать старые Docker volumes на этом сервере` - для старого
+  compose-стека на том же Docker host.
   Скрипт подготавливает новый stack, копирует
   `remnawave-tg-shop-db-data` в `remnawave-minishop-db-data`, опционально
   переносит Caddy volumes и запускает новый stack.
-- `Dump from a source PostgreSQL DSN` - для старой БД, доступной по DSN.
+- `Сделать дамп из исходного PostgreSQL DSN и восстановить в этот compose-стек` -
+  для старой БД, доступной по DSN.
   Скрипт поднимает целевой `postgres`, сбрасывает целевую БД, делает
   `pg_dump` из старой БД, восстанавливает дамп в compose-БД и запускает
   сервис `migrate`.

@@ -80,9 +80,11 @@ async function copyRuntimeAsset({ hashedName, stableName }) {
 }
 
 function prepareIndexHtml(rawHtml, { cssName, jsName }) {
+  const jsPreload = `    <link rel="preload" href="/${jsName}" as="script">`;
   const html = rawHtml
     .replace(/\r\n/g, "\n")
-    .replace('href="/subscription_webapp.css"', `href="/${cssName}"`);
+    .replace('href="/subscription_webapp.css"', `href="/${cssName}"`)
+    .replace("</head>", `${jsPreload}\n  </head>`);
   const lines = html.split("\n");
   const output = lines
     .map((line) =>

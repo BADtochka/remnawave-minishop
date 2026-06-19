@@ -32,7 +32,14 @@
     <ChevronDown size={14} class="admin-select-icon" />
   </Select.Trigger>
   <Select.Portal>
-    <Select.Content class="admin-select-content" {side} {align} {sideOffset} {collisionPadding}>
+    <Select.Content
+      class="admin-select-content"
+      {side}
+      {align}
+      {sideOffset}
+      {collisionPadding}
+      trapFocus={false}
+    >
       <Select.Viewport class="admin-select-viewport">
         {#each items as item (item.value)}
           <Select.Item value={item.value} label={item.label} class="admin-select-item">

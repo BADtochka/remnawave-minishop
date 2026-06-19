@@ -37,6 +37,15 @@ class SettingField:
     webhook_hint: str = ""
 
 
+TRAFFIC_STRATEGY_CHOICES: Tuple[Tuple[str, str], ...] = (
+    ("NO_RESET", "NO_RESET"),
+    ("DAY", "DAY"),
+    ("WEEK", "WEEK"),
+    ("MONTH", "MONTH"),
+    ("MONTH_ROLLING", "MONTH_ROLLING"),
+)
+
+
 SETTINGS_MANIFEST: List[SettingField] = [
     # ─── General ────────────────────────────────────────────────────
     SettingField(
@@ -104,6 +113,14 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "remnawave",
         "API-ключ Remnawave",
         "Секретный ключ API панели.",
+        secret=True,
+    ),
+    SettingField(
+        "PANEL_API_COOKIE",
+        "string",
+        "remnawave",
+        "Cookie API Remnawave",
+        "Optional Cookie header for Remnawave API requests behind a reverse proxy.",
         secret=True,
     ),
     SettingField(
@@ -415,6 +432,7 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "pricing",
         "Стратегия сброса трафика триала",
         optional=False,
+        choices=TRAFFIC_STRATEGY_CHOICES,
         subsection="trial",
     ),
     SettingField(
@@ -700,7 +718,13 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "USER_HWID_DEVICE_LIMIT", "int", "devices", "Лимит устройств по умолчанию (0 = ∞)", min=0
     ),
     SettingField("USER_TRAFFIC_LIMIT_GB", "float", "devices", "Лимит трафика пользователя (ГБ)"),
-    SettingField("USER_TRAFFIC_STRATEGY", "string", "devices", "Стратегия сброса трафика"),
+    SettingField(
+        "USER_TRAFFIC_STRATEGY",
+        "string",
+        "devices",
+        "Стратегия сброса трафика",
+        choices=TRAFFIC_STRATEGY_CHOICES,
+    ),
     # ─── System ────────────────────────────────────────────────────
     SettingField(
         "TELEGRAM_DROP_NON_PRIVATE_UPDATES",

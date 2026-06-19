@@ -1,4 +1,5 @@
 <script>
+  import { QueryClient } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
     Check,
@@ -165,11 +166,21 @@
     onToast(text);
   }
 
+  const adminQueryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        gcTime: 10 * 60 * 1000,
+        retry: false,
+        staleTime: 60 * 1000,
+      },
+    },
+  });
+
   const adsStore = createAdsStore({ api, onToast: flash, at });
   const backupsStore = createBackupsStore({ api, onToast: flash, at });
   const broadcastStore = createBroadcastStore({ api, onToast: flash, at });
-  const healthStore = createHealthStore({ api });
-  const logsStore = createLogsStore({ api, at });
+  const healthStore = createHealthStore({ api, at, queryClient: adminQueryClient });
+  const logsStore = createLogsStore({ api, onToast: flash, at, queryClient: adminQueryClient });
   const paymentsStore = createPaymentsStore({ api, onToast: flash, at, routePrefix });
   const promosStore = createPromosStore({ api, onToast: flash, at });
   const settingsStore = createSettingsStore({ api, onToast: flash, at });
@@ -206,11 +217,11 @@
   $: meta = SECTION_META[active] || { title: active, subtitle: "" };
   $: activeSection = SECTION_BY_ID.get(active);
   $: openSectionUserCard =
-    active === "logs"
-      ? openLogsUserCard
-      : active === "support"
-        ? openUserCard
-        : openPaymentUserCard;
+    active === "payments"
+      ? openPaymentUserCard
+      : active === "logs"
+        ? openLogsUserCard
+        : openUserCard;
   $: currentLanguageOption =
     languageOptions.find((option) => option.value === currentLang) || languageOptions[0];
 
@@ -473,6 +484,7 @@
   }
 
   onMount(() => {
+    adminQueryClient.mount();
     reduceMotion = readReduceMotion();
     let motionMql = null;
     const onMotionChange = () => {
@@ -510,6 +522,7 @@
       }
       if (typeof window !== "undefined") window.removeEventListener("popstate", onPopState);
       if (healthTimer !== null) window.clearInterval(healthTimer);
+      adminQueryClient.unmount();
       clearAdminLanguageClickGuard();
     };
   });
@@ -646,7 +659,13 @@
               </span>
               <ChevronsUpDown size={14} />
             </Select.Trigger>
-            <Select.Content class="language-select-content" side="top" align="start" sideOffset={8}>
+            <Select.Content
+              class="language-select-content"
+              side="top"
+              align="start"
+              sideOffset={8}
+              trapFocus={false}
+            >
               <Select.Viewport class="language-select-viewport">
                 {#each languageOptions as option (option.value)}
                   <Select.Item

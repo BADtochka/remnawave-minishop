@@ -1,5 +1,14 @@
 <script>
-  import { Activity, Radio, Server, TrendingDown, TrendingUp, Zap } from "$components/ui/icons.js";
+  import {
+    Activity,
+    FileText,
+    Radio,
+    Server,
+    TrendingDown,
+    TrendingUp,
+    User,
+    Zap,
+  } from "$components/ui/icons.js";
   import { getContext, onMount } from "svelte";
 
   import { fmtTrafficBytes } from "../../lib/admin/format.js";
@@ -10,6 +19,7 @@
     AdminDashboardGrid,
     AdminDashboardStack,
     AdminBadge,
+    AdminButton,
     AdminEmptyState,
     AdminRevenueChart,
     AdminRevenueCustomRangePopover,
@@ -29,7 +39,9 @@
   export let fmtDateShort = (value) => value;
   export let fmtMoney = (value) => value;
   export let paymentStatusVariant = () => "muted";
+  export let onOpenUserCard = () => {};
 
+  const paymentsStore = getContext("paymentsStore");
   const statsStore = getContext("statsStore");
 
   $: ({ stats, statsError, statsLoading } = $statsStore);
@@ -117,13 +129,65 @@
       ? inclusiveDaySpan(revenueCustomIso.from, revenueCustomIso.to)
       : 0;
   $: recentPaymentHeaders = [
-    at("id", {}, ""),
-    at("user", {}, ""),
-    at("amount", {}, ""),
-    at("provider", {}, ""),
-    at("status", {}, ""),
-    at("date", {}, ""),
+    at("id", {}, "ID"),
+    at("user", {}, "Пользователь"),
+    at("payments_col_user_id", {}, "ID"),
+    at("payments_col_traffic_regular", {}, "Основной трафик"),
+    at("payments_col_traffic_premium", {}, "Премиум"),
+    at("amount", {}, "Сумма"),
+    at("provider", {}, "Провайдер"),
+    at("description", {}, "Описание"),
+    at("status", {}, "Статус"),
+    at("date", {}, "Дата"),
   ];
+  $: recentPayments = (stats?.recent_payments || []).slice(0, 10);
+
+  /** @param {number|null|undefined} v */
+  function formatTrafficGbCell(v) {
+    if (v == null || v === "") return "—";
+    const n = Number(v);
+    if (Number.isNaN(n)) return "—";
+    let s;
+    if (Math.abs(n - Math.round(n)) < 1e-9) {
+      s = String(Math.round(n));
+    } else {
+      s = String(Math.round(n * 100) / 100);
+    }
+    return `${s} GB`;
+  }
+
+  /** @param {number|null|undefined} v */
+  function formatGbAmountPlain(v) {
+    if (v == null || v === "") return "";
+    const n = Number(v);
+    if (Number.isNaN(n)) return "";
+    if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+    return String(Math.round(n * 100) / 100);
+  }
+
+  /** @param {Record<string, unknown>} p */
+  function paymentDescriptionDisplay(p) {
+    const r = p.traffic_regular_gb;
+    const pr = p.traffic_premium_gb;
+    if (r != null && pr == null) {
+      const gb = formatGbAmountPlain(r);
+      return at(
+        "payments_desc_traffic_package_regular",
+        { gb },
+        `Пакет трафика ${gb} ГБ (обычный)`
+      );
+    }
+    if (pr != null && r == null) {
+      const gb = formatGbAmountPlain(pr);
+      return at(
+        "payments_desc_traffic_package_premium",
+        { gb },
+        `Пакет трафика ${gb} ГБ (премиум)`
+      );
+    }
+    const raw = p.description && String(p.description).trim();
+    return raw || "—";
+  }
 
   function parsePanelSystem(panel) {
     const system = panel?.system;
@@ -650,16 +714,23 @@
     <Card.Root>
       <Card.Header class="admin-cn-card-header--lead">
         <span class="admin-skeleton admin-skeleton-line" style="width:44%;height:14px"></span>
-        <span
-          class="admin-skeleton admin-skeleton-line admin-skeleton-line-tiny"
-          style="width:30%;margin-top:8px"
-        ></span>
       </Card.Header>
       <Card.Content class="admin-cn-card-content--flush">
         <AdminTableSkeleton
           headers={recentPaymentHeaders}
           rows={5}
-          widths={["48px", "120px", "78px", "82px", "72px", "96px"]}
+          widths={[
+            "48px",
+            "148px",
+            "88px",
+            "72px",
+            "72px",
+            "78px",
+            "82px",
+            "140px",
+            "72px",
+            "96px",
+          ]}
         />
       </Card.Content>
     </Card.Root>
@@ -1107,13 +1178,6 @@
         <Card.Title class="admin-cn-card-title--section"
           >{at("stats_recent_payments", {}, "")}</Card.Title
         >
-        <Card.Description
-          >{at(
-            "stats_records_count",
-            { count: (stats.recent_payments || []).length },
-            ""
-          )}</Card.Description
-        >
       </Card.Header>
       <Card.Content class="admin-cn-card-content--flush">
         <div class="admin-table-wrap">
@@ -1121,31 +1185,93 @@
             <AdminTableSkeleton
               headers={recentPaymentHeaders}
               rows={5}
-              widths={["48px", "120px", "78px", "82px", "72px", "96px"]}
+              widths={[
+                "48px",
+                "148px",
+                "88px",
+                "72px",
+                "72px",
+                "78px",
+                "82px",
+                "140px",
+                "72px",
+                "96px",
+              ]}
             />
-          {:else if (stats.recent_payments || []).length}
+          {:else if recentPayments.length}
             <AdminTable>
               <thead>
                 <tr>
-                  <th>{at("id", {}, "")}</th>
-                  <th>{at("user", {}, "")}</th>
-                  <th>{at("amount", {}, "")}</th>
-                  <th>{at("provider", {}, "")}</th>
-                  <th>{at("status", {}, "")}</th>
-                  <th>{at("date", {}, "")}</th>
+                  <th>{at("id", {}, "ID")}</th>
+                  <th>{at("user", {}, "Пользователь")}</th>
+                  <th>{at("payments_col_user_id", {}, "ID")}</th>
+                  <th>{at("payments_col_traffic_regular", {}, "Основной трафик")}</th>
+                  <th>{at("payments_col_traffic_premium", {}, "Премиум")}</th>
+                  <th>{at("amount", {}, "Сумма")}</th>
+                  <th>{at("provider", {}, "Провайдер")}</th>
+                  <th>{at("description", {}, "Описание")}</th>
+                  <th>{at("status", {}, "Статус")}</th>
+                  <th>{at("date", {}, "Дата")}</th>
                 </tr>
               </thead>
               <tbody>
-                {#each stats.recent_payments as p}
+                {#each recentPayments as p (p.payment_id)}
                   <tr>
-                    <td class="admin-cell-id" data-label={at("id", {}, "")}>#{p.payment_id}</td>
-                    <td data-label={at("user", {}, "")}>{p.user_label || p.user_id}</td>
-                    <td data-label={at("amount", {}, "")}>{fmtMoney(p.amount, p.currency)}</td>
-                    <td data-label={at("provider", {}, "")}>{p.provider}</td>
-                    <td data-label={at("status", {}, "")}>
+                    <td class="admin-cell-id" data-label="ID">
+                      <AdminButton
+                        class="admin-payment-id-btn"
+                        variant="ghost"
+                        size="sm"
+                        title={at("payment_detail_open", {}, "Открыть платеж")}
+                        aria-label={at("payment_detail_open", {}, "Открыть платеж")}
+                        onclick={() => paymentsStore.openPayment(p)}
+                      >
+                        <FileText size={14} />
+                        #{p.payment_id}
+                      </AdminButton>
+                    </td>
+                    <td
+                      class="admin-cell-user-with-action"
+                      data-label={at("user", {}, "Пользователь")}
+                    >
+                      <span class="admin-payments-user-cell">
+                        <AdminButton
+                          class="admin-payments-user-btn"
+                          variant="ghost"
+                          size="icon"
+                          title={at("payments_open_user", {}, "Открыть карточку пользователя")}
+                          aria-label={at("payments_open_user", {}, "Открыть карточку пользователя")}
+                          onclick={() => onOpenUserCard(p.user_id)}
+                        >
+                          <User size={14} />
+                        </AdminButton>
+                        <span class="admin-payments-user-name">{p.user_label || p.user_id}</span>
+                      </span>
+                    </td>
+                    <td class="admin-cell-mono" data-label={at("payments_col_user_id", {}, "ID")}>
+                      {p.user_id != null && p.user_id !== "" ? p.user_id : "—"}
+                    </td>
+                    <td
+                      class="admin-cell-traffic-gb"
+                      data-label={at("payments_col_traffic_regular", {}, "Основной трафик")}
+                    >
+                      {formatTrafficGbCell(p.traffic_regular_gb)}
+                    </td>
+                    <td
+                      class="admin-cell-traffic-gb"
+                      data-label={at("payments_col_traffic_premium", {}, "Премиум")}
+                    >
+                      {formatTrafficGbCell(p.traffic_premium_gb)}
+                    </td>
+                    <td data-label={at("amount", {}, "Сумма")}>{fmtMoney(p.amount, p.currency)}</td>
+                    <td data-label={at("provider", {}, "Провайдер")}>{p.provider}</td>
+                    <td class="admin-cell-wrap" data-label={at("description", {}, "Описание")}
+                      >{paymentDescriptionDisplay(p)}</td
+                    >
+                    <td data-label={at("status", {}, "Статус")}>
                       <AdminBadge variant={paymentStatusVariant(p.status)}>{p.status}</AdminBadge>
                     </td>
-                    <td data-label={at("date", {}, "")}>{fmtDate(p.created_at)}</td>
+                    <td data-label={at("date", {}, "Дата")}>{fmtDate(p.created_at)}</td>
                   </tr>
                 {/each}
               </tbody>
@@ -1160,3 +1286,45 @@
     </Card.Root>
   </AdminDashboardStack>
 {/if}
+
+<style>
+  .admin-payments-user-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .admin-payments-user-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-cell-user-with-action :global(.admin-payments-user-btn.admin-btn) {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
+    flex-shrink: 0;
+    padding: 0;
+    border-radius: 7px;
+  }
+
+  .admin-cell-user-with-action :global(.admin-payments-user-btn svg) {
+    width: 14px;
+    height: 14px;
+  }
+
+  .admin-cell-id :global(.admin-payment-id-btn.admin-btn) {
+    height: 28px;
+    min-height: 28px;
+    padding: 0 8px;
+    gap: 6px;
+    border-radius: 7px;
+    color: var(--admin-text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+</style>

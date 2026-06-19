@@ -9,6 +9,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOC_PATH = REPO_ROOT / "docs" / "migrations" / "remnawave-tg-shop.md"
 REMNASHOP_DOC_PATH = REPO_ROOT / "docs" / "migrations" / "remnashop.md"
+DEPLOYMENT_DOC_PATH = REPO_ROOT / "docs" / "getting-started" / "deployment.md"
 INSTALL_SCRIPT_PATH = REPO_ROOT / "scripts" / "install.sh"
 REMOVED_SCRIPT_PATH = REPO_ROOT / "scripts" / "migrate_to_minishop.sh"
 COMPOSE_FILES = (
@@ -114,9 +115,14 @@ class MigrationDocumentationFactsTests(unittest.TestCase):
         self.assertIn("frontend:80", self.doc)
 
     def test_doc_mentions_both_supported_tgshop_migration_methods(self):
-        self.assertIn("Copy old Docker volumes", self.doc)
-        self.assertIn("Dump from a source PostgreSQL DSN", self.doc)
+        self.assertIn("Скопировать старые Docker volumes на этом сервере", self.doc)
+        self.assertIn("Сделать дамп из исходного PostgreSQL DSN", self.doc)
         self.assertIn("pg_dump", self.doc)
+
+    def test_doc_uses_current_russian_wizard_menu_labels(self):
+        self.assertIn("Установить новый remnawave-minishop и мигрировать", self.doc)
+        self.assertIn("Мигрировать данные в уже установленный remnawave-minishop", self.doc)
+        self.assertIn("Старый remnawave-tg-shop", self.doc)
 
 
 class InstallWizardCoverageTests(unittest.TestCase):
@@ -189,6 +195,7 @@ class DocComposeFileReferencesTests(unittest.TestCase):
 class RemnashopMigrationDocumentationFactsTests(unittest.TestCase):
     def setUp(self) -> None:
         self.doc = _read(REMNASHOP_DOC_PATH)
+        self.deployment_doc = _read(DEPLOYMENT_DOC_PATH)
 
     def test_doc_mentions_env_payment_gateways_and_encrypted_secrets(self):
         self.assertIn("--source-env-file", self.doc)
@@ -210,6 +217,40 @@ class RemnashopMigrationDocumentationFactsTests(unittest.TestCase):
         ):
             with self.subTest(path=path):
                 self.assertIn(path, self.doc)
+
+    def test_doc_matches_current_wizard_prompts_and_defaults(self):
+        for phrase in (
+            "Установить новый remnawave-minishop и мигрировать данные из другого бота",
+            "Мигрировать данные в уже установленный remnawave-minishop",
+            "Уже установленная Remnawave через eGames",
+            "/opt/remnawave-minishop",
+            "MINISHOP_INSTALL_REPO",
+            "MINISHOP_INSTALL_REF",
+            "REMNASHOP_SOURCE_SCHEMA",
+            "backups/pre-remnashop-migration",
+            "backend`, `worker` и `frontend`",
+            "eGames Nginx",
+            "Дальнейшие шаги",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.doc)
+
+        self.assertNotIn("Install new stack and run migration", self.doc)
+        self.assertNotIn("Run migration only", self.doc)
+        self.assertNotIn("source PostgreSQL DSN Remnashop и schema", self.doc)
+
+    def test_deployment_doc_mentions_installer_dns_tls_and_proxy_refresh(self):
+        for phrase in (
+            "/opt/remnawave-minishop",
+            "проверить A-записи",
+            "Certbot Cloudflare DNS-01",
+            "10001:10001",
+            "backend`, `worker` и `frontend`",
+            "nginx -t",
+            "reload/restart eGames Nginx",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.deployment_doc)
 
 
 class MigrationFootprintRegexTests(unittest.TestCase):

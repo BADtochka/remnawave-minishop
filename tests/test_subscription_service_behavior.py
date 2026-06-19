@@ -201,7 +201,7 @@ class SubscriptionServiceActivationDispatchTests(unittest.IsolatedAsyncioTestCas
                 TRIAL_ENABLED=True,
                 TRIAL_DURATION_DAYS=3,
                 TRIAL_TRAFFIC_LIMIT_GB=5,
-                TRIAL_TRAFFIC_STRATEGY="WEEK",
+                TRIAL_TRAFFIC_STRATEGY="MONTHLY",
                 USER_SQUAD_UUIDS="fallback-squad",
                 TRIAL_SQUAD_UUIDS="trial-squad",
             )
@@ -245,7 +245,7 @@ class SubscriptionServiceActivationDispatchTests(unittest.IsolatedAsyncioTestCas
             self.assertEqual(sub_payload["traffic_limit_bytes"], 5 * GIB)
 
             panel_payload = service.panel_service.update_user_details_on_panel.await_args.args[1]
-            self.assertEqual(panel_payload["trafficLimitStrategy"], "WEEK")
+            self.assertEqual(panel_payload["trafficLimitStrategy"], "MONTH")
             self.assertEqual(panel_payload["activeInternalSquads"], ["trial-squad"])
 
     async def test_activate_trial_falls_back_to_default_user_squads(self):

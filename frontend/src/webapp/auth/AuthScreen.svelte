@@ -327,6 +327,7 @@
                 side="bottom"
                 align="center"
                 sideOffset={7}
+                trapFocus={false}
               >
                 <Select.Viewport class="language-select-viewport">
                   {#each languageOptions as option (option.value)}

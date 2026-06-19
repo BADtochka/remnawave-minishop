@@ -198,6 +198,7 @@
                   side="bottom"
                   align="start"
                   sideOffset={6}
+                  trapFocus={false}
                 >
                   <Select.Viewport class="support-select-viewport">
                     {#each categoryOptions as option (option.value)}
@@ -235,6 +236,7 @@
                   side="bottom"
                   align="start"
                   sideOffset={6}
+                  trapFocus={false}
                 >
                   <Select.Viewport class="support-select-viewport">
                     {#each priorityOptions as option (option.value)}

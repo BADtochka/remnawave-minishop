@@ -138,6 +138,9 @@ class SettingsTests(unittest.TestCase):
             "data/subpage-config/multiapp.json",
         )
         self.assertEqual(settings.SUBSCRIPTION_PAGE_CONFIG_JSON, "")
+        self.assertEqual(settings.SUBSCRIPTION_GUIDES_CONFIG_CACHE_TTL_SECONDS, 300)
+        self.assertEqual(settings.SUBSCRIPTION_GUIDES_RESOLVED_CACHE_TTL_SECONDS, 300)
+        self.assertEqual(settings.SUBSCRIPTION_GUIDES_PUBLIC_CACHE_TTL_SECONDS, 300)
 
     def test_deprecated_webapp_appearance_env_values_are_ignored(self):
         settings = Settings(
@@ -251,6 +254,19 @@ class SettingsTests(unittest.TestCase):
         )
 
         self.assertEqual(settings.TRIAL_TRAFFIC_STRATEGY, "WEEK")
+
+    def test_traffic_strategy_legacy_aliases_are_canonicalized(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+            USER_TRAFFIC_STRATEGY="monthly",
+            TRIAL_TRAFFIC_STRATEGY="MONTHLY_ROLLING",
+        )
+
+        self.assertEqual(settings.USER_TRAFFIC_STRATEGY, "MONTH")
+        self.assertEqual(settings.TRIAL_TRAFFIC_STRATEGY, "MONTH_ROLLING")
 
     def test_support_admin_email_notifications_default_to_disabled(self):
         settings = Settings(

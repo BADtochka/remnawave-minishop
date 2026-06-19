@@ -344,6 +344,7 @@ def test_remnawave_settings_include_panel_webhook_metadata():
     remnawave_keys = (
         "PANEL_API_URL",
         "PANEL_API_KEY",
+        "PANEL_API_COOKIE",
         "PANEL_API_TOTAL_TIMEOUT_SECONDS",
         "PANEL_API_CONNECT_TIMEOUT_SECONDS",
         "PANEL_API_SOCK_CONNECT_TIMEOUT_SECONDS",
@@ -352,7 +353,7 @@ def test_remnawave_settings_include_panel_webhook_metadata():
         "USER_SQUAD_UUIDS",
         "USER_EXTERNAL_SQUAD_UUID",
     )
-    timeout_keys = remnawave_keys[2:6]
+    timeout_keys = remnawave_keys[3:7]
 
     assert field["webhook_path"] == "/webhook/panel"
     assert field["webhook_requires_base_url"] is True
@@ -367,6 +368,7 @@ def test_remnawave_settings_include_panel_webhook_metadata():
         assert manifest[setting_key]["type"] == "float"
         assert manifest[setting_key]["optional"] is False
         assert manifest[setting_key]["min"] == 1
+    assert manifest["PANEL_API_COOKIE"]["secret"] is True
 
     for language in ("ru", "en"):
         messages = _locale(language)
@@ -382,6 +384,14 @@ def test_payment_provider_admin_only_toggles_are_mutually_exclusive():
 
     assert manifest["WATA_ADMIN_ONLY_ENABLED"]["mutually_exclusive_key"] == "WATA_ENABLED"
     assert manifest["WATA_ENABLED"]["mutually_exclusive_key"] == "WATA_ADMIN_ONLY_ENABLED"
+    assert (
+        manifest["WATA_CRYPTO_ADMIN_ONLY_ENABLED"]["mutually_exclusive_key"]
+        == "WATA_CRYPTO_ENABLED"
+    )
+    assert (
+        manifest["WATA_CRYPTO_ENABLED"]["mutually_exclusive_key"]
+        == "WATA_CRYPTO_ADMIN_ONLY_ENABLED"
+    )
     assert (
         manifest["PLATEGA_CRYPTO_ADMIN_ONLY_ENABLED"]["mutually_exclusive_key"]
         == "PLATEGA_CRYPTO_ENABLED"
@@ -425,6 +435,16 @@ def test_platega_settings_share_one_admin_subsection():
 
     assert platega_keys
     assert {manifest[key]["subsection"] for key in platega_keys} == {"Platega"}
+
+
+def test_wata_settings_share_one_admin_subsection():
+    manifest = _manifest_by_key()
+    wata_keys = [
+        key for key in manifest if key.startswith("WATA_") or key.startswith("PAYMENT_WATA_")
+    ]
+
+    assert wata_keys
+    assert {manifest[key]["subsection"] for key in wata_keys} == {"Wata"}
 
 
 def test_tariff_settings_page_i18n_keys_exist():

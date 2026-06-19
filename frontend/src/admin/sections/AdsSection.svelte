@@ -8,16 +8,29 @@
     AdminButton,
     AdminEmptyState,
     AdminField,
+    AdminPagination,
     AdminTable,
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
+  import {
+    createAdminDatatable,
+    syncAdminDatatable,
+    watchAdminDatatable,
+  } from "../../lib/admin/datatables.js";
 
   export let at;
   export let fmtMoney;
 
+  const ADS_PAGE_SIZE = 10;
   const adsStore = getContext("adsStore");
+  const adsTable = createAdminDatatable([], { rowsPerPage: ADS_PAGE_SIZE });
+  const adsSignal = watchAdminDatatable(adsTable);
 
   $: ({ ads, adsLoading, adCreateOpen, adDraft } = $adsStore);
+  $: {
+    syncAdminDatatable(adsTable, ads);
+    if (adsTable.currentPage > (adsTable.pageCount || 1)) adsTable.setPage(adsTable.pageCount || 1);
+  }
   $: adHeaders = [
     at("id", {}, "ID"),
     at("ads_col_source", {}, "Источник"),
@@ -61,7 +74,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each ads as ad}
+        {#each $adsSignal.rows as ad (ad.id)}
           <tr>
             <td class="admin-cell-id" data-label={at("id", {}, "ID")}>#{ad.id}</td>
             <td data-label={at("ads_col_source", {}, "Источник")}>{ad.source}</td>
@@ -94,6 +107,19 @@
         {/each}
       </tbody>
     </AdminTable>
+    {#if ads.length > ADS_PAGE_SIZE}
+      <AdminPagination
+        table={adsTable}
+        pageLabel={at("page_short", {}, "Стр.")}
+        ofLabel={at("pagination_of", {}, "из")}
+        totalLabel={at("total", {}, "Всего")}
+        jumpLabel={at("page_short", {}, "Стр.")}
+        jumpAriaLabel={at("pagination_jump_aria", {}, "Перейти к странице")}
+        goLabel={at("pagination_go", {}, "Перейти")}
+        prevLabel={at("back", {}, "Назад")}
+        nextLabel={at("next", {}, "Далее")}
+      />
+    {/if}
   {/if}
 </div>
 

@@ -38,6 +38,20 @@ class PanelApiServiceLoggingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(timeout.sock_connect, 9)
         self.assertEqual(timeout.sock_read, 20)
 
+    async def test_prepare_headers_includes_optional_panel_cookie(self):
+        service = PanelApiService(
+            SimpleNamespace(
+                PANEL_API_URL="https://panel.example.test/api",
+                PANEL_API_KEY="panel-key",
+                PANEL_API_COOKIE="rw_session=session-value",
+            )
+        )
+
+        headers = await service._prepare_headers()
+
+        self.assertEqual(headers["Authorization"], "Bearer panel-key")
+        self.assertEqual(headers["Cookie"], "rw_session=session-value")
+
     def test_endpoint_log_label_strips_user_identifiers(self):
         self.assertEqual(
             _endpoint_log_label("/users/by-email/user@example.com"),
@@ -156,6 +170,30 @@ class PanelApiServiceLoggingTests(unittest.IsolatedAsyncioTestCase):
         payload = service._request.await_args.kwargs["json"]
         self.assertNotIn("description", payload)
         self.assertEqual(payload["telegramId"], 42)
+
+    async def test_create_panel_user_normalizes_legacy_traffic_strategy(self):
+        service = self._make_service()
+        service._request = AsyncMock(return_value={"response": {"uuid": "user-uuid"}})
+
+        await service.create_panel_user(
+            username_on_panel="tg_42",
+            default_traffic_limit_strategy="MONTHLY",
+        )
+
+        payload = service._request.await_args.kwargs["json"]
+        self.assertEqual(payload["trafficLimitStrategy"], "MONTH")
+
+    async def test_update_user_details_normalizes_legacy_traffic_strategy(self):
+        service = self._make_service()
+        service._request = AsyncMock(return_value={"response": {"uuid": "user-uuid"}})
+
+        await service.update_user_details_on_panel(
+            "user-uuid",
+            {"trafficLimitStrategy": "MONTHLY_ROLLING"},
+        )
+
+        payload = service._request.await_args.kwargs["json"]
+        self.assertEqual(payload["trafficLimitStrategy"], "MONTH_ROLLING")
 
     async def test_get_user_by_uuid_uses_short_ttl_cache_and_update_invalidates(self):
         service = self._make_service()
