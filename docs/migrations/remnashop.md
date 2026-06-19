@@ -15,16 +15,25 @@ curl -fsSL https://gitlab.com/3252a8/remnawave-minishop/-/raw/main/scripts/insta
 sh install.sh
 ```
 
-В меню выберите `Install new stack and run migration` для нового сервера
-или `Run migration only`, если compose-папка и `.env` уже готовы.
+Wizard полностью русскоязычный. В главном меню выберите:
+
+- `Установить новый remnawave-minishop и мигрировать данные из другого бота` -
+  для нового сервера;
+- `Мигрировать данные в уже установленный remnawave-minishop` - если
+  compose-папка и `.env` уже готовы.
+
+Если wizard находит Remnashop на этом же сервере, он предлагает миграцию из
+него по умолчанию и подставляет найденные значения в уже заполненные ответы.
 
 Для отдельного сервера выбирайте профиль `Caddy HTTPS`: это дефолтный вариант
 wizard с автоматическими сертификатами. Если Remnawave Panel уже установлена на
 этом же хосте скриптом [`eGamesAPI/remnawave-reverse-proxy`](https://github.com/eGamesAPI/remnawave-reverse-proxy),
-выберите профиль `Existing eGames Remnawave reverse proxy on this host`. В этом
-режиме wizard использует no-proxy compose, прописывает `DEPLOYMENT_PROFILE=egames`
-и сам добавляет server-блоки для backend/webhook-домена и Mini App в существующий
-`/opt/remnawave/nginx.conf`.
+выберите профиль `Уже установленная Remnawave через eGames - использовать ее
+Nginx/TLS`. В этом режиме wizard использует no-proxy compose, прописывает
+`DEPLOYMENT_PROFILE=egames` и сам добавляет server-блоки для backend/webhook-домена
+и Mini App в найденный `nginx.conf` eGames. После применения миграции wizard
+перечитывает eGames Nginx (`nginx -t`, затем reload или restart контейнера),
+чтобы Mini App/frontend не оставался за старым upstream.
 
 ## Что переносится
 
@@ -86,10 +95,11 @@ Remnashop может хранить секреты в формате `enc_...`. 
 значения будут пропущены с предупреждением, остальные данные продолжат
 импортироваться.
 
-После успешного применения wizard печатает список новых адресов webhook. В
-профиле `egames` он дополнительно обновляет `WEBHOOK_URL` в `/opt/remnawave/.env`
-и перезапускает backend панели. Остальные внешние платежные webhook нужно
-указать во внешних сервисах вместо старых Remnashop URL:
+После успешного применения wizard в самом конце печатает раздел
+`Дальнейшие шаги` со списком новых адресов webhook. В профиле `egames` он
+дополнительно обновляет `WEBHOOK_URL` в найденном `.env` Remnawave Panel и
+перезапускает backend панели. Остальные внешние платежные webhook нужно указать
+во внешних сервисах вместо старых Remnashop URL:
 
 - Remnawave Panel -> `WEBHOOK_URL`: `WEBHOOK_BASE_URL` + `/webhook/panel`;
 - YooKassa HTTP notifications URL: `WEBHOOK_BASE_URL` + `/webhook/yookassa`;
@@ -102,25 +112,43 @@ Remnashop может хранить секреты в формате `enc_...`. 
 - Telegram webhook `WEBHOOK_BASE_URL` + `/tg/webhook` выставляется ботом
   автоматически при старте.
 
-## Flow wizard
+## Сценарий wizard
 
-Importer automatically builds `TARIFFS_CONFIG_PATH` from Remnashop `plans`,
-`plan_durations` and `plan_prices`, then maps plan id/name/tag/public_code to
-the generated `tariff_key`. Use `--tariff-map-json` only when you need to
-override that automatic mapping.
+Importer автоматически строит `TARIFFS_CONFIG_PATH` из Remnashop `plans`,
+`plan_durations` и `plan_prices`, затем сопоставляет plan id/name/tag/public_code
+с созданным `tariff_key`. Используйте `--tariff-map-json` только если нужно
+переопределить это автоматическое сопоставление.
 
-1. Wizard скачивает compose-профиль и `backend/scripts/import_legacy.py` через
-   `raw.githubusercontent.com`, без клонирования репозитория.
-2. Вы указываете source PostgreSQL DSN Remnashop и schema, обычно `public`.
-3. Опционально указываете путь к старому Remnashop `.env` для `APP_CRYPT_KEY`,
-   Remnawave API settings и переносимых settings.
-4. Вы выбираете целевую БД: текущую compose-БД или ручной target DSN.
-5. При необходимости указываете JSON map тарифов Remnashop в локальные
+1. Wizard использует папку установки `/opt/remnawave-minishop` по умолчанию,
+   скачивает выбранный compose-профиль и `backend/scripts/import_legacy.py`
+   через `raw.githubusercontent.com`, без клонирования репозитория. Repository
+   и ref не спрашиваются в обычном сценарии; для fork/dev-ветки задайте
+   `MINISHOP_INSTALL_REPO` и `MINISHOP_INSTALL_REF` перед запуском.
+2. Wizard пытается найти Remnashop PostgreSQL, `.env`, `BOT_TOKEN`,
+   `BOT_OWNER_ID`/`ADMIN_IDS`, `BOT_SECRET_TOKEN`, Remnawave API URL/key/cookie
+   и webhook secret, затем показывает найденные значения как уже заполненный
+   ответ. Enter оставляет найденное значение.
+3. Вы указываете source PostgreSQL DSN Remnashop. Schema источника по умолчанию
+   `public` и не спрашивается в обычном wizard; для редкого кастомного случая
+   задайте `REMNASHOP_SOURCE_SCHEMA=custom_schema`.
+4. Опционально указываете путь к старому Remnashop `.env` для `APP_CRYPT_KEY`,
+   Remnawave API settings, Telegram settings и переносимых provider settings.
+5. Вы выбираете целевую БД: текущую compose-БД или ручной target DSN. Для
+   текущей compose-БД wizard предлагает pre-migration backup в
+   `backups/pre-remnashop-migration-*`; внутри будут основные файлы деплоя,
+   PostgreSQL dump при доступной БД и `restore.sh`.
+6. При необходимости указываете JSON map тарифов Remnashop в локальные
    `tariff_key`, например `{"basic": "standard_month"}`.
-6. Wizard запускает `dry-run` и показывает JSON-сводку.
-7. После подтверждения `y` importer применяет изменения, печатает список новых
-   webhook URL для Remnawave Panel и платежных провайдеров, затем перезапускает
-   `backend`/`worker`, чтобы настройки совместимости перечитались.
+7. Wizard запускает проверку без записи (`dry-run`), показывает краткую сводку
+   и сохраняет полный JSON/raw-вывод в `.installer/remnashop-dry-run-summary.json`.
+8. После подтверждения `y` importer применяет изменения. У вопроса применения
+   дефолт `Y`, поэтому Enter после успешной проверки означает "применить";
+   `n` остановит миграцию без записи.
+9. После применения wizard сохраняет apply-сводку, обновляет webhook Remnawave
+   Panel для eGames-профиля, перезапускает `backend`, `worker` и `frontend`,
+   перечитывает eGames Nginx при необходимости, отправляет Telegram-уведомление
+   админам/лог-чату и в финальном разделе `Дальнейшие шаги` показывает новые
+   webhook URL.
 
 Если source DB находится на том же Docker host и host в DSN совпадает с именем
 контейнера, например `remnashop-db`, wizard сам подключит этот контейнер к сети

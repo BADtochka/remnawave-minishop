@@ -4,6 +4,18 @@
 
 ## Минимальный запуск
 
+Для нового сервера удобнее начать с интерактивного install wizard: он скачает
+нужный compose-профиль, соберет `.env`, проверит DNS, подготовит `data/` и при
+необходимости запустит миграцию из Remnashop или старого `remnawave-tg-shop`.
+Подробности: [интерактивный install wizard](deployment.md#интерактивный-install-wizard).
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/3252a8/remnawave-minishop/main/scripts/install.sh -o install.sh
+sh install.sh
+```
+
+Ручной минимальный запуск из уже скачанного репозитория:
+
 ```bash
 cp .env.example .env
 nano .env
