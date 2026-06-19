@@ -3,8 +3,10 @@ from datetime import datetime, timezone
 import pytest
 from scripts.import_legacy import (
     parse_remnashop_env_text,
+    remnashop_build_tariff_catalog,
     remnashop_env_overrides,
     remnashop_months_from_plan_snapshot,
+    remnashop_notification_overrides,
     remnashop_payment_gateway_overrides,
     remnashop_post_migration_actions,
     remnashop_pricing_amount,
@@ -32,6 +34,8 @@ def test_remnashop_status_and_sale_mode_mapping_matches_current_payment_model():
     assert remnashop_transaction_status("PENDING", "WATA") == "pending_wata"
     assert remnashop_transaction_status("CANCELED", "WATA") == "canceled"
     assert remnashop_sale_mode("NEW") == "subscription"
+    assert remnashop_sale_mode("NEW", {"type": "TRAFFIC"}) == "traffic_package"
+    assert remnashop_sale_mode("NEW", {"type": "DEVICES"}) == "hwid_devices"
     assert remnashop_sale_mode("RENEW") == "subscription"
     assert remnashop_sale_mode("CHANGE") == "tariff_upgrade"
 
@@ -55,6 +59,7 @@ def test_remnashop_env_parser_and_overrides_map_safe_values():
         # old Remnashop
         export REMNAWAVE_HOST=panel.example.com
         REMNAWAVE_TOKEN='panel-token#kept'
+        REMNAWAVE_COOKIE="rw_session=session-value"
         REMNAWAVE_WEBHOOK_SECRET="panel secret"
         BOT_SUPPORT_USERNAME=@support_bot # comment
         APP_DEFAULT_LOCALE=en
@@ -70,6 +75,7 @@ def test_remnashop_env_parser_and_overrides_map_safe_values():
     assert overrides == {
         "PANEL_API_URL": "https://panel.example.com/api",
         "PANEL_API_KEY": "panel-token#kept",
+        "PANEL_API_COOKIE": "rw_session=session-value",
         "PANEL_WEBHOOK_SECRET": "panel secret",
         "SUPPORT_LINK": "https://t.me/support_bot",
         "DEFAULT_LANGUAGE": "en",
@@ -89,6 +95,89 @@ def test_remnashop_env_overrides_skip_placeholders_and_mini_app():
     )
 
     assert overrides == {}
+
+
+def test_remnashop_notification_routes_map_to_log_chat_settings():
+    result = remnashop_notification_overrides(
+        {
+            "enabled": True,
+            "routes": {
+                "SUBSCRIPTION": {"chat_id": -111, "thread_id": None},
+                "SYSTEM": {"chat_id": -5588668915, "thread_id": 42},
+            },
+        }
+    )
+
+    assert result["overrides"] == {"LOG_CHAT_ID": -5588668915, "LOG_THREAD_ID": 42}
+    assert result["route"]["route"] == "SYSTEM"
+
+
+def test_remnashop_tariff_catalog_is_generated_from_plans_durations_and_prices():
+    plans = [
+        {
+            "id": 3,
+            "order_index": 1,
+            "is_active": True,
+            "type": "BOTH",
+            "availability": "ALL",
+            "name": "Pro 300ГБ",
+            "tag": "PRO",
+            "traffic_limit": 300,
+            "device_limit": 6,
+            "internal_squads": ["squad-1"],
+        },
+        {
+            "id": 8,
+            "order_index": 2,
+            "is_active": True,
+            "type": "TRAFFIC",
+            "availability": "ALL",
+            "name": "Трафик 50ГБ",
+            "tag": "TRAFFIC50",
+            "traffic_limit": 50,
+            "device_limit": 0,
+            "internal_squads": ["squad-1"],
+            "public_code": "traffic50gb",
+        },
+    ]
+    durations = [
+        {"id": 4, "plan_id": 3, "days": 30, "order_index": 1},
+        {"id": 5, "plan_id": 3, "days": 180, "order_index": 2},
+        {"id": 13, "plan_id": 8, "days": 30, "order_index": 1},
+    ]
+    prices = [
+        {"plan_duration_id": 4, "currency": "RUB", "price": 599},
+        {"plan_duration_id": 4, "currency": "XTR", "price": 299},
+        {"plan_duration_id": 5, "currency": "RUB", "price": 2990},
+        {"plan_duration_id": 13, "currency": "RUB", "price": 249},
+        {"plan_duration_id": 13, "currency": "USD", "price": 2.5},
+        {"plan_duration_id": 13, "currency": "XTR", "price": 125},
+    ]
+
+    result = remnashop_build_tariff_catalog(
+        plans,
+        durations,
+        prices,
+        default_currency="RUB",
+    )
+
+    assert result["warnings"] == []
+    assert result["tariff_map"]["3"] == "pro"
+    assert result["tariff_map"]["TRAFFIC50"] == "traffic50"
+    catalog = result["catalog"]
+    assert catalog["default_tariff"] == "pro"
+    pro, traffic = catalog["tariffs"]
+    assert pro["names"]["ru"] == "Pro 300ГБ"
+    assert pro["billing_model"] == "period"
+    assert pro["monthly_gb"] == 300
+    assert pro["prices"]["rub"] == {"1": 599.0, "6": 2990.0}
+    assert pro["prices"]["stars"] == {"1": 299.0}
+    assert traffic["names"]["ru"] == "Трафик 50ГБ"
+    assert traffic["billing_model"] == "traffic"
+    assert traffic["hwid_device_limit"] == 0
+    assert traffic["traffic_packages"]["rub"] == [{"gb": 50.0, "price": 249.0}]
+    assert traffic["traffic_packages"]["usd"] == [{"gb": 50.0, "price": 2.5}]
+    assert traffic["traffic_packages"]["stars"] == [{"gb": 50.0, "price": 125.0}]
 
 
 def test_remnashop_yookassa_gateway_maps_to_current_provider_settings():

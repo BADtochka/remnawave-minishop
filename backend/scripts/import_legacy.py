@@ -39,6 +39,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from config.settings import Settings  # noqa: E402
+from config.tariffs_config import TariffsConfig, normalize_currency_key  # noqa: E402
 from db.dal import user_dal  # noqa: E402
 from db.migrator import run_database_migrations  # noqa: E402
 from db.models import (  # noqa: E402
@@ -176,6 +177,16 @@ def _to_int(value: Any) -> Optional[int]:
         return None
 
 
+def _to_float(value: Any) -> Optional[float]:
+    number = _to_decimal(value)
+    if number is None:
+        return None
+    try:
+        return float(number)
+    except (OverflowError, ValueError):
+        return None
+
+
 def _split_name(name: Any) -> tuple[Optional[str], Optional[str]]:
     value = str(name or "").strip()
     if not value:
@@ -292,6 +303,7 @@ def remnashop_env_overrides(env: dict[str, str]) -> dict[str, Any]:
     overrides: dict[str, Any] = {}
     _add_override(overrides, "PANEL_API_URL", _remnashop_panel_api_url(env.get("REMNAWAVE_HOST")))
     _add_override(overrides, "PANEL_API_KEY", env.get("REMNAWAVE_TOKEN"))
+    _add_override(overrides, "PANEL_API_COOKIE", env.get("REMNAWAVE_COOKIE"))
     _add_override(overrides, "PANEL_WEBHOOK_SECRET", env.get("REMNAWAVE_WEBHOOK_SECRET"))
     _add_override(
         overrides,
@@ -634,8 +646,39 @@ def remnashop_transaction_status(status: Any, gateway_type: Any = None) -> str:
     return source_status.lower() or "unknown"
 
 
-def remnashop_sale_mode(purchase_type: Any) -> str:
+def remnashop_plan_type(plan_snapshot: Any) -> str:
+    data = _jsonish(plan_snapshot)
+    raw_value = data.get("type")
+    if hasattr(raw_value, "value"):
+        raw_value = raw_value.value
+    text_value = str(raw_value or "").strip().upper()
+    if "." in text_value:
+        text_value = text_value.rsplit(".", 1)[-1]
+    return re.sub(r"[^A-Z0-9_]+", "_", text_value).strip("_")
+
+
+def remnashop_purchased_gb(plan_snapshot: Any) -> Optional[float]:
+    if remnashop_plan_type(plan_snapshot) != "TRAFFIC":
+        return None
+    data = _jsonish(plan_snapshot)
+    value = _to_float(data.get("traffic_limit") or data.get("traffic_gb") or data.get("gb"))
+    return value if value and value > 0 else None
+
+
+def remnashop_purchased_hwid_devices(plan_snapshot: Any) -> Optional[int]:
+    if remnashop_plan_type(plan_snapshot) != "DEVICES":
+        return None
+    value = _to_int(_jsonish(plan_snapshot).get("device_limit"))
+    return value if value and value > 0 else None
+
+
+def remnashop_sale_mode(purchase_type: Any, plan_snapshot: Any = None) -> str:
     source_type = str(purchase_type or "").strip().upper()
+    plan_type = remnashop_plan_type(plan_snapshot)
+    if source_type in {"NEW", "RENEW"} and plan_type == "TRAFFIC":
+        return "traffic_package"
+    if source_type in {"NEW", "RENEW"} and plan_type == "DEVICES":
+        return "hwid_devices"
     if source_type in {"NEW", "RENEW"}:
         return "subscription"
     if source_type == "CHANGE":
@@ -680,6 +723,335 @@ def remnashop_tariff_key(plan_snapshot: Any, tariff_map: dict[str, str]) -> Opti
         if key and key in tariff_map:
             return tariff_map[key]
     return None
+
+
+def remnashop_days_to_months(days: Any) -> Optional[int]:
+    value = _to_int(days)
+    if value is None or value <= 0:
+        return None
+    return max(1, round(value / 30))
+
+
+def _remnashop_enum_text(value: Any) -> str:
+    if hasattr(value, "value"):
+        value = value.value
+    text_value = str(value or "").strip().upper()
+    if "." in text_value:
+        text_value = text_value.rsplit(".", 1)[-1]
+    return re.sub(r"[^A-Z0-9_]+", "_", text_value).strip("_")
+
+
+def _remnashop_tariff_slug(value: Any) -> str:
+    text_value = str(value or "").strip().lower()
+    slug = re.sub(r"[^a-z0-9_]+", "_", text_value).strip("_")
+    slug = re.sub(r"_+", "_", slug)
+    if slug and slug[0].isdigit():
+        slug = f"plan_{slug}"
+    return slug
+
+
+def _remnashop_plan_tariff_base_key(plan: dict[str, Any]) -> str:
+    for key in ("tag", "public_code", "name", "id"):
+        slug = _remnashop_tariff_slug(plan.get(key))
+        if slug:
+            return slug
+    return "remnashop_plan"
+
+
+def _unique_tariff_key(base_key: str, used_keys: set[str]) -> str:
+    key = base_key or "remnashop_plan"
+    if key not in used_keys:
+        used_keys.add(key)
+        return key
+    index = 2
+    while f"{key}_{index}" in used_keys:
+        index += 1
+    unique = f"{key}_{index}"
+    used_keys.add(unique)
+    return unique
+
+
+def _remnashop_currency_key(value: Any) -> str:
+    normalized = _normalize_currency(value) or str(value or "")
+    return normalize_currency_key(normalized)
+
+
+def _remnashop_price_value(value: Any) -> Optional[float]:
+    price = _to_float(value)
+    if price is None or price < 0:
+        return None
+    return price
+
+
+def _remnashop_squad_uuids(value: Any) -> list[str]:
+    squads: list[str] = []
+    for item in _listish(value):
+        text_value = str(item or "").strip()
+        if text_value and text_value not in squads:
+            squads.append(text_value)
+    return squads
+
+
+def _remnashop_plan_enabled(plan: dict[str, Any]) -> bool:
+    if not _truthy(plan.get("is_active")):
+        return False
+    availability = _remnashop_enum_text(plan.get("availability"))
+    return availability not in {"ALLOWED", "LINK"}
+
+
+def _add_tariff_map_entries(
+    tariff_map: dict[str, str],
+    plan: dict[str, Any],
+    tariff_key: str,
+) -> None:
+    for source_key in ("id", "name", "tag", "public_code"):
+        value = str(plan.get(source_key) or "").strip()
+        if value:
+            tariff_map.setdefault(value, tariff_key)
+
+
+def _duration_prices_by_id(price_rows: Iterable[dict[str, Any]]) -> dict[int, dict[str, float]]:
+    prices: dict[int, dict[str, float]] = defaultdict(dict)
+    for row in price_rows:
+        duration_id = _to_int(row.get("plan_duration_id"))
+        price = _remnashop_price_value(row.get("price"))
+        currency = _remnashop_currency_key(row.get("currency"))
+        if duration_id is None or price is None or not currency:
+            continue
+        prices[duration_id][currency] = price
+    return prices
+
+
+def _durations_by_plan(duration_rows: Iterable[dict[str, Any]]) -> dict[int, list[dict[str, Any]]]:
+    result: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for row in duration_rows:
+        plan_id = _to_int(row.get("plan_id"))
+        if plan_id is None:
+            continue
+        result[plan_id].append(row)
+    for rows in result.values():
+        rows.sort(
+            key=lambda item: (
+                _to_int(item.get("order_index")) or 0,
+                _to_int(item.get("id")) or 0,
+            )
+        )
+    return result
+
+
+def remnashop_build_tariff_catalog(
+    plans: Iterable[dict[str, Any]],
+    durations: Iterable[dict[str, Any]],
+    prices: Iterable[dict[str, Any]],
+    *,
+    default_currency: Any = "RUB",
+) -> dict[str, Any]:
+    duration_rows_by_plan = _durations_by_plan(durations)
+    prices_by_duration = _duration_prices_by_id(prices)
+    tariff_map: dict[str, str] = {}
+    warnings: list[str] = []
+    used_keys: set[str] = set()
+    tariffs: list[dict[str, Any]] = []
+    default_tariff: Optional[str] = None
+    default_currency_key = _remnashop_currency_key(default_currency) or "rub"
+    if default_currency_key == "stars":
+        default_currency_key = "rub"
+
+    sorted_plans = sorted(
+        list(plans),
+        key=lambda item: (_to_int(item.get("order_index")) or 0, _to_int(item.get("id")) or 0),
+    )
+    for plan in sorted_plans:
+        plan_id = _to_int(plan.get("id"))
+        plan_type = _remnashop_enum_text(plan.get("type"))
+        if _truthy(plan.get("is_trial")):
+            continue
+        if plan_type == "DEVICES":
+            warnings.append(
+                f"Skipped Remnashop device-only plan {plan_id or plan.get('name')}: "
+                "Minishop imports device limits inside tariffs, not standalone device plans."
+            )
+            continue
+        if plan_type not in {"BOTH", "TRAFFIC", "UNLIMITED", "DURATION", "SUBSCRIPTION"}:
+            warnings.append(
+                f"Skipped unsupported Remnashop plan {plan_id or plan.get('name')} "
+                f"with type {plan_type or 'unknown'}."
+            )
+            continue
+
+        key = _unique_tariff_key(_remnashop_plan_tariff_base_key(plan), used_keys)
+        name = str(plan.get("name") or key).strip() or key
+        description = str(plan.get("description") or "").strip()
+        enabled = _remnashop_plan_enabled(plan)
+        if not enabled and _truthy(plan.get("is_active")):
+            warnings.append(
+                f"Imported Remnashop restricted plan {plan_id or name} as disabled tariff; "
+                "review its availability rules manually."
+            )
+
+        tariff: dict[str, Any] = {
+            "key": key,
+            "names": {"ru": name, "en": name},
+            "descriptions": {"ru": description, "en": description} if description else {},
+            "squad_uuids": _remnashop_squad_uuids(plan.get("internal_squads")),
+            "enabled": enabled,
+            "hwid_device_limit": _to_int(plan.get("device_limit")),
+        }
+        if plan.get("external_squad"):
+            warnings.append(
+                f"Remnashop plan {plan_id or name} has "
+                f"external_squad={plan.get('external_squad')}; "
+                "Minishop tariffs keep internal squads only, configure external routing manually "
+                "if needed."
+            )
+
+        plan_durations = duration_rows_by_plan.get(plan_id or -1, [])
+        if plan_type == "TRAFFIC":
+            traffic_gb = _to_float(plan.get("traffic_limit"))
+            if traffic_gb is None or traffic_gb <= 0:
+                warnings.append(f"Skipped traffic plan {plan_id or name}: traffic_limit is empty.")
+                continue
+            packages: dict[str, list[dict[str, float]]] = defaultdict(list)
+            seen_packages: set[tuple[str, float, float]] = set()
+            for duration in plan_durations:
+                duration_id = _to_int(duration.get("id"))
+                for currency, price in prices_by_duration.get(duration_id or -1, {}).items():
+                    if price <= 0:
+                        continue
+                    package_key = (currency, traffic_gb, price)
+                    if package_key in seen_packages:
+                        continue
+                    seen_packages.add(package_key)
+                    packages[currency].append({"gb": traffic_gb, "price": price})
+            if not any(packages.values()):
+                warnings.append(
+                    f"Skipped traffic plan {plan_id or name}: no positive prices found."
+                )
+                continue
+            tariff.update(
+                {
+                    "billing_model": "traffic",
+                    "traffic_packages": dict(packages),
+                }
+            )
+        else:
+            monthly_gb = _to_float(plan.get("traffic_limit")) or 0.0
+            period_prices: dict[str, dict[str, float]] = defaultdict(dict)
+            enabled_periods: list[int] = []
+            for duration in plan_durations:
+                duration_id = _to_int(duration.get("id"))
+                months = remnashop_days_to_months(duration.get("days"))
+                if months is None:
+                    continue
+                duration_prices = prices_by_duration.get(duration_id or -1, {})
+                if not any(price > 0 for price in duration_prices.values()):
+                    continue
+                if months not in enabled_periods:
+                    enabled_periods.append(months)
+                for currency, price in duration_prices.items():
+                    period_prices[currency][str(months)] = price
+            if not enabled_periods:
+                warnings.append(f"Skipped period plan {plan_id or name}: no paid durations found.")
+                continue
+            tariff.update(
+                {
+                    "billing_model": "period",
+                    "monthly_gb": monthly_gb,
+                    "prices": {
+                        currency: dict(values)
+                        for currency, values in period_prices.items()
+                    },
+                    "enabled_periods": enabled_periods,
+                }
+            )
+
+        if tariff["enabled"] and default_tariff is None:
+            default_tariff = key
+        tariffs.append(tariff)
+        _add_tariff_map_entries(tariff_map, plan, key)
+
+    if not tariffs:
+        return {"catalog": None, "tariff_map": tariff_map, "warnings": warnings}
+    default_tariff = default_tariff or next(
+        (item["key"] for item in tariffs if item["enabled"]),
+        None,
+    )
+    if default_tariff is None:
+        warnings.append("No enabled Remnashop tariffs were generated; tariff catalog was skipped.")
+        return {"catalog": None, "tariff_map": tariff_map, "warnings": warnings}
+
+    catalog = {
+        "default_tariff": default_tariff,
+        "default_currency": default_currency_key,
+        "tariffs": tariffs,
+    }
+    try:
+        TariffsConfig.model_validate(catalog)
+    except Exception as exc:
+        warnings.append(f"Generated Remnashop tariff catalog is invalid: {exc}")
+        return {"catalog": None, "tariff_map": tariff_map, "warnings": warnings}
+
+    return {"catalog": catalog, "tariff_map": tariff_map, "warnings": warnings}
+
+
+def remnashop_notification_overrides(notifications: Any) -> dict[str, Any]:
+    data = _jsonish(notifications)
+    routes = data.get("routes") if isinstance(data.get("routes"), dict) else data
+    if not isinstance(routes, dict):
+        return {"overrides": {}, "route": None, "warnings": []}
+
+    preferred_order = (
+        "SYSTEM",
+        "BOT_LIFECYCLE",
+        "USER_REGISTERED",
+        "SUBSCRIPTION",
+        "PAYMENT",
+    )
+    route_keys = [
+        key for key in preferred_order if key in routes
+    ] + sorted(key for key in routes if key not in preferred_order)
+    candidates: list[dict[str, Any]] = []
+    for route_key in route_keys:
+        route = routes.get(route_key)
+        if isinstance(route, dict):
+            chat_id = _to_int(
+                route.get("chat_id")
+                or route.get("chatId")
+                or route.get("telegram_chat_id")
+                or route.get("telegramChatId")
+            )
+            thread_id = _to_int(
+                route.get("thread_id")
+                or route.get("threadId")
+                or route.get("message_thread_id")
+                or route.get("messageThreadId")
+            )
+        else:
+            chat_id = _to_int(route)
+            thread_id = None
+        if chat_id is None:
+            continue
+        candidates.append({"route": route_key, "chat_id": chat_id, "thread_id": thread_id})
+
+    if not candidates:
+        return {"overrides": {}, "route": None, "warnings": []}
+
+    selected = candidates[0]
+    overrides: dict[str, Any] = {"LOG_CHAT_ID": selected["chat_id"]}
+    if selected.get("thread_id") and int(selected["thread_id"]) > 0:
+        overrides["LOG_THREAD_ID"] = int(selected["thread_id"])
+
+    warnings: list[str] = []
+    distinct_targets = {
+        (candidate["chat_id"], candidate.get("thread_id") or None) for candidate in candidates
+    }
+    if len(distinct_targets) > 1:
+        warnings.append(
+            "Remnashop has multiple notification targets; Minishop uses one LOG_CHAT_ID. "
+            f"Imported route {selected['route']} and stored all routes in migration notes."
+        )
+
+    return {"overrides": overrides, "route": selected, "warnings": warnings}
 
 
 def _provider_value(gateway_type: Any) -> str:
@@ -736,6 +1108,7 @@ class RemnashopImporter:
         source_env: Optional[dict[str, str]] = None,
         source_crypt_key: Optional[str] = None,
         target_webhook_base_url: Optional[str] = None,
+        tariffs_config_path: Optional[str] = None,
     ) -> None:
         self.source = source
         self.target = target
@@ -744,13 +1117,19 @@ class RemnashopImporter:
         self.on_conflict = on_conflict
         self.dry_run = dry_run
         self.created_by_admin_id = created_by_admin_id
-        self.tariff_map = tariff_map
+        self.tariff_map = dict(tariff_map)
+        self.explicit_tariff_map = dict(tariff_map)
         self.write_admin_compat_overrides = write_admin_compat_overrides
         self.source_env = source_env or {}
         self.source_crypt_key = source_crypt_key or self.source_env.get("APP_CRYPT_KEY")
         self.target_webhook_base_url = target_webhook_base_url
+        self.tariffs_config_path = tariffs_config_path or "data/tariffs.json"
         self.tables: set[str] = set()
         self.user_map: dict[int, int] = {}
+        self.source_plans: list[dict[str, Any]] = []
+        self.source_plan_durations: list[dict[str, Any]] = []
+        self.source_plan_prices: list[dict[str, Any]] = []
+        self.generated_tariff_catalog: Optional[dict[str, Any]] = None
         self.imported_payment_provider_ids: list[str] = []
         self.summary: dict[str, Any] = {
             "source": SOURCE,
@@ -761,6 +1140,7 @@ class RemnashopImporter:
             "subscriptions": _counter(),
             "payments": _counter(),
             "promocodes": _counter(),
+            "tariffs": _counter(),
             "payment_provider_settings": _counter(),
             "settings": _counter(),
             "warnings": [],
@@ -769,6 +1149,10 @@ class RemnashopImporter:
     async def run(self) -> dict[str, Any]:
         self.tables = await self._source_tables()
         await self._warn_missing_tables()
+        if self._should_run("subscriptions") or self._should_run("payments") or self._should_run(
+            "settings"
+        ):
+            await self.prepare_tariffs()
 
         if self._should_run("users"):
             await self.import_users()
@@ -1001,6 +1385,7 @@ class RemnashopImporter:
                     for key in (
                         "REMNAWAVE_HOST",
                         "REMNAWAVE_TOKEN",
+                        "REMNAWAVE_COOKIE",
                         "REMNAWAVE_WEBHOOK_SECRET",
                         "BOT_SUPPORT_USERNAME",
                         "APP_DEFAULT_LOCALE",
@@ -1098,6 +1483,140 @@ class RemnashopImporter:
             order_value = ",".join(active_provider_ids)
             if await self._upsert_setting_override("PAYMENT_METHODS_ORDER", order_value):
                 self.summary["payment_provider_settings"]["payment_order_written"] += 1
+
+    async def prepare_tariffs(self) -> None:
+        if "plans" not in self.tables:
+            self.summary["tariffs"]["missing_source_table"] += 1
+            return
+
+        self.source_plans = await self._fetch_rows("plans", order_by="order_index, id")
+        self.source_plan_durations = (
+            await self._fetch_rows("plan_durations", order_by="order_index, id")
+            if "plan_durations" in self.tables
+            else []
+        )
+        self.source_plan_prices = (
+            await self._fetch_rows("plan_prices", order_by="id")
+            if "plan_prices" in self.tables
+            else []
+        )
+        source_settings = await self._fetch_one("settings") if "settings" in self.tables else None
+        result = remnashop_build_tariff_catalog(
+            self.source_plans,
+            self.source_plan_durations,
+            self.source_plan_prices,
+            default_currency=(
+                source_settings.get("default_currency") if source_settings else "RUB"
+            ),
+        )
+        for warning in result.get("warnings") or []:
+            self.summary["warnings"].append(warning)
+        generated_map = dict(result.get("tariff_map") or {})
+        self.tariff_map = {**generated_map, **self.explicit_tariff_map}
+        self.generated_tariff_catalog = result.get("catalog")
+        if generated_map:
+            self.summary["tariffs"]["auto_map_entries"] = len(generated_map)
+        if self.generated_tariff_catalog:
+            self.summary["tariffs"]["generated"] = len(
+                self.generated_tariff_catalog.get("tariffs", [])
+            )
+        else:
+            self.summary["tariffs"]["generation_skipped"] += 1
+
+    def _merged_tariff_catalog(self, existing_catalog: Optional[dict[str, Any]]) -> dict[str, Any]:
+        generated = json.loads(_json_dumps(self.generated_tariff_catalog or {}))
+        if not existing_catalog or self.on_conflict == "overwrite":
+            return generated
+        if self.on_conflict == "skip":
+            return existing_catalog
+
+        existing_tariffs = [
+            item for item in existing_catalog.get("tariffs", []) if isinstance(item, dict)
+        ]
+        generated_tariffs = [
+            item for item in generated.get("tariffs", []) if isinstance(item, dict)
+        ]
+        generated_by_key = {
+            str(item.get("key")): item for item in generated_tariffs if item.get("key")
+        }
+        merged_tariffs: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for tariff in existing_tariffs:
+            key = str(tariff.get("key") or "")
+            if key in generated_by_key:
+                merged_tariffs.append(generated_by_key[key])
+                seen.add(key)
+            else:
+                merged_tariffs.append(tariff)
+        for tariff in generated_tariffs:
+            key = str(tariff.get("key") or "")
+            if key and key not in seen:
+                merged_tariffs.append(tariff)
+                seen.add(key)
+
+        return {
+            **existing_catalog,
+            "default_tariff": generated.get("default_tariff")
+            or existing_catalog.get("default_tariff"),
+            "default_currency": generated.get("default_currency")
+            or existing_catalog.get("default_currency")
+            or "rub",
+            "tariffs": merged_tariffs,
+        }
+
+    async def write_generated_tariff_catalog(self) -> Optional[str]:
+        if not self.generated_tariff_catalog:
+            return None
+
+        catalog_path = Path(self.tariffs_config_path)
+        existing_catalog: Optional[dict[str, Any]] = None
+        if catalog_path.exists():
+            try:
+                decoded = json.loads(catalog_path.read_text(encoding="utf-8"))
+                if isinstance(decoded, dict):
+                    existing_catalog = decoded
+            except (OSError, json.JSONDecodeError) as exc:
+                if self.on_conflict == "skip":
+                    self.summary["warnings"].append(
+                        f"Skipped tariff catalog write because {catalog_path} exists "
+                        f"and cannot be read: {exc}"
+                    )
+                    self.summary["tariffs"]["catalog_write_skipped"] += 1
+                    return None
+                self.summary["warnings"].append(
+                    f"Overwriting unreadable tariff catalog {catalog_path}: {exc}"
+                )
+
+        if catalog_path.exists() and self.on_conflict == "skip":
+            self.summary["tariffs"]["catalog_write_skipped"] += 1
+            self.summary["warnings"].append(
+                f"Skipped tariff catalog write because {catalog_path} already exists."
+            )
+            return None
+
+        catalog = self._merged_tariff_catalog(existing_catalog)
+        try:
+            TariffsConfig.model_validate(catalog)
+        except Exception as exc:
+            self.summary["warnings"].append(f"Skipped invalid merged tariff catalog: {exc}")
+            self.summary["tariffs"]["catalog_write_skipped"] += 1
+            return None
+
+        self.summary["tariffs"]["catalog_path"] = str(catalog_path)
+        if self.dry_run:
+            self.summary["tariffs"]["catalog_would_write"] += 1
+            return str(catalog_path)
+
+        catalog_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = catalog_path.with_suffix(catalog_path.suffix + ".tmp")
+        tmp_path.write_text(
+            json.dumps(catalog, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        tmp_path.replace(catalog_path)
+        self.summary["tariffs"]["catalog_written"] += 1
+        self.summary["tariffs"]["catalog_tariffs"] = len(catalog.get("tariffs", []))
+        return str(catalog_path)
 
     async def _upsert_legacy_referral_code(self, *, code: str, user_id: int) -> None:
         if len(code) > 128:
@@ -1325,6 +1844,7 @@ class RemnashopImporter:
             expire_at = _as_utc(row.get("expire_at")) or now
             created_at = _as_utc(row.get("created_at")) or now
             plan_snapshot = _jsonish(row.get("plan_snapshot"))
+            plan_type = remnashop_plan_type(plan_snapshot)
             traffic_limit_bytes = remnashop_traffic_gb_to_bytes(row.get("traffic_limit"))
             payload = {
                 "user_id": int(user.user_id),
@@ -1344,8 +1864,9 @@ class RemnashopImporter:
                 "skip_notifications": True,
                 "auto_renew_enabled": False,
                 "tariff_key": remnashop_tariff_key(plan_snapshot, self.tariff_map),
-                "tier_baseline_bytes": traffic_limit_bytes,
-                "period_start_at": created_at,
+                "tier_baseline_bytes": 0 if plan_type == "TRAFFIC" else traffic_limit_bytes,
+                "topup_balance_bytes": traffic_limit_bytes if plan_type == "TRAFFIC" else 0,
+                "period_start_at": None if plan_type == "TRAFFIC" else created_at,
                 "hwid_device_limit": _to_int(row.get("device_limit")),
             }
             metadata = {
@@ -1402,6 +1923,7 @@ class RemnashopImporter:
             provider = _provider_value(row.get("gateway_type"))
             plan_snapshot = _jsonish(row.get("plan_snapshot"))
             created_at = _as_utc(row.get("created_at"))
+            sale_mode = remnashop_sale_mode(row.get("purchase_type"), plan_snapshot)
             payload = {
                 "user_id": int(user.user_id),
                 "provider_payment_id": provider_payment_id,
@@ -1414,9 +1936,13 @@ class RemnashopImporter:
                     plan_snapshot,
                     created_at=row.get("created_at"),
                     expire_at=None,
-                ),
-                "sale_mode": remnashop_sale_mode(row.get("purchase_type")),
+                )
+                if sale_mode == "subscription"
+                else None,
+                "sale_mode": sale_mode,
                 "tariff_key": remnashop_tariff_key(plan_snapshot, self.tariff_map),
+                "purchased_gb": remnashop_purchased_gb(plan_snapshot),
+                "purchased_hwid_devices": remnashop_purchased_hwid_devices(plan_snapshot),
                 "created_at": created_at,
             }
             payload = {key: value for key, value in payload.items() if value is not None}
@@ -1596,10 +2122,11 @@ class RemnashopImporter:
 
     async def import_settings(self) -> None:
         source_settings = await self._fetch_one("settings")
-        plans = (
-            await self._fetch_rows("plans", order_by="order_index")
-            if "plans" in self.tables
-            else []
+        plans = self.source_plans
+        if not plans and "plans" in self.tables:
+            plans = await self._fetch_rows("plans", order_by="order_index, id")
+        notification_import = remnashop_notification_overrides(
+            source_settings.get("notifications") if source_settings else None
         )
         notes = {
             "default_currency": (
@@ -1611,6 +2138,8 @@ class RemnashopImporter:
                 if source_settings and source_settings.get(key) is not None
             },
             "plans_count": len(plans),
+            "plan_durations_count": len(self.source_plan_durations),
+            "plan_prices_count": len(self.source_plan_prices),
             "plans": [
                 {
                     "id": plan.get("id"),
@@ -1622,6 +2151,13 @@ class RemnashopImporter:
                 }
                 for plan in plans[:100]
             ],
+            "tariff_catalog": {
+                "path": self.tariffs_config_path,
+                "generated": bool(self.generated_tariff_catalog),
+                "tariffs_count": len((self.generated_tariff_catalog or {}).get("tariffs", [])),
+                "auto_map_entries": len(self.tariff_map),
+            },
+            "notification_routes": notification_import,
             "source_env": {
                 "provided": bool(self.source_env),
                 "supported_keys_present": sorted(
@@ -1629,6 +2165,7 @@ class RemnashopImporter:
                     for key in (
                         "REMNAWAVE_HOST",
                         "REMNAWAVE_TOKEN",
+                        "REMNAWAVE_COOKIE",
                         "REMNAWAVE_WEBHOOK_SECRET",
                         "BOT_SUPPORT_USERNAME",
                         "APP_DEFAULT_LOCALE",
@@ -1645,8 +2182,19 @@ class RemnashopImporter:
             },
         }
         env_override_keys = await self.import_env_settings()
+        notification_override_keys = await self._write_setting_overrides(
+            notification_import.get("overrides") or {},
+            summary_key="settings",
+        )
+        if notification_override_keys:
+            self.summary["settings"]["notification_overrides_written"] += 1
+        for warning in notification_import.get("warnings") or []:
+            self.summary["warnings"].append(warning)
+        tariff_catalog_path = await self.write_generated_tariff_catalog()
         await self.import_payment_provider_settings()
         notes["env_override_keys"] = env_override_keys
+        notes["notification_override_keys"] = notification_override_keys
+        notes["tariff_catalog"]["written_path"] = tariff_catalog_path
         notes["payment_provider_ids"] = list(dict.fromkeys(self.imported_payment_provider_ids))
         await self._upsert_mapping(
             entity_type="settings",
@@ -1775,6 +2323,7 @@ async def run_import(args: argparse.Namespace) -> dict[str, Any]:
             source_env=source_env,
             source_crypt_key=source_crypt_key,
             target_webhook_base_url=settings.WEBHOOK_BASE_URL,
+            tariffs_config_path=settings.TARIFFS_CONFIG_PATH,
         )
         summary = await importer.run()
         if args.dry_run:

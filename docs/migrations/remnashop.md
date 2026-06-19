@@ -38,6 +38,7 @@ message logs как заметки, чтобы администратор мог
 
 - `REMNAWAVE_HOST` -> `PANEL_API_URL`;
 - `REMNAWAVE_TOKEN` -> `PANEL_API_KEY`;
+- `REMNAWAVE_COOKIE` -> `PANEL_API_COOKIE`;
 - `REMNAWAVE_WEBHOOK_SECRET` -> `PANEL_WEBHOOK_SECRET`;
 - `BOT_SUPPORT_USERNAME` -> `SUPPORT_LINK`;
 - `APP_DEFAULT_LOCALE` -> `DEFAULT_LANGUAGE`.
@@ -92,6 +93,11 @@ Remnashop может хранить секреты в формате `enc_...`. 
   автоматически при старте.
 
 ## Flow wizard
+
+Importer automatically builds `TARIFFS_CONFIG_PATH` from Remnashop `plans`,
+`plan_durations` and `plan_prices`, then maps plan id/name/tag/public_code to
+the generated `tariff_key`. Use `--tariff-map-json` only when you need to
+override that automatic mapping.
 
 1. Wizard скачивает compose-профиль и `backend/scripts/import_legacy.py` через
    `raw.githubusercontent.com`, без клонирования репозитория.
