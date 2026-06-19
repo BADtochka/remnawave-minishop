@@ -11,6 +11,7 @@ from scripts.import_legacy import (
     remnashop_post_migration_actions,
     remnashop_pricing_amount,
     remnashop_pricing_currency,
+    remnashop_row_telegram_id,
     remnashop_sale_mode,
     remnashop_traffic_gb_to_bytes,
     remnashop_transaction_status,
@@ -178,6 +179,23 @@ def test_remnashop_tariff_catalog_is_generated_from_plans_durations_and_prices()
     assert traffic["traffic_packages"]["rub"] == [{"gb": 50.0, "price": 249.0}]
     assert traffic["traffic_packages"]["usd"] == [{"gb": 50.0, "price": 2.5}]
     assert traffic["traffic_packages"]["stars"] == [{"gb": 50.0, "price": 125.0}]
+
+
+def test_remnashop_row_telegram_id_supports_fk_only_schema():
+    user_map = {1: 504250615, 2: 7410865527}
+
+    assert remnashop_row_telegram_id({"user_telegram_id": 123}, user_map) == 123
+    assert remnashop_row_telegram_id({"user_id": 2}, user_map) == 7410865527
+    assert (
+        remnashop_row_telegram_id(
+            {"referrer_id": 1},
+            user_map,
+            user_id_key="referrer_id",
+            telegram_id_key="referrer_telegram_id",
+        )
+        == 504250615
+    )
+    assert remnashop_row_telegram_id({"user_id": 3}, user_map) is None
 
 
 def test_remnashop_yookassa_gateway_maps_to_current_provider_settings():

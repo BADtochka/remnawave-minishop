@@ -725,6 +725,25 @@ def remnashop_tariff_key(plan_snapshot: Any, tariff_map: dict[str, str]) -> Opti
     return None
 
 
+def remnashop_row_telegram_id(
+    row: dict[str, Any],
+    user_telegram_by_id: Optional[dict[int, int]] = None,
+    *,
+    user_id_key: str = "user_id",
+    telegram_id_key: str = "user_telegram_id",
+) -> Optional[int]:
+    telegram_id = _to_int(row.get(telegram_id_key))
+    if telegram_id is None and telegram_id_key != "telegram_id":
+        telegram_id = _to_int(row.get("telegram_id"))
+    if telegram_id is not None:
+        return telegram_id
+
+    user_id = _to_int(row.get(user_id_key))
+    if user_id is None or not user_telegram_by_id:
+        return None
+    return _to_int(user_telegram_by_id.get(user_id))
+
+
 def remnashop_days_to_months(days: Any) -> Optional[int]:
     value = _to_int(days)
     if value is None or value <= 0:
@@ -1125,6 +1144,8 @@ class RemnashopImporter:
         self.target_webhook_base_url = target_webhook_base_url
         self.tariffs_config_path = tariffs_config_path or "data/tariffs.json"
         self.tables: set[str] = set()
+        self.source_columns: dict[str, set[str]] = {}
+        self.source_user_telegram_by_id: Optional[dict[int, int]] = None
         self.user_map: dict[int, int] = {}
         self.source_plans: list[dict[str, Any]] = []
         self.source_plan_durations: list[dict[str, Any]] = []
@@ -1194,6 +1215,27 @@ class RemnashopImporter:
 
         return await self.source.run_sync(load_tables)
 
+    async def _source_columns(self, table: str) -> set[str]:
+        if table in self.source_columns:
+            return self.source_columns[table]
+        if table not in self.tables:
+            self.source_columns[table] = set()
+            return set()
+
+        def load_columns(sync_connection: Any) -> set[str]:
+            return {
+                str(column.get("name") or "")
+                for column in inspect(sync_connection).get_columns(
+                    table,
+                    schema=self.source_schema,
+                )
+                if column.get("name")
+            }
+
+        columns = await self.source.run_sync(load_columns)
+        self.source_columns[table] = columns
+        return columns
+
     async def _warn_missing_tables(self) -> None:
         required = {"users", "subscriptions", "transactions", "referrals", "settings"}
         missing = sorted(required - self.tables)
@@ -1213,18 +1255,71 @@ class RemnashopImporter:
         rows = await self._fetch_rows(table, order_by="")
         return rows[0] if rows else None
 
+    def _remember_source_user(self, row: dict[str, Any]) -> None:
+        source_user_id = _to_int(row.get("id"))
+        telegram_id = _to_int(row.get("telegram_id"))
+        if source_user_id is None or telegram_id is None:
+            return
+        if self.source_user_telegram_by_id is None:
+            self.source_user_telegram_by_id = {}
+        self.source_user_telegram_by_id[source_user_id] = telegram_id
+
+    async def _source_user_telegram_map(self) -> dict[int, int]:
+        if self.source_user_telegram_by_id is not None:
+            return self.source_user_telegram_by_id
+        self.source_user_telegram_by_id = {}
+        for row in await self._fetch_rows("users", order_by="id"):
+            self._remember_source_user(row)
+        return self.source_user_telegram_by_id
+
+    async def _source_row_telegram_id(
+        self,
+        row: dict[str, Any],
+        *,
+        user_id_key: str = "user_id",
+        telegram_id_key: str = "user_telegram_id",
+    ) -> Optional[int]:
+        telegram_id = remnashop_row_telegram_id(
+            row,
+            user_id_key=user_id_key,
+            telegram_id_key=telegram_id_key,
+        )
+        if telegram_id is not None:
+            return telegram_id
+        return remnashop_row_telegram_id(
+            row,
+            await self._source_user_telegram_map(),
+            user_id_key=user_id_key,
+            telegram_id_key=telegram_id_key,
+        )
+
     async def _latest_panel_uuid_by_telegram(self) -> dict[int, str]:
         if "subscriptions" not in self.tables:
             return {}
+        subscription_columns = await self._source_columns("subscriptions")
+        if "user_telegram_id" in subscription_columns:
+            user_join = ""
+            telegram_expr = "s.user_telegram_id"
+        elif "user_id" in subscription_columns and "users" in self.tables:
+            user_columns = await self._source_columns("users")
+            if not {"id", "telegram_id"}.issubset(user_columns):
+                return {}
+            user_join = f'JOIN {_qtable(self.source_schema, "users")} u ON u.id = s.user_id'
+            telegram_expr = "u.telegram_id"
+        else:
+            return {}
+
         result = await self.source.execute(
             text(
                 f"""
-                SELECT DISTINCT ON (user_telegram_id)
-                    user_telegram_id,
-                    user_remna_id
-                FROM {_qtable(self.source_schema, "subscriptions")}
-                WHERE user_remna_id IS NOT NULL
-                ORDER BY user_telegram_id, updated_at DESC NULLS LAST, id DESC
+                SELECT DISTINCT ON ({telegram_expr})
+                    {telegram_expr} AS user_telegram_id,
+                    s.user_remna_id
+                FROM {_qtable(self.source_schema, "subscriptions")} s
+                {user_join}
+                WHERE s.user_remna_id IS NOT NULL
+                  AND {telegram_expr} IS NOT NULL
+                ORDER BY {telegram_expr}, s.updated_at DESC NULLS LAST, s.id DESC
                 """
             )
         )
@@ -1681,6 +1776,7 @@ class RemnashopImporter:
         rows = await self._fetch_rows("users", order_by="telegram_id")
         panel_by_tg = await self._latest_panel_uuid_by_telegram()
         for row in rows:
+            self._remember_source_user(row)
             telegram_id = _to_int(row.get("telegram_id"))
             if telegram_id is None:
                 self.summary["users"]["skipped"] += 1
@@ -1786,8 +1882,18 @@ class RemnashopImporter:
     async def import_referrals(self) -> None:
         rows = await self._fetch_rows("referrals", order_by="id")
         for row in rows:
-            referrer = await self._target_user_for_telegram(row.get("referrer_telegram_id"))
-            referred = await self._target_user_for_telegram(row.get("referred_telegram_id"))
+            referrer_telegram_id = await self._source_row_telegram_id(
+                row,
+                user_id_key="referrer_id",
+                telegram_id_key="referrer_telegram_id",
+            )
+            referred_telegram_id = await self._source_row_telegram_id(
+                row,
+                user_id_key="referred_id",
+                telegram_id_key="referred_telegram_id",
+            )
+            referrer = await self._target_user_for_telegram(referrer_telegram_id)
+            referred = await self._target_user_for_telegram(referred_telegram_id)
             if not referrer or not referred or referrer.user_id == referred.user_id:
                 self.summary["referrals"]["skipped"] += 1
                 continue
@@ -1812,7 +1918,7 @@ class RemnashopImporter:
         rows = await self._fetch_rows("subscriptions", order_by="id")
         now = datetime.now(timezone.utc)
         for row in rows:
-            user = await self._target_user_for_telegram(row.get("user_telegram_id"))
+            user = await self._target_user_for_telegram(await self._source_row_telegram_id(row))
             if not user:
                 self.summary["subscriptions"]["skipped"] += 1
                 continue
@@ -1908,7 +2014,7 @@ class RemnashopImporter:
     async def import_payments(self) -> None:
         rows = await self._fetch_rows("transactions", order_by="id")
         for row in rows:
-            user = await self._target_user_for_telegram(row.get("user_telegram_id"))
+            user = await self._target_user_for_telegram(await self._source_row_telegram_id(row))
             if not user:
                 self.summary["payments"]["skipped"] += 1
                 continue
@@ -2098,7 +2204,9 @@ class RemnashopImporter:
         activations: Iterable[dict[str, Any]],
     ) -> None:
         for activation in activations:
-            user = await self._target_user_for_telegram(activation.get("user_telegram_id"))
+            user = await self._target_user_for_telegram(
+                await self._source_row_telegram_id(activation)
+            )
             if not user:
                 self.summary["promocodes"]["activation_skipped"] += 1
                 continue
