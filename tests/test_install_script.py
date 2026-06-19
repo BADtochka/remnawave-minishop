@@ -98,6 +98,7 @@ def test_shell_installer_does_not_rename_bot_and_reports_migration_success():
     assert "notify_remnashop_migration_success" in script
     assert "remnashop-apply-summary.json" in script
     assert "remnashop-post-migration-message.txt" in script
+    assert '("providers_mapped", "перенесено")' in script
 
 
 def test_shell_installer_can_reset_target_database_before_remnashop_import():

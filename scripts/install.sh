@@ -1455,7 +1455,7 @@ lines = [
         "Платежные настройки",
         "payment_provider_settings",
         [
-            ("mapped", "перенесено"),
+            ("providers_mapped", "перенесено"),
             ("unsupported", "неподдержано"),
             ("skipped", "пропущено"),
         ],
