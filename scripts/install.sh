@@ -913,6 +913,20 @@ first_nginx_value() {
     ' "$file"
 }
 
+egames_container_has_routes() {
+    container="$1"
+    webhook_host="$2"
+    miniapp_host="$3"
+    backend_port="$4"
+    frontend_port="$5"
+    docker exec "$container" sh -c '
+        grep -Fq "server_name $1;" /etc/nginx/conf.d/default.conf &&
+        grep -Fq "server_name $2;" /etc/nginx/conf.d/default.conf &&
+        grep -Fq "proxy_pass http://127.0.0.1:$3;" /etc/nginx/conf.d/default.conf &&
+        grep -Fq "proxy_pass http://127.0.0.1:$4;" /etc/nginx/conf.d/default.conf
+    ' sh "$webhook_host" "$miniapp_host" "$backend_port" "$frontend_port"
+}
+
 is_egames_profile() {
     [ "$PROFILE_KEY" = "egames" ] && return 0
     [ "$(env_get DEPLOYMENT_PROFILE '')" = "egames" ]
@@ -1019,11 +1033,14 @@ EOF
     fi
     rm -f "$tmp"
     if docker inspect "$nginx_container" >/dev/null 2>&1; then
-        if ! docker exec -i "$nginx_container" sh -c 'cat > /etc/nginx/conf.d/default.conf' < "$nginx_conf"; then
-            warn "Could not sync eGames config into $nginx_container; restoring $backup"
-            cp "$backup" "$nginx_conf"
-            docker exec -i "$nginx_container" sh -c 'cat > /etc/nginx/conf.d/default.conf' < "$backup" || true
-            return 1
+        if ! egames_container_has_routes "$nginx_container" "$webhook_host" "$miniapp_host" "$backend_port" "$frontend_port"; then
+            warn "Restarting $nginx_container to refresh its bind-mounted eGames config."
+            if ! docker restart "$nginx_container" >/dev/null; then
+                warn "Nginx restart failed; restoring $backup"
+                cp "$backup" "$nginx_conf"
+                docker restart "$nginx_container" >/dev/null || true
+                return 1
+            fi
         fi
         if docker exec "$nginx_container" nginx -t; then
             docker exec "$nginx_container" nginx -s reload || docker restart "$nginx_container" >/dev/null
@@ -1031,7 +1048,7 @@ EOF
         else
             warn "Nginx config test failed; restoring $backup"
             cp "$backup" "$nginx_conf"
-            docker exec -i "$nginx_container" sh -c 'cat > /etc/nginx/conf.d/default.conf' < "$backup" || true
+            docker restart "$nginx_container" >/dev/null || true
             return 1
         fi
     else
