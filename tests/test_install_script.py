@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+import re
 from pathlib import Path
 
 import pytest
@@ -60,6 +61,14 @@ def test_shell_installer_downloads_raw_files_and_runs_import_in_container():
     assert "--dry-run" in script
     assert "Install new stack and run migration" in script
     assert "Run migration only" in script
+
+
+def test_shell_installer_download_helper_does_not_clobber_target_name():
+    script = INSTALL_SCRIPT.read_text(encoding="utf-8")
+    helper = script.split("download_to() {", 1)[1].split("\n}", 1)[0]
+
+    assert 'download_target="$2"' in helper
+    assert not re.search(r'^\s*target="\$2"', helper, flags=re.MULTILINE)
 
 
 def test_shell_installer_supports_egames_reverse_proxy_profile():

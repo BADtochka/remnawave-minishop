@@ -361,14 +361,14 @@ raw_url() {
 }
 
 download_to() {
-    url="$1"
-    target="$2"
+    download_url="$1"
+    download_target="$2"
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "$url" -o "$target"
+        curl -fsSL "$download_url" -o "$download_target"
         return $?
     fi
     if command -v wget >/dev/null 2>&1; then
-        wget -qO "$target" "$url"
+        wget -qO "$download_target" "$download_url"
         return $?
     fi
     fail "curl or wget is required to download files."
@@ -906,7 +906,7 @@ first_nginx_value() {
     awk -v key="$key" '
         $1 == key {
             value = $2
-            gsub(/[\";]/, "", value)
+            gsub(/[";]/, "", value)
             print value
             exit
         }
@@ -1024,7 +1024,9 @@ EOF
             return 1
         fi
     else
-        warn "Nginx container $nginx_container was not found. Config was written but not reloaded."
+        warn "Nginx container $nginx_container was not found; restoring $backup"
+        cp "$backup" "$nginx_conf"
+        return 1
     fi
 }
 
