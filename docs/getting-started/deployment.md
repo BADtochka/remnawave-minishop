@@ -31,7 +31,7 @@ sh install.sh
 
 Wizard работает через меню с цифрами и подтверждениями `y/n`. Он умеет:
 
-- скачать выбранный compose-профиль (`Caddy`, `Nginx`, `Pangolin/Newt` или `no-proxy`);
+- скачать выбранный compose-профиль (`Caddy`, `Nginx`, `Pangolin/Newt`, `no-proxy` или профиль существующего eGames reverse proxy);
 - сгенерировать минимальный `.env`, включая пароли и стабильные secrets;
 - сохранить backup существующих файлов перед перезаписью;
 - подготовить writable `data/` для файлов приложения;
@@ -82,6 +82,7 @@ Remnawave Panel и платежных провайдеров.
 | [`deploy/examples/nginx`](https://github.com/3252a8/remnawave-minishop/tree/main/deploy/examples/nginx) | Уже используете Nginx и готовы положить TLS-сертификаты рядом с примером. |
 | [`deploy/examples/newt`](https://github.com/3252a8/remnawave-minishop/tree/main/deploy/examples/newt) | Публикуете сервисы через Pangolin/Newt без входящих портов на сервере приложения. |
 | [`deploy/examples/no-proxy`](https://github.com/3252a8/remnawave-minishop/tree/main/deploy/examples/no-proxy) | Нужно напрямую открыть HTTP-порты backend/frontend или проверить стек за внешним TLS-терминатором. |
+| `Existing eGames Remnawave reverse proxy` в wizard | Remnawave Panel уже стоит на этом же хосте через [`eGamesAPI/remnawave-reverse-proxy`](https://github.com/eGamesAPI/remnawave-reverse-proxy); wizard использует no-proxy compose и добавляет backend/Mini App маршруты в `/opt/remnawave/nginx.conf`. |
 
 ## Caddy (рекомендуемый вариант)
 

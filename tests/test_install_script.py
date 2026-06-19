@@ -46,6 +46,27 @@ def test_shell_installer_downloads_raw_files_and_runs_import_in_container():
     assert "Run migration only" in script
 
 
+def test_shell_installer_supports_egames_reverse_proxy_profile():
+    script = INSTALL_SCRIPT.read_text(encoding="utf-8")
+
+    assert "Existing eGames Remnawave reverse proxy" in script
+    assert 'PROFILE_KEY="egames"' in script
+    assert "DEPLOYMENT_PROFILE" in script
+    assert "configure_egames_reverse_proxy" in script
+    assert "configure_egames_panel_webhook" in script
+    assert "PANEL_API_COOKIE" in script
+    assert "TELEGRAM_OAUTH_CLIENT_SECRET" in script
+
+
+def test_shell_installer_connects_local_remnashop_db_container_for_import():
+    script = INSTALL_SCRIPT.read_text(encoding="utf-8")
+
+    assert "connect_local_source_db_to_target_network" in script
+    assert "dsn_hostname" in script
+    assert "docker network connect" in script
+    assert "_remnawave-shop" in script
+
+
 def test_shell_installer_supports_legacy_tgshop_volume_and_dsn_paths():
     script = INSTALL_SCRIPT.read_text(encoding="utf-8")
 

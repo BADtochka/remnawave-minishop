@@ -18,6 +18,14 @@ sh install.sh
 В меню выберите `Install new stack and run migration` для нового сервера
 или `Run migration only`, если compose-папка и `.env` уже готовы.
 
+Для отдельного сервера выбирайте профиль `Caddy HTTPS`: это дефолтный вариант
+wizard с автоматическими сертификатами. Если Remnawave Panel уже установлена на
+этом же хосте скриптом [`eGamesAPI/remnawave-reverse-proxy`](https://github.com/eGamesAPI/remnawave-reverse-proxy),
+выберите профиль `Existing eGames Remnawave reverse proxy on this host`. В этом
+режиме wizard использует no-proxy compose, прописывает `DEPLOYMENT_PROFILE=egames`
+и сам добавляет server-блоки для backend/webhook-домена и Mini App в существующий
+`/opt/remnawave/nginx.conf`.
+
 ## Что переносится
 
 - пользователи Telegram, username, email, Remnawave UUID и метаданные профиля;
@@ -78,8 +86,10 @@ Remnashop может хранить секреты в формате `enc_...`. 
 значения будут пропущены с предупреждением, остальные данные продолжат
 импортироваться.
 
-После успешного применения wizard печатает список новых адресов webhook. Их
-нужно указать во внешних сервисах вместо старых Remnashop URL:
+После успешного применения wizard печатает список новых адресов webhook. В
+профиле `egames` он дополнительно обновляет `WEBHOOK_URL` в `/opt/remnawave/.env`
+и перезапускает backend панели. Остальные внешние платежные webhook нужно
+указать во внешних сервисах вместо старых Remnashop URL:
 
 - Remnawave Panel -> `WEBHOOK_URL`: `WEBHOOK_BASE_URL` + `/webhook/panel`;
 - YooKassa HTTP notifications URL: `WEBHOOK_BASE_URL` + `/webhook/yookassa`;
@@ -112,10 +122,11 @@ override that automatic mapping.
    webhook URL для Remnawave Panel и платежных провайдеров, затем перезапускает
    `backend`/`worker`, чтобы настройки совместимости перечитались.
 
-Если source DB находится на том же Docker host, помните, что DSN выполняется
-из backend-контейнера. Для подключения к сервису вне compose-сети может
-понадобиться host name вроде `host.docker.internal`, внешний адрес сервера или
-ручное подключение контейнеров к общей Docker network.
+Если source DB находится на том же Docker host и host в DSN совпадает с именем
+контейнера, например `remnashop-db`, wizard сам подключит этот контейнер к сети
+`<COMPOSE_PROJECT_NAME>_remnawave-shop` перед dry-run. Для подключения к сервису
+вне Docker по-прежнему используйте `host.docker.internal` или внешний адрес
+сервера.
 
 ## Ручной запуск
 

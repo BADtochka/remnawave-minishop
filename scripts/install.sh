@@ -42,6 +42,7 @@ TARGET_DIR=""
 SOURCE_REPO=""
 SOURCE_REF=""
 PROFILE_KEY=""
+DEPLOYMENT_PROFILE_VALUE=""
 ENV_PATH=""
 COMPOSE_STYLE=""
 PROMPT_VALUE=""
@@ -68,14 +69,19 @@ POSTGRES_USER_VALUE=""
 POSTGRES_PASSWORD_VALUE=""
 POSTGRES_DB_VALUE=""
 WEBAPP_ENABLED_VALUE=""
+WEBAPP_TITLE_VALUE=""
 WEBAPP_SESSION_SECRET_VALUE=""
 WEBHOOK_SECRET_TOKEN_VALUE=""
 TRUSTED_PROXIES_VALUE=""
 PANEL_API_URL_VALUE=""
 PANEL_API_KEY_VALUE=""
+PANEL_API_COOKIE_VALUE=""
 PANEL_WEBHOOK_SECRET_VALUE=""
+TELEGRAM_OAUTH_CLIENT_ID_VALUE=""
+TELEGRAM_OAUTH_CLIENT_SECRET_VALUE=""
+TELEGRAM_OAUTH_REQUEST_ACCESS_VALUE=""
 
-KNOWN_ENV_KEYS="COMPOSE_PROJECT_NAME IMAGE_TAG WEBHOOK_HOST MINIAPP_HOST WEBHOOK_PUBLIC_URL MINIAPP_PUBLIC_URL HTTP_BIND HTTPS_BIND WEB_SERVER_BIND FRONTEND_BIND PANGOLIN_ENDPOINT NEWT_ID NEWT_SECRET BOT_TOKEN ADMIN_IDS POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB WEBAPP_ENABLED WEBAPP_SESSION_SECRET WEBHOOK_SECRET_TOKEN TRUSTED_PROXIES PANEL_API_URL PANEL_API_KEY PANEL_WEBHOOK_SECRET"
+KNOWN_ENV_KEYS="DEPLOYMENT_PROFILE COMPOSE_PROJECT_NAME IMAGE_TAG WEBHOOK_HOST MINIAPP_HOST WEBHOOK_PUBLIC_URL MINIAPP_PUBLIC_URL HTTP_BIND HTTPS_BIND WEB_SERVER_BIND FRONTEND_BIND PANGOLIN_ENDPOINT NEWT_ID NEWT_SECRET BOT_TOKEN ADMIN_IDS POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB WEBAPP_ENABLED WEBAPP_TITLE WEBAPP_SESSION_SECRET WEBHOOK_SECRET_TOKEN TRUSTED_PROXIES PANEL_API_URL PANEL_API_KEY PANEL_API_COOKIE PANEL_WEBHOOK_SECRET TELEGRAM_OAUTH_CLIENT_ID TELEGRAM_OAUTH_CLIENT_SECRET TELEGRAM_OAUTH_REQUEST_ACCESS"
 
 color() {
     printf '%s%s%s' "$2" "$1" "$RESET"
@@ -154,7 +160,7 @@ mask_secret() {
 
 is_secret_key() {
     case "$1" in
-        BOT_TOKEN|POSTGRES_PASSWORD|WEBAPP_SESSION_SECRET|WEBHOOK_SECRET_TOKEN|PANEL_API_KEY|PANEL_WEBHOOK_SECRET|NEWT_SECRET)
+        BOT_TOKEN|POSTGRES_PASSWORD|WEBAPP_SESSION_SECRET|WEBHOOK_SECRET_TOKEN|PANEL_API_KEY|PANEL_API_COOKIE|PANEL_WEBHOOK_SECRET|TELEGRAM_OAUTH_CLIENT_SECRET|NEWT_SECRET)
             return 0
             ;;
         *)
@@ -397,17 +403,20 @@ download_raw_file() {
 }
 
 choose_profile() {
-    choose "Deployment profile" "1" "1|2|3|4" \
-        "1. Caddy HTTPS - recommended public HTTPS with automatic certificates." \
+    choose "Deployment profile" "1" "1|2|3|4|5" \
+        "1. Caddy HTTPS - recommended for a separate server, with automatic certificates." \
         "2. Nginx HTTPS - TLS certificates are managed manually." \
         "3. Pangolin / Newt - no inbound ports; public routes are configured in Pangolin." \
-        "4. No proxy / external TLS - direct HTTP ports or an external TLS terminator."
+        "4. No proxy / external TLS - direct HTTP ports or an external TLS terminator." \
+        "5. Existing eGames Remnawave reverse proxy on this host - reuse its Nginx/TLS."
     case "$CHOICE_VALUE" in
         1) PROFILE_KEY="caddy" ;;
         2) PROFILE_KEY="nginx" ;;
         3) PROFILE_KEY="newt" ;;
         4) PROFILE_KEY="no-proxy" ;;
+        5) PROFILE_KEY="egames" ;;
     esac
+    DEPLOYMENT_PROFILE_VALUE="$PROFILE_KEY"
 }
 
 download_profile_files() {
@@ -429,6 +438,10 @@ download_profile_files() {
             download_raw_file "deploy/examples/newt/.env.example" ".env.example" 1 || return 1
             ;;
         no-proxy)
+            download_raw_file "deploy/examples/no-proxy/docker-compose.yml" "docker-compose.yml" 1 || return 1
+            download_raw_file "deploy/examples/no-proxy/.env.example" ".env.example" 1 || return 1
+            ;;
+        egames)
             download_raw_file "deploy/examples/no-proxy/docker-compose.yml" "docker-compose.yml" 1 || return 1
             download_raw_file "deploy/examples/no-proxy/.env.example" ".env.example" 1 || return 1
             ;;
@@ -457,6 +470,8 @@ prompt_common_env() {
     POSTGRES_DB_VALUE="$PROMPT_VALUE"
 
     WEBAPP_ENABLED_VALUE="$(env_get WEBAPP_ENABLED True)"
+    prompt_value "Web App title" "$(env_get WEBAPP_TITLE remnawave-minishop)" 0 0 ""
+    WEBAPP_TITLE_VALUE="$PROMPT_VALUE"
     WEBAPP_SESSION_SECRET_VALUE="$(env_get WEBAPP_SESSION_SECRET "")"
     if [ -z "$WEBAPP_SESSION_SECRET_VALUE" ]; then
         WEBAPP_SESSION_SECRET_VALUE="$(secret_hex 32)"
@@ -470,6 +485,8 @@ prompt_common_env() {
     PANEL_API_URL_VALUE="$PROMPT_VALUE"
     prompt_value "Remnawave Panel API key" "$(env_get PANEL_API_KEY change_me)" 0 1 ""
     PANEL_API_KEY_VALUE="$PROMPT_VALUE"
+    prompt_value "Optional Remnawave reverse-proxy Cookie header" "$(env_get PANEL_API_COOKIE '')" 0 1 ""
+    PANEL_API_COOKIE_VALUE="$PROMPT_VALUE"
     existing_panel_webhook_secret=$(env_get PANEL_WEBHOOK_SECRET "")
     if [ -z "$existing_panel_webhook_secret" ]; then
         existing_panel_webhook_secret=$(secret_hex 24)
@@ -477,8 +494,15 @@ prompt_common_env() {
     prompt_value "Remnawave Panel webhook secret" "$existing_panel_webhook_secret" 0 1 ""
     PANEL_WEBHOOK_SECRET_VALUE="$PROMPT_VALUE"
 
+    prompt_value "Telegram OAuth client ID (empty to use bot ID)" "$(env_get TELEGRAM_OAUTH_CLIENT_ID '')" 0 0 ""
+    TELEGRAM_OAUTH_CLIENT_ID_VALUE="$PROMPT_VALUE"
+    prompt_value "Telegram OAuth client secret (from BotFather Web Login, empty to skip browser OAuth)" "$(env_get TELEGRAM_OAUTH_CLIENT_SECRET '')" 0 1 ""
+    TELEGRAM_OAUTH_CLIENT_SECRET_VALUE="$PROMPT_VALUE"
+    prompt_value "Telegram OAuth request access (empty/write/phone)" "$(env_get TELEGRAM_OAUTH_REQUEST_ACCESS '')" 0 0 ""
+    TELEGRAM_OAUTH_REQUEST_ACCESS_VALUE="$PROMPT_VALUE"
+
     case "$PROFILE_KEY" in
-        caddy|nginx|newt)
+        caddy|nginx|newt|egames)
             prompt_value "Webhook/API public hostname" "$(env_get WEBHOOK_HOST webhooks.example.com)" 1 0 "hostname"
             WEBHOOK_HOST_VALUE="$PROMPT_VALUE"
             prompt_value "Mini App public hostname" "$(env_get MINIAPP_HOST app.example.com)" 1 0 "hostname"
@@ -513,6 +537,14 @@ prompt_common_env() {
             MINIAPP_PUBLIC_URL_VALUE="$PROMPT_VALUE"
             TRUSTED_PROXIES_VALUE="$(env_get TRUSTED_PROXIES '127.0.0.1,::1')"
             ;;
+        egames)
+            prompt_value "Backend bind for eGames Nginx" "$(env_get WEB_SERVER_BIND '127.0.0.1:8080')" 0 0 ""
+            WEB_SERVER_BIND_VALUE="$PROMPT_VALUE"
+            prompt_value "Frontend bind for eGames Nginx" "$(env_get FRONTEND_BIND '127.0.0.1:8082')" 0 0 ""
+            FRONTEND_BIND_VALUE="$PROMPT_VALUE"
+            WEBHOOK_PUBLIC_URL_VALUE="$(env_get WEBHOOK_PUBLIC_URL "https://$WEBHOOK_HOST_VALUE")"
+            MINIAPP_PUBLIC_URL_VALUE="$(env_get MINIAPP_PUBLIC_URL "https://$MINIAPP_HOST_VALUE/")"
+            ;;
     esac
 }
 
@@ -539,21 +571,29 @@ show_env_value() {
 
 display_env_summary() {
     show_env_value COMPOSE_PROJECT_NAME "$COMPOSE_PROJECT_NAME_VALUE"
+    show_env_value DEPLOYMENT_PROFILE "$DEPLOYMENT_PROFILE_VALUE"
     show_env_value IMAGE_TAG "$IMAGE_TAG_VALUE"
     show_env_value WEBHOOK_HOST "$WEBHOOK_HOST_VALUE"
     show_env_value MINIAPP_HOST "$MINIAPP_HOST_VALUE"
     show_env_value WEBHOOK_PUBLIC_URL "$WEBHOOK_PUBLIC_URL_VALUE"
     show_env_value MINIAPP_PUBLIC_URL "$MINIAPP_PUBLIC_URL_VALUE"
+    show_env_value WEB_SERVER_BIND "$WEB_SERVER_BIND_VALUE"
+    show_env_value FRONTEND_BIND "$FRONTEND_BIND_VALUE"
     show_env_value BOT_TOKEN "$BOT_TOKEN_VALUE"
     show_env_value ADMIN_IDS "$ADMIN_IDS_VALUE"
     show_env_value POSTGRES_USER "$POSTGRES_USER_VALUE"
     show_env_value POSTGRES_PASSWORD "$POSTGRES_PASSWORD_VALUE"
     show_env_value POSTGRES_DB "$POSTGRES_DB_VALUE"
+    show_env_value WEBAPP_TITLE "$WEBAPP_TITLE_VALUE"
     show_env_value WEBAPP_SESSION_SECRET "$WEBAPP_SESSION_SECRET_VALUE"
     show_env_value WEBHOOK_SECRET_TOKEN "$WEBHOOK_SECRET_TOKEN_VALUE"
     show_env_value PANEL_API_URL "$PANEL_API_URL_VALUE"
     show_env_value PANEL_API_KEY "$PANEL_API_KEY_VALUE"
+    show_env_value PANEL_API_COOKIE "$PANEL_API_COOKIE_VALUE"
     show_env_value PANEL_WEBHOOK_SECRET "$PANEL_WEBHOOK_SECRET_VALUE"
+    show_env_value TELEGRAM_OAUTH_CLIENT_ID "$TELEGRAM_OAUTH_CLIENT_ID_VALUE"
+    show_env_value TELEGRAM_OAUTH_CLIENT_SECRET "$TELEGRAM_OAUTH_CLIENT_SECRET_VALUE"
+    show_env_value TELEGRAM_OAUTH_REQUEST_ACCESS "$TELEGRAM_OAUTH_REQUEST_ACCESS_VALUE"
 }
 
 append_preserved_env() {
@@ -585,6 +625,7 @@ render_env_file() {
     : > "$output"
     printf '# Deployment\n' >> "$output"
     env_line COMPOSE_PROJECT_NAME "$COMPOSE_PROJECT_NAME_VALUE" "$output"
+    env_line DEPLOYMENT_PROFILE "$DEPLOYMENT_PROFILE_VALUE" "$output"
     env_line IMAGE_TAG "$IMAGE_TAG_VALUE" "$output"
     env_line WEBHOOK_HOST "$WEBHOOK_HOST_VALUE" "$output"
     env_line MINIAPP_HOST "$MINIAPP_HOST_VALUE" "$output"
@@ -609,6 +650,7 @@ render_env_file() {
 
     printf '\n# Application\n' >> "$output"
     env_line WEBAPP_ENABLED "$WEBAPP_ENABLED_VALUE" "$output"
+    env_line WEBAPP_TITLE "$WEBAPP_TITLE_VALUE" "$output"
     env_line WEBAPP_SESSION_SECRET "$WEBAPP_SESSION_SECRET_VALUE" "$output"
     env_line WEBHOOK_SECRET_TOKEN "$WEBHOOK_SECRET_TOKEN_VALUE" "$output"
     env_line TRUSTED_PROXIES "$TRUSTED_PROXIES_VALUE" "$output"
@@ -616,7 +658,13 @@ render_env_file() {
     printf '\n# Remnawave Panel\n' >> "$output"
     env_line PANEL_API_URL "$PANEL_API_URL_VALUE" "$output"
     env_line PANEL_API_KEY "$PANEL_API_KEY_VALUE" "$output"
+    env_line PANEL_API_COOKIE "$PANEL_API_COOKIE_VALUE" "$output"
     env_line PANEL_WEBHOOK_SECRET "$PANEL_WEBHOOK_SECRET_VALUE" "$output"
+
+    printf '\n# Telegram OAuth / OpenID Connect\n' >> "$output"
+    env_line TELEGRAM_OAUTH_CLIENT_ID "$TELEGRAM_OAUTH_CLIENT_ID_VALUE" "$output"
+    env_line TELEGRAM_OAUTH_CLIENT_SECRET "$TELEGRAM_OAUTH_CLIENT_SECRET_VALUE" "$output"
+    env_line TELEGRAM_OAUTH_REQUEST_ACCESS "$TELEGRAM_OAUTH_REQUEST_ACCESS_VALUE" "$output"
 
     append_preserved_env "$output"
 }
@@ -721,6 +769,314 @@ validate_stack() {
     (cd "$TARGET_DIR" && run_compose ps) || true
     (cd "$TARGET_DIR" && run_compose logs --tail 80 migrate) || true
     ok "Validation commands completed."
+}
+
+env_file_get() {
+    key="$1"
+    file="$2"
+    [ -f "$file" ] || return 0
+    awk -v key="$key" '
+        BEGIN { q = sprintf("%c", 39) }
+        $0 ~ "^[[:space:]]*" key "=" {
+            sub(/^[^=]*=/, "")
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+            if ((substr($0, 1, 1) == "\"" && substr($0, length($0), 1) == "\"") ||
+                (substr($0, 1, 1) == q && substr($0, length($0), 1) == q)) {
+                $0 = substr($0, 2, length($0) - 2)
+            }
+            print
+            exit
+        }
+    ' "$file"
+}
+
+set_env_file_value() {
+    file="$1"
+    key="$2"
+    value="$3"
+    tmp="$file.tmp.$$"
+    awk -v key="$key" -v value="$value" '
+        BEGIN { done = 0 }
+        $0 ~ "^[[:space:]]*" key "=" {
+            print key "=" value
+            done = 1
+            next
+        }
+        { print }
+        END {
+            if (!done) {
+                print key "=" value
+            }
+        }
+    ' "$file" > "$tmp" || {
+        rm -f "$tmp"
+        return 1
+    }
+    mv "$tmp" "$file"
+}
+
+egames_remove_managed_and_conflicting_servers() {
+    input="$1"
+    output="$2"
+    webhook_host="$3"
+    miniapp_host="$4"
+    awk -v webhook_host="$webhook_host" -v miniapp_host="$miniapp_host" '
+        /^# BEGIN remnawave-minishop managed by install.sh$/ {
+            managed = 1
+            next
+        }
+        /^# END remnawave-minishop managed by install.sh$/ {
+            managed = 0
+            next
+        }
+        managed {
+            next
+        }
+        !capture && $0 ~ /^[[:space:]]*server[[:space:]]*\{/ {
+            capture = 1
+            depth = 0
+            block = ""
+            skip = 0
+        }
+        capture {
+            block = block $0 ORS
+            line = $0
+            if (line ~ /^[[:space:]]*server_name[[:space:]]/) {
+                sub(/;.*/, "", line)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+                n = split(line, names, /[[:space:]]+/)
+                for (i = 2; i <= n; i++) {
+                    if (names[i] == webhook_host || names[i] == miniapp_host) {
+                        skip = 1
+                    }
+                }
+            }
+            open_line = $0
+            close_line = $0
+            opens = gsub(/\{/, "", open_line)
+            closes = gsub(/\}/, "", close_line)
+            depth += opens - closes
+            if (depth == 0) {
+                if (!skip) {
+                    printf "%s", block
+                }
+                capture = 0
+                block = ""
+                skip = 0
+            }
+            next
+        }
+        { print }
+        END {
+            if (capture && !skip) {
+                printf "%s", block
+            }
+        }
+    ' "$input" > "$output"
+}
+
+bind_port() {
+    value="$1"
+    case "$value" in
+        *:*) printf '%s' "${value##*:}" ;;
+        *) printf '%s' "$value" ;;
+    esac
+}
+
+first_nginx_value() {
+    key="$1"
+    file="$2"
+    awk -v key="$key" '
+        $1 == key {
+            value = $2
+            gsub(/[\";]/, "", value)
+            print value
+            exit
+        }
+    ' "$file"
+}
+
+is_egames_profile() {
+    [ "$PROFILE_KEY" = "egames" ] && return 0
+    [ "$(env_get DEPLOYMENT_PROFILE '')" = "egames" ]
+}
+
+configure_egames_reverse_proxy() {
+    is_egames_profile || return 0
+    section "Configure eGames reverse proxy"
+    require_docker || return 1
+
+    prompt_value "eGames nginx.conf path" "${EGAMES_NGINX_CONF:-/opt/remnawave/nginx.conf}" 1 0 ""
+    nginx_conf="$PROMPT_VALUE"
+    if [ ! -f "$nginx_conf" ]; then
+        fail "eGames nginx.conf not found: $nginx_conf"
+        return 1
+    fi
+    prompt_value "eGames Nginx container name" "${EGAMES_NGINX_CONTAINER:-remnawave-nginx}" 1 0 ""
+    nginx_container="$PROMPT_VALUE"
+
+    webhook_host="${WEBHOOK_HOST_VALUE:-$(env_get WEBHOOK_HOST '')}"
+    miniapp_host="${MINIAPP_HOST_VALUE:-$(env_get MINIAPP_HOST '')}"
+    if [ -z "$webhook_host" ] || [ -z "$miniapp_host" ]; then
+        fail "WEBHOOK_HOST and MINIAPP_HOST are required for eGames reverse proxy configuration."
+        return 1
+    fi
+
+    cert_path=$(first_nginx_value ssl_certificate "$nginx_conf")
+    key_path=$(first_nginx_value ssl_certificate_key "$nginx_conf")
+    trusted_path=$(first_nginx_value ssl_trusted_certificate "$nginx_conf")
+    [ -n "$trusted_path" ] || trusted_path="$cert_path"
+    if [ -z "$cert_path" ] || [ -z "$key_path" ]; then
+        fail "Could not detect ssl_certificate and ssl_certificate_key from $nginx_conf"
+        return 1
+    fi
+
+    backend_port=$(bind_port "${WEB_SERVER_BIND_VALUE:-$(env_get WEB_SERVER_BIND '127.0.0.1:8080')}")
+    frontend_port=$(bind_port "${FRONTEND_BIND_VALUE:-$(env_get FRONTEND_BIND '127.0.0.1:8082')}")
+    backup=$(backup_path "$nginx_conf")
+    cp "$nginx_conf" "$backup" || return 1
+    tmp="$nginx_conf.tmp.$$"
+    egames_remove_managed_and_conflicting_servers "$backup" "$tmp" "$webhook_host" "$miniapp_host" || {
+        rm -f "$tmp"
+        return 1
+    }
+
+    cat >> "$tmp" <<EOF
+
+# BEGIN remnawave-minishop managed by install.sh
+server {
+    server_name $webhook_host;
+    listen unix:/dev/shm/nginx.sock ssl proxy_protocol;
+    http2 on;
+
+    ssl_certificate "$cert_path";
+    ssl_certificate_key "$key_path";
+    ssl_trusted_certificate "$trusted_path";
+
+    client_max_body_size 20m;
+
+    location / {
+        proxy_http_version 1.1;
+        proxy_pass http://127.0.0.1:$backend_port;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$proxy_protocol_addr;
+        proxy_set_header X-Forwarded-For \$proxy_protocol_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}
+
+server {
+    server_name $miniapp_host;
+    listen unix:/dev/shm/nginx.sock ssl proxy_protocol;
+    http2 on;
+
+    ssl_certificate "$cert_path";
+    ssl_certificate_key "$key_path";
+    ssl_trusted_certificate "$trusted_path";
+
+    client_max_body_size 20m;
+
+    location / {
+        proxy_http_version 1.1;
+        proxy_pass http://127.0.0.1:$frontend_port;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$proxy_protocol_addr;
+        proxy_set_header X-Forwarded-For \$proxy_protocol_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}
+# END remnawave-minishop managed by install.sh
+EOF
+
+    mv "$tmp" "$nginx_conf" || return 1
+    if docker inspect "$nginx_container" >/dev/null 2>&1; then
+        if docker exec "$nginx_container" nginx -t; then
+            docker exec "$nginx_container" nginx -s reload || docker restart "$nginx_container" >/dev/null
+            ok "eGames Nginx routes now point $webhook_host -> 127.0.0.1:$backend_port and $miniapp_host -> 127.0.0.1:$frontend_port"
+        else
+            warn "Nginx config test failed; restoring $backup"
+            cp "$backup" "$nginx_conf"
+            return 1
+        fi
+    else
+        warn "Nginx container $nginx_container was not found. Config was written but not reloaded."
+    fi
+}
+
+configure_egames_panel_webhook() {
+    is_egames_profile || return 0
+    section "Configure Remnawave panel webhook"
+    panel_env="${EGAMES_REMNAWAVE_ENV:-/opt/remnawave/.env}"
+    panel_dir=$(dirname "$panel_env")
+    if [ ! -f "$panel_env" ]; then
+        warn "Skipping Remnawave panel webhook update: $panel_env not found."
+        return 0
+    fi
+
+    base_url=$(target_webhook_base_url)
+    if [ -z "$base_url" ]; then
+        warn "Skipping Remnawave panel webhook update: WEBHOOK_BASE_URL could not be determined."
+        return 0
+    fi
+    panel_webhook_secret=""
+    if [ -n "$SOURCE_ENV_PATH" ]; then
+        panel_webhook_secret=$(env_file_get REMNAWAVE_WEBHOOK_SECRET "$SOURCE_ENV_PATH")
+    fi
+    [ -n "$panel_webhook_secret" ] || panel_webhook_secret=$(env_get PANEL_WEBHOOK_SECRET "")
+
+    backup=$(backup_path "$panel_env")
+    cp "$panel_env" "$backup" || return 1
+    set_env_file_value "$panel_env" WEBHOOK_URL "$base_url/webhook/panel" || return 1
+    if [ -n "$panel_webhook_secret" ]; then
+        set_env_file_value "$panel_env" WEBHOOK_SECRET_HEADER "$panel_webhook_secret" || return 1
+    fi
+
+    if [ -d "$panel_dir" ]; then
+        (cd "$panel_dir" && run_compose up -d remnawave) || warn "Could not restart Remnawave backend; restart it manually."
+    fi
+    ok "Remnawave panel webhook points to $base_url/webhook/panel"
+}
+
+configure_telegram_bot_profile() {
+    bot_token=$(env_get BOT_TOKEN "")
+    title=$(env_get WEBAPP_TITLE "remnawave-minishop")
+    [ -n "$bot_token" ] || return 0
+    [ -n "$title" ] || return 0
+    command -v curl >/dev/null 2>&1 || {
+        warn "curl not found; skipping Telegram bot display-name update."
+        return 0
+    }
+    if ! confirm "Set Telegram bot display name and short description to '$title' via Bot API?" 1; then
+        return 0
+    fi
+    curl -fsS -X POST "https://api.telegram.org/bot${bot_token}/setMyName" \
+        --data-urlencode "name=$title" >/dev/null || warn "Could not set Telegram bot display name."
+    curl -fsS -X POST "https://api.telegram.org/bot${bot_token}/setMyShortDescription" \
+        --data-urlencode "short_description=$title" >/dev/null || warn "Could not set Telegram bot short description."
+}
+
+telegram_oauth_checklist() {
+    section "Telegram OAuth / OpenID Connect"
+    miniapp_url="${MINIAPP_PUBLIC_URL_VALUE:-$(env_get MINIAPP_PUBLIC_URL '')}"
+    [ -n "$miniapp_url" ] || miniapp_url="https://${MINIAPP_HOST_VALUE:-$(env_get MINIAPP_HOST app.example.com)}/"
+    oauth_secret=$(env_get TELEGRAM_OAUTH_CLIENT_SECRET "")
+    if [ -z "$oauth_secret" ]; then
+        warn "Telegram OAuth client secret is empty. BotFather Web Login/OIDC client setup is not available through the Bot API."
+    else
+        ok "Telegram OAuth client secret is present in .env."
+    fi
+    info "In BotFather, set Mini App URL/domain to: $miniapp_url"
+    info "In BotFather Web Login / OpenID Connect, allow:"
+    printf '  %s\n' "$miniapp_url"
+    printf '  %sauth/telegram/callback\n' "$(printf '%s' "$miniapp_url" | sed 's:/*$:/:' )"
 }
 
 volume_exists() {
@@ -854,6 +1210,47 @@ target_webhook_base_url() {
     printf ''
 }
 
+dsn_hostname() {
+    dsn="$1"
+    printf '%s\n' "$dsn" | sed -n 's#^[^:][^:]*://\([^@/]*@\)\{0,1\}\(\[[^]]*\]\|[^:/?]*\).*#\2#p' | sed 's/^\[//; s/\]$//'
+}
+
+target_compose_project() {
+    project=$(env_get COMPOSE_PROJECT_NAME "")
+    [ -n "$project" ] || project=$(basename "$TARGET_DIR")
+    printf '%s' "$project"
+}
+
+connect_local_source_db_to_target_network() {
+    source_host=$(dsn_hostname "$SOURCE_DSN")
+    [ -n "$source_host" ] || return 0
+    case "$source_host" in
+        localhost|127.*|::1|postgres|host.docker.internal)
+            return 0
+            ;;
+    esac
+    if ! docker inspect --type container "$source_host" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    target_network="$(target_compose_project)_remnawave-shop"
+    if ! docker network inspect "$target_network" >/dev/null 2>&1; then
+        warn "Target Docker network $target_network not found; source container $source_host was not connected automatically."
+        return 0
+    fi
+
+    if docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$source_host" | grep -Fx "$target_network" >/dev/null 2>&1; then
+        ok "Source container $source_host is already connected to $target_network."
+        return 0
+    fi
+
+    docker network connect "$target_network" "$source_host" || {
+        warn "Could not connect source container $source_host to $target_network. Dry-run may fail if $source_host is not reachable from backend."
+        return 0
+    }
+    ok "Connected source container $source_host to $target_network for Remnashop import."
+}
+
 remnashop_webhook_checklist() {
     section "Update external webhooks"
     base_url=$(target_webhook_base_url)
@@ -985,6 +1382,7 @@ run_remnashop_migration() {
     fi
 
     IMPORTER_PATH="$(download_importer)" || return 1
+    connect_local_source_db_to_target_network
 
     section "Dry-run import"
     if ! run_import_command 1; then
@@ -998,6 +1396,9 @@ run_remnashop_migration() {
 
     section "Apply import"
     run_import_command 0 || return 1
+    configure_egames_panel_webhook || return 1
+    configure_telegram_bot_profile
+    telegram_oauth_checklist
     remnashop_webhook_checklist
     if confirm "Restart backend and worker so setting overrides are reloaded?" 1; then
         (cd "$TARGET_DIR" && run_compose restart backend worker) || true
@@ -1143,6 +1544,7 @@ install_flow() {
     prompt_common_env || return 1
     download_profile_files || return 1
     write_env_file || return 1
+    configure_egames_reverse_proxy || return 1
     mkdir -p "$TARGET_DIR/$INSTALL_STATE_DIR"
     prepare_data_mount || return 1
     if [ "$with_migration" = "1" ]; then

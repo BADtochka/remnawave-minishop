@@ -26,6 +26,7 @@
 
 | Переменная | Где менять | Назначение |
 | --- | --- | --- |
+| `DEPLOYMENT_PROFILE` | install wizard | Информационный маркер выбранного профиля (`caddy`, `nginx`, `newt`, `no-proxy`, `egames`). Для `egames` последующие migration-only запуски понимают, что нужно переиспользовать существующий `eGamesAPI/remnawave-reverse-proxy` Nginx. |
 | `APP_ENV_FILE` | CLI/Compose | Путь к env-файлу вместо `.env`. |
 | `IMAGE_TAG` | CLI/Compose | Тег Docker-образов. |
 | `FRONTEND_PORT` | `.env` / Compose | Хостовый порт frontend nginx. По умолчанию `8082`. |
