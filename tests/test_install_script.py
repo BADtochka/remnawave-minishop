@@ -263,3 +263,13 @@ def test_shell_installer_uses_default_source_without_prompting_for_repo_ref():
     assert "MINISHOP_INSTALL_REPO и MINISHOP_INSTALL_REF" in script
     assert "GitHub репозиторий\"" not in script
     assert "Git ref/ветка/тег для raw-файлов" not in script
+
+
+def test_shell_installer_hides_low_level_oauth_and_required_stack_prompts():
+    script = INSTALL_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'TELEGRAM_OAUTH_REQUEST_ACCESS_VALUE="$(env_get TELEGRAM_OAUTH_REQUEST_ACCESS write)"' in script
+    assert "Telegram OAuth request access (пусто/write/phone)" not in script
+    assert "Запустить Docker Compose stack перед импортом из Remnashop?" not in script
+    assert "Импорту из Remnashop нужна целевая база stack. Импорт пропущен." not in script
+    assert "Запускаю Docker Compose stack перед импортом из Remnashop" in script

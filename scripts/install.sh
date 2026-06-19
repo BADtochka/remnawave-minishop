@@ -831,8 +831,8 @@ prompt_common_env() {
     TELEGRAM_OAUTH_CLIENT_ID_VALUE="$PROMPT_VALUE"
     prompt_value "Telegram OAuth client secret из BotFather Web Login (пусто = пропустить browser OAuth)" "$(env_get TELEGRAM_OAUTH_CLIENT_SECRET '')" 0 1 ""
     TELEGRAM_OAUTH_CLIENT_SECRET_VALUE="$PROMPT_VALUE"
-    prompt_value "Telegram OAuth request access (пусто/write/phone)" "$(env_get TELEGRAM_OAUTH_REQUEST_ACCESS '')" 0 0 ""
-    TELEGRAM_OAUTH_REQUEST_ACCESS_VALUE="$PROMPT_VALUE"
+    TELEGRAM_OAUTH_REQUEST_ACCESS_VALUE="$(env_get TELEGRAM_OAUTH_REQUEST_ACCESS write)"
+    info "Telegram OAuth request access: $TELEGRAM_OAUTH_REQUEST_ACCESS_VALUE."
 
     case "$PROFILE_KEY" in
         caddy|nginx|newt|egames)
@@ -2677,12 +2677,8 @@ install_flow() {
             run_selected_legacy_migration
             ;;
         remnashop)
-            if confirm "Запустить Docker Compose stack перед импортом из Remnashop?" 1; then
-                start_stack || return 1
-            else
-                warn "Импорту из Remnashop нужна целевая база stack. Импорт пропущен."
-                return 0
-            fi
+            info "Запускаю Docker Compose stack перед импортом из Remnashop: importer использует целевую базу Minishop."
+            start_stack || return 1
             run_selected_legacy_migration
             ;;
         *)
