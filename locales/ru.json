@@ -1764,6 +1764,8 @@
   "admin_settings_field_panel_api_url_description": "Например, https://panel.example.com/api.",
   "admin_settings_field_panel_api_key_label": "API-ключ Remnawave",
   "admin_settings_field_panel_api_key_description": "Секретный ключ API панели.",
+  "admin_settings_field_panel_api_cookie_label": "Cookie API Remnawave",
+  "admin_settings_field_panel_api_cookie_description": "Необязательный Cookie header для API панели за reverse proxy.",
   "admin_settings_field_panel_api_total_timeout_seconds_label": "Общий таймаут API Remnawave",
   "admin_settings_field_panel_api_total_timeout_seconds_description": "Максимальное время одного запроса к Remnawave API, в секундах.",
   "admin_settings_field_panel_api_connect_timeout_seconds_label": "Таймаут подключения API Remnawave",

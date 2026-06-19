@@ -397,6 +397,26 @@
         "has_value": false
       },
       {
+        "key": "PANEL_API_COOKIE",
+        "type": "string",
+        "section": "remnawave",
+        "section_order": 3,
+        "subsection": null,
+        "label": "Cookie API Remnawave",
+        "description": "Optional Cookie header for Remnawave API requests behind a reverse proxy.",
+        "i18n_label_key": "admin_settings_field_panel_api_cookie_label",
+        "i18n_description_key": "admin_settings_field_panel_api_cookie_description",
+        "i18n_subsection_key": null,
+        "i18n_placeholder_key": null,
+        "placeholder": "",
+        "optional": true,
+        "secret": true,
+        "value": "",
+        "overridden": false,
+        "updated_at": null,
+        "has_value": false
+      },
+      {
         "key": "PANEL_API_TOTAL_TIMEOUT_SECONDS",
         "type": "float",
         "section": "remnawave",

@@ -143,6 +143,7 @@ proxy/Docker gateway и может отклонить валидный webhook. 
 | --- | --- |
 | `PANEL_API_URL` | URL API панели, например `https://panel.example.com/api`. |
 | `PANEL_API_KEY` | API-ключ панели. |
+| `PANEL_API_COOKIE` | Необязательный Cookie header для панелей, защищённых `eGamesAPI/remnawave-reverse-proxy`. |
 | `APP_RUNTIME_MODE` | Профиль запуска: `production`, `development`, `staging`, `test`. |
 | `PANEL_WRITE_MODE` | `auto`, `live` или `dry_run`. В `dry_run` приложение читает живую Remnawave Panel, но мутации пользователей только валидируются и логируются. `auto` включает dry-run для `development`/`test`, а в production остается live. |
 | `PANEL_DRY_RUN_VALIDATE_REMOTE` | При dry-run проверять ссылки на panel users/internal squads через live `GET`. |

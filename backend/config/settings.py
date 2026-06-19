@@ -488,6 +488,7 @@ class Settings(BaseSettings):
     )
     PANEL_API_URL: Optional[str] = None
     PANEL_API_KEY: Optional[str] = None
+    PANEL_API_COOKIE: Optional[str] = None
     USER_TRAFFIC_LIMIT_GB: Optional[float] = Field(default=0.0)
     USER_TRAFFIC_STRATEGY: str = Field(default="NO_RESET")
     USER_SQUAD_UUIDS: Optional[str] = Field(
@@ -1222,6 +1223,7 @@ class Settings(BaseSettings):
         "SMTP_FALLBACK_PORTS",
         "BACKUP_COMPOSE_SOURCE_DIR",
         "BACKUP_COMPOSE_RESTORE_DIR",
+        "PANEL_API_COOKIE",
         mode="before",
     )
     @classmethod

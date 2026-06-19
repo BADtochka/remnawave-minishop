@@ -38,6 +38,20 @@ class PanelApiServiceLoggingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(timeout.sock_connect, 9)
         self.assertEqual(timeout.sock_read, 20)
 
+    async def test_prepare_headers_includes_optional_panel_cookie(self):
+        service = PanelApiService(
+            SimpleNamespace(
+                PANEL_API_URL="https://panel.example.test/api",
+                PANEL_API_KEY="panel-key",
+                PANEL_API_COOKIE="rw_session=session-value",
+            )
+        )
+
+        headers = await service._prepare_headers()
+
+        self.assertEqual(headers["Authorization"], "Bearer panel-key")
+        self.assertEqual(headers["Cookie"], "rw_session=session-value")
+
     def test_endpoint_log_label_strips_user_identifiers(self):
         self.assertEqual(
             _endpoint_log_label("/users/by-email/user@example.com"),

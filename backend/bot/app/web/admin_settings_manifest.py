@@ -116,6 +116,14 @@ SETTINGS_MANIFEST: List[SettingField] = [
         secret=True,
     ),
     SettingField(
+        "PANEL_API_COOKIE",
+        "string",
+        "remnawave",
+        "Cookie API Remnawave",
+        "Optional Cookie header for Remnawave API requests behind a reverse proxy.",
+        secret=True,
+    ),
+    SettingField(
         "PANEL_API_TOTAL_TIMEOUT_SECONDS",
         "float",
         "remnawave",

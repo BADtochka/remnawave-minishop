@@ -68,6 +68,7 @@ class PanelApiService:
         self.settings = settings
         self.base_url = settings.PANEL_API_URL
         self.api_key = settings.PANEL_API_KEY
+        self.api_cookie = getattr(settings, "PANEL_API_COOKIE", None)
         self._session: Optional[aiohttp.ClientSession] = None
         self.default_client_ip = "127.0.0.1"
         # Cache slow-changing reference data fetched from the panel. Errors and
@@ -179,6 +180,8 @@ class PanelApiService:
         }
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        if self.api_cookie:
+            headers["Cookie"] = str(self.api_cookie).strip()
         return headers
 
     def _is_transient_error(self, result: Optional[Dict[str, Any]]) -> bool:
