@@ -1613,6 +1613,17 @@ run_import_command() {
     (cd "$TARGET_DIR" && run_compose "$@" < /dev/null)
 }
 
+reset_target_compose_database() {
+    section "Reset target Minishop database"
+    require_docker || return 1
+    (cd "$TARGET_DIR" && run_compose stop backend worker migrate) || true
+    (cd "$TARGET_DIR" && run_compose up -d postgres redis) || return 1
+    wait_target_postgres || return 1
+    (cd "$TARGET_DIR" && run_compose exec -T postgres sh -c \
+        'dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"') || return 1
+    ok "Target Minishop database was reset."
+}
+
 choose_legacy_source() {
     choose "Source bot" "1" "1|2|3" \
         "1. Remnashop - import users, subscriptions, payments, provider settings and promo codes." \
@@ -1670,6 +1681,9 @@ run_remnashop_migration() {
     if [ "$CHOICE_VALUE" = "1" ]; then
         TARGET_DSN="$(local_target_dsn)"
         info "Target DSN points to the Compose postgres service."
+        if confirm "Reset target Minishop database before Remnashop import? This deletes existing Minishop data." 0; then
+            reset_target_compose_database || return 1
+        fi
     else
         prompt_value "Target PostgreSQL DSN" "" 1 0 ""
         TARGET_DSN="$PROMPT_VALUE"

@@ -100,6 +100,15 @@ def test_shell_installer_does_not_rename_bot_and_reports_migration_success():
     assert "remnashop-post-migration-message.txt" in script
 
 
+def test_shell_installer_can_reset_target_database_before_remnashop_import():
+    script = INSTALL_SCRIPT.read_text(encoding="utf-8")
+
+    assert "reset_target_compose_database" in script
+    assert "Reset target Minishop database before Remnashop import" in script
+    assert "run_compose stop backend worker migrate" in script
+    assert "dropdb -U \"$POSTGRES_USER\" --if-exists \"$POSTGRES_DB\"" in script
+
+
 def test_shell_installer_connects_local_remnashop_db_container_for_import():
     script = INSTALL_SCRIPT.read_text(encoding="utf-8")
 
