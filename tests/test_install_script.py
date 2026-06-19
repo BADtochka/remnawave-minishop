@@ -219,3 +219,21 @@ def test_shell_installer_uses_russian_defaults_and_autodetects_sources():
     assert "detect_remnashop_env_file" in script
     assert "Нашел Remnashop PostgreSQL" in script
     assert "Найден Remnashop" in script
+
+
+def test_shell_installer_autodetects_egames_panel_credentials():
+    script = INSTALL_SCRIPT.read_text(encoding="utf-8")
+
+    assert "detect_panel_api_url" in script
+    assert "detect_panel_api_key" in script
+    assert "detect_panel_api_cookie" in script
+    assert "detect_panel_webhook_secret" in script
+    assert "REMNAWAVE_HOST" in script
+    assert "REMNAWAVE_TOKEN" in script
+    assert "REMNAWAVE_COOKIE" in script
+    assert "REMNAWAVE_WEBHOOK_SECRET" in script
+    assert "FRONT_END_DOMAIN" in script
+    assert "WEBHOOK_SECRET_HEADER" in script
+    assert "select token from api_tokens" in script
+    assert "Нашел API key Remnawave Panel" in script
+    assert "Нашел Cookie header eGames reverse proxy" in script

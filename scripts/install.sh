@@ -446,6 +446,19 @@ detect_egames_stack() {
     [ -n "$nginx_conf" ] && [ -n "$nginx_container" ]
 }
 
+detect_remnawave_db_container() {
+    if [ -n "${EGAMES_REMNAWAVE_DB_CONTAINER:-}" ] && docker_container_exists "$EGAMES_REMNAWAVE_DB_CONTAINER"; then
+        printf '%s' "$EGAMES_REMNAWAVE_DB_CONTAINER"
+        return 0
+    fi
+    if docker_container_exists remnawave-db; then
+        printf '%s' remnawave-db
+        return 0
+    fi
+    command -v docker >/dev/null 2>&1 || return 1
+    docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Ei 'remnawave.*(db|postgres)|postgres.*remnawave' | head -n 1
+}
+
 detect_remnashop_env_file() {
     if [ -n "${REMNASHOP_SOURCE_ENV_FILE:-}" ] && [ -f "$REMNASHOP_SOURCE_ENV_FILE" ]; then
         printf '%s' "$REMNASHOP_SOURCE_ENV_FILE"
@@ -486,6 +499,99 @@ detect_remnashop_stack() {
     env_file=$(detect_remnashop_env_file || true)
     db_container=$(detect_remnashop_db_container || true)
     [ -n "$env_file" ] || [ -n "$db_container" ]
+}
+
+detect_remnashop_env_value() {
+    key="$1"
+    env_file=$(detect_remnashop_env_file || true)
+    [ -n "$env_file" ] && [ -f "$env_file" ] || return 1
+    env_file_get "$key" "$env_file"
+}
+
+normalize_panel_api_url() {
+    value="$1"
+    [ -n "$value" ] || return 1
+    case "$value" in
+        http://*|https://*)
+            base="$value"
+            ;;
+        *)
+            base="https://$value"
+            ;;
+    esac
+    base=$(printf '%s' "$base" | sed 's:/*$::')
+    case "$base" in
+        */api)
+            printf '%s' "$base"
+            ;;
+        *)
+            printf '%s/api' "$base"
+            ;;
+    esac
+}
+
+detect_panel_api_url() {
+    value=$(detect_remnashop_env_value REMNAWAVE_HOST || true)
+    if [ -n "$value" ]; then
+        normalize_panel_api_url "$value"
+        return 0
+    fi
+
+    panel_env=$(detect_egames_panel_env || true)
+    if [ -n "$panel_env" ] && [ -f "$panel_env" ]; then
+        value=$(env_file_get REMNAWAVE_PANEL_URL "$panel_env")
+        [ -n "$value" ] || value=$(env_file_get FRONT_END_DOMAIN "$panel_env")
+        if [ -n "$value" ]; then
+            normalize_panel_api_url "$value"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+detect_panel_api_key() {
+    value=$(detect_remnashop_env_value REMNAWAVE_TOKEN || true)
+    if [ -n "$value" ]; then
+        printf '%s' "$value"
+        return 0
+    fi
+
+    container=$(detect_remnawave_db_container || true)
+    [ -n "$container" ] || return 1
+    docker exec "$container" sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select token from api_tokens order by created_at desc limit 1;"' 2>/dev/null
+}
+
+detect_panel_api_cookie() {
+    env_cookie=$(detect_remnashop_env_value REMNAWAVE_COOKIE || true)
+    case "$env_cookie" in
+        *=*)
+            printf '%s' "$env_cookie"
+            return 0
+            ;;
+    esac
+
+    nginx_conf=$(detect_egames_nginx_conf || true)
+    [ -n "$nginx_conf" ] && [ -f "$nginx_conf" ] || return 1
+    if [ -n "$env_cookie" ]; then
+        cookie=$(sed -n "s/.*\\($env_cookie=[^\"; ]*\\).*/\\1/p" "$nginx_conf" | head -n 1)
+        if [ -n "$cookie" ]; then
+            printf '%s' "$cookie"
+            return 0
+        fi
+    fi
+    sed -n 's/.*"~\*\([^"]*=[^"]*\)".*/\1/p' "$nginx_conf" | head -n 1
+}
+
+detect_panel_webhook_secret() {
+    value=$(detect_remnashop_env_value REMNAWAVE_WEBHOOK_SECRET || true)
+    if [ -n "$value" ]; then
+        printf '%s' "$value"
+        return 0
+    fi
+
+    panel_env=$(detect_egames_panel_env || true)
+    [ -n "$panel_env" ] && [ -f "$panel_env" ] || return 1
+    env_file_get WEBHOOK_SECRET_HEADER "$panel_env"
 }
 
 write_downloaded_file() {
@@ -611,13 +717,34 @@ prompt_common_env() {
         WEBHOOK_SECRET_TOKEN_VALUE="$(secret_hex 32)"
     fi
 
-    prompt_value "URL API Remnawave Panel" "$(env_get PANEL_API_URL https://panel.example.com/api)" 0 0 "url"
+    detected_panel_api_url=$(env_get PANEL_API_URL "")
+    [ -n "$detected_panel_api_url" ] || detected_panel_api_url=$(detect_panel_api_url || true)
+    [ -n "$detected_panel_api_url" ] || detected_panel_api_url="https://panel.example.com/api"
+    if [ "$detected_panel_api_url" != "https://panel.example.com/api" ]; then
+        info "Нашел URL API Remnawave Panel и подставил его по умолчанию."
+    fi
+    prompt_value "URL API Remnawave Panel" "$detected_panel_api_url" 0 0 "url"
     PANEL_API_URL_VALUE="$PROMPT_VALUE"
-    prompt_value "API key Remnawave Panel" "$(env_get PANEL_API_KEY change_me)" 0 1 ""
+    detected_panel_api_key=$(env_get PANEL_API_KEY "")
+    [ -n "$detected_panel_api_key" ] || detected_panel_api_key=$(detect_panel_api_key || true)
+    [ -n "$detected_panel_api_key" ] || detected_panel_api_key="change_me"
+    if [ "$detected_panel_api_key" != "change_me" ]; then
+        info "Нашел API key Remnawave Panel и подставил его по умолчанию."
+    fi
+    prompt_value "API key Remnawave Panel" "$detected_panel_api_key" 0 1 ""
     PANEL_API_KEY_VALUE="$PROMPT_VALUE"
-    prompt_value "Cookie header reverse proxy Remnawave (если нужен)" "$(env_get PANEL_API_COOKIE '')" 0 1 ""
+    detected_panel_api_cookie=$(env_get PANEL_API_COOKIE "")
+    [ -n "$detected_panel_api_cookie" ] || detected_panel_api_cookie=$(detect_panel_api_cookie || true)
+    if [ -n "$detected_panel_api_cookie" ]; then
+        info "Нашел Cookie header eGames reverse proxy и подставил его по умолчанию."
+    fi
+    prompt_value "Cookie header reverse proxy Remnawave (если нужен)" "$detected_panel_api_cookie" 0 1 ""
     PANEL_API_COOKIE_VALUE="$PROMPT_VALUE"
     existing_panel_webhook_secret=$(env_get PANEL_WEBHOOK_SECRET "")
+    [ -n "$existing_panel_webhook_secret" ] || existing_panel_webhook_secret=$(detect_panel_webhook_secret || true)
+    if [ -n "$existing_panel_webhook_secret" ]; then
+        info "Нашел webhook secret Remnawave Panel и подставил его по умолчанию."
+    fi
     if [ -z "$existing_panel_webhook_secret" ]; then
         existing_panel_webhook_secret=$(secret_hex 24)
     fi
