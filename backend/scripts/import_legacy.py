@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Iterable, Optional
+from urllib.parse import unquote, urlparse
 
 from sqlalchemy import inspect, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -1089,6 +1090,10 @@ def _extract_panel_subscription_uuid(url: Any, panel_user_uuid: Optional[str]) -
         candidate = match.group(0).lower()
         if candidate != panel_user_uuid:
             return candidate
+    path = urlparse(value).path if "://" in value else value
+    token = unquote(str(path or "").strip().rstrip("/").rsplit("/", 1)[-1]).strip()
+    if token and token.lower() != panel_user_uuid:
+        return token
     return None
 
 

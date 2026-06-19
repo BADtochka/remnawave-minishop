@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 from scripts.import_legacy import (
+    _extract_panel_subscription_uuid,
     parse_remnashop_env_text,
     remnashop_build_tariff_catalog,
     remnashop_env_overrides,
@@ -196,6 +197,23 @@ def test_remnashop_row_telegram_id_supports_fk_only_schema():
         == 504250615
     )
     assert remnashop_row_telegram_id({"user_id": 3}, user_map) is None
+
+
+def test_remnashop_subscription_url_token_is_kept_as_panel_subscription_uuid():
+    assert (
+        _extract_panel_subscription_uuid(
+            "https://testsub.example/DqrawmRnhfooy_P0",
+            "31a77a97-5730-46bf-bf8c-944feb0d6cd7",
+        )
+        == "DqrawmRnhfooy_P0"
+    )
+    assert (
+        _extract_panel_subscription_uuid(
+            "https://testsub.example/u/6e8bee84-cf50-4a08-92df-c85ac8904e44",
+            "31a77a97-5730-46bf-bf8c-944feb0d6cd7",
+        )
+        == "6e8bee84-cf50-4a08-92df-c85ac8904e44"
+    )
 
 
 def test_remnashop_yookassa_gateway_maps_to_current_provider_settings():
