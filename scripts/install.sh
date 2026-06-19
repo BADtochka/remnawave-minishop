@@ -1299,6 +1299,7 @@ remnashop_webhook_checklist() {
 run_import_command() {
     dry="$1"
     set -- run --rm \
+        --user 0:0 \
         -v "$IMPORTER_PATH:/app/backend/scripts/import_legacy.py:ro"
     if [ -n "$SOURCE_ENV_PATH" ]; then
         set -- "$@" -v "$SOURCE_ENV_PATH:/tmp/remnashop.env:ro"
