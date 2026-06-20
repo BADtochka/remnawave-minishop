@@ -408,6 +408,7 @@
   "log_payment_purchase_summary_line": "🗂 {summary}\n",
   "log_payment_traffic_purchase_line": "<b>{gb} GB</b> · {kind}",
   "log_payment_hwid_devices_purchase_line": "<b>+{count} HWID devices</b>",
+  "log_payment_generic_purchase_line": "<b>{amount} {unit}</b> · {kind}",
   "log_payment_traffic_kind_regular": "regular traffic",
   "log_payment_traffic_kind_premium": "premium traffic",
   "log_payment_tariff_line": "📋 Plan: <b>{name}</b>\n",

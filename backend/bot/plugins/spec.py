@@ -84,7 +84,9 @@ class Plugin:
         """General initialization; called first, once per process.
 
         This is the right place to contribute services to ``ctx.services``
-        and to subscribe to domain events (:mod:`bot.infra.events`).
+        and to subscribe to domain events (:mod:`bot.infra.events`). Plugins
+        that add payment-backed units can also register purchase resolvers in
+        :mod:`bot.infra.payment_events` from this hook.
         """
 
     def setup_bot(

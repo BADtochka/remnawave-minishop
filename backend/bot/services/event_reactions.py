@@ -6,10 +6,9 @@ from typing import Any, Dict, Optional
 
 from bot.app.web.webapp.cache_helpers import invalidate_webapp_user_caches
 from bot.infra import events
+from bot.infra.payment_events import resolve_payment_success_snapshot
 from bot.payment_providers.shared.common import (
     make_translator,
-    sale_mode_base,
-    sale_mode_tariff_key,
 )
 from bot.plugins import PluginContext
 from bot.services.email_templates import render_account_merged
@@ -50,25 +49,6 @@ def _truthy(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "on"}
     return bool(value)
-
-
-def _optional_float(value: Any) -> Optional[float]:
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _positive_int(value: Any) -> Optional[int]:
-    if value is None:
-        return None
-    try:
-        number = int(float(value))
-    except (TypeError, ValueError):
-        return None
-    return number if number > 0 else None
 
 
 class CoreEventReactions:
@@ -264,53 +244,24 @@ class CoreEventReactions:
         service = self._notification_service()
         if service is not None:
             try:
-                mode_base = sale_mode_base(
-                    payload.get("sale_mode") or getattr(payment, "sale_mode", "")
+                snapshot = resolve_payment_success_snapshot(
+                    payload,
+                    payment,
+                    default_currency=getattr(self.ctx.settings, "DEFAULT_CURRENCY", "RUB"),
                 )
-                tariff_key = (
-                    payload.get("tariff_key")
-                    or getattr(payment, "tariff_key", None)
-                    or sale_mode_tariff_key(payload.get("sale_mode") or "")
-                )
-                traffic_gb = _optional_float(payload.get("traffic_gb"))
-                if traffic_gb is None:
-                    traffic_gb = _optional_float(getattr(payment, "purchased_gb", None))
-                purchased_hwid_devices = _positive_int(payload.get("purchased_hwid_devices"))
-                if purchased_hwid_devices is None:
-                    purchased_hwid_devices = _positive_int(payload.get("hwid_devices"))
-                if purchased_hwid_devices is None:
-                    purchased_hwid_devices = _positive_int(
-                        getattr(payment, "purchased_hwid_devices", None)
-                    )
-                months = 0
-                if mode_base == "subscription":
-                    months = int(
-                        float(
-                            payload.get("months")
-                            or getattr(payment, "subscription_duration_months", None)
-                            or 0
-                        )
-                    )
                 await service.notify_payment_received(
                     user_id=int(user_id),
-                    amount=float(payload.get("amount") or getattr(payment, "amount", 0.0) or 0.0),
-                    currency=str(
-                        payload.get("currency")
-                        or getattr(payment, "currency", None)
-                        or getattr(self.ctx.settings, "DEFAULT_CURRENCY", "RUB")
-                    ),
-                    months=months,
-                    traffic_gb=traffic_gb,
-                    payment_provider=str(
-                        payload.get("notification_provider")
-                        or payload.get("provider")
-                        or getattr(payment, "provider", "")
-                    ),
+                    amount=snapshot.amount,
+                    currency=snapshot.currency,
+                    months=snapshot.months,
+                    traffic_gb=snapshot.traffic_gb,
+                    payment_provider=snapshot.notification_provider,
                     username=getattr(user, "username", None),
                     email=getattr(user, "email", None),
-                    traffic_is_premium=mode_base == "premium_topup",
-                    tariff_key=tariff_key,
-                    purchased_hwid_devices=purchased_hwid_devices,
+                    traffic_is_premium=snapshot.traffic_is_premium,
+                    tariff_key=snapshot.tariff_key,
+                    purchased_hwid_devices=snapshot.purchased_hwid_devices,
+                    purchases=snapshot.purchases,
                 )
             except Exception:
                 logger.exception("Failed to react to successful payment for user %s.", user_id)

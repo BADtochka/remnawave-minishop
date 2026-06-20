@@ -9,6 +9,7 @@ from aiogram import Bot
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.infra import events
+from bot.infra.payment_events import build_payment_succeeded_payload
 from bot.keyboards.inline.user_keyboards import get_connect_and_main_keyboard
 from bot.utils.config_link import prepare_config_links
 from bot.utils.install_links import ensure_user_install_guide_links
@@ -336,22 +337,22 @@ async def finalize_successful_payment(
 
     await events.emit(
         events.PAYMENT_SUCCEEDED,
-        {
-            "user_id": req.user_id,
-            "payment_db_id": req.payment.payment_id,
-            "provider": req.provider_subscription,
-            "notification_provider": req.provider_notification,
-            "amount": req.amount,
-            "currency": req.currency,
-            "sale_mode": req.sale_mode,
-            "tariff_key": effective_tariff_key,
-            "months": activation_months if is_subscription else None,
-            "traffic_gb": traffic_gb_for_activation,
-            "purchased_hwid_devices": getattr(req.payment, "purchased_hwid_devices", None)
-            or (activation or {}).get("purchased_hwid_devices"),
-            "end_date": events.iso(activation.get("end_date") if activation else None),
-            "is_auto_renew": False,
-        },
+        build_payment_succeeded_payload(
+            user_id=req.user_id,
+            payment_db_id=req.payment.payment_id,
+            provider=req.provider_subscription,
+            notification_provider=req.provider_notification,
+            amount=req.amount,
+            currency=req.currency,
+            sale_mode=req.sale_mode,
+            tariff_key=effective_tariff_key,
+            months=activation_months if is_subscription else None,
+            traffic_gb=traffic_gb_for_activation,
+            payment=req.payment,
+            activation=activation,
+            end_date=events.iso(activation.get("end_date") if activation else None),
+            is_auto_renew=False,
+        ),
     )
     if is_subscription and activation:
         await events.emit(

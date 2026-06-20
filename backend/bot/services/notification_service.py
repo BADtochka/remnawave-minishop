@@ -7,6 +7,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from aiogram.utils.text_decorations import html_decoration as hd
 
+from bot.infra.payment_events import PaymentPurchase, payment_purchases_from_legacy_fields
 from bot.middlewares.i18n import JsonI18n
 from bot.services.email_auth_service import EmailAuthService
 from bot.services.email_templates import (
@@ -788,13 +789,6 @@ class NotificationService:
             return str(int(value))
         return f"{value:g}"
 
-    def _format_hwid_devices_admin(self, devices: Optional[int]) -> Optional[int]:
-        try:
-            count = int(float(devices)) if devices is not None else 0
-        except (TypeError, ValueError):
-            return None
-        return count if count > 0 else None
-
     def _tariff_display_for_log(self, tariff_key: Optional[str]) -> str:
         if not tariff_key:
             return ""
@@ -821,6 +815,7 @@ class NotificationService:
         traffic_is_premium: bool = False,
         tariff_key: Optional[str] = None,
         purchased_hwid_devices: Optional[int] = None,
+        purchases: Optional[tuple[PaymentPurchase, ...]] = None,
     ):
         """Send notification about successful payment"""
         if not self.settings.LOG_PAYMENTS:
@@ -842,25 +837,36 @@ class NotificationService:
         except Exception:
             provider_emoji = "💰"
 
-        purchase_summary_parts = []
-        if traffic_gb is not None:
-            traffic_label = self._format_traffic_gb_admin(float(traffic_gb))
+        effective_purchases = (
+            purchases
+            if purchases is not None
+            else payment_purchases_from_legacy_fields(
+                traffic_gb=traffic_gb,
+                traffic_is_premium=traffic_is_premium,
+                purchased_hwid_devices=purchased_hwid_devices,
+            )
+        )
+        purchase_summary_parts = [
+            self._format_payment_purchase_line(_, purchase) for purchase in effective_purchases
+        ]
+        purchase_summary = "\n".join(line for line in purchase_summary_parts if line)
+        has_traffic_purchase = any(purchase.kind == "traffic" for purchase in effective_purchases)
+
+        if has_traffic_purchase:
+            traffic_purchase = next(
+                purchase for purchase in effective_purchases if purchase.kind == "traffic"
+            )
             traffic_kind = _(
                 "log_payment_traffic_kind_premium"
-                if traffic_is_premium
+                if traffic_purchase.scope == "premium"
                 else "log_payment_traffic_kind_regular",
             )
-            purchase_summary_parts.append(
-                _("log_payment_traffic_purchase_line", gb=traffic_label, kind=traffic_kind)
+            purchase_summary = purchase_summary or _(
+                "log_payment_traffic_purchase_line",
+                gb=self._format_traffic_gb_admin(float(traffic_purchase.amount)),
+                kind=traffic_kind,
             )
-        hwid_devices_count = self._format_hwid_devices_admin(purchased_hwid_devices)
-        if hwid_devices_count is not None:
-            purchase_summary_parts.append(
-                _("log_payment_hwid_devices_purchase_line", count=hwid_devices_count)
-            )
-        purchase_summary = "\n".join(purchase_summary_parts)
 
-        if traffic_gb is not None:
             tariff_name = self._tariff_display_for_log(tariff_key)
             tariff_line = (
                 _("log_payment_tariff_line", name=hd.quote(tariff_name)) if tariff_name else ""
@@ -876,7 +882,7 @@ class NotificationService:
                 payment_provider=payment_provider,
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             )
-        elif hwid_devices_count is not None:
+        elif effective_purchases:
             tariff_name = self._tariff_display_for_log(tariff_key)
             tariff_line = (
                 _("log_payment_tariff_line", name=hd.quote(tariff_name)) if tariff_name else ""
@@ -913,6 +919,39 @@ class NotificationService:
         # Send to log channel
         profile_keyboard = self._build_profile_keyboard(_, user_id)
         await self._send_to_log_channel(message, reply_markup=profile_keyboard)
+
+    def _format_payment_purchase_line(
+        self,
+        translate: Callable[..., str],
+        purchase: PaymentPurchase,
+    ) -> str:
+        if purchase.kind == "traffic":
+            traffic_kind = translate(
+                "log_payment_traffic_kind_premium"
+                if purchase.scope == "premium"
+                else "log_payment_traffic_kind_regular"
+            )
+            return translate(
+                "log_payment_traffic_purchase_line",
+                gb=self._format_traffic_gb_admin(float(purchase.amount)),
+                kind=traffic_kind,
+            )
+        if purchase.kind == "hwid_devices":
+            return translate(
+                "log_payment_hwid_devices_purchase_line",
+                count=int(float(purchase.amount)),
+            )
+        amount_label = self._format_traffic_gb_admin(float(purchase.amount))
+        label_kwargs = {
+            "amount": amount_label,
+            "unit": purchase.unit,
+            "kind": purchase.kind,
+            "scope": purchase.scope or "",
+            **dict(purchase.label_kwargs),
+        }
+        if purchase.label_key:
+            return translate(purchase.label_key, **label_kwargs)
+        return translate("log_payment_generic_purchase_line", **label_kwargs)
 
     async def notify_promo_activation(
         self,

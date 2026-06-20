@@ -44,8 +44,10 @@ def reset_plugins() -> None:
     _builtin_plugins = None
     _discovered_plugins = None
     _registered_plugins.clear()
+    from bot.infra.payment_events import reset_payment_purchase_resolvers
     from bot.services.entitlements import reset_entitlements
 
+    reset_payment_purchase_resolvers()
     reset_entitlements()
 
 

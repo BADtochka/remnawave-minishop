@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock
 
+from bot.infra.payment_events import PaymentPurchase
 from bot.services.notification_service import NotificationService
 
 
@@ -41,6 +42,7 @@ class _I18n:
         "log_payment_traffic_kind_regular": "regular traffic",
         "log_payment_traffic_kind_premium": "premium traffic",
         "log_payment_hwid_devices_purchase_line": "+{count} HWID devices",
+        "log_payment_generic_purchase_line": "{amount} {unit} - {kind}",
         "log_payment_tariff_line": "Plan: {name}\n",
     }
 
@@ -118,3 +120,21 @@ class PaymentLogNotificationTests(IsolatedAsyncioTestCase):
         message = service._send_to_log_channel.await_args.args[0]
         self.assertIn("10 GB - regular traffic", message)
         self.assertIn("+2 HWID devices", message)
+
+    async def test_generic_purchase_log_supports_plugin_units(self):
+        service = _service()
+
+        await service.notify_payment_received(
+            user_id=42,
+            amount=50,
+            currency="RUB",
+            months=1,
+            payment_provider="plugin",
+            username="alice",
+            tariff_key="standard",
+            purchases=(PaymentPurchase(kind="extra_seats", amount=3, unit="seat"),),
+        )
+
+        message = service._send_to_log_channel.await_args.args[0]
+        self.assertIn("3 seat - extra_seats", message)
+        self.assertIn("Period: 1 mo.", message)

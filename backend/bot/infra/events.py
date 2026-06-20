@@ -11,6 +11,9 @@ Design rules:
 - Payloads are flat dicts of primitives (ids, numbers, strings, ISO-8601
   datetimes) - never ORM objects. Subscribers that need richer data re-read
   it from the database by id.
+- Payment purchase units are normalized in :mod:`bot.infra.payment_events`.
+  Plugins that introduce new payment-backed units can register purchase
+  resolvers there while still subscribing to the plain event payload here.
 - Events may be emitted shortly before the surrounding transaction commits;
   treat a payload as a notification, not as a guarantee the row is visible.
 

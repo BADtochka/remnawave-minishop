@@ -19,6 +19,7 @@ from yookassa.domain.notification import WebhookNotification
 from yookassa.domain.request.payment_request_builder import PaymentRequestBuilder
 
 from bot.infra import events
+from bot.infra.payment_events import build_payment_succeeded_payload
 from bot.infra.webhook_queue import enqueue_webhook_event
 from bot.keyboards.inline.user_keyboards import (
     get_back_to_main_menu_markup,
@@ -904,21 +905,23 @@ async def process_successful_payment(
             str(getattr(updated_payment_record, "tariff_key", "") or "").strip()
             or effective_tariff_key
         )
-        payment_succeeded_payload = {
-            "user_id": user_id,
-            "payment_db_id": payment_db_id,
-            "provider": "yookassa",
-            "notification_provider": "yookassa",
-            "amount": payment_value,
-            "currency": str(amount_data.get("currency") or "RUB"),
-            "sale_mode": sale_mode,
-            "tariff_key": tariff_key_for_event,
-            "months": months_for_activation if sale_mode_base == "subscription" else None,
-            "traffic_gb": traffic_gb_for_activation,
-            "purchased_hwid_devices": hwid_devices_count if hwid_devices_count > 0 else None,
-            "end_date": events.iso(activation_details.get("end_date")),
-            "is_auto_renew": is_auto_renew,
-        }
+        payment_succeeded_payload = build_payment_succeeded_payload(
+            user_id=user_id,
+            payment_db_id=payment_db_id,
+            provider="yookassa",
+            notification_provider="yookassa",
+            amount=payment_value,
+            currency=str(amount_data.get("currency") or "RUB"),
+            sale_mode=sale_mode,
+            tariff_key=tariff_key_for_event,
+            months=months_for_activation if sale_mode_base == "subscription" else None,
+            traffic_gb=traffic_gb_for_activation,
+            purchased_hwid_devices=hwid_devices_count if hwid_devices_count > 0 else None,
+            payment=updated_payment_record,
+            activation=activation_details,
+            end_date=events.iso(activation_details.get("end_date")),
+            is_auto_renew=is_auto_renew,
+        )
         deferred_events = []
         if sale_mode_base == "subscription":
             deferred_events.append(

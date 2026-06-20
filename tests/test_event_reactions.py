@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
-from unittest.mock import AsyncMock, patch
+from unittest.mock import ANY, AsyncMock, patch
 
 from bot.infra import events
 from bot.plugins import PluginContext
@@ -274,6 +274,7 @@ class CoreEventReactionsTests(IsolatedAsyncioTestCase):
             traffic_is_premium=True,
             tariff_key="standard",
             purchased_hwid_devices=None,
+            purchases=ANY,
         )
         invalidate.assert_awaited_once_with(ctx.settings, 42, include_devices=True)
 
@@ -328,6 +329,7 @@ class CoreEventReactionsTests(IsolatedAsyncioTestCase):
             traffic_is_premium=False,
             tariff_key="standard",
             purchased_hwid_devices=None,
+            purchases=ANY,
         )
 
     async def test_payment_succeeded_event_passes_hwid_purchase_units_from_payment(self):
@@ -381,6 +383,7 @@ class CoreEventReactionsTests(IsolatedAsyncioTestCase):
             traffic_is_premium=False,
             tariff_key="standard",
             purchased_hwid_devices=2,
+            purchases=ANY,
         )
 
     async def test_subscription_payment_succeeded_event_includes_hwid_renewal_units(self):
@@ -435,6 +438,7 @@ class CoreEventReactionsTests(IsolatedAsyncioTestCase):
             traffic_is_premium=False,
             tariff_key="standard",
             purchased_hwid_devices=1,
+            purchases=ANY,
         )
 
     async def test_payment_canceled_event_notifies_user_and_email(self):
