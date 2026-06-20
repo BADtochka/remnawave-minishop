@@ -467,6 +467,140 @@ class CoreEventReactionsTests(IsolatedAsyncioTestCase):
             dashboard_url="https://mini.example.test",
         )
 
+    async def test_payment_canceled_event_skips_stale_platega_failure_after_later_success(self):
+        bot = SimpleNamespace(send_message=AsyncMock())
+        email = AsyncMock()
+        ctx = _context(bot=bot)
+        created_at = datetime(2026, 1, 9, 9, 0, tzinfo=timezone.utc)
+        canceled_payment = SimpleNamespace(
+            payment_id=10,
+            user_id=42,
+            status="canceled",
+            provider="platega",
+            created_at=created_at,
+            updated_at=datetime(2026, 1, 9, 13, 0, tzinfo=timezone.utc),
+            sale_mode="subscription@standard",
+            subscription_duration_months=1,
+        )
+        later_success = SimpleNamespace(
+            payment_id=11,
+            user_id=42,
+            status="succeeded",
+            provider="platega",
+            created_at=datetime(2026, 1, 9, 9, 10, tzinfo=timezone.utc),
+            updated_at=datetime(2026, 1, 9, 9, 20, tzinfo=timezone.utc),
+            sale_mode="subscription@standard",
+            subscription_duration_months=3,
+        )
+
+        with (
+            patch.object(
+                event_reactions.payment_dal,
+                "get_payment_by_db_id",
+                AsyncMock(return_value=canceled_payment),
+            ),
+            patch.object(
+                event_reactions.payment_dal,
+                "get_user_succeeded_payments_after",
+                AsyncMock(return_value=[later_success]),
+            ),
+            patch.object(event_reactions, "send_user_notification_email", email),
+        ):
+            register_core_reactions(ctx)
+            await events.emit(
+                events.PAYMENT_CANCELED,
+                {
+                    "user_id": 42,
+                    "payment_db_id": 10,
+                    "provider": "platega",
+                    "status": "canceled",
+                    "message_key": "payment_failed",
+                },
+            )
+
+        bot.send_message.assert_not_awaited()
+        email.assert_not_awaited()
+
+    async def test_payment_canceled_event_notifies_when_success_is_older(self):
+        bot = SimpleNamespace(send_message=AsyncMock())
+        email = AsyncMock()
+        ctx = _context(bot=bot)
+        user = SimpleNamespace(language_code="ru", email="alice@example.test")
+        created_at = datetime(2026, 1, 9, 12, 0, tzinfo=timezone.utc)
+        canceled_payment = SimpleNamespace(
+            payment_id=20,
+            user_id=42,
+            status="failed",
+            provider="platega",
+            created_at=created_at,
+            updated_at=datetime(2026, 1, 9, 13, 0, tzinfo=timezone.utc),
+        )
+        older_success = SimpleNamespace(
+            payment_id=19,
+            user_id=42,
+            status="succeeded",
+            provider="platega",
+            created_at=datetime(2026, 1, 8, 10, 0, tzinfo=timezone.utc),
+            updated_at=datetime(2026, 1, 8, 10, 5, tzinfo=timezone.utc),
+        )
+
+        with (
+            patch.object(event_reactions.user_dal, "get_user_by_id", AsyncMock(return_value=user)),
+            patch.object(
+                event_reactions.payment_dal,
+                "get_payment_by_db_id",
+                AsyncMock(return_value=canceled_payment),
+            ),
+            patch.object(
+                event_reactions.payment_dal,
+                "get_user_succeeded_payments_after",
+                AsyncMock(return_value=[older_success]),
+            ),
+            patch.object(event_reactions, "send_user_notification_email", email),
+        ):
+            register_core_reactions(ctx)
+            await events.emit(
+                events.PAYMENT_CANCELED,
+                {"user_id": 42, "payment_db_id": 20, "message_key": "payment_failed"},
+            )
+
+        bot.send_message.assert_awaited_once_with(42, "payment_failed")
+        email.assert_awaited_once()
+
+    async def test_payment_canceled_event_skips_when_payment_already_succeeded(self):
+        bot = SimpleNamespace(send_message=AsyncMock())
+        email = AsyncMock()
+        ctx = _context(bot=bot)
+        payment = SimpleNamespace(
+            payment_id=30,
+            user_id=42,
+            status="succeeded",
+            provider="platega",
+            created_at=datetime(2026, 1, 9, 12, 0, tzinfo=timezone.utc),
+        )
+
+        with (
+            patch.object(
+                event_reactions.payment_dal,
+                "get_payment_by_db_id",
+                AsyncMock(return_value=payment),
+            ),
+            patch.object(
+                event_reactions.payment_dal,
+                "get_user_succeeded_payments_after",
+                AsyncMock(side_effect=AssertionError("already succeeded must not query history")),
+            ),
+            patch.object(event_reactions, "send_user_notification_email", email),
+        ):
+            register_core_reactions(ctx)
+            await events.emit(
+                events.PAYMENT_CANCELED,
+                {"user_id": 42, "payment_db_id": 30, "message_key": "payment_failed"},
+            )
+
+        bot.send_message.assert_not_awaited()
+        email.assert_not_awaited()
+
     async def test_referral_bonus_event_notifies_inviter(self):
         bot = SimpleNamespace(send_message=AsyncMock())
         email = AsyncMock()

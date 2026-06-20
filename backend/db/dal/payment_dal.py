@@ -247,6 +247,33 @@ async def count_user_succeeded_payments(
     return result.scalar() or 0
 
 
+async def get_user_succeeded_payments_after(
+    session: AsyncSession,
+    user_id: int,
+    after: Any,
+    *,
+    limit: int = 20,
+    exclude_payment_id: Optional[int] = None,
+) -> List[Payment]:
+    """Return succeeded payments that could supersede an older checkout."""
+
+    conditions = [Payment.user_id == user_id, Payment.status == "succeeded"]
+    if exclude_payment_id is not None:
+        conditions.append(Payment.payment_id != exclude_payment_id)
+    if after is not None:
+        conditions.append(or_(Payment.created_at >= after, Payment.updated_at >= after))
+
+    stmt = (
+        select(Payment)
+        .where(and_(*conditions))
+        .options(joinedload(Payment.user), joinedload(Payment.promo_code_used))
+        .order_by(Payment.created_at.desc(), Payment.updated_at.desc(), Payment.payment_id.desc())
+        .limit(max(1, int(limit)))
+    )
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+
 async def update_provider_payment_and_status(
     session: AsyncSession,
     payment_db_id: int,

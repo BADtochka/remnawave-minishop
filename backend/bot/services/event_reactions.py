@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 from bot.app.web.webapp.cache_helpers import invalidate_webapp_user_caches
 from bot.infra import events
@@ -24,7 +24,7 @@ _ACCOUNT_MERGE_NOTIFY_REASONS = {"email_link", "telegram_link", "login"}
 
 def _parse_datetime(value: Any) -> Optional[datetime]:
     if isinstance(value, datetime):
-        return value
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
     if not value:
         return None
     try:
@@ -49,6 +49,42 @@ def _truthy(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "on"}
     return bool(value)
+
+
+def _payment_status_timestamp(payment: Any) -> Optional[datetime]:
+    """Best-effort time when a payment reached its current status."""
+
+    updated_at = _parse_datetime(getattr(payment, "updated_at", None))
+    created_at = _parse_datetime(getattr(payment, "created_at", None))
+    if updated_at and created_at:
+        return max(updated_at, created_at)
+    return updated_at or created_at
+
+
+def _int_or_none(value: Any) -> Optional[int]:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _has_superseding_success(
+    canceled_payment: Any,
+    successful_payments: Iterable[Any],
+) -> bool:
+    canceled_created_at = _parse_datetime(getattr(canceled_payment, "created_at", None))
+    if canceled_created_at is None:
+        return False
+    canceled_payment_id = _int_or_none(getattr(canceled_payment, "payment_id", None))
+    for payment in successful_payments:
+        if canceled_payment_id is not None and _int_or_none(
+            getattr(payment, "payment_id", None)
+        ) == canceled_payment_id:
+            continue
+        success_at = _payment_status_timestamp(payment)
+        if success_at is not None and success_at >= canceled_created_at:
+            return True
+    return False
 
 
 class CoreEventReactions:
@@ -105,6 +141,33 @@ class CoreEventReactions:
                 user_id,
             )
             return None
+
+    async def _payment_failure_is_superseded(self, payment: Any, user_id: Any) -> bool:
+        payment_user_id = _int_or_none(getattr(payment, "user_id", None))
+        event_user_id = _int_or_none(user_id)
+        if payment_user_id is None or event_user_id is None or payment_user_id != event_user_id:
+            return False
+        if str(getattr(payment, "status", "") or "").lower() == "succeeded":
+            return True
+        created_at = _parse_datetime(getattr(payment, "created_at", None))
+        if created_at is None or self.ctx.session_factory is None:
+            return False
+
+        try:
+            async with self.ctx.session_factory() as session:
+                successful_payments = await payment_dal.get_user_succeeded_payments_after(
+                    session,
+                    payment_user_id,
+                    created_at,
+                    exclude_payment_id=_int_or_none(getattr(payment, "payment_id", None)),
+                )
+        except Exception:
+            logger.exception(
+                "Failed to check superseding successful payments for payment %s.",
+                getattr(payment, "payment_id", None),
+            )
+            return False
+        return _has_superseding_success(payment, successful_payments)
 
     async def on_trial_activated(self, event_name: str, payload: Dict[str, Any]) -> None:
         del event_name
@@ -282,6 +345,15 @@ class CoreEventReactions:
         del event_name
         user_id = payload.get("user_id")
         if user_id is None or self.ctx.bot is None:
+            return
+        payment = await self._load_payment(payload.get("payment_db_id"))
+        if payment is not None and await self._payment_failure_is_superseded(payment, user_id):
+            logger.info(
+                "Suppressing canceled payment notification for user %s payment %s: "
+                "a newer successful payment already superseded it.",
+                user_id,
+                getattr(payment, "payment_id", None),
+            )
             return
         user = await self._load_user(user_id)
         language = (
