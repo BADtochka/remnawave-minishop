@@ -915,6 +915,7 @@ async def process_successful_payment(
             "tariff_key": tariff_key_for_event,
             "months": months_for_activation if sale_mode_base == "subscription" else None,
             "traffic_gb": traffic_gb_for_activation,
+            "purchased_hwid_devices": hwid_devices_count if hwid_devices_count > 0 else None,
             "end_date": events.iso(activation_details.get("end_date")),
             "is_auto_renew": is_auto_renew,
         }

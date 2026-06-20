@@ -52,6 +52,25 @@ def _truthy(value: Any) -> bool:
     return bool(value)
 
 
+def _optional_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _positive_int(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        number = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
+
+
 class CoreEventReactions:
     def __init__(self, ctx: PluginContext):
         self.ctx = ctx
@@ -253,7 +272,25 @@ class CoreEventReactions:
                     or getattr(payment, "tariff_key", None)
                     or sale_mode_tariff_key(payload.get("sale_mode") or "")
                 )
-                traffic_gb = payload.get("traffic_gb")
+                traffic_gb = _optional_float(payload.get("traffic_gb"))
+                if traffic_gb is None:
+                    traffic_gb = _optional_float(getattr(payment, "purchased_gb", None))
+                purchased_hwid_devices = _positive_int(payload.get("purchased_hwid_devices"))
+                if purchased_hwid_devices is None:
+                    purchased_hwid_devices = _positive_int(payload.get("hwid_devices"))
+                if purchased_hwid_devices is None:
+                    purchased_hwid_devices = _positive_int(
+                        getattr(payment, "purchased_hwid_devices", None)
+                    )
+                months = 0
+                if mode_base == "subscription":
+                    months = int(
+                        float(
+                            payload.get("months")
+                            or getattr(payment, "subscription_duration_months", None)
+                            or 0
+                        )
+                    )
                 await service.notify_payment_received(
                     user_id=int(user_id),
                     amount=float(payload.get("amount") or getattr(payment, "amount", 0.0) or 0.0),
@@ -262,8 +299,8 @@ class CoreEventReactions:
                         or getattr(payment, "currency", None)
                         or getattr(self.ctx.settings, "DEFAULT_CURRENCY", "RUB")
                     ),
-                    months=int(payload.get("months") or 0),
-                    traffic_gb=float(traffic_gb) if traffic_gb is not None else None,
+                    months=months,
+                    traffic_gb=traffic_gb,
                     payment_provider=str(
                         payload.get("notification_provider")
                         or payload.get("provider")
@@ -273,6 +310,7 @@ class CoreEventReactions:
                     email=getattr(user, "email", None),
                     traffic_is_premium=mode_base == "premium_topup",
                     tariff_key=tariff_key,
+                    purchased_hwid_devices=purchased_hwid_devices,
                 )
             except Exception:
                 logger.exception("Failed to react to successful payment for user %s.", user_id)

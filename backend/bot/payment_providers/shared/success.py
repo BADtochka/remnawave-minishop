@@ -347,6 +347,8 @@ async def finalize_successful_payment(
             "tariff_key": effective_tariff_key,
             "months": activation_months if is_subscription else None,
             "traffic_gb": traffic_gb_for_activation,
+            "purchased_hwid_devices": getattr(req.payment, "purchased_hwid_devices", None)
+            or (activation or {}).get("purchased_hwid_devices"),
             "end_date": events.iso(activation.get("end_date") if activation else None),
             "is_auto_renew": False,
         },

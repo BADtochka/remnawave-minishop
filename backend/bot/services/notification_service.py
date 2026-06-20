@@ -788,6 +788,13 @@ class NotificationService:
             return str(int(value))
         return f"{value:g}"
 
+    def _format_hwid_devices_admin(self, devices: Optional[int]) -> Optional[int]:
+        try:
+            count = int(float(devices)) if devices is not None else 0
+        except (TypeError, ValueError):
+            return None
+        return count if count > 0 else None
+
     def _tariff_display_for_log(self, tariff_key: Optional[str]) -> str:
         if not tariff_key:
             return ""
@@ -813,6 +820,7 @@ class NotificationService:
         *,
         traffic_is_premium: bool = False,
         tariff_key: Optional[str] = None,
+        purchased_hwid_devices: Optional[int] = None,
     ):
         """Send notification about successful payment"""
         if not self.settings.LOG_PAYMENTS:
@@ -834,6 +842,7 @@ class NotificationService:
         except Exception:
             provider_emoji = "💰"
 
+        purchase_summary_parts = []
         if traffic_gb is not None:
             traffic_label = self._format_traffic_gb_admin(float(traffic_gb))
             traffic_kind = _(
@@ -841,9 +850,17 @@ class NotificationService:
                 if traffic_is_premium
                 else "log_payment_traffic_kind_regular",
             )
-            traffic_summary = _(
-                "log_payment_traffic_purchase_line", gb=traffic_label, kind=traffic_kind
+            purchase_summary_parts.append(
+                _("log_payment_traffic_purchase_line", gb=traffic_label, kind=traffic_kind)
             )
+        hwid_devices_count = self._format_hwid_devices_admin(purchased_hwid_devices)
+        if hwid_devices_count is not None:
+            purchase_summary_parts.append(
+                _("log_payment_hwid_devices_purchase_line", count=hwid_devices_count)
+            )
+        purchase_summary = "\n".join(purchase_summary_parts)
+
+        if traffic_gb is not None:
             tariff_name = self._tariff_display_for_log(tariff_key)
             tariff_line = (
                 _("log_payment_tariff_line", name=hd.quote(tariff_name)) if tariff_name else ""
@@ -854,7 +871,29 @@ class NotificationService:
                 user_display=user_display,
                 amount=amount,
                 currency=currency,
-                traffic_summary=traffic_summary,
+                traffic_summary=purchase_summary,
+                tariff_line=tariff_line,
+                payment_provider=payment_provider,
+                timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
+        elif hwid_devices_count is not None:
+            tariff_name = self._tariff_display_for_log(tariff_key)
+            tariff_line = (
+                _("log_payment_tariff_line", name=hd.quote(tariff_name)) if tariff_name else ""
+            )
+            period_line = _("log_payment_period_line", months=months) if months else ""
+            purchase_summary_line = _(
+                "log_payment_purchase_summary_line",
+                summary=purchase_summary,
+            )
+            message = _(
+                "log_payment_received_with_purchases",
+                provider_emoji=provider_emoji,
+                user_display=user_display,
+                amount=amount,
+                currency=currency,
+                period_line=period_line,
+                purchase_summary_line=purchase_summary_line,
                 tariff_line=tariff_line,
                 payment_provider=payment_provider,
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

@@ -273,8 +273,169 @@ class CoreEventReactionsTests(IsolatedAsyncioTestCase):
             email="alice@example.test",
             traffic_is_premium=True,
             tariff_key="standard",
+            purchased_hwid_devices=None,
         )
         invalidate.assert_awaited_once_with(ctx.settings, 42, include_devices=True)
+
+    async def test_payment_succeeded_event_falls_back_to_payment_purchase_units(self):
+        notification_service = SimpleNamespace(notify_payment_received=AsyncMock())
+        ctx = _context(notification_service=notification_service)
+        user = SimpleNamespace(username="alice", email="alice@example.test")
+        payment = SimpleNamespace(
+            payment_id=5,
+            amount=120.0,
+            currency="RUB",
+            subscription_duration_months=None,
+            purchased_gb=12.5,
+            purchased_hwid_devices=None,
+            provider="wata",
+            sale_mode="topup@standard",
+            tariff_key="standard",
+        )
+
+        with (
+            patch.object(event_reactions.user_dal, "get_user_by_id", AsyncMock(return_value=user)),
+            patch.object(
+                event_reactions.payment_dal,
+                "get_payment_by_db_id",
+                AsyncMock(return_value=payment),
+            ),
+            patch.object(event_reactions, "invalidate_webapp_user_caches", AsyncMock()),
+        ):
+            register_core_reactions(ctx)
+            await events.emit(
+                events.PAYMENT_SUCCEEDED,
+                {
+                    "user_id": 42,
+                    "payment_db_id": 5,
+                    "notification_provider": "wata",
+                    "amount": 120,
+                    "currency": "RUB",
+                    "sale_mode": "topup@standard",
+                    "tariff_key": "standard",
+                },
+            )
+
+        notification_service.notify_payment_received.assert_awaited_once_with(
+            user_id=42,
+            amount=120.0,
+            currency="RUB",
+            months=0,
+            traffic_gb=12.5,
+            payment_provider="wata",
+            username="alice",
+            email="alice@example.test",
+            traffic_is_premium=False,
+            tariff_key="standard",
+            purchased_hwid_devices=None,
+        )
+
+    async def test_payment_succeeded_event_passes_hwid_purchase_units_from_payment(self):
+        notification_service = SimpleNamespace(notify_payment_received=AsyncMock())
+        ctx = _context(notification_service=notification_service)
+        user = SimpleNamespace(username="alice", email="alice@example.test")
+        payment = SimpleNamespace(
+            payment_id=5,
+            amount=80.0,
+            currency="RUB",
+            subscription_duration_months=None,
+            purchased_gb=None,
+            purchased_hwid_devices=2,
+            provider="yookassa",
+            sale_mode="hwid_devices@standard",
+            tariff_key="standard",
+        )
+
+        with (
+            patch.object(event_reactions.user_dal, "get_user_by_id", AsyncMock(return_value=user)),
+            patch.object(
+                event_reactions.payment_dal,
+                "get_payment_by_db_id",
+                AsyncMock(return_value=payment),
+            ),
+            patch.object(event_reactions, "invalidate_webapp_user_caches", AsyncMock()),
+        ):
+            register_core_reactions(ctx)
+            await events.emit(
+                events.PAYMENT_SUCCEEDED,
+                {
+                    "user_id": 42,
+                    "payment_db_id": 5,
+                    "notification_provider": "yookassa",
+                    "amount": 80,
+                    "currency": "RUB",
+                    "sale_mode": "hwid_devices@standard",
+                    "tariff_key": "standard",
+                },
+            )
+
+        notification_service.notify_payment_received.assert_awaited_once_with(
+            user_id=42,
+            amount=80.0,
+            currency="RUB",
+            months=0,
+            traffic_gb=None,
+            payment_provider="yookassa",
+            username="alice",
+            email="alice@example.test",
+            traffic_is_premium=False,
+            tariff_key="standard",
+            purchased_hwid_devices=2,
+        )
+
+    async def test_subscription_payment_succeeded_event_includes_hwid_renewal_units(self):
+        notification_service = SimpleNamespace(notify_payment_received=AsyncMock())
+        ctx = _context(notification_service=notification_service)
+        user = SimpleNamespace(username="alice", email="alice@example.test")
+        payment = SimpleNamespace(
+            payment_id=5,
+            amount=180.0,
+            currency="RUB",
+            subscription_duration_months=1,
+            purchased_gb=None,
+            purchased_hwid_devices=1,
+            provider="wata",
+            sale_mode="subscription@standard",
+            tariff_key="standard",
+        )
+
+        with (
+            patch.object(event_reactions.user_dal, "get_user_by_id", AsyncMock(return_value=user)),
+            patch.object(
+                event_reactions.payment_dal,
+                "get_payment_by_db_id",
+                AsyncMock(return_value=payment),
+            ),
+            patch.object(event_reactions, "invalidate_webapp_user_caches", AsyncMock()),
+        ):
+            register_core_reactions(ctx)
+            await events.emit(
+                events.PAYMENT_SUCCEEDED,
+                {
+                    "user_id": 42,
+                    "payment_db_id": 5,
+                    "notification_provider": "wata",
+                    "amount": 180,
+                    "currency": "RUB",
+                    "sale_mode": "subscription@standard",
+                    "tariff_key": "standard",
+                    "months": "1.0",
+                },
+            )
+
+        notification_service.notify_payment_received.assert_awaited_once_with(
+            user_id=42,
+            amount=180.0,
+            currency="RUB",
+            months=1,
+            traffic_gb=None,
+            payment_provider="wata",
+            username="alice",
+            email="alice@example.test",
+            traffic_is_premium=False,
+            tariff_key="standard",
+            purchased_hwid_devices=1,
+        )
 
     async def test_payment_canceled_event_notifies_user_and_email(self):
         bot = SimpleNamespace(send_message=AsyncMock())

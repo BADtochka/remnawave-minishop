@@ -18,7 +18,7 @@ Event payload conventions (keys may be ``None`` when unknown):
 
 - ``PAYMENT_SUCCEEDED``: user_id, payment_db_id, provider,
   notification_provider, amount, currency, sale_mode, tariff_key, months,
-  traffic_gb, end_date, is_auto_renew.
+  traffic_gb, purchased_hwid_devices, end_date, is_auto_renew.
 - ``PAYMENT_CANCELED``: user_id, payment_db_id, provider,
   provider_payment_id, status, message_key.
 - ``SUBSCRIPTION_CREATED`` / ``SUBSCRIPTION_EXTENDED``: user_id,
