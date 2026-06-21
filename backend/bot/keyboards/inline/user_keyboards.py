@@ -28,17 +28,7 @@ def telegram_bot_menu_enabled_for_user(
     is_admin: bool = False,
 ) -> bool:
     """Return whether the legacy in-bot interface should be available."""
-    if not bool(getattr(settings, "TELEGRAM_BOT_MENU_DISABLED", False)):
-        return True
-    if is_admin:
-        return True
-    if user_id is None:
-        return False
-    try:
-        normalized_user_id = int(user_id)
-    except (TypeError, ValueError):
-        return False
-    return normalized_user_id in set(getattr(settings, "ADMIN_IDS", []) or [])
+    return not bool(getattr(settings, "TELEGRAM_BOT_MENU_DISABLED", False))
 
 
 def sale_mode_tokens(sale_mode: Optional[str]) -> Tuple[str, ...]:

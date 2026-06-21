@@ -221,21 +221,22 @@ async def on_startup_configured(dispatcher: Dispatcher):
         for scope in command_scopes_to_clear:
             for language_code in _telegram_command_language_codes(settings):
                 await bot.delete_my_commands(scope=scope, language_code=language_code)
-        await bot.set_my_commands(public_bot_commands, scope=BotCommandScopeDefault())
-        await bot.set_my_commands(public_bot_commands, scope=BotCommandScopeAllPrivateChats())
         if bot_menu_disabled:
             for admin_id in getattr(settings, "ADMIN_IDS", []) or []:
-                try:
-                    await bot.set_my_commands(
-                        bot_commands,
-                        scope=BotCommandScopeChat(chat_id=admin_id),
-                    )
-                except TelegramBadRequest as exc:
-                    logging.warning(
-                        "STARTUP: Could not set admin bot commands for chat %s: %s",
-                        admin_id,
-                        exc,
-                    )
+                for language_code in _telegram_command_language_codes(settings):
+                    try:
+                        await bot.delete_my_commands(
+                            scope=BotCommandScopeChat(chat_id=admin_id),
+                            language_code=language_code,
+                        )
+                    except TelegramBadRequest as exc:
+                        logging.warning(
+                            "STARTUP: Could not clear chat-specific bot commands for chat %s: %s",
+                            admin_id,
+                            exc,
+                        )
+        await bot.set_my_commands(public_bot_commands, scope=BotCommandScopeDefault())
+        await bot.set_my_commands(public_bot_commands, scope=BotCommandScopeAllPrivateChats())
         logging.info("STARTUP: bot command descriptions set.")
 
     await _run_telegram_startup_step(

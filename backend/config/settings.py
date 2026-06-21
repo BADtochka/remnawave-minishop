@@ -670,8 +670,8 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_MENU_DISABLED: bool = Field(
         default=False,
         description=(
-            "Hide the in-bot user interface and /tg command for regular users. "
-            "Admins keep access; user renewal prompts should open the Mini App."
+            "Hide the in-bot user interface and /tg command. "
+            "User renewal prompts should open the Mini App."
         ),
     )
 

@@ -99,7 +99,7 @@ class UserBotMenuTests(unittest.TestCase):
         self.assertNotIn("main_action:bot_interface", callbacks)
         self.assertIn("main_action:info", callbacks)
 
-    def test_main_menu_keeps_bot_menu_for_admin_when_user_menu_disabled(self):
+    def test_main_menu_hides_bot_menu_for_admin_when_user_menu_disabled(self):
         self.settings.TELEGRAM_BOT_MENU_DISABLED = True
         markup = get_main_menu_inline_keyboard(
             "en",
@@ -108,7 +108,7 @@ class UserBotMenuTests(unittest.TestCase):
             user_id=42,
         )
 
-        self.assertIn("main_action:bot_interface", self._callback_data(markup))
+        self.assertNotIn("main_action:bot_interface", self._callback_data(markup))
 
     def test_subscribe_only_markup_uses_mini_app_renewal_deeplink_when_bot_menu_disabled(self):
         self.settings.TELEGRAM_BOT_MENU_DISABLED = True

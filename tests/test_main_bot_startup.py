@@ -91,6 +91,7 @@ def test_telegram_startup_clears_legacy_command_scopes_before_setting_commands()
         in source
     )
     assert "scope=BotCommandScopeChat(chat_id=admin_id)" in source
+    assert "Could not clear chat-specific bot commands" in source
 
 
 def test_telegram_startup_hides_tg_command_from_public_scopes_when_bot_menu_disabled():
@@ -100,7 +101,9 @@ def test_telegram_startup_hides_tg_command_from_public_scopes_when_bot_menu_disa
             self.set_calls = []
 
         async def delete_my_commands(self, *, scope, language_code=None):
-            self.deleted.append((type(scope).__name__, language_code))
+            self.deleted.append(
+                (type(scope).__name__, getattr(scope, "chat_id", None), language_code)
+            )
 
         async def set_my_commands(self, commands, *, scope):
             self.set_calls.append((type(scope).__name__, list(commands), scope))
@@ -122,7 +125,6 @@ def test_telegram_startup_hides_tg_command_from_public_scopes_when_bot_menu_disa
         asyncio.run(on_startup_configured(dispatcher))
 
     public_calls = dispatcher["bot_instance"].set_calls[:2]
-    admin_calls = dispatcher["bot_instance"].set_calls[2:]
 
     assert [
         (scope_name, [cmd.command for cmd in commands]) for scope_name, commands, _ in public_calls
@@ -130,10 +132,11 @@ def test_telegram_startup_hides_tg_command_from_public_scopes_when_bot_menu_disa
         ("BotCommandScopeDefault", ["start"]),
         ("BotCommandScopeAllPrivateChats", ["start"]),
     ]
-    assert [
-        (scope_name, scope.chat_id, [cmd.command for cmd in commands])
-        for scope_name, commands, scope in admin_calls
-    ] == [("BotCommandScopeChat", 42, ["start", "tg"])]
+    assert len(dispatcher["bot_instance"].set_calls) == 2
+    assert any(
+        scope_name == "BotCommandScopeChat" and chat_id == 42
+        for scope_name, chat_id, _ in dispatcher["bot_instance"].deleted
+    )
 
 
 def test_telegram_startup_network_error_retries_until_success_without_traceback(caplog):
