@@ -1,3 +1,7 @@
+# SQLAlchemy legacy Column declarations expose instance attributes as Column[T]
+# to mypy; this DAL intentionally mutates loaded ORM instances.
+# mypy: disable-error-code=assignment
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

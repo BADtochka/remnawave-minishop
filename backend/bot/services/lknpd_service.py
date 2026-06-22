@@ -23,7 +23,7 @@ class LknpdService:
             logging.warning("LKNPD credentials are missing. Receipt sending disabled.")
 
     async def _ensure_authenticated(self) -> bool:
-        if not self._client:
+        if not self._client or not self.inn or not self.password:
             return False
 
         async with self._auth_lock:

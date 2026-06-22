@@ -580,11 +580,7 @@ def get_payment_method_keyboard(
                     if hwid_renewal_selected
                     else "payment_hwid_renewal_toggle_off",
                     count=int(selected_hwid_quote.get("device_count") or 0),
-                    price=(
-                        hwid_renewal_quote.get("price")
-                        if hwid_renewal_quote
-                        else hwid_renewal_stars_quote.get("price")
-                    ),
+                    price=selected_hwid_quote.get("price"),
                     currency_symbol=currency_symbol_val,
                 ),
                 callback_data=":".join(toggle_tokens),

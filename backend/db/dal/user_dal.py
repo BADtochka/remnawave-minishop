@@ -1,3 +1,7 @@
+# SQLAlchemy legacy Column declarations expose instance attributes as Column[T]
+# to mypy; this DAL intentionally mutates loaded ORM instances.
+# mypy: disable-error-code="assignment,arg-type,operator"
+
 import logging
 import secrets
 import string
@@ -247,8 +251,10 @@ async def create_user(
     # Fetch the user (inserted just now or pre-existing)
     user_id: int = user_data["user_id"]
     user = await get_user_by_id(session, user_id)
+    if user is None:
+        raise RuntimeError(f"Failed to load user {user_id} after upsert.")
 
-    if created and user is not None:
+    if created:
         logging.info(
             f"New user {user.user_id} created in DAL. Referred by: {user.referred_by_id or 'N/A'}."
         )
@@ -272,7 +278,7 @@ async def create_user(
                     email=user_data.get("email"),
                 )
             )
-    elif user is not None:
+    else:
         logging.info(f"User {user.user_id} already exists in DAL. Proceeding without creation.")
 
     return user, created
