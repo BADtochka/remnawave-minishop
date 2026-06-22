@@ -10,7 +10,7 @@ type TicketViewOptions = { skipPush?: boolean };
 type LoadListOptions = { silent?: boolean };
 type TicketPatch = Record<string, unknown>;
 
-type SupportStats = {
+export type SupportStats = {
   active: number;
   closed: number;
   open: number;
@@ -18,7 +18,7 @@ type SupportStats = {
   total_unread_admin: number;
 };
 
-type SupportFilters = {
+export type SupportFilters = {
   status: string;
   priority: string;
   category: string;
@@ -26,7 +26,7 @@ type SupportFilters = {
   sort: string;
 };
 
-type SupportUser = Record<string, unknown> & {
+export type SupportUser = Record<string, unknown> & {
   email?: string;
   first_name?: string;
   last_name?: string;
@@ -34,14 +34,21 @@ type SupportUser = Record<string, unknown> & {
   username?: string;
 };
 
-type SupportTicket = Record<string, unknown> & {
+export type SupportTicket = Record<string, unknown> & {
+  subject?: string;
   status?: string;
   ticket_id?: number;
   unread_admin_count?: number;
   user?: SupportUser;
 };
 
-type SupportMessage = Record<string, unknown> & {
+export type SupportMessage = Record<string, unknown> & {
+  author_name?: string;
+  author_role?: string;
+  author_user_id?: number | string;
+  body?: string;
+  created_at?: string;
+  is_internal_note?: boolean;
   message_id?: number;
 };
 
@@ -66,7 +73,7 @@ type AdminSupportStoreOptions = {
   routePrefix?: string;
 };
 
-type AdminSupportStore = Pick<Writable<AdminSupportState>, "subscribe" | "update"> & {
+export type AdminSupportStore = Pick<Writable<AdminSupportState>, "subscribe" | "update"> & {
   setActive(section: string): void;
   loadStats(): Promise<void>;
   loadList(options?: LoadListOptions): Promise<void>;
