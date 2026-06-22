@@ -35,6 +35,17 @@ python_version = "3.12"
 ignore_missing_imports = true
 warn_unused_configs = true
 
+[tool.coverage.run]
+source = ["backend"]
+omit = [
+    "backend/scripts/import_legacy.py",
+    "scripts/import_legacy.py",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+
 [[tool.mypy.overrides]]
 module = "db.*"
 disallow_untyped_defs = true
