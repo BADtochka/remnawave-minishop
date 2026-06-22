@@ -32,6 +32,24 @@ def test_openapi_includes_typed_promos_contracts():
     assert "text/csv" in export_operation["responses"]["200"]["content"]
 
 
+def test_openapi_marks_user_session_security():
+    document = json.loads(DEFAULT_OUTPUT_PATH.read_text(encoding="utf-8"))
+    security_schemes = document["components"]["securitySchemes"]
+    assert security_schemes["UserSession"]["name"] == "rw_webapp_session"
+    assert security_schemes["UserBearer"]["scheme"] == "bearer"
+
+    user_security = [{"UserSession": []}, {"UserBearer": []}]
+    assert document["paths"]["/api/me"]["get"]["security"] == user_security
+    assert document["paths"]["/api/devices"]["get"]["security"] == user_security
+    assert document["paths"]["/api/subscription-guides"]["get"]["security"] == user_security
+
+    assert "security" not in document["paths"]["/api/bootstrap"]["get"]
+    assert "security" not in document["paths"]["/api/i18n"]["get"]
+    assert (
+        "security" not in document["paths"]["/api/subscription-guides/public/{share_token}"]["get"]
+    )
+
+
 def test_openapi_lists_every_live_api_route():
     document = json.loads(DEFAULT_OUTPUT_PATH.read_text(encoding="utf-8"))
     generated = generate_openapi()

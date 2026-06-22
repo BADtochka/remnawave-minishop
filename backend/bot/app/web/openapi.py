@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -20,73 +19,20 @@ from aiohttp import web
 from pydantic import BaseModel
 
 from bot.app.web import subscription_webapp
-from bot.app.web.admin_api_impl.schemas import PromoCreateBody, PromoOut, PromoUpdateBody
+from bot.app.web.route_contracts import (
+    ADMIN_SECURITY,
+    RouteContract,
+    get_contracts,
+    ok_envelope,
+    schema_ref,
+)
 from bot.plugins import WEB_SCOPE_WEBAPP, PluginContext, setup_web_plugins
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_OUTPUT_PATH = REPO_ROOT / "docs" / "openapi.json"
 
 _PATH_PARAM_RE = re.compile(r"{(?P<name>[^}:]+)(?::(?P<pattern>[^}]+))?}")
-
-
-@dataclass(frozen=True)
-class RouteContract:
-    request_model: type[BaseModel] | None = None
-    response_schema: dict[str, Any] | None = None
-    response_content_type: str = "application/json"
-    models: tuple[type[BaseModel], ...] = field(default_factory=tuple)
-
-
-def _schema_ref(model: type[BaseModel]) -> dict[str, str]:
-    return {"$ref": f"#/components/schemas/{model.__name__}"}
-
-
-def _ok_envelope(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
-    return {
-        "type": "object",
-        "additionalProperties": True,
-        "required": ["ok", *required],
-        "properties": {
-            "ok": {"type": "boolean", "const": True},
-            **properties,
-        },
-    }
-
-
-_GENERIC_JSON_RESPONSE = _ok_envelope({}, [])
-_PROMO_REF = _schema_ref(PromoOut)
-
-_ROUTE_CONTRACTS: dict[str, RouteContract] = {
-    "admin_promos_list_route": RouteContract(
-        response_schema=_ok_envelope(
-            {
-                "promos": {"type": "array", "items": _PROMO_REF},
-                "page": {"type": "integer", "minimum": 0},
-                "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
-                "total": {"type": "integer", "minimum": 0},
-            },
-            ["promos", "page", "page_size", "total"],
-        ),
-        models=(PromoOut,),
-    ),
-    "admin_promo_create_route": RouteContract(
-        request_model=PromoCreateBody,
-        response_schema=_ok_envelope({"promo": _PROMO_REF}, ["promo"]),
-        models=(PromoCreateBody, PromoOut),
-    ),
-    "admin_promo_update_route": RouteContract(
-        request_model=PromoUpdateBody,
-        response_schema=_ok_envelope({"promo": _PROMO_REF}, ["promo"]),
-        models=(PromoUpdateBody, PromoOut),
-    ),
-    "admin_promo_delete_route": RouteContract(
-        response_schema=_GENERIC_JSON_RESPONSE,
-    ),
-    "admin_payments_export_route": RouteContract(
-        response_schema={"type": "string", "contentMediaType": "text/csv"},
-        response_content_type="text/csv",
-    ),
-}
+_GENERIC_JSON_RESPONSE = ok_envelope({}, [])
 
 
 def _build_core_webapp() -> web.Application:
@@ -179,10 +125,14 @@ def _json_response(contract: RouteContract | None) -> dict[str, Any]:
     }
 
 
-def _operation_for_route(route: web.AbstractRoute, path: str) -> dict[str, Any]:
+def _operation_for_route(
+    route: web.AbstractRoute,
+    path: str,
+    contracts: dict[str, RouteContract],
+) -> dict[str, Any]:
     method = route.method.upper()
     handler_name = getattr(route.handler, "__name__", route.handler.__class__.__name__)
-    contract = _ROUTE_CONTRACTS.get(handler_name)
+    contract = contracts.get(handler_name)
     operation: dict[str, Any] = {
         "operationId": _operation_id(method, handler_name),
         "summary": _operation_summary(handler_name),
@@ -192,23 +142,34 @@ def _operation_for_route(route: web.AbstractRoute, path: str) -> dict[str, Any]:
     parameters = _path_parameters(path, route)
     if parameters:
         operation["parameters"] = parameters
-    if path.startswith("/api/admin/"):
-        operation["security"] = [{"AdminSession": []}, {"AdminBearer": []}]
-    if contract and contract.request_model is not None:
+    if contract is not None and contract.security is not None:
+        operation["security"] = contract.security
+    elif path.startswith("/api/admin/"):
+        operation["security"] = ADMIN_SECURITY
+    request_schema: dict[str, Any] | None = None
+    request_content_type = "application/json"
+    if contract is not None:
+        request_schema = (
+            schema_ref(contract.request_model)
+            if contract.request_model is not None
+            else contract.request_schema
+        )
+        request_content_type = contract.request_content_type
+    if request_schema is not None:
         operation["requestBody"] = {
             "required": True,
             "content": {
-                "application/json": {
-                    "schema": _schema_ref(contract.request_model),
+                request_content_type: {
+                    "schema": request_schema,
                 }
             },
         }
     return operation
 
 
-def _components() -> dict[str, Any]:
+def _components(contracts: dict[str, RouteContract]) -> dict[str, Any]:
     models: set[type[BaseModel]] = set()
-    for contract in _ROUTE_CONTRACTS.values():
+    for contract in contracts.values():
         if contract.request_model is not None:
             models.add(contract.request_model)
         models.update(contract.models)
@@ -229,12 +190,24 @@ def _components() -> dict[str, Any]:
                 "scheme": "bearer",
                 "description": "Authenticated admin bearer token.",
             },
+            "UserSession": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "rw_webapp_session",
+                "description": "Authenticated Mini App user session cookie.",
+            },
+            "UserBearer": {
+                "type": "http",
+                "scheme": "bearer",
+                "description": "Authenticated Mini App user bearer token.",
+            },
         },
     }
 
 
 def generate_openapi() -> dict[str, Any]:
     app = _build_core_webapp()
+    contracts = get_contracts()
     paths: dict[str, dict[str, Any]] = {}
     for route in app.router.routes():
         method = route.method.upper()
@@ -243,7 +216,7 @@ def generate_openapi() -> dict[str, Any]:
         path = _route_path(route)
         if not path.startswith("/api/"):
             continue
-        paths.setdefault(path, {})[method.lower()] = _operation_for_route(route, path)
+        paths.setdefault(path, {})[method.lower()] = _operation_for_route(route, path, contracts)
 
     return {
         "openapi": "3.1.0",
@@ -259,7 +232,7 @@ def generate_openapi() -> dict[str, Any]:
             "plugins": "core+builtin only",
         },
         "paths": {path: paths[path] for path in sorted(paths)},
-        "components": _components(),
+        "components": _components(contracts),
     }
 
 

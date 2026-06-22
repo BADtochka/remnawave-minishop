@@ -1,6 +1,44 @@
 # ruff: noqa: F401,F403,F405,I001
 from ._runtime import *  # noqa: F403,F405
 
+from bot.app.web.route_contracts import RouteContract, USER_SECURITY, register_contract
+
+
+_USER_AUTHENTICATED_ROUTE_HANDLERS = (
+    "me_route",
+    "subscription_guides_route",
+    "account_avatar_route",
+    "account_language_route",
+    "account_email_request_route",
+    "account_email_verify_route",
+    "account_password_request_route",
+    "account_password_confirm_route",
+    "account_telegram_link_route",
+    "account_telegram_notifications_probe_route",
+    "referral_welcome_bonus_claim_route",
+    "apply_promo_route",
+    "activate_trial_route",
+    "subscription_auto_renew_route",
+    "devices_route",
+    "disconnect_device_route",
+    "device_topup_options_route",
+    "support_tickets_route",
+    "support_create_ticket_route",
+    "support_ticket_detail_route",
+    "support_ticket_reply_route",
+    "support_ticket_read_route",
+    "support_unread_route",
+    "tariff_topup_options_route",
+    "tariff_change_options_route",
+    "tariff_change_route",
+    "tariff_change_payment_route",
+    "create_payment_route",
+    "payment_status_route",
+)
+
+for _handler_name in _USER_AUTHENTICATED_ROUTE_HANDLERS:
+    register_contract(_handler_name, RouteContract(security=USER_SECURITY))
+
 
 def setup_subscription_webapp_routes(app: web.Application) -> None:
     app.router.add_get("/robots.txt", robots_txt_route)

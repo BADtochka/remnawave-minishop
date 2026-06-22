@@ -4,6 +4,15 @@ from .auth import _require_admin_user_id
 from .common import _error, _ok, _serialize_log
 
 
+register_contract(
+    "admin_logs_route",
+    RouteContract(
+        response_schema=ok_envelope_for(AdminLogsListOut),
+        models=(AdminLogsListOut, LogOut),
+    ),
+)
+
+
 async def admin_logs_route(request: web.Request) -> web.Response:
     _require_admin_user_id(request)
     async_session_factory: sessionmaker = request.app["async_session_factory"]

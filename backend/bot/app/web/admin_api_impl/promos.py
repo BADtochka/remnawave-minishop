@@ -2,6 +2,44 @@
 from ._runtime import *  # noqa: F403,F405
 
 
+register_contract(
+    "admin_promos_list_route",
+    RouteContract(
+        response_schema=ok_envelope_for(
+            PromoOut,
+            key="promos",
+            many=True,
+            extra={
+                "page": {"type": "integer", "minimum": 0},
+                "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
+                "total": {"type": "integer", "minimum": 0},
+            },
+        ),
+        models=(PromoOut,),
+    ),
+)
+register_contract(
+    "admin_promo_create_route",
+    RouteContract(
+        request_model=PromoCreateBody,
+        response_schema=ok_envelope_for(PromoOut, key="promo"),
+        models=(PromoCreateBody, PromoOut),
+    ),
+)
+register_contract(
+    "admin_promo_update_route",
+    RouteContract(
+        request_model=PromoUpdateBody,
+        response_schema=ok_envelope_for(PromoOut, key="promo"),
+        models=(PromoUpdateBody, PromoOut),
+    ),
+)
+register_contract(
+    "admin_promo_delete_route",
+    RouteContract(response_schema=ok_envelope_for()),
+)
+
+
 async def admin_promos_list_route(request: web.Request) -> web.Response:
     _require_admin_user_id(request)
     async_session_factory: sessionmaker = request.app["async_session_factory"]

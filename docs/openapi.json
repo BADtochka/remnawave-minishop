@@ -1,6 +1,1533 @@
 {
   "components": {
     "schemas": {
+      "AdCreateBody": {
+        "properties": {
+          "cost": {
+            "default": 0.0,
+            "title": "Cost",
+            "type": "number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "start_param": {
+            "title": "Start Param",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "start_param"
+        ],
+        "title": "AdCreateBody",
+        "type": "object"
+      },
+      "AdOut": {
+        "properties": {
+          "cost": {
+            "title": "Cost",
+            "type": "number"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Created At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source"
+          },
+          "start_param": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Start Param"
+          },
+          "stats": {
+            "additionalProperties": true,
+            "title": "Stats",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "cost",
+          "is_active"
+        ],
+        "title": "AdOut",
+        "type": "object"
+      },
+      "AdToggleBody": {
+        "properties": {
+          "is_active": {
+            "default": true,
+            "title": "Is Active"
+          }
+        },
+        "title": "AdToggleBody",
+        "type": "object"
+      },
+      "AdminAdsListOut": {
+        "$defs": {
+          "AdOut": {
+            "properties": {
+              "cost": {
+                "title": "Cost",
+                "type": "number"
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Created At"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "is_active": {
+                "title": "Is Active",
+                "type": "boolean"
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Source"
+              },
+              "start_param": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Start Param"
+              },
+              "stats": {
+                "additionalProperties": true,
+                "title": "Stats",
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "cost",
+              "is_active"
+            ],
+            "title": "AdOut",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "campaigns": {
+            "items": {
+              "$ref": "#/components/schemas/AdOut"
+            },
+            "title": "Campaigns",
+            "type": "array"
+          },
+          "totals": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Totals",
+            "type": "object"
+          }
+        },
+        "required": [
+          "campaigns",
+          "totals"
+        ],
+        "title": "AdminAdsListOut",
+        "type": "object"
+      },
+      "AdminHealthOut": {
+        "properties": {
+          "alerts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Alerts",
+            "type": "array"
+          },
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alerts",
+          "checked_at"
+        ],
+        "title": "AdminHealthOut",
+        "type": "object"
+      },
+      "AdminLogsListOut": {
+        "$defs": {
+          "LogOut": {
+            "properties": {
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Content"
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Email"
+              },
+              "event_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Event Type"
+              },
+              "is_admin_event": {
+                "title": "Is Admin Event",
+                "type": "boolean"
+              },
+              "log_id": {
+                "title": "Log Id",
+                "type": "integer"
+              },
+              "target_user_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Target User Id"
+              },
+              "target_user_label": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Target User Label"
+              },
+              "telegram_first_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Telegram First Name"
+              },
+              "telegram_username": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Telegram Username"
+              },
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Timestamp"
+              },
+              "user_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "User Id"
+              },
+              "user_label": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "User Label"
+              }
+            },
+            "required": [
+              "log_id",
+              "is_admin_event"
+            ],
+            "title": "LogOut",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "logs": {
+            "items": {
+              "$ref": "#/components/schemas/LogOut"
+            },
+            "title": "Logs",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "logs",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "title": "AdminLogsListOut",
+        "type": "object"
+      },
+      "AdminMeOut": {
+        "properties": {
+          "admin_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Admin Ids",
+            "type": "array"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "admin_ids"
+        ],
+        "title": "AdminMeOut",
+        "type": "object"
+      },
+      "AdminPanelSyncOut": {
+        "properties": {
+          "details": {
+            "default": null,
+            "title": "Details"
+          },
+          "last_sync_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Sync Time"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subscriptions_synced": {
+            "title": "Subscriptions Synced",
+            "type": "integer"
+          },
+          "users_processed": {
+            "title": "Users Processed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "users_processed",
+          "subscriptions_synced"
+        ],
+        "title": "AdminPanelSyncOut",
+        "type": "object"
+      },
+      "AdminPaymentsListOut": {
+        "$defs": {
+          "PaymentOut": {
+            "properties": {
+              "amount": {
+                "title": "Amount",
+                "type": "number"
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Created At"
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Currency"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "payment_id": {
+                "title": "Payment Id",
+                "type": "integer"
+              },
+              "provider": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Provider"
+              },
+              "provider_payment_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Provider Payment Id"
+              },
+              "purchased_gb": {
+                "default": null,
+                "title": "Purchased Gb"
+              },
+              "purchased_hwid_devices": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Purchased Hwid Devices"
+              },
+              "sale_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sale Mode"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "subscription_duration_months": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subscription Duration Months"
+              },
+              "tariff_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Tariff Key"
+              },
+              "telegram_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Telegram Id"
+              },
+              "traffic_premium_gb": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Traffic Premium Gb"
+              },
+              "traffic_regular_gb": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Traffic Regular Gb"
+              },
+              "user_id": {
+                "title": "User Id",
+                "type": "integer"
+              },
+              "user_label": {
+                "title": "User Label",
+                "type": "string"
+              }
+            },
+            "required": [
+              "payment_id",
+              "user_id",
+              "user_label",
+              "amount"
+            ],
+            "title": "PaymentOut",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "payments": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentOut"
+            },
+            "title": "Payments",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "payments",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "title": "AdminPaymentsListOut",
+        "type": "object"
+      },
+      "AdminStatsOut": {
+        "$defs": {
+          "AdminPanelSyncOut": {
+            "properties": {
+              "details": {
+                "default": null,
+                "title": "Details"
+              },
+              "last_sync_time": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Last Sync Time"
+              },
+              "status": {
+                "title": "Status",
+                "type": "string"
+              },
+              "subscriptions_synced": {
+                "title": "Subscriptions Synced",
+                "type": "integer"
+              },
+              "users_processed": {
+                "title": "Users Processed",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "status",
+              "users_processed",
+              "subscriptions_synced"
+            ],
+            "title": "AdminPanelSyncOut",
+            "type": "object"
+          },
+          "PaymentOut": {
+            "properties": {
+              "amount": {
+                "title": "Amount",
+                "type": "number"
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Created At"
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Currency"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "payment_id": {
+                "title": "Payment Id",
+                "type": "integer"
+              },
+              "provider": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Provider"
+              },
+              "provider_payment_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Provider Payment Id"
+              },
+              "purchased_gb": {
+                "default": null,
+                "title": "Purchased Gb"
+              },
+              "purchased_hwid_devices": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Purchased Hwid Devices"
+              },
+              "sale_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sale Mode"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "subscription_duration_months": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subscription Duration Months"
+              },
+              "tariff_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Tariff Key"
+              },
+              "telegram_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Telegram Id"
+              },
+              "traffic_premium_gb": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Traffic Premium Gb"
+              },
+              "traffic_regular_gb": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Traffic Regular Gb"
+              },
+              "user_id": {
+                "title": "User Id",
+                "type": "integer"
+              },
+              "user_label": {
+                "title": "User Label",
+                "type": "string"
+              }
+            },
+            "required": [
+              "payment_id",
+              "user_id",
+              "user_label",
+              "amount"
+            ],
+            "title": "PaymentOut",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "currency_symbol": {
+            "title": "Currency Symbol",
+            "type": "string"
+          },
+          "financial": {
+            "additionalProperties": true,
+            "title": "Financial",
+            "type": "object"
+          },
+          "panel": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Panel"
+          },
+          "panel_sync": {
+            "$ref": "#/components/schemas/AdminPanelSyncOut"
+          },
+          "queue": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Queue"
+          },
+          "recent_payments": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentOut"
+            },
+            "title": "Recent Payments",
+            "type": "array"
+          },
+          "users": {
+            "additionalProperties": true,
+            "title": "Users",
+            "type": "object"
+          }
+        },
+        "required": [
+          "users",
+          "financial",
+          "panel_sync",
+          "recent_payments",
+          "currency_symbol"
+        ],
+        "title": "AdminStatsOut",
+        "type": "object"
+      },
+      "LogOut": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Content"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Email"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Event Type"
+          },
+          "is_admin_event": {
+            "title": "Is Admin Event",
+            "type": "boolean"
+          },
+          "log_id": {
+            "title": "Log Id",
+            "type": "integer"
+          },
+          "target_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target User Id"
+          },
+          "target_user_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target User Label"
+          },
+          "telegram_first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Telegram First Name"
+          },
+          "telegram_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Telegram Username"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Timestamp"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Id"
+          },
+          "user_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Label"
+          }
+        },
+        "required": [
+          "log_id",
+          "is_admin_event"
+        ],
+        "title": "LogOut",
+        "type": "object"
+      },
+      "PaymentDetailOut": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Created At"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Currency"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "idempotence_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Idempotence Key"
+          },
+          "payment_id": {
+            "title": "Payment Id",
+            "type": "integer"
+          },
+          "promo_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Promo Code"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider"
+          },
+          "provider_payment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider Payment Id"
+          },
+          "purchased_gb": {
+            "default": null,
+            "title": "Purchased Gb"
+          },
+          "purchased_hwid_devices": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Purchased Hwid Devices"
+          },
+          "sale_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sale Mode"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "subscription_duration_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subscription Duration Months"
+          },
+          "tariff_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tariff Key"
+          },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Telegram Id"
+          },
+          "traffic_premium_gb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Traffic Premium Gb"
+          },
+          "traffic_regular_gb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Traffic Regular Gb"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Updated At"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "user_label": {
+            "title": "User Label",
+            "type": "string"
+          },
+          "yookassa_payment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Yookassa Payment Id"
+          }
+        },
+        "required": [
+          "payment_id",
+          "user_id",
+          "user_label",
+          "amount"
+        ],
+        "title": "PaymentDetailOut",
+        "type": "object"
+      },
+      "PaymentOut": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Created At"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Currency"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "payment_id": {
+            "title": "Payment Id",
+            "type": "integer"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider"
+          },
+          "provider_payment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider Payment Id"
+          },
+          "purchased_gb": {
+            "default": null,
+            "title": "Purchased Gb"
+          },
+          "purchased_hwid_devices": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Purchased Hwid Devices"
+          },
+          "sale_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sale Mode"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "subscription_duration_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subscription Duration Months"
+          },
+          "tariff_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tariff Key"
+          },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Telegram Id"
+          },
+          "traffic_premium_gb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Traffic Premium Gb"
+          },
+          "traffic_regular_gb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Traffic Regular Gb"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "user_label": {
+            "title": "User Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payment_id",
+          "user_id",
+          "user_label",
+          "amount"
+        ],
+        "title": "PaymentOut",
+        "type": "object"
+      },
       "PromoCreateBody": {
         "properties": {
           "bonus_days": {
@@ -154,6 +1681,17 @@
         "in": "cookie",
         "name": "rw_webapp_session",
         "type": "apiKey"
+      },
+      "UserBearer": {
+        "description": "Authenticated Mini App user bearer token.",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "UserSession": {
+        "description": "Authenticated Mini App user session cookie.",
+        "in": "cookie",
+        "name": "rw_webapp_session",
+        "type": "apiKey"
       }
     }
   },
@@ -189,6 +1727,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Account Avatar",
         "tags": [
           "account"
@@ -220,6 +1766,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Account Email Request",
         "tags": [
           "account"
@@ -251,6 +1805,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Account Email Verify",
         "tags": [
           "account"
@@ -282,6 +1844,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Account Language",
         "tags": [
           "account"
@@ -313,6 +1883,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Account Password Confirm",
         "tags": [
           "account"
@@ -344,6 +1922,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Account Password Request",
         "tags": [
           "account"
@@ -375,6 +1961,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Account Telegram Link",
         "tags": [
           "account"
@@ -406,6 +2000,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Account Telegram Notifications Probe",
         "tags": [
           "account"
@@ -420,17 +2022,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "properties": {
-                    "ok": {
-                      "const": true,
-                      "type": "boolean"
+                  "allOf": [
+                    {
+                      "additionalProperties": true,
+                      "properties": {
+                        "ok": {
+                          "const": true,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AdminAdsListOut"
                     }
-                  },
-                  "required": [
-                    "ok"
-                  ],
-                  "type": "object"
+                  ]
                 }
               }
             },
@@ -452,6 +2061,16 @@
       },
       "post": {
         "operationId": "post_admin_ad_create_route",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdCreateBody"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -459,13 +2078,17 @@
                 "schema": {
                   "additionalProperties": true,
                   "properties": {
+                    "campaign": {
+                      "$ref": "#/components/schemas/AdOut"
+                    },
                     "ok": {
                       "const": true,
                       "type": "boolean"
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "campaign"
                   ],
                   "type": "object"
                 }
@@ -550,6 +2173,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdToggleBody"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -906,17 +2539,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "properties": {
-                    "ok": {
-                      "const": true,
-                      "type": "boolean"
+                  "allOf": [
+                    {
+                      "additionalProperties": true,
+                      "properties": {
+                        "ok": {
+                          "const": true,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AdminHealthOut"
                     }
-                  },
-                  "required": [
-                    "ok"
-                  ],
-                  "type": "object"
+                  ]
                 }
               }
             },
@@ -945,17 +2585,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "properties": {
-                    "ok": {
-                      "const": true,
-                      "type": "boolean"
+                  "allOf": [
+                    {
+                      "additionalProperties": true,
+                      "properties": {
+                        "ok": {
+                          "const": true,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AdminLogsListOut"
                     }
-                  },
-                  "required": [
-                    "ok"
-                  ],
-                  "type": "object"
+                  ]
                 }
               }
             },
@@ -984,17 +2631,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "properties": {
-                    "ok": {
-                      "const": true,
-                      "type": "boolean"
+                  "allOf": [
+                    {
+                      "additionalProperties": true,
+                      "properties": {
+                        "ok": {
+                          "const": true,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AdminMeOut"
                     }
-                  },
-                  "required": [
-                    "ok"
-                  ],
-                  "type": "object"
+                  ]
                 }
               }
             },
@@ -1062,17 +2716,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "properties": {
-                    "ok": {
-                      "const": true,
-                      "type": "boolean"
+                  "allOf": [
+                    {
+                      "additionalProperties": true,
+                      "properties": {
+                        "ok": {
+                          "const": true,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AdminPaymentsListOut"
                     }
-                  },
-                  "required": [
-                    "ok"
-                  ],
-                  "type": "object"
+                  ]
                 }
               }
             },
@@ -1146,10 +2807,14 @@
                     "ok": {
                       "const": true,
                       "type": "boolean"
+                    },
+                    "payment": {
+                      "$ref": "#/components/schemas/PaymentDetailOut"
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "payment"
                   ],
                   "type": "object"
                 }
@@ -1479,17 +3144,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "properties": {
-                    "ok": {
-                      "const": true,
-                      "type": "boolean"
+                  "allOf": [
+                    {
+                      "additionalProperties": true,
+                      "properties": {
+                        "ok": {
+                          "const": true,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AdminStatsOut"
                     }
-                  },
-                  "required": [
-                    "ok"
-                  ],
-                  "type": "object"
+                  ]
                 }
               }
             },
@@ -3094,6 +4766,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Devices",
         "tags": [
           "devices"
@@ -3125,6 +4805,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Disconnect Device",
         "tags": [
           "devices"
@@ -3156,6 +4844,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Device Topup Options",
         "tags": [
           "devices"
@@ -3218,6 +4914,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Me",
         "tags": [
           "me"
@@ -3249,6 +4953,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Create Payment",
         "tags": [
           "payments"
@@ -3291,6 +5003,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Payment Status",
         "tags": [
           "payments"
@@ -3322,6 +5042,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Apply Promo",
         "tags": [
           "promo"
@@ -3353,6 +5081,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Referral Welcome Bonus Claim",
         "tags": [
           "referral"
@@ -3384,6 +5120,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Subscription Guides",
         "tags": [
           "subscription-guides"
@@ -3457,6 +5201,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Subscription Auto Renew",
         "tags": [
           "subscription"
@@ -3488,6 +5240,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Support Tickets",
         "tags": [
           "support"
@@ -3517,6 +5277,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Support Create Ticket",
         "tags": [
           "support"
@@ -3558,6 +5326,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Support Ticket Detail",
         "tags": [
           "support"
@@ -3599,6 +5375,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Support Ticket Reply",
         "tags": [
           "support"
@@ -3640,6 +5424,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Support Ticket Read",
         "tags": [
           "support"
@@ -3671,6 +5463,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Support Unread",
         "tags": [
           "support"
@@ -3702,6 +5502,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Tariff Change",
         "tags": [
           "tariffs"
@@ -3733,6 +5541,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Tariff Change Options",
         "tags": [
           "tariffs"
@@ -3764,6 +5580,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Tariff Change Payment",
         "tags": [
           "tariffs"
@@ -3795,6 +5619,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Tariff Topup Options",
         "tags": [
           "tariffs"
@@ -3826,6 +5658,14 @@
             "description": "JSON response"
           }
         },
+        "security": [
+          {
+            "UserSession": []
+          },
+          {
+            "UserBearer": []
+          }
+        ],
         "summary": "Activate Trial",
         "tags": [
           "trial"

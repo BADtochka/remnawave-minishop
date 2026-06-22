@@ -2,6 +2,35 @@
 from ._runtime import *  # noqa: F403,F405
 
 
+register_contract(
+    "admin_ads_list_route",
+    RouteContract(
+        response_schema=ok_envelope_for(AdminAdsListOut),
+        models=(AdminAdsListOut, AdOut),
+    ),
+)
+register_contract(
+    "admin_ad_create_route",
+    RouteContract(
+        request_model=AdCreateBody,
+        response_schema=ok_envelope_for(AdOut, key="campaign"),
+        models=(AdCreateBody, AdOut),
+    ),
+)
+register_contract(
+    "admin_ad_toggle_route",
+    RouteContract(
+        request_model=AdToggleBody,
+        response_schema=ok_envelope_for(),
+        models=(AdToggleBody,),
+    ),
+)
+register_contract(
+    "admin_ad_delete_route",
+    RouteContract(response_schema=ok_envelope_for()),
+)
+
+
 async def admin_ads_list_route(request: web.Request) -> web.Response:
     _require_admin_user_id(request)
     async_session_factory: sessionmaker = request.app["async_session_factory"]
@@ -14,18 +43,18 @@ async def admin_ads_list_route(request: web.Request) -> web.Response:
                 stats = await ad_dal.get_campaign_stats(session, campaign.ad_campaign_id)
             except Exception:
                 stats = {}
-            results.append(_serialize_ad(campaign, stats))
+            results.append(AdOut.from_orm_ad(campaign, stats).model_dump(mode="json"))
     return _ok({"campaigns": results, "totals": totals})
 
 
 async def admin_ad_create_route(request: web.Request) -> web.Response:
     _require_admin_user_id(request)
-    payload = await _read_json(request)
-    source = str(payload.get("source") or "").strip()
-    start_param = str(payload.get("start_param") or "").strip()
-    cost = float(payload.get("cost") or 0.0)
-    if not source or not start_param:
-        return _error(400, "invalid_payload")
+    body, error = await parse_body(request, AdCreateBody)
+    if error:
+        return error
+    source = body.source
+    start_param = body.start_param
+    cost = body.cost
 
     async_session_factory: sessionmaker = request.app["async_session_factory"]
     async with async_session_factory() as session:
@@ -40,14 +69,16 @@ async def admin_ad_create_route(request: web.Request) -> web.Response:
         )
         await session.commit()
         await session.refresh(campaign)
-    return _ok({"campaign": _serialize_ad(campaign)})
+    return _ok({"campaign": AdOut.from_orm_ad(campaign).model_dump(mode="json")})
 
 
 async def admin_ad_toggle_route(request: web.Request) -> web.Response:
     _require_admin_user_id(request)
     campaign_id = int(request.match_info["campaign_id"])
-    payload = await _read_json(request)
-    is_active = bool(payload.get("is_active", True))
+    body, error = await parse_body(request, AdToggleBody)
+    if error:
+        return error
+    is_active = bool(body.is_active)
     async_session_factory: sessionmaker = request.app["async_session_factory"]
     async with async_session_factory() as session:
         ok = await ad_dal.toggle_campaign_active(session, campaign_id, is_active)

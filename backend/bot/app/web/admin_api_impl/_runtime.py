@@ -59,8 +59,29 @@ from db.models import (
     UserTelegramAvatar,
 )
 
+from bot.app.web.route_contracts import RouteContract, ok_envelope_for, register_contract
+
 from .request_parsing import parse_body
-from .schemas import HttpBodyModel, HttpResponseModel, PromoCreateBody, PromoOut, PromoUpdateBody
+from .schemas import (
+    AdCreateBody,
+    AdOut,
+    AdToggleBody,
+    AdminAdsListOut,
+    AdminHealthOut,
+    AdminLogsListOut,
+    AdminMeOut,
+    AdminPanelSyncOut,
+    AdminPaymentsListOut,
+    AdminStatsOut,
+    HttpBodyModel,
+    HttpResponseModel,
+    LogOut,
+    PaymentDetailOut,
+    PaymentOut,
+    PromoCreateBody,
+    PromoOut,
+    PromoUpdateBody,
+)
 
 logger = logging.getLogger(__name__)
 

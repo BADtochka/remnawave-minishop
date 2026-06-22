@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from bot.infra import events
+from bot.infra import event_payloads, events
 from bot.infra.event_payloads import (
     AccountEmailLinkedPayload,
     AccountMergedPayload,
@@ -47,6 +47,25 @@ UTC_TEXT = "2026-01-02T03:04:05+00:00"
 )
 def test_event_payload_names_match_bus_constants(model_cls, event_name):
     assert model_cls.EVENT_NAME == event_name
+
+
+def test_every_event_constant_has_exactly_one_payload_model():
+    event_names = {
+        value for name, value in vars(events).items() if name.isupper() and isinstance(value, str)
+    }
+    model_event_names = [
+        model.EVENT_NAME
+        for model in vars(event_payloads).values()
+        if isinstance(model, type)
+        and issubclass(model, event_payloads.EventPayload)
+        and model is not event_payloads.EventPayload
+    ]
+
+    duplicate_model_names = {
+        event_name for event_name in model_event_names if model_event_names.count(event_name) > 1
+    }
+    assert duplicate_model_names == set()
+    assert set(model_event_names) == event_names
 
 
 def test_emit_model_preserves_public_subscriber_signature():
