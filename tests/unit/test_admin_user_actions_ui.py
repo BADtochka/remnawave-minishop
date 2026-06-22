@@ -7,7 +7,7 @@ USER_DETAIL = REPO_ROOT / "frontend/src/admin/sections/UserDetailModal.svelte"
 STATS_SECTION = REPO_ROOT / "frontend/src/admin/sections/StatsSection.svelte"
 ADMIN_PANEL = REPO_ROOT / "frontend/src/admin/AdminPanel.svelte"
 ADMIN_CSS = REPO_ROOT / "frontend/src/styles/admin.css"
-USERS_STORE = REPO_ROOT / "frontend/src/lib/admin/stores/usersStore.js"
+USERS_STORE = REPO_ROOT / "frontend/src/lib/admin/stores/usersStore.ts"
 
 
 def _source() -> str:
