@@ -12,13 +12,13 @@ from urllib.request import urlopen
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import SettingsConfigDict
 
-from .base import (
+from ..base import (
     ProviderEnvConfig,
     normalize_payment_currency_code,
     parse_supported_currency_codes,
     provider_env_file,
 )
-from .shared import (
+from ..shared import (
     format_decimal_amount,
 )
 

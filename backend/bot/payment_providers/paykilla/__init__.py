@@ -13,30 +13,13 @@ from config.tariffs_config import (
 )
 from db.dal import payment_dal
 
-from .base import (
+from ..base import (
     PaymentProviderSpec,
     ProviderManifestField,
     ServiceFactoryContext,
     WebAppPaymentContext,
 )
-from .paykilla_core import (
-    PAYKILLA_DEFAULT_EXCHANGE_RATE_URL,
-    PAYKILLA_DEFAULT_INVOICE_CURRENCIES,
-    PAYKILLA_DEFAULT_MIN_PAYMENT_AMOUNT,
-    PAYKILLA_DEFAULT_MIN_PAYMENT_CURRENCY,
-    PAYKILLA_DEFAULT_PAYMENT_CURRENCIES,
-    PAYKILLA_DEFAULT_SUPPORTED_CURRENCIES,
-    PaykillaConfig,
-    PaykillaPresentation,
-    _clean_paykilla_text,
-    _paykilla_payment_amount_supported,
-    _paykilla_payment_minimum_metadata,
-    _sign_query,
-    _webhook_signature,
-)
-from .paykilla_service import PaykillaService
-from .paykilla_webhook import paykilla_webhook_route
-from .shared import (
+from ..shared import (
     build_payment_record_payload,
     create_webapp_payment_record,
     describe_payment,
@@ -52,6 +35,23 @@ from .shared import (
     quote_hwid_callback_parts,
     render_link_or_fail,
 )
+from .config import (
+    PAYKILLA_DEFAULT_EXCHANGE_RATE_URL,
+    PAYKILLA_DEFAULT_INVOICE_CURRENCIES,
+    PAYKILLA_DEFAULT_MIN_PAYMENT_AMOUNT,
+    PAYKILLA_DEFAULT_MIN_PAYMENT_CURRENCY,
+    PAYKILLA_DEFAULT_PAYMENT_CURRENCIES,
+    PAYKILLA_DEFAULT_SUPPORTED_CURRENCIES,
+    PaykillaConfig,
+    PaykillaPresentation,
+    _clean_paykilla_text,
+    _paykilla_payment_amount_supported,
+    _paykilla_payment_minimum_metadata,
+    _sign_query,
+    _webhook_signature,
+)
+from .service import PaykillaService
+from .webhook import paykilla_webhook_route
 
 router = Router(name="user_subscription_payments_paykilla_router")
 _LOG = "paykilla"

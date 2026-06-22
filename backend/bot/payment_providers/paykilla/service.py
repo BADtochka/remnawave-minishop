@@ -17,12 +17,24 @@ from bot.utils.request_security import ip_in_allowlist, request_client_ip
 from config.settings import Settings
 from db.dal import payment_dal
 
-from .base import (
+from ..base import (
     normalize_payment_currency_code,
     parse_supported_currency_codes,
     provider_runtime_enabled,
 )
-from .paykilla_core import (
+from ..shared import (
+    PAYMENT_STATUS_PENDING_FINALIZATION,
+    HttpClientMixin,
+    PaymentSuccessRequest,
+    decimal_amounts_equal,
+    finalize_successful_payment,
+    first_value,
+    format_decimal_amount,
+    lookup_payment_by_order_or_provider_id,
+    notify_user_payment_failed,
+    payment_units_for_activation,
+)
+from .config import (
     _FAILED_EVENTS,
     _SUCCESS_EVENTS,
     PaykillaConfig,
@@ -39,18 +51,6 @@ from .paykilla_core import (
     _signature_preview,
     _target_invoice_currency,
     _webhook_signature,
-)
-from .shared import (
-    PAYMENT_STATUS_PENDING_FINALIZATION,
-    HttpClientMixin,
-    PaymentSuccessRequest,
-    decimal_amounts_equal,
-    finalize_successful_payment,
-    first_value,
-    format_decimal_amount,
-    lookup_payment_by_order_or_provider_id,
-    notify_user_payment_failed,
-    payment_units_for_activation,
 )
 
 
