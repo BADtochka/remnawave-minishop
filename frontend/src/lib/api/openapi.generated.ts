@@ -2922,11 +2922,11 @@ export interface operations {
         content: {
           "application/json": {
             already_linked?: boolean;
+            code?: string;
+            email_code?: string;
             /** @constant */
             ok: true;
             retry_after?: number | null;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -2955,12 +2955,11 @@ export interface operations {
             account_merge?: {
               [key: string]: unknown;
             };
+            csrf_token?: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
             user_id?: number | null;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -2989,8 +2988,6 @@ export interface operations {
             language: string;
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3019,8 +3016,6 @@ export interface operations {
             /** @constant */
             ok: true;
             password_auth_enabled: boolean;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3045,8 +3040,6 @@ export interface operations {
             /** @constant */
             ok: true;
             retry_after?: number | null;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3075,12 +3068,11 @@ export interface operations {
             account_merge?: {
               [key: string]: unknown;
             };
+            csrf_token?: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
             user_id?: number | null;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3107,8 +3099,6 @@ export interface operations {
             telegram_notifications: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3129,13 +3119,10 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": ({
+          "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
-          }) &
-            components["schemas"]["AdminAdsListOut"];
+          } & components["schemas"]["AdminAdsListOut"];
         };
       };
     };
@@ -3163,8 +3150,6 @@ export interface operations {
             campaign: components["schemas"]["AdOut"];
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3190,8 +3175,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3221,8 +3204,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3260,8 +3241,6 @@ export interface operations {
             /** @constant */
             ok: true;
             persisted: boolean;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3300,8 +3279,6 @@ export interface operations {
             /** @constant */
             ok: true;
             persisted: boolean;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3329,8 +3306,6 @@ export interface operations {
             backup_dir: string;
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3360,8 +3335,6 @@ export interface operations {
             result: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3392,8 +3365,6 @@ export interface operations {
             result: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3427,8 +3398,6 @@ export interface operations {
             };
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3459,8 +3428,6 @@ export interface operations {
             ok: true;
             queued: number;
             target: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3487,8 +3454,6 @@ export interface operations {
             };
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3509,13 +3474,10 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": ({
+          "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
-          }) &
-            components["schemas"]["AdminHealthOut"];
+          } & components["schemas"]["AdminHealthOut"];
         };
       };
     };
@@ -3535,13 +3497,10 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": ({
+          "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
-          }) &
-            components["schemas"]["AdminLogsListOut"];
+          } & components["schemas"]["AdminLogsListOut"];
         };
       };
     };
@@ -3561,13 +3520,10 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": ({
+          "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
-          }) &
-            components["schemas"]["AdminMeOut"];
+          } & components["schemas"]["AdminMeOut"];
         };
       };
     };
@@ -3593,8 +3549,6 @@ export interface operations {
             squads: {
               [key: string]: unknown;
             }[];
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3615,13 +3569,10 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": ({
+          "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
-          }) &
-            components["schemas"]["AdminPaymentsListOut"];
+          } & components["schemas"]["AdminPaymentsListOut"];
         };
       };
     };
@@ -3667,8 +3618,6 @@ export interface operations {
             /** @constant */
             ok: true;
             payment: components["schemas"]["PaymentDetailOut"];
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3696,8 +3645,6 @@ export interface operations {
             page_size: number;
             promos: components["schemas"]["PromoOut"][];
             total: number;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3726,8 +3673,6 @@ export interface operations {
             /** @constant */
             ok: true;
             promo: components["schemas"]["PromoOut"];
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3753,8 +3698,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3785,8 +3728,6 @@ export interface operations {
             /** @constant */
             ok: true;
             promo: components["schemas"]["PromoOut"];
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3814,8 +3755,6 @@ export interface operations {
             sections: {
               [key: string]: unknown;
             }[];
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3845,8 +3784,6 @@ export interface operations {
             /** @constant */
             ok: true;
             reverted: number;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3867,13 +3804,10 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": ({
+          "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
-          }) &
-            components["schemas"]["AdminStatsOut"];
+          } & components["schemas"]["AdminStatsOut"];
         };
       };
     };
@@ -3899,8 +3833,6 @@ export interface operations {
             stats: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3927,8 +3859,6 @@ export interface operations {
             tickets: {
               [key: string]: unknown;
             }[];
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3963,8 +3893,6 @@ export interface operations {
             user_snapshot: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -3997,8 +3925,6 @@ export interface operations {
             ticket: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4034,8 +3960,6 @@ export interface operations {
             ticket: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4061,8 +3985,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4089,8 +4011,6 @@ export interface operations {
             result: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4122,8 +4042,6 @@ export interface operations {
             provider_currency_support: {
               [key: string]: unknown;
             }[];
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4159,8 +4077,6 @@ export interface operations {
             provider_currency_support: {
               [key: string]: unknown;
             }[];
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4189,8 +4105,6 @@ export interface operations {
             /** @constant */
             ok: true;
             themes_dir: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4223,8 +4137,6 @@ export interface operations {
             /** @constant */
             ok: true;
             themes_dir: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4256,8 +4168,6 @@ export interface operations {
             ok: true;
             override_count: number;
             path: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4288,8 +4198,6 @@ export interface operations {
             /** @constant */
             ok: true;
             reverted: number;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4319,8 +4227,6 @@ export interface operations {
             users: {
               [key: string]: unknown;
             }[];
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4369,8 +4275,6 @@ export interface operations {
               [key: string]: unknown;
             };
             vpn_connection_status: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4396,8 +4300,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4452,8 +4354,6 @@ export interface operations {
             user: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4486,8 +4386,6 @@ export interface operations {
             subscription?: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4520,8 +4418,6 @@ export interface operations {
             subscription?: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4551,8 +4447,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4582,8 +4476,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4616,8 +4508,6 @@ export interface operations {
             subscription?: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4655,8 +4545,6 @@ export interface operations {
             user: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4689,8 +4577,6 @@ export interface operations {
             subscription?: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4716,8 +4602,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4750,8 +4634,6 @@ export interface operations {
             subscription?: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4778,8 +4660,6 @@ export interface operations {
             /** @constant */
             ok: true;
             queued: boolean;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4815,8 +4695,6 @@ export interface operations {
             subscription?: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4845,12 +4723,11 @@ export interface operations {
             account_merge?: {
               [key: string]: unknown;
             };
+            csrf_token?: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
             user_id?: number | null;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4879,12 +4756,11 @@ export interface operations {
             account_merge?: {
               [key: string]: unknown;
             };
+            csrf_token?: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
             user_id?: number | null;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4910,11 +4786,11 @@ export interface operations {
         };
         content: {
           "application/json": {
+            code?: string;
+            email_code?: string;
             /** @constant */
             ok: true;
             retry_after?: number | null;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4943,12 +4819,11 @@ export interface operations {
             account_merge?: {
               [key: string]: unknown;
             };
+            csrf_token?: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
             user_id?: number | null;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -4972,8 +4847,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5000,8 +4873,6 @@ export interface operations {
             /** @constant */
             ok: true;
             request_access: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5030,12 +4901,11 @@ export interface operations {
             account_merge?: {
               [key: string]: unknown;
             };
+            csrf_token?: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
             user_id?: number | null;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5065,8 +4935,6 @@ export interface operations {
             };
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5096,8 +4964,6 @@ export interface operations {
             subscription?: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5125,8 +4991,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5155,8 +5019,6 @@ export interface operations {
             }[];
             tariff_key?: string;
             tariff_name?: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5184,8 +5046,6 @@ export interface operations {
             /** @constant */
             ok: true;
             scope: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5209,8 +5069,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5246,8 +5104,6 @@ export interface operations {
             payment_id?: number;
             payment_url?: string | null;
             status?: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5281,8 +5137,6 @@ export interface operations {
             payment_id?: number;
             payment_url?: string | null;
             status?: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5312,8 +5166,6 @@ export interface operations {
             end_date_text?: string | null;
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5340,8 +5192,6 @@ export interface operations {
             end_date_text: string | null;
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5370,8 +5220,6 @@ export interface operations {
             /** @constant */
             ok: true;
             source?: string | null;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5405,8 +5253,6 @@ export interface operations {
             subscription?: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5437,8 +5283,6 @@ export interface operations {
             ok: true;
             provider: string;
             provider_label: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5460,13 +5304,14 @@ export interface operations {
         };
         content: {
           "application/json": {
+            counts: {
+              [key: string]: unknown;
+            };
             /** @constant */
             ok: true;
             tickets: {
               [key: string]: unknown;
             }[];
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5497,8 +5342,6 @@ export interface operations {
             ticket: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5522,13 +5365,14 @@ export interface operations {
         };
         content: {
           "application/json": {
+            messages: {
+              [key: string]: unknown;
+            }[];
             /** @constant */
             ok: true;
             ticket: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5556,13 +5400,14 @@ export interface operations {
         };
         content: {
           "application/json": {
+            message: {
+              [key: string]: unknown;
+            };
             /** @constant */
             ok: true;
             ticket: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5588,8 +5433,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5614,8 +5457,6 @@ export interface operations {
             /** @constant */
             ok: true;
             unread: number;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5646,8 +5487,6 @@ export interface operations {
             subscription?: {
               [key: string]: unknown;
             };
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5677,8 +5516,6 @@ export interface operations {
             targets: {
               [key: string]: unknown;
             }[];
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5714,8 +5551,6 @@ export interface operations {
             payment_id?: number;
             payment_url?: string | null;
             status?: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5744,8 +5579,6 @@ export interface operations {
             }[];
             tariff_key?: string;
             tariff_name?: string;
-          } & {
-            [key: string]: unknown;
           };
         };
       };
@@ -5776,8 +5609,6 @@ export interface operations {
             /** @constant */
             ok: true;
             traffic_gb: number | null;
-          } & {
-            [key: string]: unknown;
           };
         };
       };

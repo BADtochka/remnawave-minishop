@@ -24,7 +24,7 @@ JSON_ARRAY_SCHEMA: dict[str, Any] = {
 BINARY_RESPONSE_SCHEMA: dict[str, str] = {"type": "string", "format": "binary"}
 GENERIC_OK_RESPONSE: dict[str, Any] = {
     "type": "object",
-    "additionalProperties": True,
+    "additionalProperties": False,
     "required": ["ok"],
     "properties": {
         "ok": {"type": "boolean", "const": True},
@@ -68,7 +68,7 @@ def schema_ref(model: type[BaseModel]) -> dict[str, str]:
 def ok_envelope(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
     return {
         "type": "object",
-        "additionalProperties": True,
+        "additionalProperties": False,
         "required": ["ok", *required],
         "properties": {
             "ok": {"type": "boolean", "const": True},

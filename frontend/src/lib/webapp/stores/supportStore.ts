@@ -3,6 +3,7 @@ import { withRoutePrefix } from "../routes.js";
 import type {
   ApiClient,
   PostPayload,
+  SupportTicketCreateResponse,
   SupportTicketDetailResponse,
   SupportTicketReadResponse,
   SupportTicketReplyResponse,
@@ -142,11 +143,20 @@ export function createSupportStore({
   let unreadPromise: Promise<unknown> | null = null;
 
   function fetchTicketList(path: string): Promise<SupportTicketsResponse> {
-    return api(path as "/support/tickets");
+    return api(path as "/support/tickets") as Promise<SupportTicketsResponse>;
   }
 
   function fetchTicketDetail(id: number): Promise<SupportTicketDetailResponse> {
     return api(`/support/tickets/${id}` as "/support/tickets/{id}");
+  }
+
+  function postCreateTicket(
+    payload: PostPayload<"/api/support/tickets">
+  ): Promise<SupportTicketCreateResponse> {
+    return api("/support/tickets", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }) as Promise<SupportTicketCreateResponse>;
   }
 
   function postTicketReply(
@@ -295,10 +305,7 @@ export function createSupportStore({
   async function createTicket(payload: PostPayload<"/api/support/tickets">) {
     state.update((s) => ({ ...s, creating: true }));
     try {
-      const res = await api("/support/tickets", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      const res = await postCreateTicket(payload);
       if (!res?.ok) throw res;
       const responsePayload = unwrap(res);
       const ticket = asRecord(responsePayload.ticket) as TicketRecord;

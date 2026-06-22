@@ -23,11 +23,12 @@ export type ApiResponse<Path extends string> =
   | JsonResponse<OperationFor<Path, "put">>
   | JsonResponse<OperationFor<Path, "patch">>
   | JsonResponse<OperationFor<Path, "delete">>;
+export type GetResponse<Path extends string> = JsonResponse<OperationFor<Path, "get">>;
 export type PostPayload<Path extends string> = JsonRequestBody<OperationFor<Path, "post">>;
 export type PostResponse<Path extends string> = JsonResponse<OperationFor<Path, "post">>;
 
-export type BootstrapResponse = ApiResponse<"/api/bootstrap">;
-export type MeResponse = ApiResponse<"/api/me">;
+export type BootstrapResponse = GetResponse<"/api/bootstrap">;
+export type MeResponse = GetResponse<"/api/me">;
 export type AccountEmailRequestResponse = PostResponse<"/api/account/email/request">;
 export type AccountEmailVerifyResponse = PostResponse<"/api/account/email/verify">;
 export type AccountLanguageResponse = PostResponse<"/api/account/language">;
@@ -40,26 +41,27 @@ export type AuthEmailRequestResponse = PostResponse<"/api/auth/email/request">;
 export type AuthEmailVerifyResponse = PostResponse<"/api/auth/email/verify">;
 export type AuthLogoutResponse = PostResponse<"/api/auth/logout">;
 export type AuthTokenResponse = PostResponse<"/api/auth/token">;
-export type DevicesResponse = ApiResponse<"/api/devices">;
+export type DevicesResponse = GetResponse<"/api/devices">;
 export type DevicesDisconnectResponse = PostResponse<"/api/devices/disconnect">;
-export type DeviceTopupOptionsResponse = ApiResponse<"/api/devices/topup-options">;
+export type DeviceTopupOptionsResponse = GetResponse<"/api/devices/topup-options">;
 export type PaymentCreateResponse = PostResponse<"/api/payments">;
-export type PaymentStatusResponse = ApiResponse<"/api/payments/{payment_id}">;
+export type PaymentStatusResponse = GetResponse<"/api/payments/{payment_id}">;
 export type PromoApplyResponse = PostResponse<"/api/promo/apply">;
 export type ReferralWelcomeBonusResponse = PostResponse<"/api/referral/welcome-bonus/claim">;
-export type SubscriptionGuidesResponse = ApiResponse<"/api/subscription-guides">;
+export type SubscriptionGuidesResponse = GetResponse<"/api/subscription-guides">;
 export type PublicSubscriptionGuidesResponse =
-  ApiResponse<"/api/subscription-guides/public/{share_token}">;
+  GetResponse<"/api/subscription-guides/public/{share_token}">;
 export type SubscriptionAutoRenewResponse = PostResponse<"/api/subscription/auto-renew">;
-export type SupportTicketsResponse = ApiResponse<"/api/support/tickets">;
-export type SupportTicketDetailResponse = ApiResponse<"/api/support/tickets/{id}">;
+export type SupportTicketsResponse = GetResponse<"/api/support/tickets">;
+export type SupportTicketCreateResponse = PostResponse<"/api/support/tickets">;
+export type SupportTicketDetailResponse = GetResponse<"/api/support/tickets/{id}">;
 export type SupportTicketReplyResponse = PostResponse<"/api/support/tickets/{id}/messages">;
 export type SupportTicketReadResponse = PostResponse<"/api/support/tickets/{id}/read">;
-export type SupportUnreadResponse = ApiResponse<"/api/support/unread">;
+export type SupportUnreadResponse = GetResponse<"/api/support/unread">;
 export type TariffChangeResponse = PostResponse<"/api/tariffs/change">;
-export type TariffChangeOptionsResponse = ApiResponse<"/api/tariffs/change-options">;
+export type TariffChangeOptionsResponse = GetResponse<"/api/tariffs/change-options">;
 export type TariffChangePaymentResponse = PostResponse<"/api/tariffs/change-payment">;
-export type TariffTopupOptionsResponse = ApiResponse<"/api/tariffs/topup-options">;
+export type TariffTopupOptionsResponse = GetResponse<"/api/tariffs/topup-options">;
 export type TrialActivateResponse = PostResponse<"/api/trial/activate">;
 
 type MockContext = Record<string, unknown>;

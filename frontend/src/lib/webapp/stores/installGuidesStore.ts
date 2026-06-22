@@ -62,12 +62,13 @@ export function createInstallGuidesStore({
   function stateFromResponse(response: GuidesResponse): InstallGuidesState {
     const payload =
       response.ok === true ? unwrap(response as GuidesResponse & { ok: boolean }) : response;
+    const payloadRecord = asRecord(payload);
     return {
       enabled: Boolean(payload?.enabled),
       config: recordOrNull(payload?.config),
       source: stringField(payload?.source) || null,
-      subscription: payload?.subscription ? asRecord(payload.subscription) : null,
-      error: stringField(payload?.error),
+      subscription: payloadRecord.subscription ? asRecord(payloadRecord.subscription) : null,
+      error: stringField(payloadRecord.error),
       loading: false,
       loaded: true,
     };

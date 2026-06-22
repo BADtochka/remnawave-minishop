@@ -148,7 +148,16 @@ _AUTH_RESPONSE_SCHEMA = ok_envelope_with(
     {
         "user_id": _NULLABLE_INTEGER_SCHEMA,
         "telegram_id": _NULLABLE_INTEGER_SCHEMA,
+        "csrf_token": _STRING_SCHEMA,
         "account_merge": loose_object_schema(),
+    },
+    required=[],
+)
+_EMAIL_REQUEST_RESPONSE_SCHEMA = ok_envelope_with(
+    {
+        "retry_after": _NULLABLE_INTEGER_SCHEMA,
+        "email_code": _STRING_SCHEMA,
+        "code": _STRING_SCHEMA,
     },
     required=[],
 )
@@ -188,7 +197,7 @@ _ROUTE_CONTRACTS = {
     ),
     "email_auth_request_route": _public_contract(
         request_model=WebAppEmailRequestPayload,
-        response_schema=ok_envelope_with({"retry_after": _NULLABLE_INTEGER_SCHEMA}, required=[]),
+        response_schema=_EMAIL_REQUEST_RESPONSE_SCHEMA,
     ),
     "email_auth_verify_route": _public_contract(
         request_model=WebAppEmailCodeAuthPayload,
@@ -246,7 +255,12 @@ _ROUTE_CONTRACTS = {
     "account_email_request_route": _user_contract(
         request_model=WebAppEmailPayload,
         response_schema=ok_envelope_with(
-            {"already_linked": _BOOLEAN_SCHEMA, "retry_after": _NULLABLE_INTEGER_SCHEMA},
+            {
+                "already_linked": _BOOLEAN_SCHEMA,
+                "retry_after": _NULLABLE_INTEGER_SCHEMA,
+                "email_code": _STRING_SCHEMA,
+                "code": _STRING_SCHEMA,
+            },
             required=[],
         ),
     ),
@@ -322,18 +336,24 @@ _ROUTE_CONTRACTS = {
     ),
     "device_topup_options_route": _user_contract(response_schema=_PLAN_OPTIONS_RESPONSE_SCHEMA),
     "support_tickets_route": _user_contract(
-        response_schema=ok_envelope_with({"tickets": loose_array_schema()}),
+        response_schema=ok_envelope_with(
+            {"tickets": loose_array_schema(), "counts": loose_object_schema()}
+        ),
     ),
     "support_create_ticket_route": _user_contract(
         request_model=CreateTicketPayload,
         response_schema=ok_envelope_with({"ticket": loose_object_schema()}),
     ),
     "support_ticket_detail_route": _user_contract(
-        response_schema=ok_envelope_with({"ticket": loose_object_schema()}),
+        response_schema=ok_envelope_with(
+            {"ticket": loose_object_schema(), "messages": loose_array_schema()}
+        ),
     ),
     "support_ticket_reply_route": _user_contract(
         request_model=TicketReplyPayload,
-        response_schema=ok_envelope_with({"ticket": loose_object_schema()}),
+        response_schema=ok_envelope_with(
+            {"ticket": loose_object_schema(), "message": loose_object_schema()}
+        ),
     ),
     "support_ticket_read_route": _user_contract(response_schema=ok_envelope_with()),
     "support_unread_route": _user_contract(
