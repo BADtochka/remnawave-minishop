@@ -19,7 +19,10 @@ Template for migrated domains:
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 
 class HttpBodyModel(BaseModel):
@@ -32,3 +35,58 @@ class HttpResponseModel(BaseModel):
     """Base class for typed response payload objects."""
 
     model_config = ConfigDict(extra="ignore")
+
+    @field_serializer("*", when_used="json")
+    def _serialize_response_value(self, value: Any) -> Any:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        return value
+
+
+class PromoCreateBody(HttpBodyModel):
+    code: str
+    bonus_days: int = Field(gt=0)
+    max_activations: int = Field(gt=0)
+    valid_days: Any = None
+
+    @field_validator("code", mode="before")
+    @classmethod
+    def _normalize_code(cls, value: Any) -> str:
+        code = str(value or "").strip().upper()
+        if not code:
+            raise ValueError("empty_code")
+        return code
+
+
+class PromoUpdateBody(HttpBodyModel):
+    is_active: Any = None
+    bonus_days: int | None = Field(default=None, gt=0)
+    max_activations: int | None = Field(default=None, gt=0)
+
+
+class PromoOut(HttpResponseModel):
+    id: int
+    code: str
+    bonus_days: int
+    max_activations: int
+    current_activations: int
+    is_active: bool
+    valid_until: datetime | None = None
+    created_at: datetime | None = None
+    created_by_admin_id: int | None = None
+
+    @classmethod
+    def from_orm_promo(cls, promo: Any) -> "PromoOut":
+        return cls(
+            id=int(promo.promo_code_id),
+            code=promo.code,
+            bonus_days=int(promo.bonus_days),
+            max_activations=int(promo.max_activations),
+            current_activations=int(promo.current_activations or 0),
+            is_active=bool(promo.is_active),
+            valid_until=promo.valid_until,
+            created_at=promo.created_at,
+            created_by_admin_id=int(promo.created_by_admin_id)
+            if promo.created_by_admin_id
+            else None,
+        )

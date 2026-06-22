@@ -14,7 +14,7 @@ async def admin_promos_list_route(request: web.Request) -> web.Response:
         total = await promo_code_dal.get_promo_codes_count(session)
     return _ok(
         {
-            "promos": [_serialize_promo(p) for p in promos],
+            "promos": [PromoOut.from_orm_promo(p).model_dump(mode="json") for p in promos],
             "page": page,
             "page_size": page_size,
             "total": int(total or 0),
@@ -24,18 +24,17 @@ async def admin_promos_list_route(request: web.Request) -> web.Response:
 
 async def admin_promo_create_route(request: web.Request) -> web.Response:
     actor_id = _require_admin_user_id(request)
-    payload = await _read_json(request)
-    code = str(payload.get("code") or "").strip().upper()
-    bonus_days = int(payload.get("bonus_days") or 0)
-    max_activations = int(payload.get("max_activations") or 0)
-    valid_days = payload.get("valid_days")
-    if not code or bonus_days <= 0 or max_activations <= 0:
-        return _error(400, "invalid_payload")
+    body, error = await parse_body(request, PromoCreateBody)
+    if error:
+        return error
+    code = body.code
+    bonus_days = body.bonus_days
+    max_activations = body.max_activations
 
     valid_until = None
-    if valid_days:
+    if body.valid_days:
         try:
-            valid_until = datetime.now(timezone.utc) + timedelta(days=int(valid_days))
+            valid_until = datetime.now(timezone.utc) + timedelta(days=int(body.valid_days))
         except (TypeError, ValueError):
             return _error(400, "invalid_valid_days")
 
@@ -56,20 +55,23 @@ async def admin_promo_create_route(request: web.Request) -> web.Response:
             },
         )
         await session.commit()
-    return _ok({"promo": _serialize_promo(promo)})
+    return _ok({"promo": PromoOut.from_orm_promo(promo).model_dump(mode="json")})
 
 
 async def admin_promo_update_route(request: web.Request) -> web.Response:
     _require_admin_user_id(request)
     promo_id = int(request.match_info["promo_id"])
-    payload = await _read_json(request)
+    body, error = await parse_body(request, PromoUpdateBody)
+    if error:
+        return error
     update_data: Dict[str, Any] = {}
-    if "is_active" in payload:
-        update_data["is_active"] = bool(payload["is_active"])
-    if "bonus_days" in payload and payload["bonus_days"] is not None:
-        update_data["bonus_days"] = int(payload["bonus_days"])
-    if "max_activations" in payload and payload["max_activations"] is not None:
-        update_data["max_activations"] = int(payload["max_activations"])
+    fields_set = body.model_fields_set
+    if "is_active" in fields_set:
+        update_data["is_active"] = bool(body.is_active)
+    if "bonus_days" in fields_set and body.bonus_days is not None:
+        update_data["bonus_days"] = int(body.bonus_days)
+    if "max_activations" in fields_set and body.max_activations is not None:
+        update_data["max_activations"] = int(body.max_activations)
 
     if not update_data:
         return _error(400, "no_changes")
@@ -81,7 +83,7 @@ async def admin_promo_update_route(request: web.Request) -> web.Response:
             return _error(404, "not_found")
         await session.commit()
         await session.refresh(promo)
-    return _ok({"promo": _serialize_promo(promo)})
+    return _ok({"promo": PromoOut.from_orm_promo(promo).model_dump(mode="json")})
 
 
 async def admin_promo_delete_route(request: web.Request) -> web.Response:

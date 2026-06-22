@@ -60,7 +60,7 @@ from db.models import (
 )
 
 from .request_parsing import parse_body
-from .schemas import HttpBodyModel, HttpResponseModel
+from .schemas import HttpBodyModel, HttpResponseModel, PromoCreateBody, PromoOut, PromoUpdateBody
 
 logger = logging.getLogger(__name__)
 
