@@ -69,6 +69,7 @@
   } from "./lib/webapp/deeplinks";
   import { createDemoAuth } from "./lib/webapp/demoAuth";
   import { createTelegramLaunch } from "./lib/webapp/telegramLaunch";
+  import { createUiChrome } from "./lib/webapp/uiChrome";
   import { normalizedEmail, telegramName } from "./lib/webapp/formatters.js";
   import { activeTariffName, buildTariffCatalog } from "./lib/webapp/tariffs.js";
   import {
@@ -187,14 +188,11 @@
   let languageMenuOpen = false;
   let languageClickGuard = false;
   let languageClickGuardArmed = false;
-  let languageClickGuardTimer = null;
-  let languageClickGuardArmTimer = null;
   let guestLanguage = "";
   let emailAvatarUrl = "";
   let avatarHashToken = "";
   let token = MOCK ? "local-preview" : "";
   let csrfToken = MOCK ? "" : readCookie(CSRF_COOKIE_NAME) || "";
-  let scrollLockApplied = false;
   let adminI18nLoaded = false;
   let adminI18nPromise = null;
   let adminBundleApi = null;
@@ -235,6 +233,22 @@
   const termUnitLabel = i18n.termUnitLabel;
   const languageName = i18n.languageName;
   guestLanguage = normalizeLangCode(CFG.language || "ru");
+  const uiChrome = createUiChrome({
+    normalizeLangCode,
+    getCurrentLang: () => currentLang,
+    setGuestLanguage: (value) => {
+      guestLanguage = value;
+    },
+    setLanguageMenuOpenState: (value) => {
+      languageMenuOpen = value;
+    },
+    setLanguageClickGuard: (value) => {
+      languageClickGuard = value;
+    },
+    setLanguageClickGuardArmed: (value) => {
+      languageClickGuardArmed = value;
+    },
+  });
   const dataClient = createWebappDataClient({
     apiBase: CFG.apiBase,
     csrfCookieName: CSRF_COOKIE_NAME,
@@ -877,55 +891,19 @@
   });
 
   function syncBodyScrollLock(locked) {
-    if (typeof document === "undefined") return;
-    if (locked && !scrollLockApplied) {
-      document.body.style.overflow = "hidden";
-      scrollLockApplied = true;
-      return;
-    }
-    if (!locked && scrollLockApplied) {
-      document.body.style.overflow = "";
-      scrollLockApplied = false;
-    }
+    uiChrome.syncBodyScrollLock(locked);
   }
 
   function clearLanguageClickGuard() {
-    if (languageClickGuardTimer) {
-      window.clearTimeout(languageClickGuardTimer);
-      languageClickGuardTimer = null;
-    }
-    if (languageClickGuardArmTimer) {
-      window.clearTimeout(languageClickGuardArmTimer);
-      languageClickGuardArmTimer = null;
-    }
-    languageClickGuard = false;
-    languageClickGuardArmed = false;
+    uiChrome.clearLanguageClickGuard();
   }
 
   function setLanguageMenuOpen(open) {
-    languageMenuOpen = Boolean(open);
-    clearLanguageClickGuard();
-    if (languageMenuOpen) {
-      languageClickGuard = true;
-      languageClickGuardArmTimer = window.setTimeout(() => {
-        languageClickGuardArmed = true;
-        languageClickGuardArmTimer = null;
-      }, 220);
-      return;
-    }
-    languageClickGuard = true;
-    languageClickGuardArmed = false;
-    languageClickGuardTimer = window.setTimeout(() => {
-      languageClickGuard = false;
-      languageClickGuardTimer = null;
-    }, 260);
+    uiChrome.setLanguageMenuOpen(open);
   }
 
   function updateGuestLanguage(nextValue) {
-    const language = normalizeLangCode(nextValue);
-    setLanguageMenuOpen(false);
-    if (!language || language === currentLang) return;
-    guestLanguage = language;
+    uiChrome.updateGuestLanguage(nextValue);
   }
 
   async function ensureI18nScope(scope) {
