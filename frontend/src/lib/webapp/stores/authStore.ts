@@ -5,10 +5,70 @@ import {
   buildTelegramOAuthStartUrl,
   emailError,
 } from "../authHelpers.js";
+import type { LoadDataOptions } from "../dataClient";
+import type { ApiClient, PostPayload } from "../publicApi";
+import { unwrap } from "../publicApi";
 
 const EMAIL_CODE_PENDING_STORAGE_KEY = "rw_email_code_login_pending_v1";
 const EMAIL_CODE_PENDING_TTL_MS = 10 * 60 * 1000;
 const EMAIL_CODE_RESEND_MS = 60 * 1000;
+
+type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
+type MaybeRecord = Record<string, unknown>;
+type PendingEmailCodeSession = {
+  email: string;
+  expiresAt: number;
+  cooldownUntil: number;
+};
+type TelegramLoginTimeout = {
+  signal: AbortSignal;
+  promise: Promise<unknown>;
+  clear(): void;
+  timedOut: boolean;
+};
+type TelegramSdk = {
+  hasLaunchParams(): boolean;
+  createMiniAppAuthTimeout(): TelegramLoginTimeout;
+  ensureForAction(): Promise<unknown>;
+};
+type AuthStoreDeps = {
+  publicApi: ApiClient["publicApi"];
+  setToken: (token: string, csrfToken?: string) => void;
+  loadData: (options?: LoadDataOptions) => Promise<unknown>;
+  telegramSdk: TelegramSdk;
+  getTg: () => unknown;
+  t: Translate;
+  currentLang: () => string;
+};
+type AuthState = {
+  authStatus: string;
+  authIsError: boolean;
+  authBusy: boolean;
+  telegramLoginBusy: boolean;
+  telegramLoginAttemptId: number;
+  loginEmailFieldError: string;
+  loginEmailTooltipOpen: boolean;
+  authResendCooldown: number;
+  email: string;
+  emailPassword: string;
+  pendingEmail: string;
+  emailCode: string;
+  passwordLoginMode: boolean;
+  passwordLoginFallback: boolean;
+};
+
+function asRecord(value: unknown): MaybeRecord {
+  return value && typeof value === "object" ? (value as MaybeRecord) : {};
+}
+
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+const buildTelegramOAuthUrl = buildTelegramOAuthStartUrl as (
+  purpose?: string,
+  tg?: unknown
+) => string;
 
 export function createAuthStore({
   publicApi,
@@ -18,8 +78,8 @@ export function createAuthStore({
   getTg,
   t,
   currentLang,
-}) {
-  const state = writable({
+}: AuthStoreDeps) {
+  const state = writable<AuthState>({
     authStatus: "",
     authIsError: false,
     authBusy: false,
@@ -36,10 +96,10 @@ export function createAuthStore({
     passwordLoginFallback: false,
   });
 
-  let authResendTimer = null;
-  let telegramLoginWatchdogTimer = null;
+  let authResendTimer: number | null = null;
+  let telegramLoginWatchdogTimer: number | null = null;
 
-  function readPendingEmailCodeSession() {
+  function readPendingEmailCodeSession(): PendingEmailCodeSession | null {
     if (typeof window === "undefined" || !window.sessionStorage) return null;
     try {
       const raw = window.sessionStorage.getItem(EMAIL_CODE_PENDING_STORAGE_KEY);
@@ -61,7 +121,7 @@ export function createAuthStore({
     }
   }
 
-  function writePendingEmailCodeSession(email) {
+  function writePendingEmailCodeSession(email: string) {
     if (typeof window === "undefined" || !window.sessionStorage) return;
     try {
       window.sessionStorage.setItem(
@@ -86,7 +146,7 @@ export function createAuthStore({
     }
   }
 
-  function restorePendingEmailCode(changeScreen) {
+  function restorePendingEmailCode(changeScreen?: (screen: string) => void) {
     const pending = readPendingEmailCodeSession();
     if (!pending) return false;
     state.update((s) => ({
@@ -113,7 +173,7 @@ export function createAuthStore({
     return true;
   }
 
-  function setAuthStatus(message, isError = false) {
+  function setAuthStatus(message: string, isError = false) {
     state.update((s) => ({ ...s, authStatus: message, authIsError: isError }));
   }
 
@@ -154,7 +214,7 @@ export function createAuthStore({
     return telegramLoginAttemptId;
   }
 
-  function stopTelegramLoginWatchdog(attemptId = null) {
+  function stopTelegramLoginWatchdog(attemptId: number | null = null) {
     if (attemptId !== null && attemptId !== get(state).telegramLoginAttemptId) return;
     if (telegramLoginWatchdogTimer) {
       window.clearTimeout(telegramLoginWatchdogTimer);
@@ -162,23 +222,31 @@ export function createAuthStore({
     }
   }
 
-  function isActiveTelegramLoginAttempt(attemptId) {
+  function isActiveTelegramLoginAttempt(attemptId: number) {
     const s = get(state);
     return attemptId === s.telegramLoginAttemptId && s.telegramLoginBusy;
   }
 
-  async function finalizeMagicLogin(loginToken) {
+  async function finalizeMagicLogin(loginToken: string) {
     const s = get(state);
     if (s.authBusy) return false;
     state.update((s) => ({ ...s, authBusy: true }));
     setAuthStatus(t("wa_auth_checking_login"));
     try {
-      const payload = { token: loginToken };
+      const payload: Record<string, unknown> = { token: loginToken };
       const referralParam = readReferralParam(getTg());
       if (referralParam) payload.referral_code = referralParam;
-      const response = await publicApi("/auth/email/magic", payload);
-      if (response.ok && response.csrf_token) {
-        setToken("", response.csrf_token);
+      const response = await publicApi(
+        "/auth/email/magic",
+        payload as PostPayload<"/api/auth/email/magic">
+      );
+      if (response.ok) {
+        const csrfToken = stringField(unwrap(response).csrf_token);
+        if (!csrfToken) {
+          setAuthStatus(t("wa_auth_login_confirm_failed"), true);
+          return false;
+        }
+        setToken("", csrfToken);
         clearPendingEmailCode();
         clearAuthQuery();
         await loadData();
@@ -193,38 +261,50 @@ export function createAuthStore({
     return false;
   }
 
-  async function finalizeTelegramAuth(authData, source = "auth_data", options = {}) {
+  async function finalizeTelegramAuth(
+    authData: unknown,
+    source: "auth_data" | "init_data" | "id_token" = "auth_data",
+    options: { signal?: AbortSignal } = {}
+  ) {
     const s = get(state);
     if (s.authBusy) return false;
     state.update((s) => ({ ...s, authBusy: true }));
     setAuthStatus(t("wa_auth_checking_telegram"));
     try {
-      const payload =
+      const authRecord = asRecord(authData);
+      const payload: Record<string, unknown> =
         source === "init_data"
           ? { init_data: authData }
           : source === "id_token"
-            ? { id_token: authData.id_token, nonce: authData.nonce }
+            ? { id_token: authRecord.id_token, nonce: authRecord.nonce }
             : { auth_data: authData };
       const referralParam = readReferralParam(getTg());
       if (referralParam) payload.referral_code = referralParam;
-      const response = await publicApi("/auth/token", payload, { signal: options.signal });
-      if (response.ok && response.csrf_token) {
-        setToken("", response.csrf_token);
+      const response = await publicApi("/auth/token", payload as PostPayload<"/api/auth/token">, {
+        signal: options.signal,
+      });
+      if (response.ok) {
+        const csrfToken = stringField(unwrap(response).csrf_token);
+        if (!csrfToken) {
+          setAuthStatus(t("wa_auth_telegram_not_confirmed"), true);
+          return false;
+        }
+        setToken("", csrfToken);
         clearPendingEmailCode();
         clearAuthQuery();
         setAuthStatus("");
         await loadData();
         return true;
       }
+      const errorCode = stringField(asRecord(response).error);
       setAuthStatus(
-        response.error === "banned"
-          ? t("wa_auth_access_denied")
-          : t("wa_auth_telegram_not_confirmed"),
+        errorCode === "banned" ? t("wa_auth_access_denied") : t("wa_auth_telegram_not_confirmed"),
         true
       );
     } catch (error) {
+      const errorName = stringField(asRecord(error).name);
       setAuthStatus(
-        error?.name === "AbortError"
+        errorName === "AbortError"
           ? t("wa_auth_telegram_timeout")
           : t("wa_auth_telegram_unavailable"),
         true
@@ -235,7 +315,7 @@ export function createAuthStore({
     return false;
   }
 
-  async function requestEmailCode(changeScreen) {
+  async function requestEmailCode(changeScreen: (screen: string) => void) {
     const s = get(state);
     const normalized = s.email.trim().toLowerCase();
     if (
@@ -263,12 +343,16 @@ export function createAuthStore({
     }));
     setAuthStatus(t("wa_auth_sending_code"));
     try {
-      const payload = { email: normalized, language: currentLang() };
+      const payload: Record<string, unknown> = { email: normalized, language: currentLang() };
       const referralParam = readReferralParam(getTg());
       if (referralParam) payload.referral_code = referralParam;
-      const response = await publicApi("/auth/email/request", payload);
+      const response = await publicApi(
+        "/auth/email/request",
+        payload as PostPayload<"/api/auth/email/request">
+      );
       if (!response.ok) throw response;
-      const presetCode = String(response.email_code || response.code || "")
+      const responsePayload = unwrap(response);
+      const presetCode = String(responsePayload.email_code || responsePayload.code || "")
         .replace(/\D/g, "")
         .slice(0, 6);
       state.update((s) => ({ ...s, pendingEmail: normalized, emailCode: presetCode }));
@@ -276,7 +360,7 @@ export function createAuthStore({
       changeScreen("code");
       setAuthStatus("");
       startCooldownTimer(60);
-    } catch (error) {
+    } catch (error: unknown) {
       setAuthStatus(emailError(error, t("wa_auth_send_code_failed"), t), true);
     } finally {
       state.update((s) => ({ ...s, authBusy: false }));
@@ -311,16 +395,19 @@ export function createAuthStore({
       const response = await publicApi("/auth/email/password", {
         email: normalized,
         password,
-      });
-      if (!response.ok || !response.csrf_token) throw response;
-      setToken("", response.csrf_token);
+      } as PostPayload<"/api/auth/email/password">);
+      if (!response.ok) throw response;
+      const csrfToken = stringField(unwrap(response).csrf_token);
+      if (!csrfToken) throw response;
+      setToken("", csrfToken);
       clearPendingEmailCode();
       await loadData();
       setAuthStatus("");
-    } catch (error) {
-      if (error?.error === "rate_limited") {
+    } catch (error: unknown) {
+      const errorCode = stringField(asRecord(error).error);
+      if (errorCode === "rate_limited") {
         setAuthStatus(emailError(error, t("wa_auth_password_login_failed"), t), true);
-      } else if (error?.error === "banned") {
+      } else if (errorCode === "banned") {
         setAuthStatus(t("wa_auth_access_denied"), true);
       } else {
         state.update((s) => ({ ...s, passwordLoginFallback: true }));
@@ -341,23 +428,31 @@ export function createAuthStore({
     state.update((s) => ({ ...s, authBusy: true }));
     setAuthStatus(t("wa_auth_checking_code"));
     try {
-      const payload = { email: s.pendingEmail, code };
+      const payload: Record<string, unknown> = { email: s.pendingEmail, code };
       const referralParam = readReferralParam(getTg());
       if (referralParam) payload.referral_code = referralParam;
-      const response = await publicApi("/auth/email/verify", payload);
-      if (!response.ok || !response.csrf_token) throw response;
-      setToken("", response.csrf_token);
+      const response = await publicApi(
+        "/auth/email/verify",
+        payload as PostPayload<"/api/auth/email/verify">
+      );
+      if (!response.ok) throw response;
+      const csrfToken = stringField(unwrap(response).csrf_token);
+      if (!csrfToken) throw response;
+      setToken("", csrfToken);
       clearPendingEmailCode();
       await loadData();
       setAuthStatus("");
-    } catch (error) {
+    } catch (error: unknown) {
       setAuthStatus(emailError(error, t("wa_auth_invalid_code"), t), true);
     } finally {
       state.update((s) => ({ ...s, authBusy: false }));
     }
   }
 
-  async function openTelegramLogin(telegramOAuthClientId, getTelegramMiniAppInitData) {
+  async function openTelegramLogin(
+    telegramOAuthClientId: number | string | null,
+    getTelegramMiniAppInitData: () => string
+  ) {
     const s = get(state);
     if (s.authBusy || s.telegramLoginBusy) return;
     setAuthStatus("");
@@ -365,7 +460,7 @@ export function createAuthStore({
     const isTelegramMiniAppAttempt = telegramSdk.hasLaunchParams();
     if (!isTelegramMiniAppAttempt && telegramOAuthClientId) {
       state.update((s) => ({ ...s, telegramLoginBusy: true }));
-      window.location.assign(buildTelegramOAuthStartUrl("login", getTg()));
+      window.location.assign(buildTelegramOAuthUrl("login", getTg()));
       window.setTimeout(() => {
         state.update((s) => ({ ...s, telegramLoginBusy: false }));
       }, 1500);
@@ -391,13 +486,13 @@ export function createAuthStore({
             return;
           }
 
-          window.location.assign(buildTelegramOAuthStartUrl("login", getTg()));
+          window.location.assign(buildTelegramOAuthUrl("login", getTg()));
         })(),
         loginTimeout.promise,
       ]);
-    } catch (error) {
+    } catch (error: unknown) {
       if (!isActiveTelegramLoginAttempt(attemptId)) return;
-      if (error?.name === "AbortError") {
+      if (stringField(asRecord(error).name) === "AbortError") {
         setAuthStatus(t("wa_auth_telegram_timeout"), true);
       } else {
         setAuthStatus(t("wa_auth_telegram_unavailable"), true);
