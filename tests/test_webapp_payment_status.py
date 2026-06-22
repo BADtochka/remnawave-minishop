@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import bot.app.web.subscription_webapp  # noqa: F401
 from bot.app.web.webapp import billing as billing_module
+from bot.app.web.webapp import billing_status as billing_status_module
 from bot.payment_providers.base import PaymentProviderSpec, WebAppPaymentContext
 from bot.payment_providers.freekassa import FreeKassaService
 from bot.payment_providers.heleket import HeleketService
@@ -855,14 +856,14 @@ class WebAppPaymentStatusTests(IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(billing_module, "_require_user_id", return_value=1001),
+            patch.object(billing_status_module, "_require_user_id", return_value=1001),
             patch.object(
                 billing_module.payment_dal,
                 "get_payment_by_db_id",
                 AsyncMock(return_value=payment),
             ),
             patch.object(
-                billing_module,
+                billing_status_module,
                 "_refresh_yookassa_payment_status",
                 AsyncMock(return_value=payment),
             ),

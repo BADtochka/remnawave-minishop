@@ -6,6 +6,7 @@ from unittest.mock import ANY, AsyncMock, patch
 
 import bot.app.web.subscription_webapp  # noqa: F401
 from bot.app.web.webapp import billing as billing_module
+from bot.app.web.webapp import billing_options, billing_payments
 
 
 class _SessionFactory:
@@ -90,7 +91,7 @@ class WebAppDeviceTopupOptionsTests(IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(billing_module, "_require_user_id", return_value=42),
+            patch.object(billing_options, "_require_user_id", return_value=42),
             patch.object(
                 billing_module.user_dal,
                 "get_user_by_id",
@@ -182,7 +183,7 @@ class WebAppDeviceTopupOptionsTests(IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(billing_module, "_require_user_id", return_value=42),
+            patch.object(billing_options, "_require_user_id", return_value=42),
             patch.object(
                 billing_module.user_dal,
                 "get_user_by_id",
@@ -273,14 +274,14 @@ class WebAppDeviceTopupOptionsTests(IsolatedAsyncioTestCase):
             )
 
         with (
-            patch.object(billing_module, "_require_user_id", return_value=42),
+            patch.object(billing_payments, "_require_user_id", return_value=42),
             patch.object(
-                billing_module,
+                billing_payments,
                 "_enforce_webapp_rate_limit",
                 AsyncMock(return_value=None),
             ),
             patch.object(
-                billing_module,
+                billing_payments,
                 "_get_cached_webapp_settings",
                 return_value={"subscription_options": {}, "stars_subscription_options": {}},
             ),
@@ -295,7 +296,7 @@ class WebAppDeviceTopupOptionsTests(IsolatedAsyncioTestCase):
                 AsyncMock(return_value=sub),
             ),
             patch.object(
-                billing_module,
+                billing_payments,
                 "_create_subscription_payment",
                 AsyncMock(side_effect=_fake_create_payment),
             ) as create_payment,
@@ -370,14 +371,14 @@ class WebAppDeviceTopupOptionsTests(IsolatedAsyncioTestCase):
             )
 
         with (
-            patch.object(billing_module, "_require_user_id", return_value=42),
+            patch.object(billing_payments, "_require_user_id", return_value=42),
             patch.object(
-                billing_module,
+                billing_payments,
                 "_enforce_webapp_rate_limit",
                 AsyncMock(return_value=None),
             ),
             patch.object(
-                billing_module,
+                billing_payments,
                 "_get_cached_webapp_settings",
                 return_value={"subscription_options": {}, "stars_subscription_options": {}},
             ),
@@ -387,7 +388,7 @@ class WebAppDeviceTopupOptionsTests(IsolatedAsyncioTestCase):
                 AsyncMock(return_value=db_user),
             ),
             patch.object(
-                billing_module,
+                billing_payments,
                 "_create_subscription_payment",
                 AsyncMock(side_effect=_fake_create_payment),
             ) as create_payment,
@@ -440,14 +441,14 @@ class WebAppDeviceTopupOptionsTests(IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(billing_module, "_require_user_id", return_value=42),
+            patch.object(billing_payments, "_require_user_id", return_value=42),
             patch.object(
-                billing_module,
+                billing_payments,
                 "_enforce_webapp_rate_limit",
                 AsyncMock(return_value=None),
             ),
             patch.object(
-                billing_module,
+                billing_payments,
                 "_get_cached_webapp_settings",
                 return_value={"subscription_options": {}, "stars_subscription_options": {}},
             ),
