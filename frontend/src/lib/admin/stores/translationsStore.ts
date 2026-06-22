@@ -55,7 +55,7 @@ export type TranslationDirtyEntry = {
   value: string;
   deleted: boolean;
 };
-type TranslationDirtyState = Record<string, TranslationDirtyEntry>;
+export type TranslationDirtyState = Record<string, TranslationDirtyEntry>;
 export type TranslationDelete = { lang: string; key: string };
 export type TranslationUpdates = Record<string, Record<string, string>>;
 export type TranslationsSavedPayload = {
