@@ -1,5 +1,66 @@
 import { writable, get } from "svelte/store";
 import { emailError, buildTelegramOAuthStartUrl } from "../authHelpers.js";
+import type { LoadDataOptions } from "../dataClient";
+import type { ApiClient, PostPayload } from "../publicApi";
+import { unwrap } from "../publicApi";
+
+type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
+type TelegramSdk = {
+  hasLaunchParams(): boolean;
+  ensureForAction(): Promise<unknown>;
+};
+type AccountStoreDeps = {
+  api: ApiClient["api"];
+  publicApi: ApiClient["publicApi"];
+  setToken: (token: string, csrfToken?: string) => void;
+  loadData: (options?: LoadDataOptions & Record<string, unknown>) => Promise<unknown>;
+  t: Translate;
+  showToast: (message: string) => void;
+  clearToken: () => void;
+  markManualLogout: () => void;
+  showLogin: () => void;
+  telegramSdk: TelegramSdk;
+  getTg: () => unknown;
+  telegramOAuthClientId: number | string | (() => number | string);
+  currentLang: () => string;
+  normalizeLangCode: (value: string) => string;
+  updateLocalData: (updatedLanguage: string) => void;
+};
+type AccountState = {
+  linkEmailOpen: boolean;
+  linkEmailBusy: boolean;
+  linkTelegramBusy: boolean;
+  linkEmailValue: string;
+  linkEmailPending: string;
+  linkEmailCode: string;
+  linkEmailStatus: string;
+  linkEmailIsError: boolean;
+  linkEmailFieldError: string;
+  linkEmailResendCooldown: number;
+  setPasswordOpen: boolean;
+  setPasswordBusy: boolean;
+  setPasswordPending: boolean;
+  setPasswordValue: string;
+  setPasswordConfirm: string;
+  setPasswordCode: string;
+  setPasswordStatus: string;
+  setPasswordIsError: boolean;
+  setPasswordResendCooldown: number;
+  languageBusy: boolean;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+const buildTelegramOAuthUrl = buildTelegramOAuthStartUrl as (
+  purpose?: string,
+  tg?: unknown
+) => string;
 
 export function createAccountStore({
   api,
@@ -17,8 +78,8 @@ export function createAccountStore({
   currentLang,
   normalizeLangCode,
   updateLocalData,
-}) {
-  const state = writable({
+}: AccountStoreDeps) {
+  const state = writable<AccountState>({
     linkEmailOpen: false,
     linkEmailBusy: false,
     linkTelegramBusy: false,
@@ -41,10 +102,10 @@ export function createAccountStore({
     languageBusy: false,
   });
 
-  let linkEmailResendTimer = null;
-  let setPasswordResendTimer = null;
+  let linkEmailResendTimer: number | null = null;
+  let setPasswordResendTimer: number | null = null;
 
-  function setLinkEmailStatus(message, isError = false) {
+  function setLinkEmailStatus(message: string, isError = false) {
     state.update((s) => ({ ...s, linkEmailStatus: message, linkEmailIsError: isError }));
   }
 
@@ -90,7 +151,7 @@ export function createAccountStore({
     }, 1000);
   }
 
-  function openLinkEmailDialog(email) {
+  function openLinkEmailDialog(email: string) {
     state.update((s) => ({
       ...s,
       linkEmailOpen: true,
@@ -121,7 +182,7 @@ export function createAccountStore({
     clearCooldownTimer();
   }
 
-  function setPasswordStatus(message, isError = false) {
+  function setPasswordStatus(message: string, isError = false) {
     state.update((s) => ({
       ...s,
       setPasswordStatus: message,
@@ -206,18 +267,20 @@ export function createAccountStore({
     state.update((s) => ({ ...s, linkEmailFieldError: "", linkEmailBusy: true }));
     setLinkEmailStatus(t("wa_auth_sending_code"));
     try {
+      const payload: PostPayload<"/api/account/email/request"> = { email: normalized };
       const response = await api("/account/email/request", {
         method: "POST",
-        body: JSON.stringify({ email: normalized }),
+        body: JSON.stringify(payload),
       });
       if (!response?.ok) throw response;
-      const presetCode = String(response.email_code || response.code || "")
+      const responsePayload = unwrap(response);
+      const presetCode = String(responsePayload.email_code || responsePayload.code || "")
         .replace(/\D/g, "")
         .slice(0, 6);
       state.update((s) => ({ ...s, linkEmailPending: normalized, linkEmailCode: presetCode }));
       setLinkEmailStatus("");
       startCooldownTimer(60);
-    } catch (error) {
+    } catch (error: unknown) {
       setLinkEmailStatus(emailError(error, t("wa_auth_send_code_failed"), t), true);
     } finally {
       state.update((s) => ({ ...s, linkEmailBusy: false }));
@@ -240,16 +303,21 @@ export function createAccountStore({
     state.update((s) => ({ ...s, linkEmailBusy: true }));
     setLinkEmailStatus(t("wa_auth_checking_code"));
     try {
+      const payload: PostPayload<"/api/account/email/verify"> = {
+        email: s.linkEmailPending,
+        code,
+      };
       const response = await api("/account/email/verify", {
         method: "POST",
-        body: JSON.stringify({ email: s.linkEmailPending, code }),
+        body: JSON.stringify(payload),
       });
       if (!response?.ok) throw response;
-      if (response?.csrf_token) setToken("", response.csrf_token);
+      const csrfToken = stringField(unwrap(response).csrf_token);
+      if (csrfToken) setToken("", csrfToken);
       await loadData();
       closeLinkEmailDialog();
       showToast(t("wa_settings_linked"));
-    } catch (error) {
+    } catch (error: unknown) {
       setLinkEmailStatus(emailError(error, t("wa_auth_invalid_code"), t), true);
     } finally {
       state.update((s) => ({ ...s, linkEmailBusy: false }));
@@ -268,13 +336,13 @@ export function createAccountStore({
     try {
       const response = await api("/account/password/request", {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify({} as PostPayload<"/api/account/password/request">),
       });
       if (!response?.ok) throw response;
       state.update((s) => ({ ...s, setPasswordPending: true, setPasswordCode: "" }));
       setPasswordStatus("");
       startPasswordCooldownTimer(60);
-    } catch (error) {
+    } catch (error: unknown) {
       setPasswordStatus(emailError(error, t("wa_password_code_send_failed"), t), true);
     } finally {
       state.update((s) => ({ ...s, setPasswordBusy: false }));
@@ -294,23 +362,25 @@ export function createAccountStore({
     state.update((s) => ({ ...s, setPasswordBusy: true }));
     setPasswordStatus(t("wa_auth_checking_code"));
     try {
+      const payload: PostPayload<"/api/account/password/confirm"> = {
+        password: s.setPasswordValue,
+        password_confirm: s.setPasswordConfirm,
+        code,
+      };
       const response = await api("/account/password/confirm", {
         method: "POST",
-        body: JSON.stringify({
-          password: s.setPasswordValue,
-          password_confirm: s.setPasswordConfirm,
-          code,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!response?.ok) throw response;
       await loadData();
       closeSetPasswordDialog();
       showToast(t("wa_password_set_success"));
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorCode = stringField(asRecord(error).error);
       const fallback =
-        error?.error === "password_mismatch"
+        errorCode === "password_mismatch"
           ? t("wa_password_mismatch")
-          : error?.error === "password_too_short"
+          : errorCode === "password_too_short"
             ? t("wa_password_too_short")
             : t("wa_password_set_failed");
       setPasswordStatus(emailError(error, fallback, t), true);
@@ -319,7 +389,9 @@ export function createAccountStore({
     }
   }
 
-  async function linkTelegramAccountWithPayload(payload) {
+  async function linkTelegramAccountWithPayload(
+    payload: PostPayload<"/api/account/telegram/link">
+  ) {
     state.update((s) => ({ ...s, linkTelegramBusy: true }));
     try {
       const response = await api("/account/telegram/link", {
@@ -327,17 +399,18 @@ export function createAccountStore({
         body: JSON.stringify(payload),
       });
       if (!response?.ok) throw response;
-      if (response?.csrf_token) setToken("", response.csrf_token);
+      const csrfToken = stringField(unwrap(response).csrf_token);
+      if (csrfToken) setToken("", csrfToken);
       await loadData();
       showToast(t("wa_settings_linked"));
-    } catch (error) {
-      showToast(error?.message || t("wa_auth_telegram_not_confirmed"));
+    } catch (error: unknown) {
+      showToast(stringField(asRecord(error).message) || t("wa_auth_telegram_not_confirmed"));
     } finally {
       state.update((s) => ({ ...s, linkTelegramBusy: false }));
     }
   }
 
-  async function linkTelegramAccount(getTelegramMiniAppInitData = () => "") {
+  async function linkTelegramAccount(getTelegramMiniAppInitData: () => string = () => "") {
     const s = get(state);
     if (s.linkTelegramBusy) return;
     const readTelegramMiniAppInitData =
@@ -348,7 +421,9 @@ export function createAccountStore({
     }
     const initData = readTelegramMiniAppInitData();
     if (initData) {
-      await linkTelegramAccountWithPayload({ init_data: initData });
+      await linkTelegramAccountWithPayload({
+        init_data: initData,
+      } as PostPayload<"/api/account/telegram/link">);
       return;
     }
     if (!getTelegramOAuthClientId()) {
@@ -356,24 +431,24 @@ export function createAccountStore({
       return;
     }
     state.update((s) => ({ ...s, linkTelegramBusy: true }));
-    window.location.assign(buildTelegramOAuthStartUrl("link", getTg()));
+    window.location.assign(buildTelegramOAuthUrl("link", getTg()));
   }
 
-  async function updateAccountLanguage(nextValue, options = {}) {
+  async function updateAccountLanguage(nextValue: string, options: Record<string, unknown> = {}) {
     const s = get(state);
-    const normalize = typeof normalizeLangCode === "function" ? normalizeLangCode : (v) => v;
+    const normalize = normalizeLangCode;
     const language = normalize(nextValue);
     if (!language || s.languageBusy || language === currentLang()) return;
     state.update((s) => ({ ...s, languageBusy: true }));
     try {
+      const payload: PostPayload<"/api/account/language"> = { language };
       const response = await api("/account/language", {
         method: "POST",
-        body: JSON.stringify({ language }),
+        body: JSON.stringify(payload),
       });
       if (!response?.ok) throw response;
-      if (typeof updateLocalData === "function") {
-        updateLocalData(normalize(response.language || language));
-      }
+      const responsePayload = unwrap(response);
+      updateLocalData(normalize(stringField(responsePayload.language) || language));
       await loadData({ fresh: true, preserveView: true, ...options });
     } catch {
       showToast(t("wa_settings_language_update_failed"));
@@ -387,7 +462,7 @@ export function createAccountStore({
     markManualLogout();
     clearToken();
     try {
-      await publicApi("/auth/logout", { keepalive: true });
+      await publicApi("/auth/logout", { keepalive: true } as PostPayload<"/api/auth/logout">);
     } catch (_error) {
       void _error;
     }

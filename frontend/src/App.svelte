@@ -6,7 +6,7 @@
   import { createDevicesStore } from "./lib/webapp/stores/devicesStore.js";
   import { createInstallGuidesStore } from "./lib/webapp/stores/installGuidesStore.js";
   import { createSupportStore } from "./lib/webapp/stores/supportStore.js";
-  import { createAccountStore } from "./lib/webapp/stores/accountStore.js";
+  import { createAccountStore } from "./lib/webapp/stores/accountStore";
   import { Tooltip } from "$components/ui/primitives.js";
   import { CheckCircle2 } from "$components/ui/icons.js";
 
