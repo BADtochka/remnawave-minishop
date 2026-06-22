@@ -1,4 +1,4 @@
-from typing import TypeVar
+from typing import TypeVar, cast
 
 from bot.app.web.context import (
     get_bot,
@@ -43,9 +43,12 @@ BodyModelT = TypeVar("BodyModelT", bound=BaseModel)
 
 
 def _json_error(status: int, code: str, message: str) -> web.Response:
-    return web.json_response(
-        {"ok": False, "error": code, "message": message},
-        status=status,
+    return cast(
+        web.Response,
+        web.json_response(
+            {"ok": False, "error": code, "message": message},
+            status=status,
+        ),
     )
 
 
@@ -104,10 +107,13 @@ async def _parse_model_payload(
     request: web.Request,
     model_cls: type[BodyModelT],
 ) -> BodyModelT:
-    return await parse_body_or_400(
-        request,
-        model_cls,
-        validation_error_response_factory=_validation_error_response,
+    return cast(
+        BodyModelT,
+        await parse_body_or_400(
+            request,
+            model_cls,
+            validation_error_response_factory=_validation_error_response,
+        ),
     )
 
 
@@ -145,7 +151,8 @@ def _resolve_telegram_oauth_request_access(settings: Settings) -> List[str]:
 def _extract_authenticated_user_id(request: web.Request) -> Optional[int]:
     from bot.app.web.session import extract_authenticated_user_id
 
-    return extract_authenticated_user_id(request)
+    user_id = extract_authenticated_user_id(request)
+    return user_id if isinstance(user_id, int) else None
 
 
 def _require_user_id(request: web.Request) -> int:
@@ -186,9 +193,10 @@ def _telegram_avatar_is_stale(avatar: Optional[UserTelegramAvatar]) -> bool:
     updated_at = avatar.updated_at
     if updated_at.tzinfo is None:
         updated_at = updated_at.replace(tzinfo=timezone.utc)
-    return (
+    is_stale = (
         datetime.now(timezone.utc) - updated_at
     ).total_seconds() >= WEBAPP_TELEGRAM_AVATAR_REFRESH_SECONDS
+    return bool(is_stale)
 
 
 def _telegram_avatar_url(avatar: Optional[UserTelegramAvatar]) -> str:
