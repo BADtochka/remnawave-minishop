@@ -59,6 +59,9 @@ from db.models import (
     UserTelegramAvatar,
 )
 
+from .request_parsing import parse_body
+from .schemas import HttpBodyModel, HttpResponseModel
+
 logger = logging.getLogger(__name__)
 
 
