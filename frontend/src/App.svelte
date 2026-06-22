@@ -2,7 +2,7 @@
   import { onMount, setContext, tick } from "svelte";
   import { Toaster, toast as sonnerToast } from "svelte-sonner";
   import { createAuthStore } from "./lib/webapp/stores/authStore";
-  import { createBillingStore } from "./lib/webapp/stores/billingStore.js";
+  import { createBillingStore } from "./lib/webapp/stores/billingStore";
   import { createDevicesStore } from "./lib/webapp/stores/devicesStore";
   import { createInstallGuidesStore } from "./lib/webapp/stores/installGuidesStore.js";
   import { createSupportStore } from "./lib/webapp/stores/supportStore";

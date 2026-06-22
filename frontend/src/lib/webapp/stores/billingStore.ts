@@ -1,4 +1,53 @@
 import { writable, get } from "svelte/store";
+import type { LoadDataOptions } from "../dataClient";
+import type { BillingActions } from "../billingActions";
+import { unwrap } from "../publicApi";
+
+type TelegramWebApp = Record<string, unknown> & {
+  openInvoice?: (url: string, callback: (status: string) => void) => void;
+};
+type BillingRecord = Record<string, unknown> & {
+  action?: string;
+  actions?: BillingRecord[];
+  available?: boolean;
+  hwid_renewal?: BillingRecord;
+  key?: string;
+  message?: string;
+  mode?: string;
+  paid?: boolean;
+  payment_id?: string | number;
+  payment_url?: string | null;
+  plans?: BillingRecord[];
+  sale_mode?: string;
+  status?: string;
+  tariff_key?: string;
+  targets?: BillingRecord[];
+  topup_kind?: string;
+};
+type BillingOkRecord = BillingRecord & { ok: boolean };
+type BillingState = {
+  paymentModalOpen: boolean;
+  paymentStep: string;
+  selectedTariffKey: string;
+  selectedPlan: BillingRecord | null;
+  selectedMethod: string;
+  renewHwidDevices: boolean;
+  paymentStartedWithActiveSubscription: boolean;
+  topupModalOpen: boolean;
+  topupKind: string;
+  deviceTopupModalOpen: boolean;
+  changeModalOpen: boolean;
+  topupOptions: BillingRecord | null;
+  deviceTopupOptions: BillingRecord | null;
+  changeOptions: BillingRecord | null;
+  selectedTopupPlan: BillingRecord | null;
+  selectedDeviceTopupPlan: BillingRecord | null;
+  selectedChangeTarget: BillingRecord | null;
+  selectedChangeAction: BillingRecord | null;
+  changeConfirmOpen: boolean;
+  tariffActionBusy: boolean;
+  payBusy: boolean;
+};
 
 export function createBillingStore({
   billing,
@@ -11,8 +60,38 @@ export function createBillingStore({
   tg,
   getTg = null,
   telegramSdk = null,
+}: {
+  billing: BillingActions;
+  loadData: (options?: LoadDataOptions & Record<string, unknown>) => Promise<unknown>;
+  t: (key: string, params?: Record<string, unknown>, fallback?: string) => string;
+  showToast: (message: string) => void;
+  openExternalLink: (url: string) => void;
+  onSubscriptionActivationPending?: ((context: Record<string, unknown>) => void) | null;
+  onSubscriptionActivated?: ((context: Record<string, unknown>) => Promise<void> | void) | null;
+  tg?: TelegramWebApp | null;
+  getTg?: (() => TelegramWebApp | null) | null;
+  telegramSdk?: {
+    refresh?: () => TelegramWebApp | null;
+    ensureForAction?: () => Promise<TelegramWebApp | null>;
+  } | null;
 }) {
-  const state = writable({
+  function asRecord(value: unknown): BillingRecord {
+    return value && typeof value === "object" ? (value as BillingRecord) : {};
+  }
+
+  function arrayRecords(value: unknown): BillingRecord[] {
+    return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : [];
+  }
+
+  function stringField(value: unknown): string {
+    return typeof value === "string" ? value : "";
+  }
+
+  function unwrapBilling<T extends { ok: boolean }>(response: T): T & BillingRecord {
+    return unwrap(response) as T & BillingRecord;
+  }
+
+  const state = writable<BillingState>({
     paymentModalOpen: false,
     paymentStep: "tariff",
     selectedTariffKey: "",
@@ -38,13 +117,13 @@ export function createBillingStore({
 
   let topupOptionsRequestId = 0;
   let paymentPollToken = 0;
-  const successfulPaymentIds = new Set();
+  const successfulPaymentIds = new Set<string>();
 
-  function sleep(ms) {
+  function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  function isSubscriptionSale(plan) {
+  function isSubscriptionSale(plan: BillingRecord | null) {
     const saleMode = String(plan?.sale_mode || "subscription").toLowerCase();
     return ![
       "traffic",
@@ -56,7 +135,7 @@ export function createBillingStore({
     ].includes(saleMode);
   }
 
-  function paymentSuccessContext(s, response = {}) {
+  function paymentSuccessContext(s: BillingState, response: BillingRecord = {}) {
     return {
       paymentId: response.payment_id || "",
       initialSubscriptionPayment:
@@ -66,7 +145,7 @@ export function createBillingStore({
     };
   }
 
-  async function handlePaymentSuccess(successContext = {}) {
+  async function handlePaymentSuccess(successContext: BillingRecord = {}) {
     const paymentId = String(successContext.paymentId || "");
     if (paymentId && successfulPaymentIds.has(paymentId)) return;
     if (paymentId) {
@@ -83,7 +162,7 @@ export function createBillingStore({
     }
   }
 
-  function rememberSubscriptionActivationPending(successContext = {}) {
+  function rememberSubscriptionActivationPending(successContext: BillingRecord = {}) {
     if (
       !successContext.initialSubscriptionPayment ||
       typeof onSubscriptionActivationPending !== "function"
@@ -98,16 +177,16 @@ export function createBillingStore({
   }
 
   function openPaymentModal(
-    tariffMode,
-    singleTariffMode,
-    tariffCatalog,
-    subscription,
-    plans,
+    tariffMode: boolean,
+    singleTariffMode: boolean,
+    tariffCatalog: BillingRecord[],
+    subscription: BillingRecord,
+    plans: BillingRecord[],
     defaultMethod = "",
-    options = {}
+    options: BillingRecord = {}
   ) {
     state.update((s) => {
-      let step;
+      let step: string;
       let plan = s.selectedPlan;
       let tariffKey = s.selectedTariffKey;
       const catalog = tariffCatalog || [];
@@ -126,11 +205,11 @@ export function createBillingStore({
 
       if (tariffMode) {
         if (deeplinkTariff?.key) {
-          tariffKey = deeplinkTariff.key;
+          tariffKey = String(deeplinkTariff.key);
           plan = planList.find((p) => p?.tariff_key === tariffKey) || null;
           step = options?.preferCheckout && plan ? "checkout" : "tariff";
         } else if (singleTariffMode && catalog[0]?.key) {
-          tariffKey = catalog[0].key;
+          tariffKey = String(catalog[0].key);
           plan = planList.find((p) => p?.tariff_key === tariffKey) || null;
           step = "checkout";
         } else if (
@@ -138,7 +217,7 @@ export function createBillingStore({
           subscription?.tariff_key &&
           catalog.some((t) => t.key === subscription.tariff_key)
         ) {
-          tariffKey = subscription.tariff_key;
+          tariffKey = String(subscription.tariff_key);
           plan = planList.find((p) => p?.tariff_key === tariffKey) || null;
           step = "checkout";
         } else {
@@ -166,7 +245,7 @@ export function createBillingStore({
     state.update((s) => ({ ...s, paymentModalOpen: false }));
   }
 
-  function selectTariff(tariff, plans = []) {
+  function selectTariff(tariff: BillingRecord, plans: BillingRecord[] = []) {
     const key = String(tariff?.key || "").trim();
     if (!key) return;
     state.update((s) => ({
@@ -177,7 +256,7 @@ export function createBillingStore({
     }));
   }
 
-  function continueWithSelectedTariff(selectedTariffPlans = []) {
+  function continueWithSelectedTariff(selectedTariffPlans: BillingRecord[] = []) {
     state.update((s) => {
       if (!s.selectedTariffKey) return s;
       return {
@@ -189,7 +268,7 @@ export function createBillingStore({
     });
   }
 
-  function backToTariffList(subscription, tariffCatalog = []) {
+  function backToTariffList(subscription: BillingRecord, tariffCatalog: BillingRecord[] = []) {
     if (
       subscription?.active &&
       subscription?.tariff_key &&
@@ -265,7 +344,7 @@ export function createBillingStore({
     return null;
   }
 
-  async function resolveInvoiceTelegramWebApp() {
+  async function resolveInvoiceTelegramWebApp(): Promise<TelegramWebApp | null> {
     const currentTg = resolveTelegramWebApp();
     if (currentTg?.openInvoice) return currentTg;
     if (telegramSdk?.ensureForAction) {
@@ -275,7 +354,7 @@ export function createBillingStore({
     return resolveTelegramWebApp();
   }
 
-  async function openTelegramInvoice(url, successContext = {}) {
+  async function openTelegramInvoice(url: string, successContext: BillingRecord = {}) {
     if (!url) return false;
     const invoiceTg = await resolveInvoiceTelegramWebApp();
     if (invoiceTg?.openInvoice) {
@@ -294,27 +373,35 @@ export function createBillingStore({
     return false;
   }
 
-  async function handlePaymentResponse(response, successContext = {}, closeModal = () => {}) {
+  async function handlePaymentResponse(
+    response: BillingOkRecord,
+    successContext: BillingRecord = {},
+    closeModal: () => void = () => {}
+  ) {
     if (!response.ok) throw response;
+    const payload = unwrapBilling(response);
     showToast(t("wa_payment_created"));
-    if (response.action === "open_invoice") {
-      if (!response.payment_url) throw response;
-      const opened = await openTelegramInvoice(response.payment_url, successContext);
+    if (payload.action === "open_invoice") {
+      if (!payload.payment_url) throw response;
+      const opened = await openTelegramInvoice(payload.payment_url, successContext);
       if (!opened) return false;
-    } else if (response.action === "invoice_sent") {
-      startPaymentStatusPolling(response.payment_id, successContext);
+    } else if (payload.action === "invoice_sent") {
+      startPaymentStatusPolling(payload.payment_id, successContext);
       closeModal();
       return true;
     } else {
-      if (!response.payment_url) throw response;
-      openExternalLink(response.payment_url);
+      if (!payload.payment_url) throw response;
+      openExternalLink(payload.payment_url);
     }
-    startPaymentStatusPolling(response.payment_id, successContext);
+    startPaymentStatusPolling(payload.payment_id, successContext);
     closeModal();
     return true;
   }
 
-  function startPaymentStatusPolling(paymentId, successContext = {}) {
+  function startPaymentStatusPolling(
+    paymentId: string | number | undefined,
+    successContext: BillingRecord = {}
+  ) {
     if (!paymentId || !billing.fetchPaymentStatus) return;
     const token = ++paymentPollToken;
     void (async () => {
@@ -324,11 +411,12 @@ export function createBillingStore({
         try {
           const status = await billing.fetchPaymentStatus(paymentId);
           if (!status?.ok) continue;
-          if (status.paid || status.status === "succeeded") {
+          const payload = unwrapBilling(status);
+          if (payload.paid || payload.status === "succeeded") {
             await handlePaymentSuccess({ ...successContext, paymentId });
             return;
           }
-          const normalized = String(status.status || "").toLowerCase();
+          const normalized = String(payload.status || "").toLowerCase();
           if (
             normalized === "failed" ||
             normalized === "canceled" ||
@@ -360,14 +448,14 @@ export function createBillingStore({
       await handlePaymentResponse(response, successContext, () => {
         state.update((s) => ({ ...s, paymentModalOpen: false }));
       });
-    } catch (error) {
-      showToast(error?.message || t("wa_payment_create_failed"));
+    } catch (error: unknown) {
+      showToast(stringField(asRecord(error).message) || t("wa_payment_create_failed"));
     } finally {
       state.update((s) => ({ ...s, payBusy: false }));
     }
   }
 
-  async function loadTopupOptions(kind) {
+  async function loadTopupOptions(kind: string) {
     const s = get(state);
     if (s.topupOptions?.topup_kind === kind) return;
     const requestId = ++topupOptionsRequestId;
@@ -381,14 +469,15 @@ export function createBillingStore({
       const response = await billing.fetchTopupOptions(kind);
       if (requestId !== topupOptionsRequestId || kind !== get(state).topupKind) return;
       if (!response?.ok) throw response;
+      const payload = unwrapBilling(response);
       state.update((s) => ({
         ...s,
-        topupOptions: response,
-        selectedTopupPlan: response.plans?.[0] || null,
+        topupOptions: payload,
+        selectedTopupPlan: arrayRecords(payload.plans)[0] || null,
       }));
-    } catch (error) {
+    } catch (error: unknown) {
       if (requestId !== topupOptionsRequestId || kind !== get(state).topupKind) return;
-      showToast(error?.message || t("wa_tariff_options_failed"));
+      showToast(stringField(asRecord(error).message) || t("wa_tariff_options_failed"));
       state.update((s) => ({ ...s, topupModalOpen: false }));
     } finally {
       if (requestId === topupOptionsRequestId) {
@@ -403,13 +492,17 @@ export function createBillingStore({
     state.update((s) => ({ ...s, payBusy: true }));
     try {
       const response = await billing.postPayment(
-        billing.topupPaymentBody(s.selectedTopupPlan, s.selectedMethod, s.topupOptions?.tariff_key)
+        billing.topupPaymentBody(
+          s.selectedTopupPlan,
+          s.selectedMethod,
+          stringField(s.topupOptions?.tariff_key)
+        )
       );
       await handlePaymentResponse(response, {}, () => {
         state.update((s) => ({ ...s, topupModalOpen: false }));
       });
-    } catch (error) {
-      showToast(error?.message || t("wa_payment_create_failed"));
+    } catch (error: unknown) {
+      showToast(stringField(asRecord(error).message) || t("wa_payment_create_failed"));
     } finally {
       state.update((s) => ({ ...s, payBusy: false }));
     }
@@ -422,14 +515,17 @@ export function createBillingStore({
     try {
       const response = await billing.fetchTariffChangeOptions();
       if (!response?.ok) throw response;
+      const payload = unwrapBilling(response);
+      const targets = arrayRecords(payload.targets);
+      const firstTarget = targets[0] || null;
       state.update((s) => ({
         ...s,
-        changeOptions: response,
-        selectedChangeTarget: response.targets?.[0] || null,
-        selectedChangeAction: response.targets?.[0]?.actions?.[0] || null,
+        changeOptions: payload,
+        selectedChangeTarget: firstTarget,
+        selectedChangeAction: firstTarget?.actions?.[0] || null,
       }));
-    } catch (error) {
-      showToast(error?.message || t("wa_tariff_options_failed"));
+    } catch (error: unknown) {
+      showToast(stringField(asRecord(error).message) || t("wa_tariff_options_failed"));
       state.update((s) => ({ ...s, changeModalOpen: false }));
     } finally {
       state.update((s) => ({ ...s, tariffActionBusy: false }));
@@ -446,10 +542,11 @@ export function createBillingStore({
     state.update((s) => ({ ...s, tariffActionBusy: true }));
     try {
       const response = await billing.postTariffChange({
-        tariff_key: s.selectedChangeTarget.tariff_key,
-        mode: s.selectedChangeAction.mode,
+        tariff_key: stringField(s.selectedChangeTarget.tariff_key),
+        mode: stringField(s.selectedChangeAction.mode),
       });
       if (!response?.ok) throw response;
+      unwrapBilling(response);
       showToast(t("wa_tariff_change_applied"));
       state.update((s) => ({
         ...s,
@@ -458,8 +555,8 @@ export function createBillingStore({
         changeOptions: null,
       }));
       await loadData();
-    } catch (error) {
-      showToast(error?.message || t("wa_tariff_change_failed"));
+    } catch (error: unknown) {
+      showToast(stringField(asRecord(error).message) || t("wa_tariff_change_failed"));
     } finally {
       state.update((s) => ({ ...s, tariffActionBusy: false }));
     }
@@ -484,8 +581,8 @@ export function createBillingStore({
       await handlePaymentResponse(response, {}, () => {
         state.update((s) => ({ ...s, changeConfirmOpen: false, changeModalOpen: false }));
       });
-    } catch (error) {
-      showToast(error?.message || t("wa_payment_create_failed"));
+    } catch (error: unknown) {
+      showToast(stringField(asRecord(error).message) || t("wa_payment_create_failed"));
     } finally {
       state.update((s) => ({ ...s, payBusy: false }));
     }
@@ -498,13 +595,14 @@ export function createBillingStore({
     try {
       const response = await billing.fetchDeviceTopupOptions();
       if (!response?.ok) throw response;
+      const payload = unwrapBilling(response);
       state.update((s) => ({
         ...s,
-        deviceTopupOptions: response,
-        selectedDeviceTopupPlan: response.plans?.[0] || null,
+        deviceTopupOptions: payload,
+        selectedDeviceTopupPlan: arrayRecords(payload.plans)[0] || null,
       }));
-    } catch (error) {
-      showToast(error?.message || t("wa_device_topup_options_failed"));
+    } catch (error: unknown) {
+      showToast(stringField(asRecord(error).message) || t("wa_device_topup_options_failed"));
       state.update((s) => ({ ...s, deviceTopupModalOpen: false }));
     } finally {
       state.update((s) => ({ ...s, tariffActionBusy: false }));
@@ -520,14 +618,14 @@ export function createBillingStore({
         billing.deviceTopupPaymentBody(
           s.selectedDeviceTopupPlan,
           s.selectedMethod,
-          s.deviceTopupOptions?.tariff_key
+          stringField(s.deviceTopupOptions?.tariff_key)
         )
       );
       await handlePaymentResponse(response, {}, () => {
         state.update((s) => ({ ...s, deviceTopupModalOpen: false }));
       });
-    } catch (error) {
-      showToast(error?.message || t("wa_payment_create_failed"));
+    } catch (error: unknown) {
+      showToast(stringField(asRecord(error).message) || t("wa_payment_create_failed"));
     } finally {
       state.update((s) => ({ ...s, payBusy: false }));
     }
