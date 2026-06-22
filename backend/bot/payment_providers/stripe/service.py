@@ -17,11 +17,11 @@ from bot.services.subscription_service import SubscriptionService
 from config.settings import Settings
 from db.dal import payment_dal, user_billing_dal
 
-from .base import (
+from ..base import (
     normalize_payment_currency_code,
     provider_runtime_enabled,
 )
-from .shared import (
+from ..shared import (
     PAYMENT_STATUS_PENDING_FINALIZATION,
     HttpClientMixin,
     PaymentSuccessRequest,
@@ -34,7 +34,7 @@ from .shared import (
     notify_user_payment_failed,
     payment_units_for_activation,
 )
-from .stripe_core import (
+from .config import (
     _FAILED_EVENT_TYPES,
     _FAILED_PAYMENT_INTENT_STATUSES,
     _SUCCESS_EVENT_TYPES,

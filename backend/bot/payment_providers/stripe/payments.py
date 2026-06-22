@@ -7,10 +7,10 @@ from aiohttp import web
 
 from config.settings import Settings
 
-from .base import (
+from ..base import (
     WebAppPaymentContext,
 )
-from .shared import (
+from ..shared import (
     create_webapp_payment_record,
     finalize_webapp_link_payment,
     first_value,
@@ -19,7 +19,7 @@ from .shared import (
     payment_unavailable,
     sale_mode_base,
 )
-from .stripe_service import StripeService
+from .service import StripeService
 
 
 async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:

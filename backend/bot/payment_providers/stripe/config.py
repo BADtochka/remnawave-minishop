@@ -6,7 +6,7 @@ from typing import Any, List, Mapping, Optional
 from pydantic import Field, field_validator
 from pydantic_settings import SettingsConfigDict
 
-from .base import (
+from ..base import (
     ProviderEnvConfig,
     normalize_payment_currency_code,
     provider_env_file,

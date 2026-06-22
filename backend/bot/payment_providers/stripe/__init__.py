@@ -5,22 +5,22 @@ from typing import Any, Optional
 
 from db.dal import payment_dal, user_billing_dal
 
-from .base import (
+from ..base import (
     PaymentProviderSpec,
     ProviderManifestField,
     ServiceFactoryContext,
     parse_supported_currency_codes,
 )
-from .shared import PAYMENT_STATUS_PENDING_FINALIZATION
-from .stripe_core import (
+from ..shared import PAYMENT_STATUS_PENDING_FINALIZATION
+from .config import (
     StripeConfig,
     StripePresentation,
     _stripe_amount_to_minor_units,
 )
-from .stripe_payments import create_webapp_payment, reuse_webapp_payment
-from .stripe_router import router
-from .stripe_service import StripeService
-from .stripe_webhook import stripe_webhook_route
+from .payments import create_webapp_payment, reuse_webapp_payment
+from .router import router
+from .service import StripeService
+from .webhook import stripe_webhook_route
 
 logger = logging.getLogger(__name__)
 _LOG = "stripe"

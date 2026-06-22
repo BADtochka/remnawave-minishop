@@ -14,7 +14,7 @@ from config.tariffs_config import (
 )
 from db.dal import payment_dal
 
-from .shared import (
+from ..shared import (
     build_payment_record_payload,
     describe_payment,
     first_value,
@@ -29,8 +29,8 @@ from .shared import (
     render_payment_link,
     safe_callback_answer,
 )
-from .stripe_router import router
-from .stripe_service import StripeService
+from .router import router
+from .service import StripeService
 
 _LOG = "stripe"
 

@@ -13,9 +13,10 @@ import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from bot.payment_providers import stripe, stripe_service
+from bot.payment_providers import stripe
 from bot.payment_providers.shared import RecurringChargeContext
 from bot.payment_providers.stripe import StripeConfig, StripeService
+from bot.payment_providers.stripe import service as stripe_service
 
 
 def _stripe_signature(body: bytes, secret: str, timestamp: int | None = None) -> str:
