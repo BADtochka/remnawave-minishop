@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount, setContext, tick } from "svelte";
   import { Toaster, toast as sonnerToast } from "svelte-sonner";
   import { createAuthStore } from "./lib/webapp/stores/authStore";
@@ -124,10 +124,44 @@
     withRoutePrefix,
   } from "./lib/webapp/routes.js";
 
-  export let mockRuntime = null;
+  type AnyRecord = Record<string, any>;
+  type TelegramWebApp = AnyRecord & {
+    initData?: string;
+    openInvoice?: (url: string, callback: (status: string) => void) => void;
+    openLink?: (url: string, options?: AnyRecord) => void;
+    openTelegramLink?: (url: string) => void;
+    platform?: string;
+    ready?: () => void;
+    expand?: () => void;
+  };
+  type AppLoadDataOptions = {
+    fresh?: boolean;
+    preserveView?: boolean;
+    section?: string;
+    adminSection?: string | null;
+    [key: string]: any;
+  };
+  type AdminPersistOptions = {
+    updates?: Record<string, unknown>;
+    deletes?: string[];
+    reloadFrontend?: boolean;
+    deferFrontendReload?: boolean;
+  };
+  type PublicInstallPreload = {
+    path?: string;
+    promise?: Promise<AnyRecord | null>;
+  };
+  type WindowWithPublicInstallPreload = Window &
+    Record<string, PublicInstallPreload | null | undefined>;
+
+  function asRecord(value: unknown): AnyRecord {
+    return value && typeof value === "object" ? (value as AnyRecord) : {};
+  }
+
+  export let mockRuntime: AnyRecord | null = null;
 
   const FALLBACK_BRAND_TITLE = "Subscription";
-  const EMPTY_MOCK = {
+  const EMPTY_MOCK: AnyRecord = {
     config: {
       title: FALLBACK_BRAND_TITLE,
       primaryColor: "#00fe7a",
@@ -144,7 +178,7 @@
       themes_catalog: { default_theme: "dark", themes: [] },
     },
   };
-  const MOCK_SOURCE = mockRuntime?.source || EMPTY_MOCK;
+  const MOCK_SOURCE: AnyRecord = mockRuntime?.source || EMPTY_MOCK;
   const previewBoardComponent = mockRuntime?.PreviewBoard || null;
   const isDocsDemo = mockRuntime?.docsDemo === true;
   const routePrefix = isDocsDemo ? "/demo/runtime" : "";
@@ -153,21 +187,21 @@
   const isAppLaunchRoute = isExternalAppLaunchPath(window.location.pathname);
   mockRuntime?.applyPreviewMock?.(query.get("mock"));
   const isPreviewBoard = Boolean(previewBoardComponent) && query.get("preview") === "all";
-  const injectedConfig = readJsonScript("webapp-config");
-  const injectedI18n = readJsonScript("i18n");
+  const injectedConfig = readJsonScript("webapp-config") as AnyRecord | null;
+  const injectedI18n = readJsonScript("i18n") as AnyRecord | null;
   const isLocalShell =
     window.location.protocol === "file:" ||
     ["", "localhost", "127.0.0.1"].includes(window.location.hostname);
-  const MOCK =
+  const MOCK: AnyRecord | null =
     mockRuntime?.mockApi && !injectedConfig && (isLocalShell || isDocsDemo) ? MOCK_SOURCE : null;
-  const CFG = {
+  const CFG: AnyRecord = {
     ...MOCK_SOURCE.config,
     ...(MOCK ? MOCK.config : {}),
     ...(injectedConfig || {}),
   };
   const themePreviewKey = String(CFG.themePreviewKey || query.get("theme_preview") || "").trim();
   const themePreviewDraft = readThemePreviewDraft(themePreviewKey);
-  const I18N = injectedI18n || {};
+  const I18N: AnyRecord = injectedI18n || {};
   let telegramSdkStatus = "idle";
   let telegramMiniAppInitData = "";
 
@@ -175,9 +209,9 @@
   let activeTab = "home";
   let screen = "home";
   let emailLoginDeeplinkConsumed = false;
-  let data = isPreviewBoard ? structuredCloneSafe(MOCK_SOURCE.data) : null;
+  let data: AnyRecord | null = isPreviewBoard ? structuredCloneSafe(MOCK_SOURCE.data) : null;
   let appLaunchTarget = isAppLaunchRoute ? readExternalAppLaunchTarget() : "";
-  let publicInstallSubscription = null;
+  let publicInstallSubscription: AnyRecord | null = null;
   let publicInstallToken = "";
   let autoRenewBusy = false;
   let activationSuccessDialogOpen = false;
@@ -194,25 +228,25 @@
   let token = MOCK ? "local-preview" : "";
   let csrfToken = MOCK ? "" : readCookie(CSRF_COOKIE_NAME) || "";
   let adminI18nLoaded = false;
-  let adminI18nPromise = null;
-  let adminBundleApi = null;
+  let adminI18nPromise: Promise<unknown> | null = null;
+  let adminBundleApi: AnyRecord | null = null;
   let adminBundleError = "";
-  let adminMountTarget = null;
-  let adminPanelProps = {};
+  let adminMountTarget: HTMLElement | null = null;
+  let adminPanelProps: AnyRecord = {};
   let adminActiveSection = "stats";
-  let tg = null;
+  let tg: TelegramWebApp | null = null;
   const telegramSdk = createTelegramSdk({
     scriptUrl: TELEGRAM_WEBAPP_SCRIPT_URL,
     bootTimeoutMs: TELEGRAM_SDK_BOOT_TIMEOUT_MS,
     actionTimeoutMs: TELEGRAM_SDK_ACTION_TIMEOUT_MS,
     miniAppAuthTimeoutMs: TELEGRAM_MINI_APP_AUTH_TIMEOUT_MS,
-    onStatusChange: (status) => (telegramSdkStatus = status),
-    onInitDataChange: (initData) => (telegramMiniAppInitData = initData || ""),
-  });
+    onStatusChange: (status: string) => (telegramSdkStatus = status),
+    onInitDataChange: (initData: string) => (telegramMiniAppInitData = initData || ""),
+  } as any);
   tg = telegramSdk.refresh();
   telegramSdkStatus = tg ? "ready" : "idle";
   telegramMiniAppInitData = telegramSdk.initData;
-  const telegramLaunch = createTelegramLaunch({
+  const telegramLaunch = createTelegramLaunch<TelegramWebApp | null>({
     telegramSdk,
     defaultTimeoutMs: TELEGRAM_SDK_BOOT_TIMEOUT_MS,
     onLoaded: (value, initData) => {
@@ -227,7 +261,7 @@
     messages: I18N,
     defaultLang: "ru",
     getLang: () => user?.language_code || guestLanguage || CFG.language || "ru",
-  });
+  } as any);
   const normalizeLangCode = i18n.normalizeLangCode;
   const t = i18n.t;
   const termUnitLabel = i18n.termUnitLabel;
@@ -271,7 +305,7 @@
   const activationHandoff = createActivationHandoff({
     storageKey: ACTIVATION_HANDOFF_STORAGE_KEY,
     ttlMs: ACTIVATION_HANDOFF_TTL_MS,
-  });
+  } as any) as any;
   const activationWatcher = createActivationWatcher({
     activationHandoff,
     billing,
@@ -280,7 +314,7 @@
     maybeShowActivationSuccessDialog,
     shouldWatch: () =>
       mode === "app" &&
-      activationHandoff.hasPending(data) &&
+      activationHandoff.hasPending(data || {}) &&
       !activationSuccessDialogOpen &&
       screen !== "admin",
     canRefreshOnResume: () =>
@@ -292,7 +326,7 @@
       !deviceTopupModalOpen &&
       !changeModalOpen &&
       !changeConfirmOpen &&
-      activationHandoff.hasPending(data),
+      activationHandoff.hasPending(data || {}),
   });
   const adminBundle = createAdminBundle({
     ensureI18nScope: () => ensureI18nScope("admin"),
@@ -307,11 +341,10 @@
     publicApi,
     setToken,
     loadData,
-    telegramSdk,
+    telegramSdk: telegramSdk as any,
     getTg: () => tg,
     t,
     currentLang: () => currentLang,
-    clearManualLogoutFlag,
   });
   const demoAuth = createDemoAuth({
     authStore,
@@ -328,9 +361,9 @@
     openExternalLink,
     onSubscriptionActivationPending: rememberActivationPending,
     onSubscriptionActivated: handleSubscriptionActivated,
-    tg,
+    tg: tg as any,
     getTg: () => tg || telegramSdk.refresh(),
-    telegramSdk,
+    telegramSdk: telegramSdk as any,
   });
   const devicesStore = createDevicesStore({ api, t, showToast });
   const supportStore = createSupportStore({ api, t, showToast, routePrefix });
@@ -352,7 +385,7 @@
     clearToken,
     markManualLogout,
     showLogin,
-    telegramSdk,
+    telegramSdk: telegramSdk as any,
     getTg: () => tg,
     getCurrentUser: () => data?.user || user || {},
     getTelegramMiniAppInitData: () =>
@@ -457,9 +490,9 @@
     ...brand,
     faviconUrl: String(CFG.faviconUrl || "").trim() || brand.logoUrl,
   };
-  $: plans = data?.plans?.length ? data.plans : MOCK_SOURCE.data.plans;
-  $: methods = data?.payment_methods?.length ? data.payment_methods : [];
-  $: appSettings = data?.settings || MOCK_SOURCE.data.settings;
+  $: plans = (data?.plans?.length ? data.plans : MOCK_SOURCE.data.plans) as AnyRecord[];
+  $: methods = (data?.payment_methods?.length ? data.payment_methods : []) as AnyRecord[];
+  $: appSettings = (data?.settings || MOCK_SOURCE.data.settings || {}) as AnyRecord;
   $: rawEmailAuthEnabled =
     data?.settings?.email_auth_enabled ?? appSettings?.email_auth_enabled ?? CFG.emailAuthEnabled;
   $: emailAuthEnabled = rawEmailAuthEnabled !== false && rawEmailAuthEnabled !== "false";
@@ -481,7 +514,7 @@
   $: supportEnabled = Boolean(appSettings?.support_tickets_enabled ?? true);
   $: installGuidesEnabled = Boolean(appSettings?.subscription_guides_enabled);
   $: supportStore.setActive(Boolean(mode === "app" && screen === "support" && supportEnabled));
-  $: subscription = data?.subscription || MOCK_SOURCE.data.subscription;
+  $: subscription = (data?.subscription || MOCK_SOURCE.data.subscription || {}) as AnyRecord;
   $: hasActiveTariffSubscription = Boolean(
     tariffMode && subscription?.active && subscription?.tariff_key
   );
@@ -521,7 +554,7 @@
     (subscriptionIsTrafficTariff ||
       premiumTrafficPercent(subscription) >= TRAFFIC_TOPUP_UNLOCK_PERCENT)
   );
-  $: user = data?.user || {};
+  $: user = (data?.user || {}) as AnyRecord;
   $: rawThemesCatalog = themePreviewDraft?.catalog ||
     data?.themes_catalog ||
     CFG.themesCatalog || { default_theme: "dark", themes: [] };
@@ -563,11 +596,15 @@
     [currentLang]
   );
   $: languageOptions = languageCodes.map((code) => {
-    const serverLanguage = (CFG.languages || []).find((language) => language.code === code);
+    const serverLanguage = ((CFG.languages || []) as AnyRecord[]).find(
+      (language) => language.code === code
+    );
+    const languageLabels = LANGUAGE_LABELS as Record<string, string>;
+    const languageFlags = LANGUAGE_FLAGS as Record<string, string>;
     return {
       value: code,
-      label: serverLanguage?.label || LANGUAGE_LABELS[code] || code.toUpperCase(),
-      flag: serverLanguage?.flag || LANGUAGE_FLAGS[code] || "🏳️",
+      label: serverLanguage?.label || languageLabels[code] || code.toUpperCase(),
+      flag: serverLanguage?.flag || languageFlags[code] || "🏳️",
     };
   });
   $: currentLanguageOption =
@@ -688,7 +725,7 @@
     }
   }
 
-  function canUseInstallGuides(settings = appSettings, sub = subscription) {
+  function canUseInstallGuides(settings: AnyRecord = appSettings, sub: AnyRecord = subscription) {
     const enabled =
       settings === appSettings
         ? installGuidesEnabled
@@ -696,15 +733,15 @@
     return Boolean(enabled && sub?.active);
   }
 
-  function hasPendingActivationHandoff(payload = data) {
-    return activationHandoff.hasPending(payload);
+  function hasPendingActivationHandoff(payload: AnyRecord | null = data) {
+    return activationHandoff.hasPending(payload || {});
   }
 
-  function rememberActivationPending(context = {}) {
-    activationHandoff.rememberPending(context, data);
+  function rememberActivationPending(context: AnyRecord = {}) {
+    activationHandoff.rememberPending(context, data || {});
   }
 
-  async function maybeShowActivationSuccessDialog(context = {}) {
+  async function maybeShowActivationSuccessDialog(context: AnyRecord = {}) {
     if (activationSuccessDialogOpen) return false;
     await tick();
     const payload = context.payload || data;
@@ -890,7 +927,7 @@
     };
   });
 
-  function syncBodyScrollLock(locked) {
+  function syncBodyScrollLock(locked: boolean) {
     uiChrome.syncBodyScrollLock(locked);
   }
 
@@ -898,15 +935,15 @@
     uiChrome.clearLanguageClickGuard();
   }
 
-  function setLanguageMenuOpen(open) {
+  function setLanguageMenuOpen(open: boolean) {
     uiChrome.setLanguageMenuOpen(open);
   }
 
-  function updateGuestLanguage(nextValue) {
+  function updateGuestLanguage(nextValue: string) {
     uiChrome.updateGuestLanguage(nextValue);
   }
 
-  async function ensureI18nScope(scope) {
+  async function ensureI18nScope(scope: string) {
     if (MOCK || scope !== "admin" || adminI18nLoaded) return;
     if (adminI18nPromise) return adminI18nPromise;
     const apiBase = String(CFG.apiBase || "/api").replace(/\/+$/, "");
@@ -1038,7 +1075,7 @@
     }
   }
 
-  function normalizeDemoRoutePath(value) {
+  function normalizeDemoRoutePath(value: string) {
     const raw = String(value || "").trim();
     if (!raw) return "";
     const withSlash = raw.startsWith("/") ? raw : `/${raw}`;
@@ -1108,22 +1145,32 @@
     return adminSectionFromPath(routePathnameFromLocation(), routePrefix);
   }
 
-  function syncDocsDemoSection(section, replace = false, adminSection = null, adminUserId = null) {
+  function syncDocsDemoSection(
+    section: string,
+    replace = false,
+    adminSection: string | null = null,
+    adminUserId: string | number | null = null
+  ) {
     if (!isDocsDemo || window.location.protocol === "file:") return false;
-    syncSectionPath(section, replace, adminSection, adminUserId, routePrefix);
+    (syncSectionPath as any)(section, replace, adminSection, adminUserId, routePrefix);
     cleanDocsDemoRouteQuery();
     return true;
   }
 
-  function syncAppSectionPath(section, replace = false, adminSection = null, adminUserId = null) {
+  function syncAppSectionPath(
+    section: string,
+    replace = false,
+    adminSection: string | null = null,
+    adminUserId: string | number | null = null
+  ) {
     if (syncDocsDemoSection(section, replace, adminSection, adminUserId)) return;
-    syncSectionPath(section, replace, adminSection, adminUserId);
+    (syncSectionPath as any)(section, replace, adminSection, adminUserId);
   }
 
   $: adminPanelProps = {
     api,
     onClose: closeAdminPanel,
-    onToast: (text) => showToast(text),
+    onToast: (text: string) => showToast(text),
     initialSection: screen === "admin" ? adminActiveSection : initialAdminSectionFromLocation(),
     initialSettingsPath: adminSettingsPathFromPath(routePathnameFromLocation(), routePrefix),
     initialPaymentId: adminPaymentIdFromPath(routePathnameFromLocation(), routePrefix),
@@ -1153,7 +1200,7 @@
     const props = adminPanelProps;
 
     if (shouldMountAdmin) {
-      adminBundle.mount(adminMountTarget, props);
+      adminBundle.mount(adminMountTarget!, props as Record<string, unknown>);
       syncAdminBundleState();
     } else {
       destroyAdminMount();
@@ -1173,7 +1220,7 @@
     }
     await runWebappBoot({
       MOCK,
-      setMode: (next) => {
+      setMode: (next: string) => {
         mode = next;
       },
       hasTelegramLaunchParams,
@@ -1181,8 +1228,8 @@
       prepareTelegramMiniApp: () => {
         if (!tg) return;
         try {
-          tg.ready();
-          tg.expand();
+          tg.ready?.();
+          tg.expand?.();
         } catch (_error) {
           void _error;
         }
@@ -1193,9 +1240,11 @@
       clearManualLogoutFlag,
       isManuallyLoggedOut,
       hasEmailCodeLoginDeeplink,
-      finalizeMagicLogin: (loginToken) => authStore.finalizeMagicLogin(loginToken),
-      finalizeTelegramAuth: (authData, source) => authStore.finalizeTelegramAuth(authData, source),
-      setAuthStatus: (message, isError) => authStore.setAuthStatus(message, isError),
+      finalizeMagicLogin: (loginToken: string) => authStore.finalizeMagicLogin(loginToken),
+      finalizeTelegramAuth: (authData: unknown, source: "auth_data" | "init_data" | "id_token") =>
+        authStore.finalizeTelegramAuth(authData, source),
+      setAuthStatus: (message: string, isError = false) =>
+        authStore.setAuthStatus(message, isError),
       t,
       getInitDataForBoot: () =>
         telegramMiniAppInitData || tg?.initData || readTelegramMiniAppInitDataFromLocation(),
@@ -1220,7 +1269,7 @@
     );
   }
 
-  function syncPasswordLoginPath(enabled, replace = false) {
+  function syncPasswordLoginPath(enabled: boolean, replace = false) {
     if (typeof window === "undefined" || window.location.protocol === "file:") return;
     const targetPath = enabled ? "/login/password" : isDocsDemo ? "/login" : "/";
     if (isDocsDemo) {
@@ -1236,7 +1285,7 @@
     window.history[replace ? "replaceState" : "pushState"](null, "", nextUrl);
   }
 
-  function setPasswordLoginMode(enabled, replace = false) {
+  function setPasswordLoginMode(enabled: boolean, replace = false) {
     const nextEnabled = Boolean(enabled);
     authStore.update((s) => ({
       ...s,
@@ -1248,7 +1297,7 @@
     syncPasswordLoginPath(nextEnabled, replace);
   }
 
-  async function loadData(options = {}) {
+  async function loadData(options: AppLoadDataOptions = {}) {
     const preserveView = options?.preserveView === true;
     const preservedSection = preserveView
       ? normalizeSection(options?.section || screen || activeTab)
@@ -1266,7 +1315,7 @@
         ? normalizeSection(currentQuery.get("screen"))
         : sectionFromPath(routePathnameFromLocation(), routePrefix);
     const installGuidesPromise = routeSection === "install" ? installGuidesStore.load() : null;
-    const payload = await dataClient.loadData({ fresh: options?.fresh === true });
+    const payload = (await dataClient.loadData({ fresh: options?.fresh === true })) as AnyRecord;
     if (!payload.ok) throw new Error(payload.error || "load_failed");
     data = payload;
     billingStore.update((s) => ({
@@ -1277,7 +1326,7 @@
       renewHwidDevices: true,
       selectedMethod: payload.payment_methods?.[0]?.id || "",
     }));
-    let section = routeSection;
+    let section = String(routeSection || "home");
     if (section === "admin" && !payload.user?.is_admin) section = "settings";
     if (section === "devices" && !payload.settings?.my_devices_enabled) section = "home";
     if (section === "support" && payload.settings?.support_tickets_enabled === false) {
@@ -1365,10 +1414,10 @@
 
     const topupDeep = new URLSearchParams(window.location.search).get("topup");
     if (topupDeep === "regular" || topupDeep === "premium") {
-      const plansList = payload.plans?.length ? payload.plans : [];
+      const plansList = (payload.plans?.length ? payload.plans : []) as AnyRecord[];
       const tariffCatalogLocal = buildTariffCatalog(plansList);
-      const sub = payload.subscription || {};
-      const tariffModeLocal = plansList.some((plan) => plan?.tariff_key);
+      const sub = (payload.subscription || {}) as AnyRecord;
+      const tariffModeLocal = plansList.some((plan: AnyRecord) => plan?.tariff_key);
       const hasTariffSub = Boolean(
         tariffModeLocal &&
         sub?.active &&
@@ -1394,9 +1443,9 @@
 
     const renewalDeep = readRenewalDeeplink();
     if (renewalDeep) {
-      const plansList = payload.plans?.length ? payload.plans : [];
+      const plansList = (payload.plans?.length ? payload.plans : []) as AnyRecord[];
       const tariffCatalogLocal = buildTariffCatalog(plansList);
-      const tariffModeLocal = plansList.some((plan) => plan?.tariff_key);
+      const tariffModeLocal = plansList.some((plan: AnyRecord) => plan?.tariff_key);
       activeTab = "home";
       screen = "home";
       syncAppSectionPath("home", true);
@@ -1418,20 +1467,23 @@
     return payload;
   }
 
-  async function loadPublicInstallGuides(shareToken) {
+  async function loadPublicInstallGuides(shareToken: string) {
     const path = installGuidesStore.publicPath(shareToken);
-    const preload = typeof window !== "undefined" ? window[PUBLIC_INSTALL_PRELOAD_KEY] : null;
+    const preload =
+      typeof window !== "undefined"
+        ? (window as unknown as WindowWithPublicInstallPreload)[PUBLIC_INSTALL_PRELOAD_KEY]
+        : null;
     if (preload?.path === path && preload.promise) {
       const payload = await preload.promise;
       if (payload) {
-        window[PUBLIC_INSTALL_PRELOAD_KEY] = null;
+        (window as unknown as WindowWithPublicInstallPreload)[PUBLIC_INSTALL_PRELOAD_KEY] = null;
         return installGuidesStore.hydrate(path, payload);
       }
     }
     return installGuidesStore.loadPublic(shareToken, true);
   }
 
-  async function loadPublicInstall(shareToken) {
+  async function loadPublicInstall(shareToken: string) {
     mode = "publicInstall";
     screen = "install";
     activeTab = "home";
@@ -1455,7 +1507,7 @@
     void startEmailCodeLoginFromDeeplink();
   }
 
-  function setToken(nextToken, nextCsrf = "") {
+  function setToken(nextToken: string, nextCsrf = "") {
     clearManualLogoutFlag();
     token = nextToken || "";
     csrfToken = nextCsrf || readCookie(CSRF_COOKIE_NAME) || "";
@@ -1480,13 +1532,13 @@
     return readManualLogoutFlag(MANUAL_LOGOUT_FLAG_KEY);
   }
 
-  function submitEmailOnEnter(event) {
+  function submitEmailOnEnter(event: KeyboardEvent) {
     if (event.key !== "Enter") return;
     event.preventDefault();
     authStore.requestEmailCode((s) => (screen = s));
   }
 
-  function openExternalLink(url) {
+  function openExternalLink(url: string) {
     if (!url) return;
     if (tg?.openLink) {
       tg.openLink(url, { try_instant_view: false });
@@ -1495,7 +1547,7 @@
     window.location.assign(url);
   }
 
-  function openAppLink(url) {
+  function openAppLink(url: string) {
     const raw = String(url || "").trim();
     if (!raw || hasControlChars(raw) || /^(javascript|data|vbscript):/i.test(raw)) {
       return;
@@ -1617,7 +1669,7 @@
     if (shouldOpenConnect) openActivationConnectLink();
   }
 
-  async function copyText(value, success = t("wa_copied")) {
+  async function copyText(value: string, success = t("wa_copied")) {
     if (!value) {
       showToast(t("wa_unavailable"));
       return;
@@ -1639,7 +1691,7 @@
     return actionsStore.applyPromo();
   }
 
-  function setPromoCode(value) {
+  function setPromoCode(value: string) {
     actionsStore.setPromoCode(value);
   }
 
@@ -1647,7 +1699,7 @@
     actionsStore.clearPromoFieldError();
   }
 
-  function _trialActivationFailureMessage(error) {
+  function _trialActivationFailureMessage(error: AnyRecord) {
     if (
       error?.error === "trial_telegram_required" ||
       error?.message === "telegram_required" ||
@@ -1662,7 +1714,7 @@
     return error?.message || t("wa_trial_activation_failed");
   }
 
-  function _referralWelcomeFailureMessage(error) {
+  function _referralWelcomeFailureMessage(error: AnyRecord) {
     if (
       error?.error === "referral_welcome_telegram_required" ||
       error?.message === "telegram_required" ||
@@ -1681,7 +1733,7 @@
     return actionsStore.activateTrial();
   }
 
-  async function toggleAutoRenew(enabled) {
+  async function toggleAutoRenew(enabled: boolean) {
     if (autoRenewBusy) return;
     autoRenewBusy = true;
     try {
@@ -1692,17 +1744,18 @@
       );
       await loadData({ fresh: true, preserveView: true });
     } catch (error) {
-      if (error?.error === "auto_renew_requires_saved_method") {
+      const errorRecord = asRecord(error);
+      if (errorRecord.error === "auto_renew_requires_saved_method") {
         showToast(t("wa_auto_renew_requires_saved_method"));
       } else {
-        showToast(error?.message || t("wa_auto_renew_update_failed"));
+        showToast(errorRecord.message || t("wa_auto_renew_update_failed"));
       }
     } finally {
       autoRenewBusy = false;
     }
   }
 
-  function showToast(message) {
+  function showToast(message: unknown) {
     const text = String(message ?? "").trim();
     if (!text) return;
     sonnerToast(text, { duration: 2400 });
@@ -1768,7 +1821,7 @@
     );
   }
 
-  function openTopupModal(kind) {
+  function openTopupModal(kind: string) {
     billingStore.openTopupModal(kind, defaultPaymentMethod());
   }
 
@@ -1839,7 +1892,10 @@
     syncAppSectionPath("settings");
   }
 
-  function handleAdminSectionChange(adminSection, adminUserId = null) {
+  function handleAdminSectionChange(
+    adminSection: string,
+    adminUserId: string | number | null = null
+  ) {
     if (screen !== "admin") return;
     const nextAdminSection = normalizeAdminSection(adminSection);
     adminActiveSection = nextAdminSection;
@@ -1847,7 +1903,7 @@
     syncAppSectionPath("admin", false, nextAdminSection, adminUserId);
   }
 
-  function adminPayloadHasLogoChange(options = {}) {
+  function adminPayloadHasLogoChange(options: AdminPersistOptions = {}) {
     const keys = new Set([
       ...Object.keys(options.updates || {}),
       ...(Array.isArray(options.deletes) ? options.deletes : []),
@@ -1860,7 +1916,7 @@
     ].some((key) => keys.has(key));
   }
 
-  async function handleAdminPersistedSaved(options = {}) {
+  async function handleAdminPersistedSaved(options: AdminPersistOptions = {}) {
     invalidateWebappTariffOptionCaches(billingStore);
     installGuidesStore.reset();
     try {
@@ -1876,7 +1932,7 @@
     }
   }
 
-  async function refreshI18nScope(scope) {
+  async function refreshI18nScope(scope: string) {
     if (MOCK) return;
     const apiBase = String(CFG.apiBase || "/api").replace(/\/+$/, "");
     try {
@@ -1899,7 +1955,7 @@
     await handleAdminPersistedSaved({ ...options, deferFrontendReload: true });
   }
 
-  function selectTariff(tariff) {
+  function selectTariff(tariff: AnyRecord) {
     billingStore.selectTariff(tariff, plans);
   }
 
@@ -2004,14 +2060,14 @@
             {privacyPolicyUrl}
             {userAgreementUrl}
             {currentLang}
-            {currentLanguageOption}
+            currentLanguageOption={currentLanguageOption as any}
             {languageOptions}
             {languageMenuOpen}
             {languageClickGuard}
             {languageClickGuardArmed}
             {t}
-            {setLanguageMenuOpen}
-            updateLoginLanguage={updateGuestLanguage}
+            setLanguageMenuOpen={setLanguageMenuOpen as any}
+            updateLoginLanguage={updateGuestLanguage as any}
             requestEmailCode={() => authStore.requestEmailCode((s) => (screen = s))}
             loginWithEmailPassword={authStore.loginWithEmailPassword}
             verifyEmailCode={authStore.verifyEmailCode}
@@ -2023,7 +2079,7 @@
               loginEmailFieldError = "";
               loginEmailTooltipOpen = false;
             }}
-            setPasswordLoginMode={(enabled) => setPasswordLoginMode(enabled)}
+            setPasswordLoginMode={(enabled: boolean) => setPasswordLoginMode(enabled)}
           />
         {:else if screen === "admin" && isAdmin}
           {#if adminBundleApi}
@@ -2132,15 +2188,15 @@
                 {promoIsError}
                 {promoStatus}
                 {applyPromo}
-                {setPromoCode}
+                setPromoCode={setPromoCode as any}
                 {clearPromoFieldError}
-                {copyText}
+                copyText={copyText as any}
                 {t}
               />
             {:else if screen === "devices"}
               <DevicesScreen
                 {devicesBusy}
-                {devicesData}
+                devicesData={devicesData || undefined}
                 {devicesIsError}
                 {devicesLoaded}
                 {devicesErrorCode}
