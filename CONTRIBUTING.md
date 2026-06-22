@@ -28,7 +28,7 @@ make check
 python -m pytest -q                 # полный прогон (в CI поднимаются сервисы Postgres + Redis)
 python -m ruff check .              # линт
 python -m ruff format --check .     # формат
-python -m mypy backend/db backend/bot/infra backend/bot/payment_providers \
+python -m mypy backend/db backend/bot/infra backend/bot/middlewares backend/bot/payment_providers \
   backend/bot/services backend/bot/handlers backend/bot/app/factories \
   backend/bot/app/controllers backend/bot/app/web   # текущий CI scope, зелёный
 ```

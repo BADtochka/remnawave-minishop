@@ -4,6 +4,7 @@ NPM ?= npm
 MYPY_PATHS := \
 	backend/db \
 	backend/bot/infra \
+	backend/bot/middlewares \
 	backend/bot/payment_providers \
 	backend/bot/services \
 	backend/bot/handlers \
