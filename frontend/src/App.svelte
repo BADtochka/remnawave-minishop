@@ -59,6 +59,15 @@
   import { createI18n } from "./lib/webapp/i18n.js";
   import { createActivationWatcher } from "./lib/webapp/activationWatcher";
   import { createAdminBundle } from "./lib/webapp/adminBundle";
+  import {
+    currentSearchParams,
+    hasEmailCodeLoginDeeplink,
+    readEmailCodeLoginDeeplink,
+    readRenewalDeeplink,
+    stripRenewalLoginQueryFromUrl,
+    stripTopupQueryFromUrl,
+  } from "./lib/webapp/deeplinks";
+  import { createTelegramLaunch } from "./lib/webapp/telegramLaunch";
   import { normalizedEmail, telegramName } from "./lib/webapp/formatters.js";
   import { activeTariffName, buildTariffCatalog } from "./lib/webapp/tariffs.js";
   import {
@@ -204,6 +213,17 @@
   tg = telegramSdk.refresh();
   telegramSdkStatus = tg ? "ready" : "idle";
   telegramMiniAppInitData = telegramSdk.initData;
+  const telegramLaunch = createTelegramLaunch({
+    telegramSdk,
+    defaultTimeoutMs: TELEGRAM_SDK_BOOT_TIMEOUT_MS,
+    onLoaded: (value, initData) => {
+      tg = value;
+      telegramMiniAppInitData = initData;
+    },
+  });
+  const readTelegramMiniAppInitDataFromLocation = telegramLaunch.readInitDataFromLocation;
+  const hasTelegramLaunchParams = telegramLaunch.hasLaunchParams;
+  const loadTelegramSdk = telegramLaunch.load;
   const i18n = createI18n({
     messages: I18N,
     defaultLang: "ru",
@@ -900,22 +920,6 @@
     guestLanguage = language;
   }
 
-  function readTelegramMiniAppInitDataFromLocation() {
-    return telegramSdk.readInitDataFromLocation();
-  }
-
-  function hasTelegramLaunchParams() {
-    return telegramSdk.hasLaunchParams();
-  }
-
-  function loadTelegramSdk(timeoutMs = TELEGRAM_SDK_BOOT_TIMEOUT_MS) {
-    return telegramSdk.load(timeoutMs).then((value) => {
-      tg = value;
-      telegramMiniAppInitData = telegramSdk.initData;
-      return value;
-    });
-  }
-
   async function ensureI18nScope(scope) {
     if (MOCK || scope !== "admin" || adminI18nLoaded) return;
     if (adminI18nPromise) return adminI18nPromise;
@@ -1073,22 +1077,6 @@
     openExternalLink(link);
   }
 
-  function currentSearchParams() {
-    return new URLSearchParams(window.location.search);
-  }
-
-  function readEmailCodeLoginDeeplink() {
-    const params = currentSearchParams();
-    if (params.get("login") !== "email_code") return null;
-    const emailHint = normalizedEmail(params.get("login_email") || "");
-    if (!emailHint || !emailHint.includes("@")) return null;
-    return emailHint;
-  }
-
-  function hasEmailCodeLoginDeeplink() {
-    return Boolean(readEmailCodeLoginDeeplink());
-  }
-
   async function startEmailCodeLoginFromDeeplink() {
     if (emailLoginDeeplinkConsumed) return;
     const emailHint = readEmailCodeLoginDeeplink();
@@ -1107,30 +1095,6 @@
     await authStore.requestEmailCode((nextScreen) => {
       screen = nextScreen;
     });
-  }
-
-  function readRenewalDeeplink() {
-    const params = currentSearchParams();
-    const shouldRenew = params.get("after_login") === "renew" || params.get("renew") === "1";
-    if (!shouldRenew) return null;
-    return {
-      tariffKey: String(params.get("renew_tariff") || "").trim(),
-    };
-  }
-
-  function stripRenewalLoginQueryFromUrl() {
-    if (typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    const keys = ["login", "login_email", "after_login", "renew", "renew_tariff"];
-    const changed = keys.some((key) => url.searchParams.has(key));
-    if (!changed) return;
-    for (const key of keys) url.searchParams.delete(key);
-    const search = url.searchParams.toString();
-    window.history.replaceState(
-      null,
-      "",
-      `${url.pathname}${search ? `?${search}` : ""}${url.hash}`
-    );
   }
 
   function docsDemoParentSearchParams() {
@@ -1315,16 +1279,6 @@
         if (!shown) startPendingActivationWatch();
       }
     }
-  }
-
-  function stripTopupQueryFromUrl() {
-    if (typeof window === "undefined") return;
-    const u = new URL(window.location.href);
-    if (!u.searchParams.has("topup")) return;
-    u.searchParams.delete("topup");
-    const search = u.searchParams.toString();
-    const qs = search ? `?${search}` : "";
-    window.history.replaceState(null, "", `${u.pathname}${qs}${u.hash}`);
   }
 
   function isPasswordLoginPath(pathname = routePathnameFromLocation()) {
