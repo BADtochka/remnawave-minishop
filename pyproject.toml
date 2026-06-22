@@ -57,6 +57,7 @@ no_implicit_optional = true
 module = [
     "bot.app.factories.*",
     "bot.middlewares.*",
+    "bot.utils.*",
     "bot.infra.*",
     "bot.app.web.http_contracts",
     "bot.app.web.route_contracts",
