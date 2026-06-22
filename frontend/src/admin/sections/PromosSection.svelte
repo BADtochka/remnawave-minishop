@@ -11,13 +11,18 @@
     AdminTable,
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
-  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
+  import {
+    createAdminDatatable,
+    syncAdminDatatable,
+    watchAdminDatatable,
+  } from "../../lib/admin/datatables.js";
 
   export let at;
   export let fmtDateShort;
 
   const promosStore = getContext("promosStore");
   const promosTable = createAdminDatatable();
+  const promosTableSignal = watchAdminDatatable(promosTable);
 
   $: ({ promos, promosTotal, promosPage, promosLoading, promoCreateOpen, promoDraft } =
     $promosStore);
@@ -63,7 +68,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each promosTable.rows as p (p.id)}
+        {#each $promosTableSignal.rows as p (p.id)}
           <tr>
             <td class="admin-cell-mono" data-label={at("promo_col_code", {}, "Код")}>{p.code}</td>
             <td data-label={at("promo_col_bonus", {}, "Бонус")}

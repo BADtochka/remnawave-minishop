@@ -22,7 +22,11 @@
   } from "$components/patterns/admin/index.js";
   import { getContext, onMount } from "svelte";
   import { trafficOfLabel } from "../../lib/admin/format.js";
-  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
+  import {
+    createAdminDatatable,
+    syncAdminDatatable,
+    watchAdminDatatable,
+  } from "../../lib/admin/datatables.js";
 
   export let at = (key) => key;
   export let fmtDateShort = (value) => value;
@@ -35,6 +39,7 @@
 
   const usersStore = getContext("usersStore");
   const usersTable = createAdminDatatable();
+  const usersTableSignal = watchAdminDatatable(usersTable);
 
   $: ({
     users,
@@ -434,7 +439,7 @@
       rows={USERS_PAGE_SIZE}
       widths={["220px", "128px", "112px", "78px", "88px", "96px", "112px", "112px"]}
     />
-  {:else if !usersTable.rows.length}
+  {:else if !$usersTableSignal.rows.length}
     <AdminEmptyState tone="card"
       ><span class="admin-muted">{at("users_empty", {}, "Никого не найдено")}</span
       ></AdminEmptyState
@@ -475,7 +480,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each usersTable.rows as user (user.user_id)}
+        {#each $usersTableSignal.rows as user (user.user_id)}
           {@const avatar = resolvedAvatarUrl(user)}
           {@const badge = panelStatusBadge(user)}
           <tr

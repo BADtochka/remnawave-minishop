@@ -9,7 +9,11 @@
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
   import { FileText, User } from "$components/ui/icons.js";
-  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
+  import {
+    createAdminDatatable,
+    syncAdminDatatable,
+    watchAdminDatatable,
+  } from "../../lib/admin/datatables.js";
 
   export let at = (key) => key;
   export let fmtDate = (value) => value;
@@ -19,6 +23,7 @@
 
   const paymentsStore = getContext("paymentsStore");
   const paymentsTable = createAdminDatatable();
+  const paymentsTableSignal = watchAdminDatatable(paymentsTable);
   const PAYMENTS_PAGE_SIZE = 25;
 
   $: ({ payments, paymentsTotal, paymentsPage, paymentsLoading } = $paymentsStore);
@@ -98,7 +103,7 @@
       rows={8}
       widths={["48px", "148px", "88px", "72px", "72px", "78px", "82px", "140px", "72px", "96px"]}
     />
-  {:else if !paymentsTable.rows.length}
+  {:else if !$paymentsTableSignal.rows.length}
     <AdminEmptyState tone="card"
       ><span class="admin-muted">{at("payments_empty", {}, "Нет платежей")}</span></AdminEmptyState
     >
@@ -119,7 +124,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each paymentsTable.rows as p (p.payment_id)}
+        {#each $paymentsTableSignal.rows as p (p.payment_id)}
           <tr>
             <td class="admin-cell-id" data-label="ID">
               <AdminButton

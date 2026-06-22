@@ -1,29 +1,48 @@
 import { readable } from "svelte/store";
 import { TableHandler } from "@vincjo/datatables";
 
+const watchedTables = new WeakMap();
+const watchedTableListeners = new WeakSet();
+
 export function createAdminDatatable(rows = [], options = {}) {
   return new TableHandler(Array.isArray(rows) ? rows : [], options);
 }
 
 export function syncAdminDatatable(table, rows = []) {
   table.setRows(Array.isArray(rows) ? rows : []);
+  notifyAdminDatatable(table);
 }
 
-// The runes-based TableHandler keeps its state (rows, currentPage, pageCount)
-// in Svelte 5 signals that legacy-mode admin components ($: and {#each}) do not
-// track — Svelte wraps reads of a plain `const` handler in untrack(). Bridge the
-// handler's "change" event (fired on paging, setRows and sorting) into a Svelte
-// store so legacy reactivity re-runs on every mutation.
+function notifyAdminDatatable(table) {
+  const subscribers = watchedTables.get(table);
+  if (!subscribers) return;
+  for (const set of subscribers) set(table);
+}
+
+function ensureAdminDatatableListener(table) {
+  if (!table || watchedTableListeners.has(table)) return;
+  watchedTableListeners.add(table);
+  table.event.add("change", () => notifyAdminDatatable(table));
+}
+
+// The runes-based TableHandler keeps rows, currentPage and pageCount in Svelte 5
+// signals that legacy-mode admin components cannot track through a plain const.
+// Bridge handler changes into a Svelte store, and notify immediately after
+// syncAdminDatatable() so first-load rows render without a user action.
 export function watchAdminDatatable(table) {
   return readable(table, (set) => {
     if (!table) return;
-    let disposed = false;
-    const notify = () => {
-      if (!disposed) set(table);
-    };
-    table.event.add("change", notify);
+    ensureAdminDatatableListener(table);
+    let subscribers = watchedTables.get(table);
+    if (!subscribers) {
+      subscribers = new Set();
+      watchedTables.set(table, subscribers);
+    }
+    subscribers.add(set);
+    set(table);
     return () => {
-      disposed = true;
+      subscribers.delete(set);
+      if (subscribers.size === 0) watchedTables.delete(table);
     };
   });
 }

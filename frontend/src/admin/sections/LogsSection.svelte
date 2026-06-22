@@ -9,7 +9,11 @@
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
   import { RefreshCw, TriangleAlert, User } from "$components/ui/icons.js";
-  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
+  import {
+    createAdminDatatable,
+    syncAdminDatatable,
+    watchAdminDatatable,
+  } from "../../lib/admin/datatables.js";
 
   export let at;
   export let fmtDate;
@@ -17,6 +21,7 @@
 
   const logsStore = getContext("logsStore");
   const logsTable = createAdminDatatable();
+  const logsTableSignal = watchAdminDatatable(logsTable);
   const LOGS_PAGE_SIZE = 50;
 
   $: ({ logs, logsTotal, logsPage, logsUserFilter, logsLoading, logsError } = $logsStore);
@@ -105,7 +110,7 @@
         {at("btn_refresh", {}, "Обновить")}
       </AdminButton>
     </AdminEmptyState>
-  {:else if !logsTable.rows.length}
+  {:else if !$logsTableSignal.rows.length}
     <AdminEmptyState tone="card"
       ><span class="admin-muted">{at("logs_empty", {}, "Записей нет")}</span></AdminEmptyState
     >
@@ -121,7 +126,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each logsTable.rows as entry (entry.log_id)}
+        {#each $logsTableSignal.rows as entry (entry.log_id)}
           <tr>
             <td data-label={at("date", {}, "Дата")}>{fmtDate(entry.timestamp)}</td>
             <td class="admin-cell-mono" data-label={at("event", {}, "Событие")}
