@@ -44,9 +44,9 @@ from .success import HWID_DEVICE_SALE_BASES
 
 
 def _provider_spec() -> PaymentProviderSpec:
-    from . import yookassa as yookassa_facade
+    from . import SPEC
 
-    return yookassa_facade.SPEC
+    return SPEC
 
 
 async def _initiate_yk_payment(

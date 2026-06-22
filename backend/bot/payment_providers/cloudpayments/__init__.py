@@ -2,6 +2,8 @@
 
 from . import service as _service
 
+SPEC = _service.SPEC
+
 _NAMESPACE = {
     _name: _value
     for _name, _value in vars(_service).items()
