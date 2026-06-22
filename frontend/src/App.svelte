@@ -54,7 +54,7 @@
     openUrlWithHiddenAnchor,
     readExternalAppLaunchTarget,
   } from "./lib/webapp/appLinks.js";
-  import { createApiClient } from "./lib/webapp/publicApi";
+  import { createWebappDataClient } from "./lib/webapp/dataClient";
   import { createI18n } from "./lib/webapp/i18n.js";
   import { normalizedEmail, telegramName } from "./lib/webapp/formatters.js";
   import { activeTariffName, buildTariffCatalog } from "./lib/webapp/tariffs.js";
@@ -93,7 +93,7 @@
     createActivationHandoff,
   } from "./lib/webapp/activationHandoff.js";
   import { buildGravatarUrl, resolveProfileAvatarUrl } from "./lib/webapp/gravatar.js";
-  import { createBillingActions } from "./lib/webapp/billingActions.js";
+  import { createBillingActions } from "./lib/webapp/billingActions";
   import { invalidateWebappTariffOptionCaches } from "./lib/webapp/billingOptionCache.js";
   import { runWebappBoot } from "./lib/webapp/webappBoot.js";
   import {
@@ -240,7 +240,7 @@
   const termUnitLabel = i18n.termUnitLabel;
   const languageName = i18n.languageName;
   guestLanguage = normalizeLangCode(CFG.language || "ru");
-  const apiClient = createApiClient({
+  const dataClient = createWebappDataClient({
     apiBase: CFG.apiBase,
     csrfCookieName: CSRF_COOKIE_NAME,
     getCsrfToken: () => csrfToken,
@@ -254,9 +254,10 @@
         : null,
     getMockContext: () => ({ currentLang, normalizeLangCode, clone: structuredCloneSafe }),
   });
+  const api = dataClient.api;
+  const publicApi = dataClient.publicApi;
   const billing = createBillingActions({
-    api: (path, options) => apiClient.api(path, options),
-    t: (...args) => t(...args),
+    api,
   });
   const activationHandoff = createActivationHandoff({
     storageKey: ACTIVATION_HANDOFF_STORAGE_KEY,
@@ -1765,7 +1766,7 @@
         ? normalizeSection(currentQuery.get("screen"))
         : sectionFromPath(routePathnameFromLocation(), routePrefix);
     const installGuidesPromise = routeSection === "install" ? installGuidesStore.load() : null;
-    const payload = await api(options?.fresh ? "/me?fresh=1" : "/me");
+    const payload = await dataClient.loadData({ fresh: options?.fresh === true });
     if (!payload.ok) throw new Error(payload.error || "load_failed");
     data = payload;
     billingStore.update((s) => ({
@@ -1952,14 +1953,6 @@
       screen = nextScreen;
     });
     void startEmailCodeLoginFromDeeplink();
-  }
-
-  async function api(path, options = {}) {
-    return apiClient.api(path, options);
-  }
-
-  async function publicApi(path, payload = {}, options = {}) {
-    return apiClient.publicApi(path, payload, options);
   }
 
   function setToken(nextToken, nextCsrf = "") {
