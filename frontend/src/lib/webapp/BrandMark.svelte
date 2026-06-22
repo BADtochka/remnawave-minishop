@@ -141,29 +141,22 @@
 
   .brand-mark-spinner {
     position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .brand-mark-spinner::after {
-    content: "";
-    width: 1rem;
-    height: 1rem;
-    border: 2px solid currentColor;
-    border-bottom-color: transparent;
+    top: 50%;
+    left: 50%;
+    width: clamp(1rem, 42%, 2.5rem);
+    height: clamp(1rem, 42%, 2.5rem);
+    border: 2px solid color-mix(in srgb, currentColor 24%, transparent);
+    border-top-color: currentColor;
     border-radius: 50%;
     animation: brand-mark-spin 0.8s linear infinite;
-    opacity: 0.5;
+    opacity: 0.65;
+    transform: translate(-50%, -50%) rotate(0deg);
+    transform-origin: center;
   }
 
   @keyframes brand-mark-spin {
-    0% {
-      transform: rotate(0deg);
-    }
     100% {
-      transform: rotate(360deg);
+      transform: translate(-50%, -50%) rotate(360deg);
     }
   }
 
