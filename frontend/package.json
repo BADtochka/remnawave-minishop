@@ -13,8 +13,8 @@
     "lint": "eslint src scripts",
     "lint:fix": "npm run lint:js:fix",
     "lint:js:fix": "eslint src scripts --fix",
-    "format": "prettier --write \"src/**/*.{js,svelte}\" \"src/lib/api/**/*.ts\" \"src/lib/webapp/publicApi.ts\" \"scripts/**/*.mjs\"",
-    "format:check": "prettier --check \"src/**/*.{js,svelte}\" \"src/lib/api/**/*.ts\" \"src/lib/webapp/publicApi.ts\" \"scripts/**/*.mjs\"",
+    "format": "prettier --write \"src/**/*.{js,ts,svelte}\" \"scripts/**/*.mjs\"",
+    "format:check": "prettier --check \"src/**/*.{js,ts,svelte}\" \"scripts/**/*.mjs\"",
     "check:svelte": "svelte-check --tsconfig ./jsconfig.json",
     "check": "npm run lint && npm run check:svelte && npm run format:check",
     "fix": "npm run format && npm run lint:js:fix"
@@ -46,6 +46,7 @@
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "4.3.0",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1",
     "uplot": "^1.6.32",
     "vite": "^8.0.16"
   },
