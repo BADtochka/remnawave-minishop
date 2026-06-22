@@ -1,6 +1,7 @@
 import hashlib
 import html
 import logging
+from collections.abc import Sized
 from datetime import datetime
 from typing import Any, Optional, Union
 
@@ -1288,11 +1289,8 @@ async def my_subscription_command_handler(
                         devices_count = len(devices_list)
                     elif isinstance(devices_list, int):
                         devices_count = devices_list
-                    else:
-                        try:
-                            devices_count = len(devices_list)  # type: ignore[arg-type]
-                        except Exception:
-                            devices_count = None
+                    elif isinstance(devices_list, Sized):
+                        devices_count = len(devices_list)
                     if devices_count is None:
                         total_value = devices_response.get("total")
                         if isinstance(total_value, int):
