@@ -52,6 +52,16 @@ jobs:
         run: npm run lint
         working-directory: frontend
 
+      - name: Svelte typecheck
+        run: npm run check:svelte
+        working-directory: frontend
+
+      - name: Check generated API types are in sync
+        run: |
+          npm run generate:api-types
+          git diff --exit-code src/lib/api/openapi.generated.ts
+        working-directory: frontend
+
       - name: Prettier check (frontend)
         run: npm run format:check
         working-directory: frontend
@@ -155,11 +165,12 @@ jobs:
       - name: Install backend deps + mypy
         run: pip install -r backend/requirements.txt "mypy>=1.15,<2"
 
-      - name: Mypy scoped typed API modules
+      - name: Mypy web API and event layers
         run: >-
           python -m mypy
-          backend/bot/infra/event_payloads.py
-          backend/bot/app/web/admin_api_impl/schemas.py
+          backend/bot/infra
+          backend/bot/app/web/admin_api_impl
+          backend/bot/app/web/webapp
           backend/bot/app/web/http_contracts.py
           backend/bot/app/web/route_contracts.py
           backend/bot/app/web/openapi.py

@@ -54,7 +54,7 @@
     openUrlWithHiddenAnchor,
     readExternalAppLaunchTarget,
   } from "./lib/webapp/appLinks.js";
-  import { createApiClient } from "./lib/webapp/publicApi.js";
+  import { createApiClient } from "./lib/webapp/publicApi";
   import { createI18n } from "./lib/webapp/i18n.js";
   import { normalizedEmail, telegramName } from "./lib/webapp/formatters.js";
   import { activeTariffName, buildTariffCatalog } from "./lib/webapp/tariffs.js";

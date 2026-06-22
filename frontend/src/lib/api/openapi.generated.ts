@@ -1503,6 +1503,42 @@ export interface components {
         [key: string]: number;
       };
     };
+    /** AdminBackupRestoreBody */
+    AdminBackupRestoreBody: {
+      /**
+       * Archive Name
+       * @default
+       */
+      archive_name: unknown;
+      /**
+       * Confirm
+       * @default false
+       */
+      confirm: unknown;
+      /**
+       * Restore Compose
+       * @default false
+       */
+      restore_compose: unknown;
+      /**
+       * Restore Database
+       * @default false
+       */
+      restore_database: unknown;
+    };
+    /** AdminBroadcastBody */
+    AdminBroadcastBody: {
+      /**
+       * Target
+       * @default all
+       */
+      target: unknown;
+      /**
+       * Text
+       * @default
+       */
+      text: unknown;
+    };
     /** AdminHealthOut */
     AdminHealthOut: {
       /** Alerts */
@@ -1562,6 +1598,13 @@ export interface components {
       payments: components["schemas"]["PaymentOut"][];
       /** Total */
       total: number;
+    };
+    /** AdminSettingsPatchBody */
+    AdminSettingsPatchBody: {
+      /** Deletes */
+      deletes?: unknown;
+      /** Updates */
+      updates?: unknown;
     };
     /** AdminStatsOut */
     AdminStatsOut: {
@@ -1625,6 +1668,137 @@ export interface components {
        * @default false
        */
       is_internal_note: boolean;
+    };
+    /** AdminTranslationsPatchBody */
+    AdminTranslationsPatchBody: {
+      /** Deletes */
+      deletes?: unknown;
+      /** Updates */
+      updates?: unknown;
+    };
+    /** AdminUserBanBody */
+    AdminUserBanBody: {
+      /**
+       * Banned
+       * @default false
+       */
+      banned: unknown;
+    };
+    /** AdminUserExtendBody */
+    AdminUserExtendBody: {
+      /**
+       * Days
+       * @default null
+       */
+      days: unknown;
+      /**
+       * Extend Hwid Devices
+       * @default null
+       */
+      extend_hwid_devices: unknown;
+      /**
+       * Tariff Key
+       * @default null
+       */
+      tariff_key: unknown;
+    };
+    /** AdminUserHwidDeviceLimitBody */
+    AdminUserHwidDeviceLimitBody: {
+      /**
+       * Hwid Device Limit
+       * @default null
+       */
+      hwid_device_limit: unknown;
+      /**
+       * Limit
+       * @default null
+       */
+      limit: unknown;
+      /**
+       * Reset To Default
+       * @default false
+       */
+      reset_to_default: unknown;
+      /**
+       * Unlimited
+       * @default false
+       */
+      unlimited: unknown;
+      /**
+       * Use Default
+       * @default false
+       */
+      use_default: unknown;
+    };
+    /** AdminUserMessageBody */
+    AdminUserMessageBody: {
+      /**
+       * Text
+       * @default
+       */
+      text: unknown;
+    };
+    /** AdminUserPremiumOverrideBody */
+    AdminUserPremiumOverrideBody: {
+      /**
+       * Bonus Bytes
+       * @default null
+       */
+      bonus_bytes: unknown;
+      /**
+       * Bonus Gb
+       * @default null
+       */
+      bonus_gb: unknown;
+      /**
+       * Unlimited
+       * @default false
+       */
+      unlimited: unknown;
+    };
+    /** AdminUserRegularTrafficOverrideBody */
+    AdminUserRegularTrafficOverrideBody: {
+      /**
+       * Regular Bonus Bytes
+       * @default null
+       */
+      regular_bonus_bytes: unknown;
+      /**
+       * Regular Bonus Gb
+       * @default null
+       */
+      regular_bonus_gb: unknown;
+      /**
+       * Unlimited
+       * @default false
+       */
+      unlimited: unknown;
+    };
+    /** AdminUserTariffBody */
+    AdminUserTariffBody: {
+      /**
+       * Tariff Key
+       * @default null
+       */
+      tariff_key: unknown;
+    };
+    /** AdminUserTrafficGrantBody */
+    AdminUserTrafficGrantBody: {
+      /**
+       * Bytes
+       * @default null
+       */
+      bytes: unknown;
+      /**
+       * Gb
+       * @default null
+       */
+      gb: unknown;
+      /**
+       * Kind
+       * @default regular
+       */
+      kind: unknown;
     };
     /** CreateTicketPayload */
     CreateTicketPayload: {
@@ -2072,6 +2246,16 @@ export interface components {
       /** @default null */
       topup_packages_default: components["schemas"]["PackageSet"] | null;
     };
+    /** TariffsSaveBody */
+    TariffsSaveBody: {
+      /**
+       * Catalog
+       * @default null
+       */
+      catalog: unknown;
+    } & {
+      [key: string]: unknown;
+    };
     /**
      * ThemeTokens
      * @description CSS design tokens for the subscription Mini App shell.
@@ -2384,6 +2568,16 @@ export interface components {
        */
       warning_text: string | null;
     };
+    /** ThemesSaveBody */
+    ThemesSaveBody: {
+      /**
+       * Catalog
+       * @default null
+       */
+      catalog: unknown;
+    } & {
+      [key: string]: unknown;
+    };
     /** TicketReplyPayload */
     TicketReplyPayload: {
       /** Body */
@@ -2406,6 +2600,29 @@ export interface components {
       /** Token */
       token: string;
     };
+    /** WebAppEmailCodeAuthPayload */
+    WebAppEmailCodeAuthPayload: {
+      /**
+       * Code
+       * @default
+       */
+      code: string;
+      /**
+       * Email
+       * Format: email
+       */
+      email: string;
+      /**
+       * Referral Code
+       * @default null
+       */
+      referral_code: string | null;
+      /**
+       * Start Param
+       * @default null
+       */
+      start_param: string | null;
+    };
     /** WebAppEmailCodePayload */
     WebAppEmailCodePayload: {
       /**
@@ -2419,8 +2636,18 @@ export interface components {
        */
       email: string;
     };
-    /** WebAppEmailMagicPayload */
-    WebAppEmailMagicPayload: {
+    /** WebAppEmailMagicAuthPayload */
+    WebAppEmailMagicAuthPayload: {
+      /**
+       * Referral Code
+       * @default null
+       */
+      referral_code: string | null;
+      /**
+       * Start Param
+       * @default null
+       */
+      start_param: string | null;
       /** Token */
       token: string;
     };
@@ -2441,6 +2668,19 @@ export interface components {
        * Format: email
        */
       email: string;
+    };
+    /** WebAppEmailRequestPayload */
+    WebAppEmailRequestPayload: {
+      /**
+       * Email
+       * Format: email
+       */
+      email: string;
+      /**
+       * Language
+       * @default null
+       */
+      language: string | null;
     };
     /** WebAppLanguagePayload */
     WebAppLanguagePayload: {
@@ -2500,6 +2740,14 @@ export interface components {
        */
       traffic_gb: unknown;
     };
+    /** WebAppPromoApplyPayload */
+    WebAppPromoApplyPayload: {
+      /**
+       * Code
+       * @default
+       */
+      code: unknown;
+    };
     /** WebAppSetPasswordPayload */
     WebAppSetPasswordPayload: {
       /** Code */
@@ -2515,6 +2763,39 @@ export interface components {
       mode: string;
       /** Tariff Key */
       tariff_key: string;
+    };
+    /** WebAppTelegramAuthPayload */
+    WebAppTelegramAuthPayload: {
+      /**
+       * Auth Data
+       * @default null
+       */
+      auth_data: unknown;
+      /**
+       * Id Token
+       * @default
+       */
+      id_token: string;
+      /**
+       * Init Data
+       * @default
+       */
+      init_data: string;
+      /**
+       * Nonce
+       * @default
+       */
+      nonce: string;
+      /**
+       * Referral Code
+       * @default null
+       */
+      referral_code: string | null;
+      /**
+       * Start Param
+       * @default null
+       */
+      start_param: string | null;
     };
     /**
      * WebappTheme
@@ -2780,18 +3061,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          auth_data?: {
-            [key: string]: unknown;
-          };
-          id_token?: string;
-          init_data?: string;
-          nonce?: string;
-          referral_code?: string;
-          start_param?: string;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["WebAppTelegramAuthPayload"];
       };
     };
     responses: {
@@ -3106,14 +3376,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          archive_name: string;
-          confirm: boolean;
-          restore_compose?: boolean;
-          restore_database?: boolean;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminBackupRestoreBody"];
       };
     };
     responses: {
@@ -3180,13 +3443,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          /** @enum {string} */
-          target?: "active" | "active_never_connected" | "all" | "expired" | "inactive" | "never";
-          text: string;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminBroadcastBody"];
       };
     };
     responses: {
@@ -3573,14 +3830,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          deletes?: string[];
-          updates?: {
-            [key: string]: unknown;
-          };
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminSettingsPatchBody"];
       };
     };
     responses: {
@@ -3888,13 +4138,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json":
-          | components["schemas"]["TariffsConfig"]
-          | ({
-              catalog: components["schemas"]["TariffsConfig"];
-            } & {
-              [key: string]: unknown;
-            });
+        "application/json": components["schemas"]["TariffsSaveBody"];
       };
     };
     responses: {
@@ -3961,13 +4205,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json":
-          | components["schemas"]["WebappThemesConfig"]
-          | ({
-              catalog: components["schemas"]["WebappThemesConfig"];
-            } & {
-              [key: string]: unknown;
-            });
+        "application/json": components["schemas"]["ThemesSaveBody"];
       };
     };
     responses: {
@@ -4034,16 +4272,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          deletes?: {
-            [key: string]: unknown;
-          }[];
-          updates?: {
-            [key: string]: unknown;
-          };
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminTranslationsPatchBody"];
       };
     };
     responses: {
@@ -4207,11 +4436,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          banned: boolean;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminUserBanBody"];
       };
     };
     responses: {
@@ -4245,13 +4470,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          days: number;
-          extend_hwid_devices?: boolean;
-          tariff_key?: string | null;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminUserExtendBody"];
       };
     };
     responses: {
@@ -4285,15 +4504,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          hwid_device_limit?: number | null;
-          limit?: number | null;
-          reset_to_default?: boolean;
-          unlimited?: boolean;
-          use_default?: boolean;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminUserHwidDeviceLimitBody"];
       };
     };
     responses: {
@@ -4327,11 +4538,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          text: string;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminUserMessageBody"];
       };
     };
     responses: {
@@ -4362,11 +4569,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          text: string;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminUserMessageBody"];
       };
     };
     responses: {
@@ -4397,13 +4600,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          bonus_bytes?: number | null;
-          bonus_gb?: number | null;
-          unlimited?: boolean;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminUserPremiumOverrideBody"];
       };
     };
     responses: {
@@ -4476,13 +4673,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          regular_bonus_bytes?: number | null;
-          regular_bonus_gb?: number | null;
-          unlimited?: boolean;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminUserRegularTrafficOverrideBody"];
       };
     };
     responses: {
@@ -4543,11 +4734,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          tariff_key: string;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminUserTariffBody"];
       };
     };
     responses: {
@@ -4609,14 +4796,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          bytes?: number | null;
-          gb?: number | null;
-          /** @enum {string} */
-          kind?: "regular" | "premium";
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["AdminUserTrafficGrantBody"];
       };
     };
     responses: {
@@ -4651,7 +4831,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["WebAppEmailMagicPayload"];
+        "application/json": components["schemas"]["WebAppEmailMagicAuthPayload"];
       };
     };
     responses: {
@@ -4719,7 +4899,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["WebAppEmailPayload"];
+        "application/json": components["schemas"]["WebAppEmailRequestPayload"];
       };
     };
     responses: {
@@ -4749,7 +4929,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["WebAppEmailCodePayload"];
+        "application/json": components["schemas"]["WebAppEmailCodeAuthPayload"];
       };
     };
     responses: {
@@ -4836,18 +5016,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          auth_data?: {
-            [key: string]: unknown;
-          };
-          id_token?: string;
-          init_data?: string;
-          nonce?: string;
-          referral_code?: string;
-          start_param?: string;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["WebAppTelegramAuthPayload"];
       };
     };
     responses: {
@@ -5128,11 +5297,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          code: string;
-        } & {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["WebAppPromoApplyPayload"];
       };
     };
     responses: {
