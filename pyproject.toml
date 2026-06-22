@@ -34,3 +34,10 @@ line-ending = "auto"
 python_version = "3.12"
 ignore_missing_imports = true
 warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = ["db", "db.*"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_return_any = true
+no_implicit_optional = true
