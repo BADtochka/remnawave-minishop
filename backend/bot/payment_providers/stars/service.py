@@ -15,7 +15,7 @@ from bot.utils.callback_answer import callback_message_or_none
 from config.settings import Settings
 from db.dal import payment_dal
 
-from .base import (
+from ..base import (
     PaymentProviderSpec,
     ProviderEnvConfig,
     ProviderManifestField,
@@ -23,7 +23,7 @@ from .base import (
     WebAppPaymentContext,
     provider_env_file,
 )
-from .shared import (
+from ..shared import (
     PAYMENT_STATUS_PENDING_FINALIZATION,
     PaymentSuccessRequest,
     create_webapp_payment_record,
