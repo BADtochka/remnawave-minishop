@@ -1,6 +1,9 @@
-import logging
-from typing import TYPE_CHECKING, Any, Optional
+from __future__ import annotations
 
+import logging
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
+from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from aiogram.utils.text_decorations import html_decoration as hd
 
@@ -10,9 +13,11 @@ from bot.services.email_templates import (
     render_support_ticket_closed_user,
     render_support_user_reply_admin,
 )
+from bot.services.email_templates_common import EmailContent
 from bot.utils import MessageContent, send_message_via_queue
 from bot.utils.message_queue import get_queue_manager
 from db.dal import app_settings_dal, user_dal
+from db.models import SupportTicket, SupportTicketMessage, User
 
 if TYPE_CHECKING:
     from bot.middlewares.i18n import JsonI18n
@@ -29,6 +34,7 @@ class NotificationSupportMixin:
         session_factory: Any
         email_auth_service: Optional["EmailAuthService"]
         bot_username: str
+        bot: Bot
 
         async def _send_to_admins(
             self,
@@ -84,7 +90,7 @@ class NotificationSupportMixin:
         return text if len(text) <= limit else f"{text[: limit - 1]}…"
 
     @staticmethod
-    def _support_user_display(user) -> str:
+    def _support_user_display(user: User) -> str:
         name = " ".join(
             part for part in [user.first_name, getattr(user, "last_name", None)] if part
         )
@@ -98,7 +104,7 @@ class NotificationSupportMixin:
         return display
 
     @staticmethod
-    def _support_snapshot_rows(snapshot: Optional[dict]) -> list[tuple[str, str]]:
+    def _support_snapshot_rows(snapshot: Optional[dict[str, object]]) -> list[tuple[str, str]]:
         if not snapshot:
             return []
         rows = []
@@ -148,8 +154,8 @@ class NotificationSupportMixin:
 
     def _support_keyboard(
         self,
-        ticket,
-        user,
+        ticket: SupportTicket,
+        user: User,
         *,
         admin: bool = True,
         web_app_buttons: bool = True,
@@ -209,7 +215,7 @@ class NotificationSupportMixin:
             reply_markup=log_markup,
         )
 
-    def _support_user_keyboard(self, ticket, user) -> InlineKeyboardMarkup:
+    def _support_user_keyboard(self, ticket: SupportTicket, user: User) -> InlineKeyboardMarkup:
         button_text = self._support_text(
             getattr(user, "language_code", None),
             "wa_support_open_ticket",
@@ -225,7 +231,7 @@ class NotificationSupportMixin:
             )
         return InlineKeyboardMarkup(inline_keyboard=[[button]])
 
-    async def _admin_email_users(self):
+    async def _admin_email_users(self) -> list[User]:
         if not self.session_factory:
             return []
         async with self.session_factory() as session:
@@ -236,7 +242,9 @@ class NotificationSupportMixin:
                     users.append(user)
             return users
 
-    async def _send_admin_support_email(self, renderer, **kwargs) -> None:
+    async def _send_admin_support_email(
+        self, renderer: Callable[..., EmailContent], **kwargs: object
+    ) -> None:
         if not await self.support_admin_email_notifications_enabled():
             return
         if not self.email_auth_service:
@@ -256,7 +264,13 @@ class NotificationSupportMixin:
             except Exception:
                 logging.exception("Failed to send support email to admin %s.", admin.user_id)
 
-    async def notify_new_support_ticket(self, ticket, user, first_message: str, snapshot: dict):
+    async def notify_new_support_ticket(
+        self,
+        ticket: SupportTicket,
+        user: User,
+        first_message: str,
+        snapshot: dict[str, object],
+    ) -> None:
         if not getattr(self.settings, "LOG_SUPPORT", True):
             return
         priority_emoji = {"low": "🟢", "normal": "🟡", "high": "🟠", "urgent": "🔴"}.get(
@@ -295,15 +309,15 @@ class NotificationSupportMixin:
 
     async def notify_support_user_reply(
         self,
-        ticket,
-        message,
-        user,
-        snapshot: dict,
+        ticket: SupportTicket,
+        message: SupportTicketMessage,
+        user: User,
+        snapshot: dict[str, object],
         *,
         unread_count: Optional[int] = None,
         send_telegram: bool = True,
         send_email: bool = True,
-    ):
+    ) -> None:
         if not getattr(self.settings, "LOG_SUPPORT", True):
             return
         preview = self._support_preview(message.body)
@@ -336,7 +350,9 @@ class NotificationSupportMixin:
                 ticket_url=self._support_ticket_url(ticket.ticket_id, admin=True),
             )
 
-    async def notify_support_admin_reply(self, ticket, message, user):
+    async def notify_support_admin_reply(
+        self, ticket: SupportTicket, message: SupportTicketMessage, user: User
+    ) -> None:
         preview = self._support_preview(message.body, limit=500)
         url = self._support_ticket_url(ticket.ticket_id, admin=False)
         text = f"💬 <b>Новый ответ по тикету #{ticket.ticket_id}</b>\n\n{hd.quote(preview)}"
@@ -372,7 +388,9 @@ class NotificationSupportMixin:
             )
             await self.email_auth_service.send_rendered_email(email=user.email, content=content)
 
-    async def notify_support_ticket_closed(self, ticket, user, closing_admin):
+    async def notify_support_ticket_closed(
+        self, ticket: SupportTicket, user: User, closing_admin: User | None
+    ) -> None:
         url = self._support_ticket_url(ticket.ticket_id, admin=False)
         text = f"✅ <b>Тикет #{ticket.ticket_id} закрыт</b>\n\n{hd.quote(ticket.subject)}"
         keyboard = self._support_user_keyboard(ticket, user)

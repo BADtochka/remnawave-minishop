@@ -6,6 +6,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.text_decorations import html_decoration as hd
+from sqlalchemy.orm import sessionmaker
 
 from bot.infra.payment_events import PaymentPurchase, payment_purchases_from_legacy_fields
 from bot.middlewares.i18n import JsonI18n
@@ -32,10 +33,10 @@ class NotificationService(NotificationSupportMixin):
         settings: Settings,
         i18n: Optional[JsonI18n] = None,
         *,
-        session_factory=None,
+        session_factory: Optional[sessionmaker] = None,
         email_auth_service: Optional[EmailAuthService] = None,
         bot_username: Optional[str] = None,
-    ):
+    ) -> None:
         self.bot = bot
         self.settings = settings
         self.i18n = i18n
@@ -98,7 +99,7 @@ class NotificationService(NotificationSupportMixin):
         message: str,
         thread_id: Optional[int] = None,
         reply_markup: Optional[InlineKeyboardMarkup] = None,
-    ):
+    ) -> None:
         """Send message to configured log channel/group using message queue"""
         if not self.settings.LOG_CHAT_ID:
             return
@@ -173,7 +174,7 @@ class NotificationService(NotificationSupportMixin):
         self,
         message: str,
         reply_markup: Optional[InlineKeyboardMarkup] = None,
-    ):
+    ) -> None:
         """Send message to all admin users using message queue"""
         if not self.settings.ADMIN_IDS:
             return
@@ -213,7 +214,7 @@ class NotificationService(NotificationSupportMixin):
         first_name: Optional[str] = None,
         email: Optional[str] = None,
         referred_by_id: Optional[int] = None,
-    ):
+    ) -> None:
         """Send notification about new user registration"""
         if not self.settings.LOG_NEW_USERS:
             return
@@ -253,7 +254,7 @@ class NotificationService(NotificationSupportMixin):
         user_id: int,
         email: str,
         referred_by_id: Optional[int] = None,
-    ):
+    ) -> None:
         """Send notification about new user registration via email (Web App)."""
         if not self.settings.LOG_NEW_USERS:
             return
@@ -301,7 +302,7 @@ class NotificationService(NotificationSupportMixin):
         telegram_id: Optional[int] = None,
         username: Optional[str] = None,
         first_name: Optional[str] = None,
-    ):
+    ) -> None:
         """Send notification when an email is linked to a Telegram-created account."""
         if not self.settings.LOG_NEW_USERS:
             return
@@ -338,7 +339,7 @@ class NotificationService(NotificationSupportMixin):
         telegram_id: int,
         username: Optional[str] = None,
         first_name: Optional[str] = None,
-    ):
+    ) -> None:
         """Send notification when Telegram is linked to an email-created account."""
         if not self.settings.LOG_NEW_USERS:
             return
@@ -377,7 +378,7 @@ class NotificationService(NotificationSupportMixin):
         final_end_date_text: Optional[str] = None,
         primary_panel_user_uuid: Optional[str] = None,
         removed_panel_user_uuid: Optional[str] = None,
-    ):
+    ) -> None:
         """Send notification when duplicate email/Telegram accounts are merged."""
         if not self.settings.LOG_NEW_USERS:
             return
@@ -444,7 +445,7 @@ class NotificationService(NotificationSupportMixin):
         tariff_key: Optional[str] = None,
         purchased_hwid_devices: Optional[int] = None,
         purchases: Optional[tuple[PaymentPurchase, ...]] = None,
-    ):
+    ) -> None:
         """Send notification about successful payment"""
         if not self.settings.LOG_PAYMENTS:
             return
@@ -588,7 +589,7 @@ class NotificationService(NotificationSupportMixin):
         bonus_days: int,
         username: Optional[str] = None,
         email: Optional[str] = None,
-    ):
+    ) -> None:
         """Send notification about promo code activation"""
         if not self.settings.LOG_PROMO_ACTIVATIONS:
             return
@@ -620,7 +621,7 @@ class NotificationService(NotificationSupportMixin):
         end_date: datetime,
         username: Optional[str] = None,
         email: Optional[str] = None,
-    ):
+    ) -> None:
         """Send notification about trial activation"""
         if not self.settings.LOG_TRIAL_ACTIVATIONS:
             return
@@ -652,7 +653,7 @@ class NotificationService(NotificationSupportMixin):
         users_processed: int,
         subs_synced: int,
         username: Optional[str] = None,
-    ):
+    ) -> None:
         """Send notification about panel synchronization"""
         if not getattr(self.settings, "LOG_PANEL_SYNC", True):
             return
@@ -685,7 +686,7 @@ class NotificationService(NotificationSupportMixin):
         username: Optional[str] = None,
         first_name: Optional[str] = None,
         email: Optional[str] = None,
-    ):
+    ) -> None:
         """Send notification about a suspicious promo code attempt."""
         if not self.settings.LOG_SUSPICIOUS_ACTIVITY:
             return
@@ -718,7 +719,7 @@ class NotificationService(NotificationSupportMixin):
         to_admins: bool = False,
         to_log_channel: bool = True,
         thread_id: Optional[int] = None,
-    ):
+    ) -> None:
         """Send custom notification message"""
         if to_log_channel:
             await self._send_to_log_channel(message, thread_id)
