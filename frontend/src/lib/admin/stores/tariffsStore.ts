@@ -43,10 +43,15 @@ export type ProviderCurrencySupport = {
 };
 type TariffDraftRow = Record<string, unknown>;
 export type TariffDraft = ReturnType<typeof emptyTariffDraft> & Record<string, unknown>;
-type DraftSquadField = "squadUuids" | "premiumSquadUuids";
-type DraftRowsField = "periodRows" | "topupRows" | "premiumTopupRows" | "trafficRows" | "hwidRows";
-type TariffEditorTab = "general" | "pricing" | "topup" | "premium" | "hwid";
-type TariffsState = {
+export type DraftSquadField = "squadUuids" | "premiumSquadUuids";
+export type DraftRowsField =
+  | "periodRows"
+  | "topupRows"
+  | "premiumTopupRows"
+  | "trafficRows"
+  | "hwidRows";
+export type TariffEditorTab = "general" | "pricing" | "topup" | "premium" | "hwid";
+export type TariffsState = {
   tariffsCatalog: TariffsCatalog;
   tariffsPath: string;
   tariffsLoading: boolean;
