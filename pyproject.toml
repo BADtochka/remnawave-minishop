@@ -63,6 +63,7 @@ module = [
     "bot.keyboards.*",
     "bot.services.*",
     "bot.payment_providers.*",
+    "bot.handlers.*",
     "bot.app.web.*",
     "web.http_contracts",
     "web.route_contracts",
