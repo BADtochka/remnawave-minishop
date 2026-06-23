@@ -16,7 +16,7 @@ type ToastFn = (message: string) => void;
 type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 type StatsResponse = GetResponse<"/api/admin/stats">;
 type SyncResponse = PostResponse<"/api/admin/sync">;
-type StatsState = {
+export type StatsState = {
   stats: StatsResponse | null;
   statsLoading: boolean;
   statsError: string;
