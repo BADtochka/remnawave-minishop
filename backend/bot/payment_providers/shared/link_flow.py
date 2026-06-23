@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Generic, Optional, Protocol, Tuple, TypeVar
 
 from aiogram import types
+from aiohttp import web
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import Settings
@@ -246,7 +247,7 @@ async def run_callback_payment(
 async def run_webapp_payment(
     descriptor: LinkPaymentDescriptor[ServiceT],
     ctx: WebAppPaymentContext,
-) -> Any:
+) -> web.Response:
     """Shared body of every link provider's ``create_webapp_payment``."""
     settings = app_required(ctx.request, "settings", Settings)
     service = app_required(ctx.request, descriptor.service_app_key, descriptor.service_type)

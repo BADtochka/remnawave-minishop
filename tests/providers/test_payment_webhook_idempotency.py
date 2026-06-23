@@ -102,12 +102,12 @@ def test_severpay_duplicate_success_webhook_does_not_finalize_again(monkeypatch)
 
     monkeypatch.setattr(severpay_service, "lookup_payment_by_order_or_provider_id", lookup_payment)
     monkeypatch.setattr(
-        severpay.payment_dal,
+        severpay_service.payment_dal,
         "update_provider_payment_and_status",
         AsyncMock(side_effect=AssertionError("duplicate webhook must not update payment")),
     )
     monkeypatch.setattr(
-        severpay,
+        severpay_service,
         "finalize_successful_payment",
         AsyncMock(side_effect=AssertionError("duplicate webhook must not finalize")),
     )
