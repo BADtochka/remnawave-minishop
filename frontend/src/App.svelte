@@ -77,6 +77,7 @@
   import { createTariffActions } from "./lib/webapp/tariffActions.js";
   import { createPrimaryPayActionLabel } from "./lib/webapp/primaryPayActionLabel.js";
   import { createTelegramLoginActions } from "./lib/webapp/telegramLoginActions.js";
+  import { buildAdminPanelProps } from "./lib/webapp/adminPanelProps.js";
   import {
     resolveInitialLoadRoute,
     resolveLoadedWebappRoute,
@@ -95,14 +96,7 @@
   import { runWebappBoot } from "./lib/webapp/webappBoot.js";
   import { CSRF_COOKIE_NAME, readCookie } from "./lib/webapp/session.js";
   import { createTelegramSdk } from "./lib/webapp/telegramSdk.js";
-  import {
-    adminPaymentIdFromPath,
-    adminPaymentsUserIdFromPath,
-    adminSettingsPathFromPath,
-    adminUserIdFromPath,
-    publicInstallTokenFromPath,
-    sectionFromPath,
-  } from "./lib/webapp/routes.js";
+  import { publicInstallTokenFromPath, sectionFromPath } from "./lib/webapp/routes.js";
 
   type AnyRecord = Record<string, any>;
   type TelegramWebApp = AnyRecord & {
@@ -959,33 +953,32 @@
     });
   }
 
-  $: adminPanelProps = {
+  $: adminPanelProps = buildAdminPanelProps({
+    adminActiveSection,
     api,
+    appFaviconUrl: CFG.faviconUrl,
+    appFaviconUseCustom: CFG.faviconUseCustom,
+    appRepositoryUrl: CFG.appRepositoryUrl,
+    appVersion: CFG.appVersion,
+    brand,
+    brandTitle,
+    currentLang,
+    fallbackAdminSection: initialAdminSectionFromLocation(),
+    languageBusy,
+    languageOptions,
     onClose: closeAdminPanel,
-    onToast: (text: string) => showToast(text),
-    initialSection: screen === "admin" ? adminActiveSection : initialAdminSectionFromLocation(),
-    initialSettingsPath: adminSettingsPathFromPath(routePathnameFromLocation(), routePrefix),
-    initialPaymentId: adminPaymentIdFromPath(routePathnameFromLocation(), routePrefix),
-    initialPaymentUserId: adminPaymentsUserIdFromPath(routePathnameFromLocation(), routePrefix),
-    initialUserId: adminUserIdFromPath(routePathnameFromLocation(), routePrefix),
+    onLanguageChange: accountStore.updateAccountLanguage,
     onSectionChange: handleAdminSectionChange,
     onSettingsSaved: handleAdminPersistedSaved,
     onTariffsSaved: handleAdminPersistedSaved,
     onThemesSaved: handleAdminPersistedSaved,
+    onToast: (text: string) => showToast(text),
     onTranslationsSaved: handleAdminTranslationsSaved,
+    pathname: routePathnameFromLocation(),
     routePrefix,
-    brandTitle,
-    brand,
-    appFaviconUrl: CFG.faviconUrl,
-    appFaviconUseCustom: CFG.faviconUseCustom,
-    appVersion: CFG.appVersion,
-    appRepositoryUrl: CFG.appRepositoryUrl,
-    currentLang,
-    languageOptions,
-    languageBusy,
-    onLanguageChange: accountStore.updateAccountLanguage,
+    screen,
     t,
-  };
+  });
 
   $: {
     const shouldMountAdmin = screen === "admin" && isAdmin && adminBundleApi && adminMountTarget;
