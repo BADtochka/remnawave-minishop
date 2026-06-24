@@ -202,6 +202,30 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(support_settings.admin_notification_cooldown_seconds, 300)
         self.assertEqual(support_settings.admin_email_cooldown_seconds, 1800)
 
+    def test_panel_settings_view_reflects_panel_fields(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+            PANEL_API_URL="https://panel.example.com",
+            PANEL_API_KEY="secret-key",
+            PANEL_WEBHOOK_SECRET="hook",
+            APP_RUNTIME_MODE="development",
+        )
+
+        panel_settings = settings.panel_settings
+
+        self.assertEqual(panel_settings.api_url, "https://panel.example.com")
+        self.assertEqual(panel_settings.api_key, "secret-key")
+        self.assertIsNone(panel_settings.api_cookie)
+        self.assertEqual(panel_settings.webhook_secret, "hook")
+        self.assertEqual(panel_settings.write_mode, "auto")
+        self.assertTrue(panel_settings.dry_run_enabled)
+        self.assertEqual(panel_settings.api_total_timeout_seconds, 25)
+        self.assertEqual(panel_settings.api_connect_timeout_seconds, 8)
+        self.assertEqual(panel_settings.api_sock_read_timeout_seconds, 15)
+
     def test_subscription_guides_defaults_are_enabled(self):
         settings = Settings(
             _env_file=None,

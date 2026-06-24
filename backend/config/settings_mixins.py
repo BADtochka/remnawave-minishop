@@ -21,6 +21,7 @@ from pydantic import field_validator
 from config.settings_models import (
     DBSettings,
     EmailSettings,
+    PanelSettings,
     PaymentSettings,
     ReferralSettings,
     SupportSettings,
@@ -90,6 +91,14 @@ if TYPE_CHECKING:
         PAYMENT_REQUEST_TIMEOUT_SECONDS: float
         ADMIN_IDS_STR: str
         PANEL_WRITE_MODE: str
+        PANEL_API_URL: Optional[str]
+        PANEL_API_KEY: Optional[str]
+        PANEL_API_COOKIE: Optional[str]
+        PANEL_WEBHOOK_SECRET: Optional[str]
+        PANEL_API_TOTAL_TIMEOUT_SECONDS: float
+        PANEL_API_CONNECT_TIMEOUT_SECONDS: float
+        PANEL_API_SOCK_CONNECT_TIMEOUT_SECONDS: float
+        PANEL_API_SOCK_READ_TIMEOUT_SECONDS: float
         APP_RUNTIME_MODE: str
         TRIAL_TRAFFIC_LIMIT_GB: Optional[float]
         TRIAL_PREMIUM_TRAFFIC_LIMIT_GB: Optional[float]
@@ -260,6 +269,21 @@ class SettingsComputedMixin(_SettingsComputedMixinBase):
             admin_email_notifications_enabled=self.SUPPORT_ADMIN_EMAIL_NOTIFICATIONS_ENABLED,
             admin_notification_cooldown_seconds=self.SUPPORT_ADMIN_NOTIFICATION_COOLDOWN_SECONDS,
             admin_email_cooldown_seconds=self.SUPPORT_ADMIN_EMAIL_COOLDOWN_SECONDS,
+        )
+
+    @property
+    def panel_settings(self) -> PanelSettings:
+        return PanelSettings(
+            api_url=self.PANEL_API_URL,
+            api_key=self.PANEL_API_KEY,
+            api_cookie=self.PANEL_API_COOKIE,
+            webhook_secret=self.PANEL_WEBHOOK_SECRET,
+            write_mode=self.PANEL_WRITE_MODE,
+            dry_run_enabled=self.panel_dry_run_enabled,
+            api_total_timeout_seconds=self.PANEL_API_TOTAL_TIMEOUT_SECONDS,
+            api_connect_timeout_seconds=self.PANEL_API_CONNECT_TIMEOUT_SECONDS,
+            api_sock_connect_timeout_seconds=self.PANEL_API_SOCK_CONNECT_TIMEOUT_SECONDS,
+            api_sock_read_timeout_seconds=self.PANEL_API_SOCK_READ_TIMEOUT_SECONDS,
         )
 
     @computed_field

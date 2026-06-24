@@ -59,6 +59,19 @@ class PaymentSettings(BaseModel):
     traffic_sale_mode: bool
 
 
+class PanelSettings(BaseModel):
+    api_url: Optional[str]
+    api_key: Optional[str]
+    api_cookie: Optional[str]
+    webhook_secret: Optional[str]
+    write_mode: str
+    dry_run_enabled: bool
+    api_total_timeout_seconds: float
+    api_connect_timeout_seconds: float
+    api_sock_connect_timeout_seconds: float
+    api_sock_read_timeout_seconds: float
+
+
 class SupportSettings(BaseModel):
     link: Optional[str]
     tickets_enabled: bool

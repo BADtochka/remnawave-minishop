@@ -10,6 +10,7 @@ from config.settings_mixins import SettingsComputedMixin, SettingsValidationMixi
 from config.settings_models import (
     DBSettings,
     EmailSettings,
+    PanelSettings,
     PaymentSettings,
     ReferralSettings,
     SupportSettings,
@@ -783,6 +784,7 @@ def get_settings() -> Settings:
 __all__ = [
     "DBSettings",
     "EmailSettings",
+    "PanelSettings",
     "PaymentSettings",
     "ReferralSettings",
     "Settings",
