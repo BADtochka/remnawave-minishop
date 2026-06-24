@@ -27,7 +27,6 @@
     structuredCloneSafe,
   } from "./lib/webapp/browser.js";
   import { isExternalAppLaunchPath, readExternalAppLaunchTarget } from "./lib/webapp/appLinks.js";
-  import { openAppLinkTarget } from "./lib/webapp/appLinkActions.js";
   import { createWebappDataClient } from "./lib/webapp/dataClient";
   import { canUseSubscriptionInstallGuides } from "./lib/webapp/connectLinks.js";
   import { createI18n } from "./lib/webapp/i18n.js";
@@ -69,7 +68,6 @@
   import { createAdminPanelActions } from "./lib/webapp/adminPanelActions.js";
   import { createPublicInstallActions } from "./lib/webapp/publicInstallActions.js";
   import { createWebappSessionActions } from "./lib/webapp/webappSessionActions.js";
-  import { createAppLaunchActions } from "./lib/webapp/appLaunchActions.js";
   import { createAccountUiActions } from "./lib/webapp/accountUiActions.js";
   import { createConnectActions } from "./lib/webapp/connectActions.js";
   import { createClipboardActions } from "./lib/webapp/clipboardActions.js";
@@ -78,6 +76,7 @@
   import { createPrimaryPayActionLabel } from "./lib/webapp/primaryPayActionLabel.js";
   import { createTelegramLoginActions } from "./lib/webapp/telegramLoginActions.js";
   import { buildAdminPanelProps } from "./lib/webapp/adminPanelProps.js";
+  import { createExternalLinkRuntime } from "./lib/webapp/externalLinkRuntime.js";
   import {
     resolveInitialLoadRoute,
     resolveLoadedWebappRoute,
@@ -231,6 +230,20 @@
   const readTelegramMiniAppInitDataFromLocation = telegramLaunch.readInitDataFromLocation;
   const hasTelegramLaunchParams = telegramLaunch.hasLaunchParams;
   const loadTelegramSdk = telegramLaunch.load;
+  const { openAppLaunchTarget, openAppLink, openExternalLink, refreshAppLaunchTarget } =
+    createExternalLinkRuntime({
+      assignLocation: (url) => window.location.assign(url),
+      getCurrentLang: () => currentLang,
+      getTelegram: () => tg,
+      hasTelegramLaunchParams,
+      refreshTelegram: () => telegramSdk.refresh(),
+      setAppLaunchTarget: (target) => {
+        appLaunchTarget = target;
+      },
+      setTelegram: (value) => {
+        tg = value;
+      },
+    });
   const i18n = createI18n({
     messages: I18N,
     defaultLang: "ru",
@@ -764,12 +777,6 @@
     }
   }
 
-  const { openAppLaunchTarget, refreshAppLaunchTarget } = createAppLaunchActions({
-    setAppLaunchTarget: (target) => {
-      appLaunchTarget = target;
-    },
-  });
-
   onMount(() => {
     if (isPreviewBoard) return;
     if (isAppLaunchRoute) return;
@@ -1260,28 +1267,6 @@
     if (event.key !== "Enter") return;
     event.preventDefault();
     authStore.requestEmailCode((s) => (screen = s));
-  }
-
-  function openExternalLink(url: string) {
-    if (!url) return;
-    if (tg?.openLink) {
-      tg.openLink(url, { try_instant_view: false });
-      return;
-    }
-    window.location.assign(url);
-  }
-
-  function openAppLink(url: string) {
-    openAppLinkTarget(url, {
-      currentLang,
-      getTelegram: () => tg,
-      hasTelegramLaunchParams,
-      openExternalLink,
-      refreshTelegram: () => telegramSdk.refresh(),
-      setTelegram: (value) => {
-        tg = value;
-      },
-    });
   }
 
   const {
