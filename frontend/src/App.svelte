@@ -1440,36 +1440,6 @@
     actionsStore.clearPromoFieldError();
   }
 
-  function _trialActivationFailureMessage(error: AnyRecord) {
-    if (
-      error?.error === "trial_telegram_required" ||
-      error?.message === "telegram_required" ||
-      error?.message === "disposable_email"
-    ) {
-      return t(
-        "wa_trial_telegram_required_error",
-        {},
-        "Для активации пробного периода привяжите Telegram."
-      );
-    }
-    return error?.message || t("wa_trial_activation_failed");
-  }
-
-  function _referralWelcomeFailureMessage(error: AnyRecord) {
-    if (
-      error?.error === "referral_welcome_telegram_required" ||
-      error?.message === "telegram_required" ||
-      error?.message === "disposable_email"
-    ) {
-      return t(
-        "wa_referral_welcome_telegram_required_error",
-        {},
-        "Для получения реферального бонуса привяжите Telegram."
-      );
-    }
-    return error?.message || t("wa_referral_welcome_claim_failed");
-  }
-
   function activateTrial() {
     return actionsStore.activateTrial();
   }
