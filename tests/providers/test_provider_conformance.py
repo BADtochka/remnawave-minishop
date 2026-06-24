@@ -19,7 +19,9 @@ import importlib
 
 import pytest
 
+from bot.payment_providers.base import BaseProviderService
 from bot.payment_providers.registry import PAYMENT_PROVIDER_SPECS
+from bot.payment_providers.shared.http_client import HttpClientMixin
 from bot.payment_providers.shared.link_flow import LinkPaymentDescriptor
 
 SPECS = list(PAYMENT_PROVIDER_SPECS)
@@ -46,8 +48,79 @@ LINKFLOW_BESPOKE = {
 }
 
 
+# Webhook handling is NOT one base-class contract (F2 audit). Each provider is
+# classified into exactly one profile, derived below from the real service class
+# and SPEC so the inventory cannot silently drift:
+#
+#   base-template        — inherits BaseProviderService (parse -> verify -> handle).
+#   service-route        — HttpClientMixin service owns its own ``webhook_route``
+#                          (IP allowlists, multi-scheme signatures, idempotency).
+#   standalone-sdk-route — has a webhook route but neither base class (SDK objects
+#                          + IP allowlist, e.g. yookassa).
+#   telegram-invoice     — no provider HTTP webhook at all (Telegram Stars).
+#
+# The detection (`_detect_webhook_profile`) and the partition test below keep this
+# map honest: changing a service's base class, or adding/removing a webhook route,
+# fails CI until this inventory is updated to match.
+WEBHOOK_PROFILES = {
+    "base-template": {"cryptopay"},
+    "service-route": {
+        "cloudpayments",
+        "freekassa",
+        "heleket",
+        "lava",
+        "pally",
+        "paykilla",
+        "platega",
+        "severpay",
+        "stripe",
+        "wata",
+    },
+    "standalone-sdk-route": {"yookassa"},
+    "telegram-invoice": {"stars"},
+}
+
+
 def _service_module(name: str):
     return importlib.import_module(f"bot.payment_providers.{name}.service")
+
+
+def _service_class(name: str) -> type:
+    """Return the single ``*Service`` class defined in a provider's service module."""
+    module = _service_module(name)
+    classes = [
+        obj
+        for attr, obj in vars(module).items()
+        if isinstance(obj, type) and obj.__module__ == module.__name__ and attr.endswith("Service")
+    ]
+    assert len(classes) == 1, f"{name}: expected exactly one *Service class, found {classes}"
+    return classes[0]
+
+
+def _specs_for(name: str) -> list:
+    return [s for s in SPECS if s.service_key and s.service_key.removesuffix("_service") == name]
+
+
+def _provider_has_webhook(name: str) -> bool:
+    return any(spec.webhook_route is not None for spec in _specs_for(name))
+
+
+def _detect_webhook_profile(name: str) -> str:
+    service_class = _service_class(name)
+    if issubclass(service_class, BaseProviderService):
+        return "base-template"
+    if not _provider_has_webhook(name):
+        return "telegram-invoice"
+    if issubclass(service_class, HttpClientMixin):
+        return "service-route"
+    return "standalone-sdk-route"
+
+
+def _declared_webhook_profile(name: str) -> str | None:
+    for profile, members in WEBHOOK_PROFILES.items():
+        if name in members:
+            return profile
+    return None
 
 
 @pytest.mark.parametrize("spec", SPECS, ids=SPEC_IDS)
@@ -125,6 +198,29 @@ def test_descriptor_is_consistent_with_spec(name):
     assert descriptor.service_app_key == descriptor.spec.service_key, (
         f"{name}: descriptor.service_app_key ({descriptor.service_app_key}) != "
         f"spec.service_key ({descriptor.spec.service_key})"
+    )
+
+
+def test_webhook_profiles_partition_providers():
+    members = [name for names in WEBHOOK_PROFILES.values() for name in names]
+    assert len(members) == len(set(members)), (
+        f"a provider appears in more than one webhook profile: {sorted(members)}"
+    )
+    declared = set(members)
+    providers = set(PROVIDER_NAMES)
+    missing = providers - declared
+    stale = declared - providers
+    assert not missing, f"providers with no webhook profile: {sorted(missing)}"
+    assert not stale, f"WEBHOOK_PROFILES names that are not real providers: {sorted(stale)}"
+
+
+@pytest.mark.parametrize("name", PROVIDER_NAMES)
+def test_webhook_profile_matches_implementation(name):
+    declared = _declared_webhook_profile(name)
+    detected = _detect_webhook_profile(name)
+    assert declared == detected, (
+        f"{name}: declared webhook profile {declared!r} does not match the implementation "
+        f"({detected!r}). Update WEBHOOK_PROFILES, or restore the provider's webhook shape."
     )
 
 
