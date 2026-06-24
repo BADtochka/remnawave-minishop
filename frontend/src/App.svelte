@@ -249,22 +249,23 @@
   const termUnitLabel = i18n.termUnitLabel;
   const languageName = i18n.languageName;
   guestLanguage = normalizeLangCode(CFG.language || "ru");
-  const uiChrome = createUiChrome({
-    normalizeLangCode,
-    getCurrentLang: () => currentLang,
-    setGuestLanguage: (value) => {
-      guestLanguage = value;
-    },
-    setLanguageMenuOpenState: (value) => {
-      languageMenuOpen = value;
-    },
-    setLanguageClickGuard: (value) => {
-      languageClickGuard = value;
-    },
-    setLanguageClickGuardArmed: (value) => {
-      languageClickGuardArmed = value;
-    },
-  });
+  const { clearLanguageClickGuard, setLanguageMenuOpen, syncBodyScrollLock, updateGuestLanguage } =
+    createUiChrome({
+      normalizeLangCode,
+      getCurrentLang: () => currentLang,
+      setGuestLanguage: (value) => {
+        guestLanguage = value;
+      },
+      setLanguageMenuOpenState: (value) => {
+        languageMenuOpen = value;
+      },
+      setLanguageClickGuard: (value) => {
+        languageClickGuard = value;
+      },
+      setLanguageClickGuardArmed: (value) => {
+        languageClickGuardArmed = value;
+      },
+    });
   const { clearManualLogoutFlag, clearToken, isManuallyLoggedOut, markManualLogout, setToken } =
     createWebappSessionActions({
       csrfCookieName: CSRF_COOKIE_NAME,
@@ -859,22 +860,6 @@
       destroyAdminMount();
     };
   });
-
-  function syncBodyScrollLock(locked: boolean) {
-    uiChrome.syncBodyScrollLock(locked);
-  }
-
-  function clearLanguageClickGuard() {
-    uiChrome.clearLanguageClickGuard();
-  }
-
-  function setLanguageMenuOpen(open: boolean) {
-    uiChrome.setLanguageMenuOpen(open);
-  }
-
-  function updateGuestLanguage(nextValue: string) {
-    uiChrome.updateGuestLanguage(nextValue);
-  }
 
   async function ensureI18nScope(scope: string) {
     if (MOCK || scope !== "admin" || adminI18nLoaded) return;
