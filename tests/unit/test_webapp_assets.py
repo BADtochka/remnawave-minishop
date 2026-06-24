@@ -348,13 +348,16 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         source = (Path(__file__).resolve().parents[2] / "frontend/src/App.svelte").read_text(
             encoding="utf-8"
         )
+        account_view_source = (
+            Path(__file__).resolve().parents[2] / "frontend/src/lib/webapp/accountView.ts"
+        ).read_text(encoding="utf-8")
         settings_source = (
             Path(__file__).resolve().parents[2]
             / "frontend/src/webapp/screens/SettingsScreen.svelte"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("CFG.serverStatusUrl", source)
-        self.assertIn("appSettings?.server_status_url", source)
+        self.assertIn("cfg.serverStatusUrl", account_view_source)
+        self.assertIn("appSettings?.server_status_url", account_view_source)
         self.assertIn("{serverStatusUrl}", source)
         self.assertIn('t("menu_server_status_button")', settings_source)
 

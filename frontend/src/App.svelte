@@ -66,7 +66,7 @@
   import { createDemoAuth } from "./lib/webapp/demoAuth";
   import { createTelegramLaunch } from "./lib/webapp/telegramLaunch";
   import { createUiChrome } from "./lib/webapp/uiChrome";
-  import { normalizedEmail, telegramName } from "./lib/webapp/formatters.js";
+  import { normalizedEmail } from "./lib/webapp/formatters.js";
   import {
     buildTariffCatalog,
     type BillingPlan,
@@ -78,6 +78,7 @@
   import { computeBillingView } from "./lib/webapp/billingView.js";
   import { computeLanguageView, type LanguageOption } from "./lib/webapp/languageView.js";
   import { computeTelegramLoginView } from "./lib/webapp/telegramLoginView.js";
+  import { computeAccountView } from "./lib/webapp/accountView.js";
 
   /** Used-traffic percent from which top-up modals and CTAs unlock in the web app home screen */
   const TRAFFIC_TOPUP_UNLOCK_PERCENT = 80;
@@ -86,7 +87,7 @@
   const TELEGRAM_NOTIFICATIONS_RESUME_REFRESH_COOLDOWN_MS = 1500;
   const PUBLIC_INSTALL_PRELOAD_KEY = "__RW_PUBLIC_INSTALL_PRELOAD__";
   import { createActivationHandoff } from "./lib/webapp/activationHandoff.js";
-  import { buildGravatarUrl, resolveProfileAvatarUrl } from "./lib/webapp/gravatar.js";
+  import { buildGravatarUrl } from "./lib/webapp/gravatar.js";
   import { createBillingActions } from "./lib/webapp/billingActions";
   import { invalidateWebappTariffOptionCaches } from "./lib/webapp/billingOptionCache.js";
   import { runWebappBoot } from "./lib/webapp/webappBoot.js";
@@ -583,25 +584,45 @@
     currentLanguageOption = languageView.currentLanguageOption || null;
   }
   $: userLanguage = languageName(currentLang);
-  $: emailLinkStatus = user?.email ? t("wa_settings_linked") : t("wa_settings_email_not_linked");
-  $: telegramNotificationsStatus = String(user?.telegram_notifications_status || "unknown");
-  $: telegramNotificationsNeedPrompt = Boolean(
-    user?.telegram_linked && user?.telegram_notifications_need_prompt
-  );
-  $: telegramNotificationsStartLink = String(user?.telegram_notifications_start_link || "");
-  $: hasUnlinkedIdentity =
-    !user?.telegram_linked || (emailAuthEnabled && !user?.email) || telegramNotificationsNeedPrompt;
+  let emailLinkStatus = "";
+  let telegramNotificationsStatus = "unknown";
+  let telegramNotificationsNeedPrompt = false;
+  let telegramNotificationsStartLink = "";
+  let hasUnlinkedIdentity = false;
   $: referralBonusDetails = Array.isArray(referral?.bonus_details) ? referral.bonus_details : [];
   $: referralWelcomeBonusDays = Math.max(0, Number(referral?.welcome_bonus_days || 0));
   $: referralOneBonusPerReferee = Boolean(referral?.one_bonus_per_referee);
-  $: telegramProfileName = telegramName(user);
-  $: profileEmail = user?.email || t("wa_settings_email_not_linked");
-  $: profileTelegramId = user?.telegram_id ? `TG ID ${user.telegram_id}` : t("wa_tg_id_not_linked");
-  $: profileAvatarUrl = resolveProfileAvatarUrl(user, emailAvatarUrl);
-  $: privacyPolicyUrl = String(CFG.privacyPolicyUrl || "").trim();
-  $: userAgreementUrl = String(CFG.userAgreementUrl || "").trim();
-  $: supportUrl = String(appSettings?.support_url || CFG.supportUrl || "").trim();
-  $: serverStatusUrl = String(appSettings?.server_status_url || CFG.serverStatusUrl || "").trim();
+  let telegramProfileName = "";
+  let profileEmail = "";
+  let profileTelegramId = "";
+  let profileAvatarUrl = "";
+  let privacyPolicyUrl = "";
+  let userAgreementUrl = "";
+  let supportUrl = "";
+  let serverStatusUrl = "";
+  $: {
+    const accountView = computeAccountView({
+      appSettings,
+      cfg: CFG,
+      emailAuthEnabled,
+      emailAvatarUrl,
+      t,
+      user,
+    });
+    emailLinkStatus = accountView.emailLinkStatus;
+    telegramNotificationsStatus = accountView.telegramNotificationsStatus;
+    telegramNotificationsNeedPrompt = accountView.telegramNotificationsNeedPrompt;
+    telegramNotificationsStartLink = accountView.telegramNotificationsStartLink;
+    hasUnlinkedIdentity = accountView.hasUnlinkedIdentity;
+    telegramProfileName = accountView.telegramProfileName;
+    profileEmail = accountView.profileEmail;
+    profileTelegramId = accountView.profileTelegramId;
+    profileAvatarUrl = accountView.profileAvatarUrl;
+    privacyPolicyUrl = accountView.privacyPolicyUrl;
+    userAgreementUrl = accountView.userAgreementUrl;
+    supportUrl = accountView.supportUrl;
+    serverStatusUrl = accountView.serverStatusUrl;
+  }
   $: telegramLoginBotId = Number(CFG.telegramLoginBotId || 0);
   $: telegramOAuthClientId = Number(CFG.telegramOAuthClientId || telegramLoginBotId || 0);
   $: telegramMiniAppInitData = tg?.initData || readTelegramMiniAppInitDataFromLocation();
