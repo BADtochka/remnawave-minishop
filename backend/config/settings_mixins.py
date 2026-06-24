@@ -3,14 +3,37 @@ from __future__ import annotations
 import logging
 import re
 import secrets
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, List, Optional, TypeVar, overload
 
-from pydantic import computed_field, field_validator
+from pydantic import field_validator
 
 from config.settings_models import DBSettings, EmailSettings, PaymentSettings, WebAppSettings
 from config.tariffs_config import TariffsConfig, load_tariffs_config
 from config.traffic_strategy import normalize_traffic_limit_strategy
 from config.webapp_themes_config import WebappThemesConfig, resolved_webapp_themes_catalog
+
+_T = TypeVar("_T")
+_Owner = TypeVar("_Owner")
+
+if TYPE_CHECKING:
+
+    class _ComputedField(Generic[_T]):
+        @overload
+        def __get__(self, obj: None, owner: type[_Owner]) -> property: ...
+
+        @overload
+        def __get__(self, obj: _Owner, owner: type[_Owner] | None = None) -> _T: ...
+
+        def __get__(
+            self,
+            obj: object | None,
+            owner: type[object] | None = None,
+        ) -> object: ...
+
+    def computed_field(func: Callable[[Any], _T]) -> _ComputedField[_T]: ...
+
+else:
+    from pydantic import computed_field
 
 
 def _split_csv(value: Optional[str]) -> List[str]:
@@ -21,12 +44,10 @@ def _split_csv(value: Optional[str]) -> List[str]:
 
 class SettingsComputedMixin:
     @computed_field
-    @property
     def DATABASE_URL(self) -> str:
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     @computed_field
-    @property
     def db_settings(self) -> DBSettings:
         return DBSettings(
             user=self.POSTGRES_USER,
@@ -37,7 +58,6 @@ class SettingsComputedMixin:
         )
 
     @computed_field
-    @property
     def email_settings(self) -> EmailSettings:
         return EmailSettings(
             smtp_host=self.SMTP_HOST,
@@ -59,7 +79,6 @@ class SettingsComputedMixin:
         )
 
     @computed_field
-    @property
     def webapp_settings(self) -> WebAppSettings:
         return WebAppSettings(
             title=self.WEBAPP_TITLE,
@@ -93,7 +112,6 @@ class SettingsComputedMixin:
         )
 
     @computed_field
-    @property
     def ADMIN_IDS(self) -> List[int]:
         if self.ADMIN_IDS_STR:
             try:
@@ -110,13 +128,11 @@ class SettingsComputedMixin:
         return []
 
     @computed_field
-    @property
     def PRIMARY_ADMIN_ID(self) -> Optional[int]:
         ids = self.ADMIN_IDS
         return ids[0] if ids else None
 
     @computed_field
-    @property
     def panel_dry_run_enabled(self) -> bool:
         mode = str(self.PANEL_WRITE_MODE or "auto").strip().lower().replace("-", "_")
         if mode == "dry_run":
@@ -127,35 +143,30 @@ class SettingsComputedMixin:
         return runtime in {"dev", "development", "local", "test", "testing"}
 
     @computed_field
-    @property
     def trial_traffic_limit_bytes(self) -> int:
         if self.TRIAL_TRAFFIC_LIMIT_GB is None or self.TRIAL_TRAFFIC_LIMIT_GB <= 0:
             return 0
         return int(self.TRIAL_TRAFFIC_LIMIT_GB * (1024**3))
 
     @computed_field
-    @property
     def trial_premium_traffic_limit_bytes(self) -> int:
         if self.TRIAL_PREMIUM_TRAFFIC_LIMIT_GB is None or self.TRIAL_PREMIUM_TRAFFIC_LIMIT_GB <= 0:
             return 0
         return int(self.TRIAL_PREMIUM_TRAFFIC_LIMIT_GB * (1024**3))
 
     @computed_field
-    @property
     def user_traffic_limit_bytes(self) -> int:
         if self.USER_TRAFFIC_LIMIT_GB is None or self.USER_TRAFFIC_LIMIT_GB <= 0:
             return 0
         return int(self.USER_TRAFFIC_LIMIT_GB * (1024**3))
 
     @computed_field
-    @property
     def parsed_user_squad_uuids(self) -> Optional[List[str]]:
         if self.USER_SQUAD_UUIDS:
             return [uuid.strip() for uuid in self.USER_SQUAD_UUIDS.split(",") if uuid.strip()]
         return None
 
     @computed_field
-    @property
     def parsed_trial_squad_uuids(self) -> Optional[List[str]]:
         if self.TRIAL_SQUAD_UUIDS:
             trial_squads = [
@@ -166,7 +177,6 @@ class SettingsComputedMixin:
         return self.parsed_user_squad_uuids
 
     @computed_field
-    @property
     def parsed_trial_premium_squad_uuids(self) -> Optional[List[str]]:
         if self.TRIAL_PREMIUM_SQUAD_UUIDS:
             premium_squads = [
@@ -177,7 +187,6 @@ class SettingsComputedMixin:
         return None
 
     @computed_field
-    @property
     def disposable_email_domains(self) -> List[str]:
         domains: List[str] = []
         for domain in _split_csv(self.DISPOSABLE_EMAIL_DOMAINS):
@@ -187,7 +196,6 @@ class SettingsComputedMixin:
         return domains
 
     @computed_field
-    @property
     def parsed_user_external_squad_uuid(self) -> Optional[str]:
         if self.USER_EXTERNAL_SQUAD_UUID:
             cleaned = self.USER_EXTERNAL_SQUAD_UUID.strip()
@@ -196,22 +204,18 @@ class SettingsComputedMixin:
         return None
 
     @computed_field
-    @property
     def trusted_proxies(self) -> List[str]:
         return _split_csv(self.TRUSTED_PROXIES)
 
     @computed_field
-    @property
     def telegram_webhook_path(self) -> str:
         return "/tg/webhook"
 
     @computed_field
-    @property
     def panel_webhook_path(self) -> str:
         return "/webhook/panel"
 
     @computed_field
-    @property
     def panel_full_webhook_url(self) -> Optional[str]:
         base = self.WEBHOOK_BASE_URL
         if base:
@@ -219,7 +223,6 @@ class SettingsComputedMixin:
         return None
 
     @computed_field
-    @property
     def subscription_options(self) -> Dict[int, float]:
         options: Dict[int, float] = {}
 
@@ -234,7 +237,6 @@ class SettingsComputedMixin:
         return options
 
     @computed_field
-    @property
     def stars_subscription_options(self) -> Dict[int, int]:
         options: Dict[int, int] = {}
         stars_enabled = self.STARS_ENABLED or self.STARS_ADMIN_ONLY_ENABLED
@@ -249,7 +251,6 @@ class SettingsComputedMixin:
         return options
 
     @computed_field
-    @property
     def traffic_packages(self) -> Dict[float, float]:
         """
         Mapping of traffic size in GB to price in the default currency.
@@ -274,7 +275,6 @@ class SettingsComputedMixin:
         return packages
 
     @computed_field
-    @property
     def stars_traffic_packages(self) -> Dict[float, int]:
         """
         Mapping of traffic size in GB to price in Telegram Stars.
@@ -299,7 +299,6 @@ class SettingsComputedMixin:
         return packages
 
     @computed_field
-    @property
     def traffic_sale_mode(self) -> bool:
         """When true, the bot sells traffic packages instead of time-based subscriptions."""
         if self.tariffs_config is not None:
@@ -307,7 +306,6 @@ class SettingsComputedMixin:
         return bool(self.traffic_packages or self.stars_traffic_packages)
 
     @computed_field
-    @property
     def tariff_traffic_warning_levels(self) -> List[int]:
         levels: List[int] = []
         for part in (self.TARIFF_TRAFFIC_WARNING_LEVELS or "").split(","):
@@ -324,12 +322,10 @@ class SettingsComputedMixin:
         return sorted(levels) or [85, 90, 95]
 
     @computed_field
-    @property
     def tariffs_config(self) -> Optional[TariffsConfig]:
         return load_tariffs_config(self.TARIFFS_CONFIG_PATH)
 
     @computed_field
-    @property
     def webapp_themes_catalog(self) -> WebappThemesConfig:
         return resolved_webapp_themes_catalog(
             primary_accent=self.WEBAPP_PRIMARY_COLOR or "#00fe7a",
@@ -363,7 +359,6 @@ class SettingsComputedMixin:
         return None
 
     @computed_field
-    @property
     def referral_bonus_inviter(self) -> Dict[int, int]:
         bonuses: Dict[int, int] = {}
         if self.REFERRAL_BONUS_DAYS_INVITER_1_MONTH is not None:
@@ -377,7 +372,6 @@ class SettingsComputedMixin:
         return bonuses
 
     @computed_field
-    @property
     def referral_bonus_referee(self) -> Dict[int, int]:
         bonuses: Dict[int, int] = {}
         if self.REFERRAL_BONUS_DAYS_REFEREE_1_MONTH is not None:
@@ -395,7 +389,7 @@ class SettingsComputedMixin:
         """Autopay features are available only when YooKassa itself is enabled.
 
         Proxies into the YooKassaConfig BaseSettings model that lives in the
-        yookassa provider module — env-config is owned by the provider now.
+        yookassa provider module вЂ” env-config is owned by the provider now.
         """
         from bot.payment_providers import get_provider_bundle
 
@@ -405,13 +399,12 @@ class SettingsComputedMixin:
         return bool(bundle.config.autopayments_active)
 
     @computed_field
-    @property
     def payment_methods_order(self) -> List[str]:
         """
         Ordered list of payment providers to show in the subscription payment keyboard.
 
         Honors PAYMENT_METHODS_ORDER from the env (user-controlled order), but
-        always appends any newly added provider that the user hasn't listed —
+        always appends any newly added provider that the user hasn't listed вЂ”
         otherwise upgrading to a release that adds, say, ``heleket`` would
         silently hide the new button until the operator manually updated their
         .env. Toggling the button on/off stays on the per-provider ENABLED
@@ -458,14 +451,14 @@ class SettingsComputedMixin:
             if not slug:
                 continue
             if slug == "platega":
-                # Legacy slug — expand to the new sub-methods preserving order
+                # Legacy slug вЂ” expand to the new sub-methods preserving order
                 if "platega_sbp" not in methods:
                     methods.append("platega_sbp")
                 if "platega_crypto" not in methods:
                     methods.append("platega_crypto")
                 continue
             methods.append(slug)
-        # Append any registered spec that the operator didn't list — keeps
+        # Append any registered spec that the operator didn't list вЂ” keeps
         # newly shipped providers visible after an upgrade without forcing a
         # .env edit. Toggling the button is still controlled by ENABLED.
         for sid in spec_ids:
@@ -490,7 +483,6 @@ class SettingsComputedMixin:
         return (primary or fallback or "").strip()
 
     @computed_field
-    @property
     def email_auth_configured(self) -> bool:
         return bool(
             self.SMTP_HOST
@@ -501,7 +493,6 @@ class SettingsComputedMixin:
         )
 
     @computed_field
-    @property
     def smtp_ports_to_try(self) -> List[int]:
         ports: List[int] = []
 

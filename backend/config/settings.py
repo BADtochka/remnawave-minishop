@@ -1,5 +1,3 @@
-# mypy: disable-error-code=prop-decorator
-
 import logging
 import os
 import secrets
