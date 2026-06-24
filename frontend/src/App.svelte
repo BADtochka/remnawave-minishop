@@ -9,15 +9,11 @@
   import { createAccountStore } from "./lib/webapp/stores/accountStore";
   import { createActionsStore } from "./lib/webapp/stores/actionsStore";
   import { Tooltip } from "$components/ui/primitives.js";
-  import { CheckCircle2 } from "$components/ui/icons.js";
 
   import BrandMark from "$lib/webapp/BrandMark.svelte";
-  import Button from "$components/ui/button.svelte";
-  import Dialog from "$components/ui/dialog.svelte";
+  import AuthenticatedDialogs from "./webapp/AuthenticatedDialogs.svelte";
   import AuthenticatedScreens from "./webapp/AuthenticatedScreens.svelte";
   import AuthScreen from "./webapp/auth/AuthScreen.svelte";
-  import PaymentDialogs from "./webapp/PaymentDialogs.svelte";
-  import TariffDialogs from "./webapp/TariffDialogs.svelte";
   import AppLaunchScreen from "./webapp/screens/AppLaunchScreen.svelte";
   import InstallGuideScreen from "./webapp/screens/InstallGuideScreen.svelte";
 
@@ -415,45 +411,17 @@
     topupKind,
     deviceTopupModalOpen,
     changeModalOpen,
-    topupOptions,
-    deviceTopupOptions,
-    changeOptions,
     changeConfirmOpen,
-    tariffActionBusy,
-    payBusy,
   } = $billingStore);
-  $: ({
-    devicesData,
-    devicesLoaded,
-    devicesBusy,
-    devicesStatus,
-    devicesIsError,
-    devicesErrorCode,
-    deviceConfirmOpen,
-    deviceToDisconnect,
-    deviceDisconnectBusy,
-  } = $devicesStore);
+  $: ({ devicesData, devicesLoaded, devicesBusy, devicesStatus, devicesIsError, devicesErrorCode } =
+    $devicesStore);
   $: ({
     unreadCount: supportUnreadCount,
     unreadLoading: supportUnreadLoading,
     unreadLoaded: supportUnreadLoaded,
   } = $supportStore);
-  $: ({
-    linkEmailOpen,
-    linkEmailBusy,
-    linkTelegramBusy,
-    linkEmailPending,
-    linkEmailStatus,
-    linkEmailIsError,
-    linkEmailResendCooldown,
-    setPasswordBusy,
-    setPasswordIsError,
-    setPasswordOpen,
-    setPasswordPending,
-    setPasswordResendCooldown,
-    setPasswordStatus,
-    languageBusy,
-  } = $accountStore);
+  $: ({ linkEmailOpen, linkEmailBusy, linkTelegramBusy, setPasswordOpen, languageBusy } =
+    $accountStore);
   $: ({
     promoCode,
     promoBusy,
@@ -2187,119 +2155,34 @@
             {userLanguage}
           />
 
-          <PaymentDialogs
-            bind:linkEmailCode={$accountStore.linkEmailCode}
-            bind:linkEmailFieldError={$accountStore.linkEmailFieldError}
-            bind:linkEmailValue={$accountStore.linkEmailValue}
-            bind:paymentModalOpen={$billingStore.paymentModalOpen}
-            bind:paymentStep={$billingStore.paymentStep}
-            bind:selectedMethod={$billingStore.selectedMethod}
-            bind:selectedPlan={$billingStore.selectedPlan}
-            bind:renewHwidDevices={$billingStore.renewHwidDevices}
-            bind:selectedTariffKey={$billingStore.selectedTariffKey}
-            bind:setPasswordCode={$accountStore.setPasswordCode}
-            bind:setPasswordConfirm={$accountStore.setPasswordConfirm}
-            bind:setPasswordValue={$accountStore.setPasswordValue}
-            setPasswordEmail={user?.email || ""}
-            createPayment={billingStore.createPayment}
-            {deviceConfirmOpen}
-            {deviceDisconnectBusy}
-            {deviceToDisconnect}
+          <AuthenticatedDialogs
+            {accountStore}
+            {activationSuccessDialogOpen}
+            {activationSuccessUseInstallGuides}
+            {backToTariffList}
+            {billingStore}
+            {closeActivationSuccessDialog}
+            {closeDeviceTopupModal}
+            {continueWithSelectedTariff}
+            {devicesStore}
             {disconnectDevice}
-            {linkEmailBusy}
-            {linkEmailIsError}
-            linkEmailOpen={emailAuthEnabled && linkEmailOpen}
-            {linkEmailPending}
-            {linkEmailResendCooldown}
-            {linkEmailStatus}
-            {setPasswordBusy}
-            {setPasswordIsError}
-            setPasswordOpen={emailAuthEnabled && setPasswordOpen}
-            {setPasswordPending}
-            {setPasswordResendCooldown}
-            {setPasswordStatus}
+            {emailAuthEnabled}
             {hasMultipleTariffs}
             {methods}
-            {payBusy}
             {plans}
+            {selectTariff}
             {selectedTariff}
             {selectedTariffPlans}
             {singleTariffMode}
             {subscription}
             {subscriptionPurchaseDescription}
+            {t}
             {tariffCatalog}
             {tariffMode}
-            closeDeviceDisconnectDialog={devicesStore.closeDeviceDisconnectDialog}
-            closeLinkEmailDialog={accountStore.closeLinkEmailDialog}
-            closePaymentModal={billingStore.closePaymentModal}
-            closeSetPasswordDialog={accountStore.closeSetPasswordDialog}
-            {backToTariffList}
-            {continueWithSelectedTariff}
-            requestLinkEmailCode={accountStore.requestLinkEmailCode}
-            requestSetPasswordCode={accountStore.requestSetPasswordCode}
-            {selectTariff}
-            {t}
             {termUnitLabel}
-            verifyLinkEmailCode={accountStore.verifyLinkEmailCode}
-            confirmSetPassword={accountStore.confirmSetPassword}
-          />
-
-          <TariffDialogs
-            bind:changeConfirmOpen={$billingStore.changeConfirmOpen}
-            bind:changeModalOpen={$billingStore.changeModalOpen}
-            bind:deviceTopupModalOpen={$billingStore.deviceTopupModalOpen}
-            bind:selectedChangeAction={$billingStore.selectedChangeAction}
-            bind:selectedChangeTarget={$billingStore.selectedChangeTarget}
-            bind:selectedDeviceTopupPlan={$billingStore.selectedDeviceTopupPlan}
-            bind:selectedMethod={$billingStore.selectedMethod}
-            bind:selectedTopupPlan={$billingStore.selectedTopupPlan}
-            bind:topupModalOpen={$billingStore.topupModalOpen}
-            applyTariffChange={billingStore.applyTariffChange}
-            {changeOptions}
-            {closeDeviceTopupModal}
-            closeTariffChangeConfirm={billingStore.closeTariffChangeConfirm}
-            closeTariffChangeModal={billingStore.closeTariffChangeModal}
-            closeTopupModal={billingStore.closeTopupModal}
-            createDeviceTopupPayment={billingStore.createDeviceTopupPayment}
-            createTopupPayment={billingStore.createTopupPayment}
-            {deviceTopupOptions}
-            {methods}
-            openTariffChangeConfirm={billingStore.openTariffChangeConfirm}
-            {payBusy}
-            {singleTariffMode}
-            {subscription}
-            {tariffActionBusy}
-            {topupKind}
-            {topupOptions}
             {trafficMode}
-            {t}
+            {user}
           />
-
-          <Dialog
-            open={activationSuccessDialogOpen}
-            title={t("wa_activation_success_title", {}, "Everything is successfully activated")}
-            description={activationSuccessUseInstallGuides
-              ? t(
-                  "wa_activation_success_install_hint",
-                  {},
-                  "Press OK and follow the setup instructions for your device."
-                )
-              : t(
-                  "wa_activation_success_connect_hint",
-                  {},
-                  "Press OK and we will open the Remnawave subscription page for setup."
-                )}
-            closeLabel={t("wa_close")}
-            onclose={closeActivationSuccessDialog}
-            class="activation-success-dialog"
-          >
-            <CheckCircle2 slot="titleIcon" size={23} />
-            <div class="activation-success-dialog-body">
-              <Button class="wide" onclick={closeActivationSuccessDialog}>
-                {t("wa_ok", {}, "OK")}
-              </Button>
-            </div>
-          </Dialog>
         {/if}
       </div>
     {/if}
