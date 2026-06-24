@@ -50,7 +50,7 @@
     type PaymentMethod,
     type TariffCatalogEntry,
   } from "./lib/webapp/tariffs.js";
-  import { renewalPaymentConfig, resolveTopupDeeplinkKind } from "./lib/webapp/billingDeeplinks.js";
+  import { createBillingDeeplinkEffects } from "./lib/webapp/billingDeeplinkEffects.js";
   import { activeTabForWebappSection } from "./lib/webapp/sectionAvailability.js";
   import { readThemePreviewDraft, syncThemeGoogleFonts } from "./lib/webapp/themeStyle.js";
   import { computeThemeView } from "./lib/webapp/themeView.js";
@@ -412,6 +412,17 @@
     tg: tg as any,
     getTg: () => tg || telegramSdk.refresh(),
     telegramSdk: telegramSdk as any,
+  });
+  const { applyPostLoadBillingDeeplinks } = createBillingDeeplinkEffects({
+    billingStore,
+    readRenewalDeeplink,
+    setHomeRoute: () => {
+      activeTab = "home";
+      screen = "home";
+      syncAppSectionPath("home", true);
+    },
+    stripRenewalLoginQueryFromUrl,
+    stripTopupQueryFromUrl,
   });
   const devicesStore = createDevicesStore({ api, t, showToast });
   const supportStore = createSupportStore({ api, t, showToast, routePrefix });
@@ -1112,40 +1123,12 @@
     if (deviceTopupModalOpen) await billingStore.loadDeviceTopupOptions();
     if (changeModalOpen) await billingStore.loadTariffChangeOptions();
 
-    const deeplinkPlans = (payload.plans?.length ? payload.plans : []) as BillingPlan[];
-    const deeplinkDefaultMethod = String(payload.payment_methods?.[0]?.id || "");
-    const topupDeeplinkKind = resolveTopupDeeplinkKind({
-      plans: deeplinkPlans,
+    applyPostLoadBillingDeeplinks({
+      defaultMethod: String(payload.payment_methods?.[0]?.id || ""),
+      plans: (payload.plans?.length ? payload.plans : []) as BillingPlan[],
       search: window.location.search,
       subscription: (payload.subscription || {}) as AnyRecord,
     });
-    if (topupDeeplinkKind) {
-      billingStore.openTopupModal(topupDeeplinkKind, deeplinkDefaultMethod);
-      stripTopupQueryFromUrl();
-    }
-
-    const renewalDeep = readRenewalDeeplink();
-    if (renewalDeep) {
-      const renewalPayment = renewalPaymentConfig({
-        defaultMethod: deeplinkDefaultMethod,
-        plans: deeplinkPlans,
-        subscription: (payload.subscription || {}) as AnyRecord,
-        tariffKey: renewalDeep.tariffKey,
-      });
-      activeTab = "home";
-      screen = "home";
-      syncAppSectionPath("home", true);
-      billingStore.openPaymentModal(
-        renewalPayment.tariffMode,
-        renewalPayment.singleTariffMode,
-        renewalPayment.tariffCatalog,
-        renewalPayment.subscription,
-        renewalPayment.plans,
-        renewalPayment.defaultMethod,
-        renewalPayment.options
-      );
-      stripRenewalLoginQueryFromUrl();
-    }
     return payload;
   }
 
