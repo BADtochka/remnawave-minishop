@@ -153,6 +153,31 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(payment_settings.stars_traffic_packages, {10.0: 1000})
         self.assertTrue(payment_settings.traffic_sale_mode)
 
+    def test_referral_settings_view_reflects_referral_fields(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+            REFERRAL_BONUS_DAYS_1_MONTH=5,
+            REFEREE_BONUS_DAYS_12_MONTHS=11,
+            REFERRAL_ONE_BONUS_PER_REFEREE=False,
+            REFERRAL_WELCOME_BONUS_DAYS=9,
+            REFERRAL_WELCOME_BONUS_WITHOUT_TELEGRAM_ENABLED=False,
+            LEGACY_REFS=False,
+        )
+
+        referral_settings = settings.referral_settings
+
+        self.assertEqual(referral_settings.bonus_days_inviter_1_month, 5)
+        self.assertEqual(referral_settings.bonus_days_inviter_3_months, 7)
+        self.assertEqual(referral_settings.bonus_days_referee_12_months, 11)
+        self.assertEqual(referral_settings.bonus_days_referee_1_month, 1)
+        self.assertFalse(referral_settings.one_bonus_per_referee)
+        self.assertEqual(referral_settings.welcome_bonus_days, 9)
+        self.assertFalse(referral_settings.welcome_bonus_without_telegram_enabled)
+        self.assertFalse(referral_settings.legacy_refs_enabled)
+
     def test_subscription_guides_defaults_are_enabled(self):
         settings = Settings(
             _env_file=None,

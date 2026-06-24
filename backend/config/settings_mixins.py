@@ -18,7 +18,13 @@ from typing import (
 
 from pydantic import field_validator
 
-from config.settings_models import DBSettings, EmailSettings, PaymentSettings, WebAppSettings
+from config.settings_models import (
+    DBSettings,
+    EmailSettings,
+    PaymentSettings,
+    ReferralSettings,
+    WebAppSettings,
+)
 from config.tariffs_config import TariffsConfig, load_tariffs_config
 from config.traffic_strategy import normalize_traffic_limit_strategy
 from config.webapp_themes_config import WebappThemesConfig, resolved_webapp_themes_catalog
@@ -122,6 +128,10 @@ if TYPE_CHECKING:
         REFERRAL_BONUS_DAYS_REFEREE_3_MONTHS: Optional[int]
         REFERRAL_BONUS_DAYS_REFEREE_6_MONTHS: Optional[int]
         REFERRAL_BONUS_DAYS_REFEREE_12_MONTHS: Optional[int]
+        REFERRAL_ONE_BONUS_PER_REFEREE: bool
+        REFERRAL_WELCOME_BONUS_DAYS: int
+        REFERRAL_WELCOME_BONUS_WITHOUT_TELEGRAM_ENABLED: bool
+        LEGACY_REFS: bool
         PAYMENT_METHODS_ORDER: Optional[str]
         SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED: bool
         DEFAULT_LANGUAGE: str
@@ -211,6 +221,23 @@ class SettingsComputedMixin(_SettingsComputedMixinBase):
             traffic_packages=self.traffic_packages,
             stars_traffic_packages=self.stars_traffic_packages,
             traffic_sale_mode=self.traffic_sale_mode,
+        )
+
+    @property
+    def referral_settings(self) -> ReferralSettings:
+        return ReferralSettings(
+            bonus_days_inviter_1_month=self.REFERRAL_BONUS_DAYS_INVITER_1_MONTH,
+            bonus_days_inviter_3_months=self.REFERRAL_BONUS_DAYS_INVITER_3_MONTHS,
+            bonus_days_inviter_6_months=self.REFERRAL_BONUS_DAYS_INVITER_6_MONTHS,
+            bonus_days_inviter_12_months=self.REFERRAL_BONUS_DAYS_INVITER_12_MONTHS,
+            bonus_days_referee_1_month=self.REFERRAL_BONUS_DAYS_REFEREE_1_MONTH,
+            bonus_days_referee_3_months=self.REFERRAL_BONUS_DAYS_REFEREE_3_MONTHS,
+            bonus_days_referee_6_months=self.REFERRAL_BONUS_DAYS_REFEREE_6_MONTHS,
+            bonus_days_referee_12_months=self.REFERRAL_BONUS_DAYS_REFEREE_12_MONTHS,
+            one_bonus_per_referee=self.REFERRAL_ONE_BONUS_PER_REFEREE,
+            welcome_bonus_days=self.REFERRAL_WELCOME_BONUS_DAYS,
+            welcome_bonus_without_telegram_enabled=self.REFERRAL_WELCOME_BONUS_WITHOUT_TELEGRAM_ENABLED,
+            legacy_refs_enabled=self.LEGACY_REFS,
         )
 
     @computed_field

@@ -7,7 +7,13 @@ from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from config.settings_mixins import SettingsComputedMixin, SettingsValidationMixin
-from config.settings_models import DBSettings, EmailSettings, PaymentSettings, WebAppSettings
+from config.settings_models import (
+    DBSettings,
+    EmailSettings,
+    PaymentSettings,
+    ReferralSettings,
+    WebAppSettings,
+)
 
 DEFAULT_SUBSCRIPTION_PURCHASE_DESCRIPTION_RU = (
     "Покупая или продлевая подписку, вы получаете доступ к VPN/прокси-сервису, "
@@ -777,6 +783,7 @@ __all__ = [
     "DBSettings",
     "EmailSettings",
     "PaymentSettings",
+    "ReferralSettings",
     "Settings",
     "WebAppSettings",
     "get_settings",

@@ -57,3 +57,18 @@ class PaymentSettings(BaseModel):
     traffic_packages: Dict[float, float]
     stars_traffic_packages: Dict[float, int]
     traffic_sale_mode: bool
+
+
+class ReferralSettings(BaseModel):
+    bonus_days_inviter_1_month: Optional[int]
+    bonus_days_inviter_3_months: Optional[int]
+    bonus_days_inviter_6_months: Optional[int]
+    bonus_days_inviter_12_months: Optional[int]
+    bonus_days_referee_1_month: Optional[int]
+    bonus_days_referee_3_months: Optional[int]
+    bonus_days_referee_6_months: Optional[int]
+    bonus_days_referee_12_months: Optional[int]
+    one_bonus_per_referee: bool
+    welcome_bonus_days: int
+    welcome_bonus_without_telegram_enabled: bool
+    legacy_refs_enabled: bool
