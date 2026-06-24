@@ -29,15 +29,11 @@
   import TrialActivationScreen from "./webapp/screens/TrialActivationScreen.svelte";
 
   import {
-    LANGUAGE_FLAGS,
-    LANGUAGE_LABELS,
     MANUAL_LOGOUT_FLAG_KEY,
     TELEGRAM_MINI_APP_AUTH_TIMEOUT_MS,
     TELEGRAM_SDK_ACTION_TIMEOUT_MS,
     TELEGRAM_SDK_BOOT_TIMEOUT_MS,
     TELEGRAM_WEBAPP_SCRIPT_URL,
-    uniqueLanguageCodes,
-    WEBAPP_LANGUAGE_ORDER,
   } from "./lib/webapp/constants.js";
 
   import {
@@ -80,6 +76,7 @@
   import { readThemePreviewDraft, syncThemeGoogleFonts } from "./lib/webapp/themeStyle.js";
   import { computeThemeView } from "./lib/webapp/themeView.js";
   import { computeBillingView } from "./lib/webapp/billingView.js";
+  import { computeLanguageView, type LanguageOption } from "./lib/webapp/languageView.js";
 
   /** Used-traffic percent from which top-up modals and CTAs unlock in the web app home screen */
   const TRAFFIC_TOPUP_UNLOCK_PERCENT = 80;
@@ -573,26 +570,17 @@
   }
   $: referral = data?.referral || MOCK_SOURCE.data.referral;
   $: currentLang = normalizeLangCode(user?.language_code || guestLanguage || CFG.language || "ru");
-  $: languageCodes = uniqueLanguageCodes(
-    WEBAPP_LANGUAGE_ORDER,
-    CFG.languages,
-    Object.keys(I18N || {}),
-    [currentLang]
-  );
-  $: languageOptions = languageCodes.map((code) => {
-    const serverLanguage = ((CFG.languages || []) as AnyRecord[]).find(
-      (language) => language.code === code
-    );
-    const languageLabels = LANGUAGE_LABELS as Record<string, string>;
-    const languageFlags = LANGUAGE_FLAGS as Record<string, string>;
-    return {
-      value: code,
-      label: serverLanguage?.label || languageLabels[code] || code.toUpperCase(),
-      flag: serverLanguage?.flag || languageFlags[code] || "🏳️",
-    };
-  });
-  $: currentLanguageOption =
-    languageOptions.find((option) => option.value === currentLang) || languageOptions[0];
+  let languageOptions: LanguageOption[] = [];
+  let currentLanguageOption: LanguageOption | null = null;
+  $: {
+    const languageView = computeLanguageView({
+      cfgLanguages: CFG.languages,
+      currentLang,
+      i18nMessages: I18N,
+    });
+    languageOptions = languageView.languageOptions;
+    currentLanguageOption = languageView.currentLanguageOption || null;
+  }
   $: userLanguage = languageName(currentLang);
   $: emailLinkStatus = user?.email ? t("wa_settings_linked") : t("wa_settings_email_not_linked");
   $: telegramNotificationsStatus = String(user?.telegram_notifications_status || "unknown");
