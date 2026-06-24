@@ -4854,9 +4854,18 @@ export interface operations {
             page: number;
             page_size: number;
             total: number;
-            users: {
-              [key: string]: unknown;
-            }[];
+            users: (components["schemas"]["AdminUserWithAvatarOut"] & {
+              invited_users_count: number;
+              panel_status: string | null;
+              panel_status_expired_at?: string | null;
+              payments_count: number;
+              payments_currency: string | null;
+              payments_total_amount: number;
+              premium_traffic: {
+                [key: string]: unknown;
+              };
+              subscription_expires_at: string | null;
+            })[];
           };
         };
       };

@@ -7157,8 +7157,62 @@
                     },
                     "users": {
                       "items": {
-                        "additionalProperties": true,
-                        "type": "object"
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/AdminUserWithAvatarOut"
+                          },
+                          {
+                            "properties": {
+                              "invited_users_count": {
+                                "type": "integer"
+                              },
+                              "panel_status": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "panel_status_expired_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "payments_count": {
+                                "type": "integer"
+                              },
+                              "payments_currency": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "payments_total_amount": {
+                                "type": "number"
+                              },
+                              "premium_traffic": {
+                                "additionalProperties": true,
+                                "type": "object"
+                              },
+                              "subscription_expires_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "panel_status",
+                              "subscription_expires_at",
+                              "premium_traffic",
+                              "payments_total_amount",
+                              "payments_count",
+                              "payments_currency",
+                              "invited_users_count"
+                            ],
+                            "type": "object"
+                          }
+                        ]
                       },
                       "type": "array"
                     }

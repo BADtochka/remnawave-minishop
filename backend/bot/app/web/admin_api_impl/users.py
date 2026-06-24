@@ -4,6 +4,7 @@ from ._runtime import (
     BINARY_RESPONSE_SCHEMA,
     BOOLEAN_SCHEMA,
     INTEGER_SCHEMA,
+    JSON_OBJECT_SCHEMA,
     NULLABLE_STRING_SCHEMA,
     NUMBER_SCHEMA,
     STRING_SCHEMA,
@@ -21,7 +22,6 @@ from ._runtime import (
     AdminUserWithAvatarOut,
     PaymentOut,
     RouteContract,
-    loose_array_schema,
     ok_envelope_with,
     register_contract,
     schema_ref,
@@ -67,14 +67,47 @@ from .users_listing import (
 register_contract(
     "admin_users_list_route",
     RouteContract(
+        models=(AdminUserWithAvatarOut,),
         response_schema=ok_envelope_with(
             {
-                "users": loose_array_schema(),
+                "users": {
+                    "type": "array",
+                    # Base admin user (+ avatar_url) enriched per-row by the list
+                    # endpoint; panel_status_expired_at is only present for expired
+                    # subscriptions, so it stays out of ``required``.
+                    "items": {
+                        "allOf": [
+                            schema_ref(AdminUserWithAvatarOut),
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "panel_status": NULLABLE_STRING_SCHEMA,
+                                    "subscription_expires_at": NULLABLE_STRING_SCHEMA,
+                                    "panel_status_expired_at": NULLABLE_STRING_SCHEMA,
+                                    "premium_traffic": JSON_OBJECT_SCHEMA,
+                                    "payments_total_amount": NUMBER_SCHEMA,
+                                    "payments_count": INTEGER_SCHEMA,
+                                    "payments_currency": NULLABLE_STRING_SCHEMA,
+                                    "invited_users_count": INTEGER_SCHEMA,
+                                },
+                                "required": [
+                                    "panel_status",
+                                    "subscription_expires_at",
+                                    "premium_traffic",
+                                    "payments_total_amount",
+                                    "payments_count",
+                                    "payments_currency",
+                                    "invited_users_count",
+                                ],
+                            },
+                        ],
+                    },
+                },
                 "page": INTEGER_SCHEMA,
                 "page_size": INTEGER_SCHEMA,
                 "total": INTEGER_SCHEMA,
             }
-        )
+        ),
     ),
 )
 register_contract(
