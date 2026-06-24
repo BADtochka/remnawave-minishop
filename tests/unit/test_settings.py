@@ -178,6 +178,30 @@ class SettingsTests(unittest.TestCase):
         self.assertFalse(referral_settings.welcome_bonus_without_telegram_enabled)
         self.assertFalse(referral_settings.legacy_refs_enabled)
 
+    def test_support_settings_view_reflects_support_fields(self):
+        settings = Settings(
+            _env_file=None,
+            BOT_TOKEN="token",
+            POSTGRES_USER="app_user",
+            POSTGRES_PASSWORD="app_password",
+            SUPPORT_LINK="https://t.me/support",
+            SUPPORT_TICKETS_ENABLED=False,
+            SUPPORT_TICKET_MAX_BODY_LENGTH=1000,
+            SUPPORT_TICKET_RATE_LIMIT_PER_HOUR=2,
+            SUPPORT_ADMIN_EMAIL_NOTIFICATIONS_ENABLED=True,
+        )
+
+        support_settings = settings.support_settings
+
+        self.assertEqual(support_settings.link, "https://t.me/support")
+        self.assertFalse(support_settings.tickets_enabled)
+        self.assertEqual(support_settings.ticket_max_body_length, 1000)
+        self.assertEqual(support_settings.ticket_max_subject_length, 160)
+        self.assertEqual(support_settings.ticket_rate_limit_per_hour, 2)
+        self.assertTrue(support_settings.admin_email_notifications_enabled)
+        self.assertEqual(support_settings.admin_notification_cooldown_seconds, 300)
+        self.assertEqual(support_settings.admin_email_cooldown_seconds, 1800)
+
     def test_subscription_guides_defaults_are_enabled(self):
         settings = Settings(
             _env_file=None,

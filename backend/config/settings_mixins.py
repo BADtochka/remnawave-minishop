@@ -23,6 +23,7 @@ from config.settings_models import (
     EmailSettings,
     PaymentSettings,
     ReferralSettings,
+    SupportSettings,
     WebAppSettings,
 )
 from config.tariffs_config import TariffsConfig, load_tariffs_config
@@ -132,6 +133,14 @@ if TYPE_CHECKING:
         REFERRAL_WELCOME_BONUS_DAYS: int
         REFERRAL_WELCOME_BONUS_WITHOUT_TELEGRAM_ENABLED: bool
         LEGACY_REFS: bool
+        SUPPORT_LINK: Optional[str]
+        SUPPORT_TICKETS_ENABLED: bool
+        SUPPORT_TICKET_MAX_BODY_LENGTH: int
+        SUPPORT_TICKET_MAX_SUBJECT_LENGTH: int
+        SUPPORT_TICKET_RATE_LIMIT_PER_HOUR: int
+        SUPPORT_ADMIN_EMAIL_NOTIFICATIONS_ENABLED: bool
+        SUPPORT_ADMIN_NOTIFICATION_COOLDOWN_SECONDS: int
+        SUPPORT_ADMIN_EMAIL_COOLDOWN_SECONDS: int
         PAYMENT_METHODS_ORDER: Optional[str]
         SUBSCRIPTION_PURCHASE_DESCRIPTION_ENABLED: bool
         DEFAULT_LANGUAGE: str
@@ -238,6 +247,19 @@ class SettingsComputedMixin(_SettingsComputedMixinBase):
             welcome_bonus_days=self.REFERRAL_WELCOME_BONUS_DAYS,
             welcome_bonus_without_telegram_enabled=self.REFERRAL_WELCOME_BONUS_WITHOUT_TELEGRAM_ENABLED,
             legacy_refs_enabled=self.LEGACY_REFS,
+        )
+
+    @property
+    def support_settings(self) -> SupportSettings:
+        return SupportSettings(
+            link=self.SUPPORT_LINK,
+            tickets_enabled=self.SUPPORT_TICKETS_ENABLED,
+            ticket_max_body_length=self.SUPPORT_TICKET_MAX_BODY_LENGTH,
+            ticket_max_subject_length=self.SUPPORT_TICKET_MAX_SUBJECT_LENGTH,
+            ticket_rate_limit_per_hour=self.SUPPORT_TICKET_RATE_LIMIT_PER_HOUR,
+            admin_email_notifications_enabled=self.SUPPORT_ADMIN_EMAIL_NOTIFICATIONS_ENABLED,
+            admin_notification_cooldown_seconds=self.SUPPORT_ADMIN_NOTIFICATION_COOLDOWN_SECONDS,
+            admin_email_cooldown_seconds=self.SUPPORT_ADMIN_EMAIL_COOLDOWN_SECONDS,
         )
 
     @computed_field

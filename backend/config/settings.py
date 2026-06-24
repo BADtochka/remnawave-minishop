@@ -12,6 +12,7 @@ from config.settings_models import (
     EmailSettings,
     PaymentSettings,
     ReferralSettings,
+    SupportSettings,
     WebAppSettings,
 )
 
@@ -785,6 +786,7 @@ __all__ = [
     "PaymentSettings",
     "ReferralSettings",
     "Settings",
+    "SupportSettings",
     "WebAppSettings",
     "get_settings",
 ]

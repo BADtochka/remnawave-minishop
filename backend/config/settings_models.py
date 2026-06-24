@@ -59,6 +59,17 @@ class PaymentSettings(BaseModel):
     traffic_sale_mode: bool
 
 
+class SupportSettings(BaseModel):
+    link: Optional[str]
+    tickets_enabled: bool
+    ticket_max_body_length: int
+    ticket_max_subject_length: int
+    ticket_rate_limit_per_hour: int
+    admin_email_notifications_enabled: bool
+    admin_notification_cooldown_seconds: int
+    admin_email_cooldown_seconds: int
+
+
 class ReferralSettings(BaseModel):
     bonus_days_inviter_1_month: Optional[int]
     bonus_days_inviter_3_months: Optional[int]
