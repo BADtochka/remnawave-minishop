@@ -42,7 +42,6 @@
   } from "./lib/webapp/deeplinks";
   import { createDemoAuth } from "./lib/webapp/demoAuth";
   import { createDocsDemoRouter } from "./lib/webapp/docsDemoRoutes.js";
-  import { createTelegramLaunch } from "./lib/webapp/telegramLaunch";
   import { createUiChrome } from "./lib/webapp/uiChrome";
   import { createEmailAvatarSync } from "./lib/webapp/emailAvatarSync.js";
   import {
@@ -98,19 +97,10 @@
   import { invalidateWebappTariffOptionCaches } from "./lib/webapp/billingOptionCache.js";
   import { runWebappBoot } from "./lib/webapp/webappBoot.js";
   import { CSRF_COOKIE_NAME, readCookie } from "./lib/webapp/session.js";
-  import { createTelegramSdk } from "./lib/webapp/telegramSdk.js";
+  import { createTelegramRuntime, type TelegramWebApp } from "./lib/webapp/telegramRuntime.js";
   import { publicInstallTokenFromPath, sectionFromPath } from "./lib/webapp/routes.js";
 
   type AnyRecord = Record<string, any>;
-  type TelegramWebApp = AnyRecord & {
-    initData?: string;
-    openInvoice?: (url: string, callback: (status: string) => void) => void;
-    openLink?: (url: string, options?: AnyRecord) => void;
-    openTelegramLink?: (url: string) => void;
-    platform?: string;
-    ready?: () => void;
-    expand?: () => void;
-  };
   type AppLoadDataOptions = {
     fresh?: boolean;
     preserveView?: boolean;
@@ -204,35 +194,32 @@
   let adminPanelProps: AnyRecord = {};
   let adminActiveSection = "stats";
   let tg: TelegramWebApp | null = null;
-  const telegramSdk = createTelegramSdk({
+  const telegramRuntime = createTelegramRuntime<TelegramWebApp | null>({
     scriptUrl: TELEGRAM_WEBAPP_SCRIPT_URL,
     bootTimeoutMs: TELEGRAM_SDK_BOOT_TIMEOUT_MS,
     actionTimeoutMs: TELEGRAM_SDK_ACTION_TIMEOUT_MS,
     miniAppAuthTimeoutMs: TELEGRAM_MINI_APP_AUTH_TIMEOUT_MS,
-    onStatusChange: (status: string) => (telegramSdkStatus = status),
-    onInitDataChange: (initData: string) => (telegramMiniAppInitData = initData || ""),
-  } as any);
-  tg = telegramSdk.refresh();
-  telegramSdkStatus = tg ? "ready" : "idle";
-  telegramMiniAppInitData = telegramSdk.initData;
-  const telegramLaunch = createTelegramLaunch<TelegramWebApp | null>({
-    telegramSdk,
-    defaultTimeoutMs: TELEGRAM_SDK_BOOT_TIMEOUT_MS,
-    onLoaded: (value, initData) => {
+    setInitData: (initData) => {
+      telegramMiniAppInitData = initData || "";
+    },
+    setStatus: (status) => {
+      telegramSdkStatus = status;
+    },
+    setTelegram: (value) => {
       tg = value;
-      telegramMiniAppInitData = initData;
     },
   });
-  const readTelegramMiniAppInitDataFromLocation = telegramLaunch.readInitDataFromLocation;
-  const hasTelegramLaunchParams = telegramLaunch.hasLaunchParams;
-  const loadTelegramSdk = telegramLaunch.load;
+  const telegramSdk = telegramRuntime.telegramSdk;
+  const readTelegramMiniAppInitDataFromLocation = telegramRuntime.readInitDataFromLocation;
+  const hasTelegramLaunchParams = telegramRuntime.hasLaunchParams;
+  const loadTelegramSdk = telegramRuntime.load;
   const { openAppLaunchTarget, openAppLink, openExternalLink, refreshAppLaunchTarget } =
     createExternalLinkRuntime({
       assignLocation: (url) => window.location.assign(url),
       getCurrentLang: () => currentLang,
       getTelegram: () => tg,
       hasTelegramLaunchParams,
-      refreshTelegram: () => telegramSdk.refresh(),
+      refreshTelegram: telegramRuntime.refreshTelegram,
       setAppLaunchTarget: (target) => {
         appLaunchTarget = target;
       },
@@ -917,7 +904,7 @@
       telegramNotificationsBotOpenedAt = openedAt;
     },
     openExternalLink,
-    refreshTelegram: () => telegramSdk.refresh(),
+    refreshTelegram: telegramRuntime.refreshTelegram,
     setTelegram: (value) => {
       tg = value;
     },
