@@ -32,11 +32,10 @@
   import { createI18n } from "./lib/webapp/i18n.js";
   import { createActivationWatcher } from "./lib/webapp/activationWatcher";
   import { createActivationRuntime } from "./lib/webapp/activationRuntime.js";
-  import { isPasswordLoginPath, syncPasswordLoginPath } from "./lib/webapp/passwordLoginRoute.js";
+  import { createAuthRuntime } from "./lib/webapp/authRuntime.js";
   import {
     currentSearchParams,
     hasEmailCodeLoginDeeplink,
-    readEmailCodeLoginDeeplink,
     readRenewalDeeplink,
     stripRenewalLoginQueryFromUrl,
     stripTopupQueryFromUrl,
@@ -423,6 +422,28 @@
     loadData,
     maybeShowActivationSuccessDialog,
   });
+  const authRuntime = createAuthRuntime({
+    authStore,
+    cleanDocsDemoRouteQuery,
+    getEmailLoginDeeplinkConsumed: () => emailLoginDeeplinkConsumed,
+    isDocsDemo,
+    routePathnameFromLocation,
+    routePrefix,
+    setActiveTab: (tab) => {
+      activeTab = tab;
+    },
+    setEmailLoginDeeplinkConsumed: (consumed) => {
+      emailLoginDeeplinkConsumed = consumed;
+    },
+    setMode: (nextMode) => {
+      mode = nextMode;
+    },
+    setScreen: (nextScreen) => {
+      screen = nextScreen;
+    },
+    tick,
+  });
+  const { setPasswordLoginMode, showLogin, submitEmailOnEnter } = authRuntime;
   const accountStore = createAccountStore({
     api,
     publicApi,
@@ -897,26 +918,6 @@
     t,
   });
 
-  async function startEmailCodeLoginFromDeeplink() {
-    if (emailLoginDeeplinkConsumed) return;
-    const emailHint = readEmailCodeLoginDeeplink();
-    if (!emailHint) return;
-    emailLoginDeeplinkConsumed = true;
-    authStore.clearPendingEmailCode();
-    authStore.update((s) => ({
-      ...s,
-      email: emailHint,
-      emailCode: "",
-      pendingEmail: "",
-      passwordLoginMode: false,
-      passwordLoginFallback: false,
-    }));
-    await tick();
-    await authStore.requestEmailCode((nextScreen) => {
-      screen = nextScreen;
-    });
-  }
-
   $: adminPanelProps = buildAdminPanelProps({
     adminActiveSection,
     api,
@@ -1004,24 +1005,6 @@
         if (!shown) startPendingActivationWatch();
       }
     }
-  }
-
-  function setPasswordLoginMode(enabled: boolean, replace = false) {
-    const nextEnabled = Boolean(enabled);
-    authStore.update((s) => ({
-      ...s,
-      passwordLoginMode: nextEnabled,
-      passwordLoginFallback: false,
-      authStatus: "",
-      authIsError: false,
-    }));
-    syncPasswordLoginPath({
-      cleanDocsDemoRouteQuery,
-      enabled: nextEnabled,
-      isDocsDemo,
-      replace,
-      routePrefix,
-    });
   }
 
   async function loadData(options: AppLoadDataOptions = {}) {
@@ -1168,23 +1151,6 @@
       stripRenewalLoginQueryFromUrl();
     }
     return payload;
-  }
-
-  function showLogin() {
-    mode = "login";
-    screen = "login";
-    activeTab = "home";
-    setPasswordLoginMode(isPasswordLoginPath(routePathnameFromLocation()), true);
-    authStore.restorePendingEmailCode((nextScreen) => {
-      screen = nextScreen;
-    });
-    void startEmailCodeLoginFromDeeplink();
-  }
-
-  function submitEmailOnEnter(event: KeyboardEvent) {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    authStore.requestEmailCode((s) => (screen = s));
   }
 
   const {
