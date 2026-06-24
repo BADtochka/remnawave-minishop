@@ -80,13 +80,13 @@
   import { createBillingModalActions } from "./lib/webapp/billingModalActions.js";
   import { createAutoRenewAction } from "./lib/webapp/autoRenewAction.js";
   import { createAdminPanelActions } from "./lib/webapp/adminPanelActions.js";
+  import { createPublicInstallActions } from "./lib/webapp/publicInstallActions.js";
 
   /** Used-traffic percent from which top-up modals and CTAs unlock in the web app home screen */
   const TRAFFIC_TOPUP_UNLOCK_PERCENT = 80;
   const ACTIVATION_HANDOFF_STORAGE_KEY = "rw_webapp_activation_handoff_v1";
   const ACTIVATION_HANDOFF_TTL_MS = 48 * 60 * 60 * 1000;
   const TELEGRAM_NOTIFICATIONS_RESUME_REFRESH_COOLDOWN_MS = 1500;
-  const PUBLIC_INSTALL_PRELOAD_KEY = "__RW_PUBLIC_INSTALL_PRELOAD__";
   import { createActivationHandoff } from "./lib/webapp/activationHandoff.js";
   import { createBillingActions } from "./lib/webapp/billingActions";
   import { invalidateWebappTariffOptionCaches } from "./lib/webapp/billingOptionCache.js";
@@ -137,13 +137,6 @@
     reloadFrontend?: boolean;
     deferFrontendReload?: boolean;
   };
-  type PublicInstallPreload = {
-    path?: string;
-    promise?: Promise<AnyRecord | null>;
-  };
-  type WindowWithPublicInstallPreload = Window &
-    Record<string, PublicInstallPreload | null | undefined>;
-
   export let mockRuntime: AnyRecord | null = null;
 
   const FALLBACK_BRAND_TITLE = "Subscription";
@@ -1260,34 +1253,26 @@
     return payload;
   }
 
-  async function loadPublicInstallGuides(shareToken: string) {
-    const path = installGuidesStore.publicPath(shareToken);
-    const preload =
-      typeof window !== "undefined"
-        ? (window as unknown as WindowWithPublicInstallPreload)[PUBLIC_INSTALL_PRELOAD_KEY]
-        : null;
-    if (preload?.path === path && preload.promise) {
-      const payload = await preload.promise;
-      if (payload) {
-        (window as unknown as WindowWithPublicInstallPreload)[PUBLIC_INSTALL_PRELOAD_KEY] = null;
-        return installGuidesStore.hydrate(path, payload);
-      }
-    }
-    return installGuidesStore.loadPublic(shareToken, true);
-  }
-
-  async function loadPublicInstall(shareToken: string) {
-    mode = "publicInstall";
-    screen = "install";
-    activeTab = "home";
-    publicInstallToken = shareToken;
-    publicInstallSubscription = {
-      install_share_token: shareToken,
-      share_url: typeof window !== "undefined" ? `${window.location.origin}/s/${shareToken}` : "",
-    };
-    const response = await loadPublicInstallGuides(shareToken);
-    publicInstallSubscription = response?.subscription || publicInstallSubscription;
-  }
+  const { loadPublicInstall } = createPublicInstallActions({
+    getOrigin: () => (typeof window !== "undefined" ? window.location.origin : ""),
+    getPreloadHost: () => (typeof window !== "undefined" ? (window as unknown as AnyRecord) : null),
+    installGuidesStore,
+    setActiveTab: (tab) => {
+      activeTab = tab;
+    },
+    setMode: (nextMode) => {
+      mode = nextMode;
+    },
+    setPublicInstallSubscription: (subscription) => {
+      publicInstallSubscription = subscription;
+    },
+    setPublicInstallToken: (nextToken) => {
+      publicInstallToken = nextToken;
+    },
+    setScreen: (nextScreen) => {
+      screen = nextScreen;
+    },
+  });
 
   function showLogin() {
     mode = "login";

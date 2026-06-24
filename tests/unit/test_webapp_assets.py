@@ -432,15 +432,17 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
 
     def test_frontend_starts_public_install_preload_before_mount(self):
         main_source = Path("frontend/src/main.js").read_text(encoding="utf-8")
-        app_source = Path("frontend/src/App.svelte").read_text(encoding="utf-8")
+        public_install_actions_source = Path(
+            "frontend/src/lib/webapp/publicInstallActions.ts"
+        ).read_text(encoding="utf-8")
         store_source = Path("frontend/src/lib/webapp/stores/installGuidesStore.ts").read_text(
             encoding="utf-8"
         )
 
         self.assertIn("__RW_PUBLIC_INSTALL_PRELOAD__", main_source)
         self.assertIn("startPublicInstallPreload();", main_source)
-        self.assertIn("loadPublicInstallGuides", app_source)
-        self.assertIn("installGuidesStore.hydrate", app_source)
+        self.assertIn("loadPublicInstallGuides", public_install_actions_source)
+        self.assertIn("installGuidesStore.hydrate", public_install_actions_source)
         self.assertIn("hydrate,", store_source)
 
     def test_home_screen_hides_unlimited_traffic_limit_cards(self):
