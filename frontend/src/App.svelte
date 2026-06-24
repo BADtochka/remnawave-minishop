@@ -31,7 +31,6 @@
   import { canUseSubscriptionInstallGuides } from "./lib/webapp/connectLinks.js";
   import { createI18n } from "./lib/webapp/i18n.js";
   import { createActivationWatcher } from "./lib/webapp/activationWatcher";
-  import { createAdminBundle } from "./lib/webapp/adminBundle";
   import { isPasswordLoginPath, syncPasswordLoginPath } from "./lib/webapp/passwordLoginRoute.js";
   import {
     currentSearchParams,
@@ -62,7 +61,6 @@
   import { computeAccountView } from "./lib/webapp/accountView.js";
   import { computeAppDataView } from "./lib/webapp/appDataView.js";
   import { createWebappNavigation } from "./lib/webapp/webappNavigation.js";
-  import { adminPayloadHasFrontendReloadChange } from "./lib/webapp/adminPersistedSettings.js";
   import { createBillingModalActions } from "./lib/webapp/billingModalActions.js";
   import { createAutoRenewAction } from "./lib/webapp/autoRenewAction.js";
   import { createAdminPanelActions } from "./lib/webapp/adminPanelActions.js";
@@ -76,6 +74,7 @@
   import { createPrimaryPayActionLabel } from "./lib/webapp/primaryPayActionLabel.js";
   import { createTelegramLoginActions } from "./lib/webapp/telegramLoginActions.js";
   import { buildAdminPanelProps } from "./lib/webapp/adminPanelProps.js";
+  import { createAdminRuntime } from "./lib/webapp/adminRuntime.js";
   import { createExternalLinkRuntime } from "./lib/webapp/externalLinkRuntime.js";
   import {
     resolveInitialLoadRoute,
@@ -113,12 +112,6 @@
     section?: string;
     adminSection?: string | null;
     [key: string]: any;
-  };
-  type AdminPersistOptions = {
-    updates?: Record<string, unknown>;
-    deletes?: string[];
-    reloadFrontend?: boolean;
-    deferFrontendReload?: boolean;
   };
   export let mockRuntime: AnyRecord | null = null;
 
@@ -200,8 +193,6 @@
   let emailAvatarUrl = "";
   let token = MOCK ? "local-preview" : "";
   let csrfToken = MOCK ? "" : readCookie(CSRF_COOKIE_NAME) || "";
-  let adminI18nLoaded = false;
-  let adminI18nPromise: Promise<unknown> | null = null;
   let adminBundleApi: AnyRecord | null = null;
   let adminBundleError = "";
   let adminMountTarget: HTMLElement | null = null;
@@ -253,6 +244,39 @@
   const t = i18n.t;
   const termUnitLabel = i18n.termUnitLabel;
   const languageName = i18n.languageName;
+  const adminRuntime = createAdminRuntime({
+    fetchI18nScope: async (scope) => {
+      const apiBase = String(CFG.apiBase || "/api").replace(/\/+$/, "");
+      const response = await fetch(`${apiBase}/i18n?scope=${encodeURIComponent(scope)}`, {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      return response.ok ? response.json() : null;
+    },
+    getAdminAssets: () => ({
+      adminCssAsset: CFG.adminCssAsset,
+      adminJsAsset: CFG.adminJsAsset,
+    }),
+    getIsMock: () => Boolean(MOCK),
+    getShouldPrefetch: () => isAdmin && screen !== "admin",
+    invalidateTariffOptionCaches: () => {
+      invalidateWebappTariffOptionCaches(billingStore);
+    },
+    loadData: (options) => loadData(options as AppLoadDataOptions),
+    mergeMessages: (messages) => {
+      i18n.mergeMessages((messages || {}) as AnyRecord);
+    },
+    reloadWindow: () => {
+      if (typeof window !== "undefined") window.location.reload();
+    },
+    resetInstallGuides: () => {
+      installGuidesStore.reset();
+    },
+    setBundleState: (api, error) => {
+      adminBundleApi = api as AnyRecord | null;
+      adminBundleError = error;
+    },
+  });
   guestLanguage = normalizeLangCode(CFG.language || "ru");
   const { clearLanguageClickGuard, setLanguageMenuOpen, syncBodyScrollLock, updateGuestLanguage } =
     createUiChrome({
@@ -329,15 +353,6 @@
       !changeConfirmOpen &&
       activationHandoff.hasPending(data || {}),
   });
-  const adminBundle = createAdminBundle({
-    ensureI18nScope: () => ensureI18nScope("admin"),
-    getAssets: () => ({
-      adminCssAsset: CFG.adminCssAsset,
-      adminJsAsset: CFG.adminJsAsset,
-    }),
-    shouldPrefetch: () => isAdmin && screen !== "admin",
-  });
-
   const authStore = createAuthStore({
     publicApi,
     setToken,
@@ -820,11 +835,14 @@
       }
       if (decision.kind === "admin") {
         adminActiveSection = decision.adminSection;
-        cancelAdminAssetsPrefetch();
+        adminRuntime.cancelAdminAssetsPrefetch();
         activeTab = decision.activeTab;
         screen = decision.section;
         const pathAtStart = window.location.pathname;
-        void Promise.all([ensureI18nScope("admin"), ensureAdminBundle()]).catch(() => {
+        void Promise.all([
+          adminRuntime.ensureI18nScope("admin"),
+          adminRuntime.ensureAdminBundle(),
+        ]).catch(() => {
           if (sectionFromPath(routePathnameFromLocation(), routePrefix) !== "admin") return;
           if (window.location.pathname !== pathAtStart) return;
           if (screen === "admin") {
@@ -866,59 +884,11 @@
       supportStore.closePolling();
       stopPendingActivationWatch();
       clearLanguageClickGuard();
-      cancelAdminAssetsPrefetch();
+      adminRuntime.cancelAdminAssetsPrefetch();
       syncBodyScrollLock(false);
-      destroyAdminMount();
+      adminRuntime.destroyAdminMount();
     };
   });
-
-  async function ensureI18nScope(scope: string) {
-    if (MOCK || scope !== "admin" || adminI18nLoaded) return;
-    if (adminI18nPromise) return adminI18nPromise;
-    const apiBase = String(CFG.apiBase || "/api").replace(/\/+$/, "");
-    adminI18nPromise = fetch(`${apiBase}/i18n?scope=admin`, {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload) => {
-        if (!payload?.ok || !payload.i18n) return;
-        i18n.mergeMessages(payload.i18n);
-        adminI18nLoaded = true;
-      })
-      .catch((_error) => {
-        void _error;
-      })
-      .finally(() => {
-        adminI18nPromise = null;
-      });
-    return adminI18nPromise;
-  }
-
-  function scheduleAdminAssetsPrefetch(adminAllowed = isAdmin) {
-    adminBundle.schedulePrefetch(adminAllowed);
-  }
-
-  function cancelAdminAssetsPrefetch() {
-    adminBundle.cancelPrefetch();
-  }
-
-  async function ensureAdminBundle() {
-    try {
-      return await adminBundle.ensure();
-    } finally {
-      syncAdminBundleState();
-    }
-  }
-
-  function syncAdminBundleState() {
-    adminBundleApi = adminBundle.getApi();
-    adminBundleError = adminBundle.getError();
-  }
-
-  function destroyAdminMount() {
-    adminBundle.destroyMount();
-  }
 
   const { openLoginTelegram } = createTelegramLoginActions({
     authStore,
@@ -990,11 +960,11 @@
     onClose: closeAdminPanel,
     onLanguageChange: accountStore.updateAccountLanguage,
     onSectionChange: handleAdminSectionChange,
-    onSettingsSaved: handleAdminPersistedSaved,
-    onTariffsSaved: handleAdminPersistedSaved,
-    onThemesSaved: handleAdminPersistedSaved,
+    onSettingsSaved: adminRuntime.handleAdminPersistedSaved,
+    onTariffsSaved: adminRuntime.handleAdminPersistedSaved,
+    onThemesSaved: adminRuntime.handleAdminPersistedSaved,
     onToast: (text: string) => showToast(text),
-    onTranslationsSaved: handleAdminTranslationsSaved,
+    onTranslationsSaved: adminRuntime.handleAdminTranslationsSaved,
     pathname: routePathnameFromLocation(),
     routePrefix,
     screen,
@@ -1002,15 +972,11 @@
   });
 
   $: {
-    const shouldMountAdmin = screen === "admin" && isAdmin && adminBundleApi && adminMountTarget;
-    const props = adminPanelProps;
-
-    if (shouldMountAdmin) {
-      adminBundle.mount(adminMountTarget!, props as Record<string, unknown>);
-      syncAdminBundleState();
-    } else {
-      destroyAdminMount();
-    }
+    adminRuntime.syncAdminMount({
+      props: adminPanelProps,
+      shouldMount: Boolean(screen === "admin" && isAdmin && adminBundleApi && adminMountTarget),
+      target: adminMountTarget,
+    });
   }
 
   async function boot() {
@@ -1123,14 +1089,14 @@
     let section = loadedRoute.section;
     const initialAdminSection = loadedRoute.initialAdminSection;
     if (section === "admin" && payload.user?.is_admin) {
-      cancelAdminAssetsPrefetch();
+      adminRuntime.cancelAdminAssetsPrefetch();
       adminActiveSection = initialAdminSection || "stats";
       activeTab = "settings";
       screen = "admin";
       mode = "app";
       try {
-        await ensureI18nScope("admin");
-        await ensureAdminBundle();
+        await adminRuntime.ensureI18nScope("admin");
+        await adminRuntime.ensureAdminBundle();
       } catch (_error) {
         void _error;
         section = "settings";
@@ -1151,7 +1117,7 @@
     screen = section;
     mode = "app";
     if (loadedRoute.shouldPrefetchAdminAssets) {
-      scheduleAdminAssetsPrefetch(true);
+      adminRuntime.scheduleAdminAssetsPrefetch(true);
     }
     if (loadedRoute.supportEnabled) {
       if (typeof payload.support_unread_count !== "undefined") {
@@ -1387,11 +1353,11 @@
   });
 
   const { closeAdminPanel, handleAdminSectionChange, openAdminPanel } = createAdminPanelActions({
-    cancelAdminAssetsPrefetch,
+    cancelAdminAssetsPrefetch: adminRuntime.cancelAdminAssetsPrefetch,
     clearLanguageClickGuard,
     closePaymentModal: () => billingStore.closePaymentModal(),
-    ensureAdminBundle,
-    ensureI18nScope,
+    ensureAdminBundle: adminRuntime.ensureAdminBundle,
+    ensureI18nScope: adminRuntime.ensureI18nScope,
     getAdminActiveSection: () => adminActiveSection,
     getRoutePathname: routePathnameFromLocation,
     getScreen: () => screen,
@@ -1411,45 +1377,6 @@
     syncAppSectionPath,
     t,
   });
-
-  async function handleAdminPersistedSaved(options: AdminPersistOptions = {}) {
-    invalidateWebappTariffOptionCaches(billingStore);
-    installGuidesStore.reset();
-    try {
-      await loadData({ fresh: true, preserveView: true });
-    } catch {
-      // Admin save already succeeded; a later full refresh will pick up new settings or catalog.
-    }
-    const shouldReloadFrontend =
-      options?.reloadFrontend === true ||
-      (!options?.deferFrontendReload && adminPayloadHasFrontendReloadChange(options));
-    if (shouldReloadFrontend && typeof window !== "undefined") {
-      window.location.reload();
-    }
-  }
-
-  async function refreshI18nScope(scope: string) {
-    if (MOCK) return;
-    const apiBase = String(CFG.apiBase || "/api").replace(/\/+$/, "");
-    try {
-      const response = await fetch(`${apiBase}/i18n?scope=${encodeURIComponent(scope)}`, {
-        credentials: "same-origin",
-        headers: { Accept: "application/json" },
-      });
-      if (!response.ok) return;
-      const payload = await response.json();
-      if (payload?.ok && payload.i18n) i18n.mergeMessages(payload.i18n);
-      if (scope === "admin") adminI18nLoaded = true;
-    } catch (_error) {
-      void _error;
-    }
-  }
-
-  async function handleAdminTranslationsSaved(options = {}) {
-    adminI18nLoaded = false;
-    await Promise.all([refreshI18nScope("webapp"), refreshI18nScope("admin")]);
-    await handleAdminPersistedSaved({ ...options, deferFrontendReload: true });
-  }
 
   const { backToTariffList, continueWithSelectedTariff, selectTariff } = createTariffActions({
     billingStore,
