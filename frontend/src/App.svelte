@@ -44,6 +44,7 @@
   import { createI18n } from "./lib/webapp/i18n.js";
   import { createActivationWatcher } from "./lib/webapp/activationWatcher";
   import { createAdminBundle } from "./lib/webapp/adminBundle";
+  import { isPasswordLoginPath, syncPasswordLoginPath } from "./lib/webapp/passwordLoginRoute.js";
   import {
     currentSearchParams,
     hasEmailCodeLoginDeeplink,
@@ -806,7 +807,7 @@
           ? normalizeSection(currentQuery.get("screen"))
           : sectionFromPath(routePathnameFromLocation(), routePrefix);
       if (mode === "login") {
-        setPasswordLoginMode(isPasswordLoginPath(), true);
+        setPasswordLoginMode(isPasswordLoginPath(routePathnameFromLocation()), true);
         screen = "login";
         return;
       }
@@ -1102,30 +1103,6 @@
     }
   }
 
-  function isPasswordLoginPath(pathname = routePathnameFromLocation()) {
-    return (
-      String(pathname || "")
-        .replace(/\/+$/, "")
-        .toLowerCase() === "/login/password"
-    );
-  }
-
-  function syncPasswordLoginPath(enabled: boolean, replace = false) {
-    if (typeof window === "undefined" || window.location.protocol === "file:") return;
-    const targetPath = enabled ? "/login/password" : isDocsDemo ? "/login" : "/";
-    if (isDocsDemo) {
-      const targetRuntimePath = withRoutePrefix(targetPath, routePrefix);
-      if (window.location.pathname === targetRuntimePath) return;
-      const nextUrl = `${targetRuntimePath}${window.location.search}${window.location.hash}`;
-      window.history[replace ? "replaceState" : "pushState"](null, "", nextUrl);
-      cleanDocsDemoRouteQuery();
-      return;
-    }
-    if (window.location.pathname === targetPath) return;
-    const nextUrl = `${targetPath}${window.location.search}${window.location.hash}`;
-    window.history[replace ? "replaceState" : "pushState"](null, "", nextUrl);
-  }
-
   function setPasswordLoginMode(enabled: boolean, replace = false) {
     const nextEnabled = Boolean(enabled);
     authStore.update((s) => ({
@@ -1135,7 +1112,13 @@
       authStatus: "",
       authIsError: false,
     }));
-    syncPasswordLoginPath(nextEnabled, replace);
+    syncPasswordLoginPath({
+      cleanDocsDemoRouteQuery,
+      enabled: nextEnabled,
+      isDocsDemo,
+      replace,
+      routePrefix,
+    });
   }
 
   async function loadData(options: AppLoadDataOptions = {}) {
@@ -1341,7 +1324,7 @@
     mode = "login";
     screen = "login";
     activeTab = "home";
-    setPasswordLoginMode(isPasswordLoginPath(), true);
+    setPasswordLoginMode(isPasswordLoginPath(routePathnameFromLocation()), true);
     authStore.restorePendingEmailCode((nextScreen) => {
       screen = nextScreen;
     });
