@@ -55,8 +55,10 @@
   import {
     buildTariffCatalog,
     type BillingPlan,
+    type PaymentMethod,
     type TariffCatalogEntry,
   } from "./lib/webapp/tariffs.js";
+  import { reconcileBillingSelection } from "./lib/webapp/billingSelectionSync.js";
   import { premiumTrafficLimitVisible, regularTrafficLimitVisible } from "./lib/webapp/traffic.js";
   import { readThemePreviewDraft, syncThemeGoogleFonts } from "./lib/webapp/themeStyle.js";
   import { computeThemeView } from "./lib/webapp/themeView.js";
@@ -450,7 +452,7 @@
     faviconUrl: String(CFG.faviconUrl || "").trim() || brand.logoUrl,
   };
   $: plans = (data?.plans?.length ? data.plans : MOCK_SOURCE.data.plans) as AnyRecord[];
-  $: methods = (data?.payment_methods?.length ? data.payment_methods : []) as AnyRecord[];
+  $: methods = (data?.payment_methods?.length ? data.payment_methods : []) as PaymentMethod[];
   $: appSettings = (data?.settings || MOCK_SOURCE.data.settings || {}) as AnyRecord;
   $: rawEmailAuthEnabled =
     data?.settings?.email_auth_enabled ?? appSettings?.email_auth_enabled ?? CFG.emailAuthEnabled;
@@ -634,46 +636,24 @@
   $: if (!emailAuthEnabled && setPasswordOpen) {
     accountStore.closeSetPasswordDialog();
   }
-  $: if (!tariffMode && !$billingStore.selectedPlan && plans.length) {
-    billingStore.update((s) => ({ ...s, selectedPlan: plans[Math.min(1, plans.length - 1)] }));
-  }
-  $: if (singleTariffMode && tariffCatalog[0]?.key && selectedTariffKey !== tariffCatalog[0].key) {
-    const tariffKey = tariffCatalog[0].key;
-    billingStore.update((s) => ({
-      ...s,
-      selectedTariffKey: tariffKey,
-      selectedPlan: plans.find((plan) => plan?.tariff_key === tariffKey) || null,
-      paymentStep: s.paymentStep === "tariff" ? "checkout" : s.paymentStep,
-    }));
-  }
-  $: if (
-    tariffMode &&
-    selectedTariffKey &&
-    !tariffCatalog.some((tariff) => tariff.key === selectedTariffKey)
-  ) {
-    billingStore.update((s) => ({
-      ...s,
-      selectedTariffKey: "",
-      selectedPlan: null,
-      paymentStep: singleTariffMode ? "checkout" : "tariff",
-    }));
-  }
-  $: if (
-    tariffMode &&
-    selectedTariffKey &&
-    (!selectedPlan || selectedPlan.tariff_key !== selectedTariffKey)
-  ) {
-    billingStore.update((s) => ({ ...s, selectedPlan: selectedTariffPlans[0] || null }));
-  }
-  $: if (methods.length) {
-    const selectedMethodAvailable = methods.some(
-      (method) => method.id === $billingStore.selectedMethod
+  $: {
+    const billingSelectionPatch = reconcileBillingSelection(
+      {
+        paymentStep: $billingStore.paymentStep,
+        selectedMethod: $billingStore.selectedMethod,
+        selectedPlan,
+        selectedTariffKey,
+      },
+      {
+        methods,
+        plans,
+        selectedTariffPlans,
+        singleTariffMode,
+        tariffCatalog,
+        tariffMode,
+      }
     );
-    if (!$billingStore.selectedMethod || !selectedMethodAvailable) {
-      billingStore.update((s) => ({ ...s, selectedMethod: methods[0].id }));
-    }
-  } else if ($billingStore.selectedMethod) {
-    billingStore.update((s) => ({ ...s, selectedMethod: "" }));
+    if (billingSelectionPatch) billingStore.update((s) => ({ ...s, ...billingSelectionPatch }));
   }
   $: {
     const emailKey = normalizedEmail(user?.email);
@@ -1664,7 +1644,7 @@
   }
 
   function defaultPaymentMethod() {
-    return methods[0]?.id || "";
+    return String(methods[0]?.id || "");
   }
 
   function openPaymentModal() {
