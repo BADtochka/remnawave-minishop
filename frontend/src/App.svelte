@@ -23,7 +23,6 @@
   import {
     applyFavicon,
     applyDocumentTitle,
-    normalizeBrand,
     readJsonScript,
     structuredCloneSafe,
   } from "./lib/webapp/browser.js";
@@ -62,6 +61,7 @@
   import { computeLanguageView, type LanguageOption } from "./lib/webapp/languageView.js";
   import { computeTelegramLoginView } from "./lib/webapp/telegramLoginView.js";
   import { computeAccountView } from "./lib/webapp/accountView.js";
+  import { computeAppDataView } from "./lib/webapp/appDataView.js";
   import { createWebappNavigation } from "./lib/webapp/webappNavigation.js";
   import { adminPayloadHasFrontendReloadChange } from "./lib/webapp/adminPersistedSettings.js";
   import { createBillingModalActions } from "./lib/webapp/billingModalActions.js";
@@ -441,29 +441,47 @@
     trialActivationError,
   } = $actionsStore);
 
-  $: brandTitle = CFG.title || FALLBACK_BRAND_TITLE;
-  $: brand = normalizeBrand({
-    title: brandTitle,
-    logoUrl: CFG.logoUrl,
-  });
-  $: faviconBrand = {
-    ...brand,
-    faviconUrl: String(CFG.faviconUrl || "").trim() || brand.logoUrl,
-  };
-  $: plans = (data?.plans?.length ? data.plans : MOCK_SOURCE.data.plans) as AnyRecord[];
-  $: methods = (data?.payment_methods?.length ? data.payment_methods : []) as PaymentMethod[];
-  $: appSettings = (data?.settings || MOCK_SOURCE.data.settings || {}) as AnyRecord;
-  $: rawEmailAuthEnabled =
-    data?.settings?.email_auth_enabled ?? appSettings?.email_auth_enabled ?? CFG.emailAuthEnabled;
-  $: emailAuthEnabled = rawEmailAuthEnabled !== false && rawEmailAuthEnabled !== "false";
-  $: subscriptionPurchaseDescription = String(
-    appSettings?.subscription_purchase_description || ""
-  ).trim();
-  $: devicesEnabled = Boolean(appSettings?.my_devices_enabled);
-  $: supportEnabled = Boolean(appSettings?.support_tickets_enabled ?? true);
-  $: installGuidesEnabled = Boolean(appSettings?.subscription_guides_enabled);
+  let brandTitle = FALLBACK_BRAND_TITLE;
+  let brand: AnyRecord = {};
+  let faviconBrand: AnyRecord = {};
+  let plans: AnyRecord[] = [];
+  let methods: PaymentMethod[] = [];
+  let appSettings: AnyRecord = {};
+  let emailAuthEnabled = true;
+  let subscriptionPurchaseDescription = "";
+  let devicesEnabled = false;
+  let supportEnabled = true;
+  let installGuidesEnabled = false;
+  let subscription: AnyRecord = {};
+  let referral: AnyRecord = {};
+  let referralBonusDetails: AnyRecord[] = [];
+  let referralWelcomeBonusDays = 0;
+  let referralOneBonusPerReferee = false;
+  $: {
+    const appDataView = computeAppDataView({
+      cfg: CFG,
+      data,
+      fallbackBrandTitle: FALLBACK_BRAND_TITLE,
+      mockData: MOCK_SOURCE.data,
+    });
+    brandTitle = appDataView.brandTitle;
+    brand = appDataView.brand;
+    faviconBrand = appDataView.faviconBrand;
+    plans = appDataView.plans;
+    methods = appDataView.methods;
+    appSettings = appDataView.appSettings;
+    emailAuthEnabled = appDataView.emailAuthEnabled;
+    subscriptionPurchaseDescription = appDataView.subscriptionPurchaseDescription;
+    devicesEnabled = appDataView.devicesEnabled;
+    supportEnabled = appDataView.supportEnabled;
+    installGuidesEnabled = appDataView.installGuidesEnabled;
+    subscription = appDataView.subscription;
+    referral = appDataView.referral;
+    referralBonusDetails = appDataView.referralBonusDetails;
+    referralWelcomeBonusDays = appDataView.referralWelcomeBonusDays;
+    referralOneBonusPerReferee = appDataView.referralOneBonusPerReferee;
+  }
   $: supportStore.setActive(Boolean(mode === "app" && screen === "support" && supportEnabled));
-  $: subscription = (data?.subscription || MOCK_SOURCE.data.subscription || {}) as AnyRecord;
   let trafficMode = false;
   let tariffMode = false;
   let tariffCatalog: TariffCatalogEntry[] = [];
@@ -539,7 +557,6 @@
     screen = "settings";
     activeTab = "settings";
   }
-  $: referral = data?.referral || MOCK_SOURCE.data.referral;
   $: currentLang = normalizeLangCode(user?.language_code || guestLanguage || CFG.language || "ru");
   let languageOptions: LanguageOption[] = [];
   let currentLanguageOption: LanguageOption | null = null;
@@ -558,9 +575,6 @@
   let telegramNotificationsNeedPrompt = false;
   let telegramNotificationsStartLink = "";
   let hasUnlinkedIdentity = false;
-  $: referralBonusDetails = Array.isArray(referral?.bonus_details) ? referral.bonus_details : [];
-  $: referralWelcomeBonusDays = Math.max(0, Number(referral?.welcome_bonus_days || 0));
-  $: referralOneBonusPerReferee = Boolean(referral?.one_bonus_per_referee);
   let telegramProfileName = "";
   let profileEmail = "";
   let profileTelegramId = "";
