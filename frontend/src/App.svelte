@@ -48,6 +48,7 @@
     stripTopupQueryFromUrl,
   } from "./lib/webapp/deeplinks";
   import { createDemoAuth } from "./lib/webapp/demoAuth";
+  import { createDocsDemoRouter } from "./lib/webapp/docsDemoRoutes.js";
   import { createTelegramLaunch } from "./lib/webapp/telegramLaunch";
   import { createUiChrome } from "./lib/webapp/uiChrome";
   import { normalizedEmail } from "./lib/webapp/formatters.js";
@@ -95,7 +96,6 @@
     publicInstallTokenFromPath,
     sectionFromPath,
     supportTicketIdFromPath,
-    syncSectionPath,
     withRoutePrefix,
   } from "./lib/webapp/routes.js";
 
@@ -174,6 +174,18 @@
     ...(MOCK ? MOCK.config : {}),
     ...(injectedConfig || {}),
   };
+  const docsDemoRouter = createDocsDemoRouter({
+    currentSearchParams,
+    getParentRouteConsumed: () => docsDemoParentRouteConsumed,
+    isDocsDemo,
+    isMockEnabled: () => Boolean(MOCK),
+    routePrefix,
+  });
+  const cleanDocsDemoRouteQuery = docsDemoRouter.cleanRouteQuery;
+  const docsDemoParentSearchParams = docsDemoRouter.parentSearchParams;
+  const initialAdminSectionFromLocation = docsDemoRouter.initialAdminSectionFromLocation;
+  const routePathnameFromLocation = docsDemoRouter.routePathnameFromLocation;
+  const syncAppSectionPath = docsDemoRouter.syncAppSectionPath;
   const themePreviewKey = String(CFG.themePreviewKey || query.get("theme_preview") || "").trim();
   const themePreviewDraft = readThemePreviewDraft(themePreviewKey);
   const I18N: AnyRecord = injectedI18n || {};
@@ -1010,108 +1022,6 @@
     await authStore.requestEmailCode((nextScreen) => {
       screen = nextScreen;
     });
-  }
-
-  function docsDemoParentSearchParams() {
-    if (!isDocsDemo) return null;
-    try {
-      if (window.parent === window) return null;
-      return new URLSearchParams(window.parent.location.search);
-    } catch (_error) {
-      return null;
-    }
-  }
-
-  function normalizeDemoRoutePath(value: string) {
-    const raw = String(value || "").trim();
-    if (!raw) return "";
-    const withSlash = raw.startsWith("/") ? raw : `/${raw}`;
-    return withSlash.replace(/\/{2,}/g, "/").replace(/\/+$/, "") || "/";
-  }
-
-  function docsDemoRouteParams() {
-    if (!isDocsDemo) return null;
-    const currentQuery = currentSearchParams();
-    const currentParams = {
-      path: currentQuery.get("path") || "",
-      screen: currentQuery.get("screen") || "",
-      adminSection: currentQuery.get("admin_section") || "",
-    };
-    if (currentParams.path || currentParams.screen || currentParams.adminSection) {
-      return currentParams;
-    }
-    if (docsDemoParentRouteConsumed) return currentParams;
-    const parentQuery = docsDemoParentSearchParams();
-    return {
-      path: parentQuery?.get("path") || "",
-      screen: parentQuery?.get("screen") || "",
-      adminSection: parentQuery?.get("admin_section") || "",
-    };
-  }
-
-  function docsDemoRoutePathFromParams() {
-    const params = docsDemoRouteParams();
-    if (!params) return "";
-    const explicitPath = normalizeDemoRoutePath(params.path);
-    if (explicitPath) return explicitPath;
-    const section = normalizeSection(params.screen);
-    if (section === "admin") {
-      return `/admin/${normalizeAdminSection(params.adminSection || "stats")}`;
-    }
-    return params.screen ? `/${section}` : "";
-  }
-
-  function routePathnameFromLocation() {
-    return docsDemoRoutePathFromParams() || window.location.pathname;
-  }
-
-  function cleanDocsDemoRouteQuery() {
-    if (!isDocsDemo || window.location.protocol === "file:") return;
-    const url = new URL(window.location.href);
-    const routeKeys = ["path", "screen", "admin_section"];
-    const changed = routeKeys.some((key) => url.searchParams.has(key));
-    if (!changed) return;
-    for (const key of routeKeys) url.searchParams.delete(key);
-    const search = url.searchParams.toString();
-    window.history.replaceState(
-      null,
-      "",
-      `${url.pathname}${search ? `?${search}` : ""}${url.hash}`
-    );
-  }
-
-  function initialAdminSectionFromLocation() {
-    const currentQuery = currentSearchParams();
-    if (MOCK && currentQuery.get("admin_section")) {
-      return normalizeAdminSection(currentQuery.get("admin_section"));
-    }
-    const demoRouteParams = docsDemoRouteParams();
-    if (MOCK && demoRouteParams?.adminSection) {
-      return normalizeAdminSection(demoRouteParams.adminSection);
-    }
-    return adminSectionFromPath(routePathnameFromLocation(), routePrefix);
-  }
-
-  function syncDocsDemoSection(
-    section: string,
-    replace = false,
-    adminSection: string | null = null,
-    adminUserId: string | number | null = null
-  ) {
-    if (!isDocsDemo || window.location.protocol === "file:") return false;
-    (syncSectionPath as any)(section, replace, adminSection, adminUserId, routePrefix);
-    cleanDocsDemoRouteQuery();
-    return true;
-  }
-
-  function syncAppSectionPath(
-    section: string,
-    replace = false,
-    adminSection: string | null = null,
-    adminUserId: string | number | null = null
-  ) {
-    if (syncDocsDemoSection(section, replace, adminSection, adminUserId)) return;
-    (syncSectionPath as any)(section, replace, adminSection, adminUserId);
   }
 
   $: adminPanelProps = {
