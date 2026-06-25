@@ -200,12 +200,8 @@
     createExternalLinkRuntime({
       assignLocation: (url) => window.location.assign(url),
       getCurrentLang: () => currentLang,
-      getTelegram: () => tg,
       hasTelegramLaunchParams,
       refreshTelegram: telegramRuntime.refreshTelegram,
-      setTelegram: (value) => {
-        shellState.tg = value;
-      },
     });
   const i18n = createI18n({
     messages: I18N,

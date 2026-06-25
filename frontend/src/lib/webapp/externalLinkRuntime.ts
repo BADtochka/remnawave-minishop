@@ -1,5 +1,6 @@
 import { createAppLaunchActions } from "./appLaunchActions.js";
 import { openAppLinkTarget } from "./appLinkActions.js";
+import { shellState } from "./shellState.svelte";
 
 type TelegramWebApp = Record<string, unknown> & {
   openLink?: (url: string, options?: Record<string, unknown>) => void;
@@ -9,29 +10,25 @@ type TelegramWebApp = Record<string, unknown> & {
 type ExternalLinkRuntimeDeps = {
   assignLocation: (url: string) => void;
   getCurrentLang: () => string;
-  getTelegram: () => TelegramWebApp | null;
   hasTelegramLaunchParams: () => boolean;
   openHiddenAnchor?: (url: string) => void;
   openLaunchTarget?: (url: string) => void;
   refreshTelegram: () => TelegramWebApp | null;
   readLaunchTarget?: () => string;
-  setTelegram: (value: TelegramWebApp) => void;
 };
 
 export function createExternalLinkRuntime({
   assignLocation,
   getCurrentLang,
-  getTelegram,
   hasTelegramLaunchParams,
   openHiddenAnchor,
   openLaunchTarget,
   refreshTelegram,
   readLaunchTarget,
-  setTelegram,
 }: ExternalLinkRuntimeDeps) {
   function openExternalLink(url: string) {
     if (!url) return;
-    const telegram = getTelegram();
+    const telegram = shellState.tg;
     if (telegram?.openLink) {
       telegram.openLink(url, { try_instant_view: false });
       return;
@@ -42,12 +39,14 @@ export function createExternalLinkRuntime({
   function openAppLink(url: string) {
     openAppLinkTarget(url, {
       currentLang: getCurrentLang(),
-      getTelegram,
+      getTelegram: () => shellState.tg,
       hasTelegramLaunchParams,
       openExternalLink,
       openHiddenAnchor,
       refreshTelegram,
-      setTelegram,
+      setTelegram: (value) => {
+        shellState.tg = value;
+      },
     });
   }
 

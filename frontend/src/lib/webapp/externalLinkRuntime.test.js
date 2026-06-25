@@ -9,19 +9,15 @@ function makeRuntime(overrides = {}) {
     telegram: null,
     ...overrides,
   };
-  resetShellState();
+  resetShellState({ tg: state.telegram });
   const deps = {
     assignLocation: vi.fn(),
     getCurrentLang: () => state.currentLang,
-    getTelegram: () => state.telegram,
     hasTelegramLaunchParams: vi.fn(() => false),
     openHiddenAnchor: vi.fn(),
     openLaunchTarget: vi.fn(),
     refreshTelegram: vi.fn(() => state.telegram),
     readLaunchTarget: vi.fn(() => ""),
-    setTelegram: vi.fn((value) => {
-      state.telegram = value;
-    }),
   };
   return { deps, runtime: createExternalLinkRuntime(deps), state };
 }
