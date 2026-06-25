@@ -27,8 +27,7 @@
   import { createWebappDataClient } from "./lib/webapp/dataClient";
   import { canUseSubscriptionInstallGuides } from "./lib/webapp/connectLinks.js";
   import { createI18n } from "./lib/webapp/i18n.js";
-  import { createActivationWatcher } from "./lib/webapp/activationWatcher";
-  import { createActivationRuntime } from "./lib/webapp/activationRuntime.js";
+  import { createWebappActivationContext } from "./lib/webapp/webappActivationContext";
   import { createAuthRuntime } from "./lib/webapp/authRuntime.js";
   import { createResumeLifecycle } from "./lib/webapp/resumeLifecycle.js";
   import { refreshTelegramNotificationsAfterResume } from "./lib/webapp/telegramNotificationsResume.js";
@@ -89,10 +88,7 @@
 
   /** Used-traffic percent from which top-up modals and CTAs unlock in the web app home screen */
   const TRAFFIC_TOPUP_UNLOCK_PERCENT = 80;
-  const ACTIVATION_HANDOFF_STORAGE_KEY = "rw_webapp_activation_handoff_v1";
-  const ACTIVATION_HANDOFF_TTL_MS = 48 * 60 * 60 * 1000;
   const TELEGRAM_NOTIFICATIONS_RESUME_REFRESH_COOLDOWN_MS = 1500;
-  import { createActivationHandoff } from "./lib/webapp/activationHandoff.js";
   import { createBillingActions } from "./lib/webapp/billingActions";
   import { invalidateWebappTariffOptionCaches } from "./lib/webapp/billingOptionCache.js";
   import { runWebappBoot } from "./lib/webapp/webappBoot.js";
@@ -319,22 +315,29 @@
     api,
   });
   const emailAvatarSync = createEmailAvatarSync();
-  const activationHandoff = createActivationHandoff({
-    storageKey: ACTIVATION_HANDOFF_STORAGE_KEY,
-    ttlMs: ACTIVATION_HANDOFF_TTL_MS,
-  } as any) as any;
-  let activationWatcher: ReturnType<typeof createActivationWatcher>;
-  const activationRuntime = createActivationRuntime({
-    activationHandoff,
-    closePaymentModal: () => billingStore.closePaymentModal(),
-    getActivationSuccessDialogOpen: () => activationSuccessDialogOpen,
-    getActivationSuccessUseInstallGuides: () => activationSuccessUseInstallGuides,
+  const {
+    closeActivationSuccessDialog,
+    handleSubscriptionActivated,
+    hasPendingActivationHandoff,
+    maybeShowActivationSuccessDialog,
+    refreshPendingActivationOnResume,
+    rememberActivationPending,
+    startPendingActivationWatch,
+    stopPendingActivationWatch,
+  } = createWebappActivationContext({
+    billing,
+    loadData,
     getData: () => data,
     getSubscription: () => subscription,
-    canUseInstallGuides,
-    loadInstallGuides: (force) => installGuidesStore.load(force),
-    openActivationConnectLink: () => openActivationConnectLink(),
-    refreshPendingActivationOnResume: () => activationWatcher.refreshOnResume(),
+    getMode: () => mode,
+    getScreen: () => screen,
+    getActivationSuccessDialogOpen: () => activationSuccessDialogOpen,
+    getActivationSuccessUseInstallGuides: () => activationSuccessUseInstallGuides,
+    getPaymentModalOpen: () => paymentModalOpen,
+    getTopupModalOpen: () => topupModalOpen,
+    getDeviceTopupModalOpen: () => deviceTopupModalOpen,
+    getChangeModalOpen: () => changeModalOpen,
+    getChangeConfirmOpen: () => changeConfirmOpen,
     setActivationSuccessDialogOpen: (open) => {
       activationSuccessDialogOpen = open;
     },
@@ -347,42 +350,11 @@
     setScreen: (nextScreen) => {
       screen = nextScreen;
     },
-    startPendingActivationWatch: () => activationWatcher.start(),
-    stopPendingActivationWatch: () => activationWatcher.stop(),
+    canUseInstallGuides,
+    closePaymentModal: () => billingStore.closePaymentModal(),
+    loadInstallGuides: (force) => installGuidesStore.load(force),
+    openActivationConnectLink: () => openActivationConnectLink(),
     syncAppSectionPath,
-    tick,
-  });
-  const {
-    closeActivationSuccessDialog,
-    handleSubscriptionActivated,
-    hasPendingActivationHandoff,
-    maybeShowActivationSuccessDialog,
-    refreshPendingActivationOnResume,
-    rememberActivationPending,
-    startPendingActivationWatch,
-    stopPendingActivationWatch,
-  } = activationRuntime;
-  activationWatcher = createActivationWatcher({
-    activationHandoff,
-    billing,
-    getData: () => data,
-    loadData,
-    maybeShowActivationSuccessDialog,
-    shouldWatch: () =>
-      mode === "app" &&
-      activationHandoff.hasPending(data || {}) &&
-      !activationSuccessDialogOpen &&
-      screen !== "admin",
-    canRefreshOnResume: () =>
-      mode === "app" &&
-      screen !== "admin" &&
-      !activationSuccessDialogOpen &&
-      !paymentModalOpen &&
-      !topupModalOpen &&
-      !deviceTopupModalOpen &&
-      !changeModalOpen &&
-      !changeConfirmOpen &&
-      activationHandoff.hasPending(data || {}),
   });
   const authStore = createAuthStore({
     publicApi,
