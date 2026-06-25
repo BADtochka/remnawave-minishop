@@ -3,15 +3,17 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_SVELTE = REPO_ROOT / "frontend/src/App.svelte"
+APP_SHELL_VIEW = REPO_ROOT / "frontend/src/lib/webapp/appShellView.ts"
 WEBAPP_CSS = REPO_ROOT / "frontend/src/styles/webapp.css"
 LOCALES = REPO_ROOT / "locales"
 
 
 def test_sonner_toaster_uses_app_theme_and_unstyled_toasts():
     source = APP_SVELTE.read_text(encoding="utf-8")
+    shell_view_source = APP_SHELL_VIEW.read_text(encoding="utf-8")
 
-    assert 'let toastTheme: "dark" | "light" = "dark";' in source
-    assert "toastTheme = themeView.toastTheme;" in source
+    assert "computeThemeView" in shell_view_source
+    assert "toastTheme," in source
     assert "theme={toastTheme}" in source
     assert "style={shellStyle}" in source
     assert 'toastOptions={{ class: "app-toast", unstyled: true }}' in source

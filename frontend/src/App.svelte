@@ -42,20 +42,10 @@
   import { createDocsDemoRouter } from "./lib/webapp/docsDemoRoutes.js";
   import { createUiChrome } from "./lib/webapp/uiChrome";
   import { createEmailAvatarSync } from "./lib/webapp/emailAvatarSync.js";
-  import {
-    type BillingPlan,
-    type PaymentMethod,
-    type TariffCatalogEntry,
-  } from "./lib/webapp/tariffs.js";
   import { createBillingDeeplinkEffects } from "./lib/webapp/billingDeeplinkEffects.js";
   import { createWebappSectionContext } from "./lib/webapp/webappSectionContext";
   import { readThemePreviewDraft, syncThemeGoogleFonts } from "./lib/webapp/themeStyle.js";
-  import { computeThemeView } from "./lib/webapp/themeView.js";
-  import { computeBillingView } from "./lib/webapp/billingView.js";
-  import { computeLanguageView, type LanguageOption } from "./lib/webapp/languageView.js";
-  import { computeTelegramLoginView } from "./lib/webapp/telegramLoginView.js";
-  import { computeAccountView } from "./lib/webapp/accountView.js";
-  import { computeAppDataView } from "./lib/webapp/appDataView.js";
+  import { computeAppShellView } from "./lib/webapp/appShellView.js";
   import { createWebappNavigation } from "./lib/webapp/webappNavigation.js";
   import { createBillingModalActions } from "./lib/webapp/billingModalActions.js";
   import { createAutoRenewAction } from "./lib/webapp/autoRenewAction.js";
@@ -178,6 +168,14 @@
   let adminPanelProps: AnyRecord = {};
   let adminActiveSection = "stats";
   let tg: TelegramWebApp | null = null;
+  let currentLang = String(CFG.language || "ru");
+  let demoAuthLogin: unknown = false;
+  let installGuidesEnabled = false;
+  let isAdmin = false;
+  let subscription: AnyRecord = {};
+  let telegramNotificationsNeedPrompt = false;
+  let telegramOAuthClientId = 0;
+  let user: AnyRecord = {};
   const telegramRuntime = createTelegramRuntime<TelegramWebApp | null>({
     scriptUrl: TELEGRAM_WEBAPP_SCRIPT_URL,
     bootTimeoutMs: TELEGRAM_SDK_BOOT_TIMEOUT_MS,
@@ -517,191 +515,116 @@
     trialActivationError,
   } = $actionsStore);
 
-  let brandTitle = FALLBACK_BRAND_TITLE;
-  let brand: AnyRecord = {};
-  let faviconBrand: AnyRecord = {};
-  let plans: AnyRecord[] = [];
-  let methods: PaymentMethod[] = [];
-  let appSettings: AnyRecord = {};
-  let emailAuthEnabled = true;
-  let subscriptionPurchaseDescription = "";
-  let devicesEnabled = false;
-  let supportEnabled = true;
-  let installGuidesEnabled = false;
-  let subscription: AnyRecord = {};
-  let referral: AnyRecord = {};
-  let referralBonusDetails: AnyRecord[] = [];
-  let referralWelcomeBonusDays = 0;
-  let referralOneBonusPerReferee = false;
-  $: {
-    const appDataView = computeAppDataView({
+  function computeCurrentShellView() {
+    return computeAppShellView({
+      authBusy,
+      authStatus,
       cfg: CFG,
       data,
+      emailAvatarUrl,
       fallbackBrandTitle: FALLBACK_BRAND_TITLE,
+      guestLanguage,
+      hasTelegramLaunchParams,
+      i18nMessages: I18N,
+      isDemoAuthMock: () => demoAuth.isDemoAuthMock(),
+      languageName,
       mockData: MOCK_SOURCE.data,
-    });
-    brandTitle = appDataView.brandTitle;
-    brand = appDataView.brand;
-    faviconBrand = appDataView.faviconBrand;
-    plans = appDataView.plans;
-    methods = appDataView.methods;
-    appSettings = appDataView.appSettings;
-    emailAuthEnabled = appDataView.emailAuthEnabled;
-    subscriptionPurchaseDescription = appDataView.subscriptionPurchaseDescription;
-    devicesEnabled = appDataView.devicesEnabled;
-    supportEnabled = appDataView.supportEnabled;
-    installGuidesEnabled = appDataView.installGuidesEnabled;
-    subscription = appDataView.subscription;
-    referral = appDataView.referral;
-    referralBonusDetails = appDataView.referralBonusDetails;
-    referralWelcomeBonusDays = appDataView.referralWelcomeBonusDays;
-    referralOneBonusPerReferee = appDataView.referralOneBonusPerReferee;
-  }
-  $: supportStore.setActive(Boolean(mode === "app" && screen === "support" && supportEnabled));
-  let trafficMode = false;
-  let tariffMode = false;
-  let tariffCatalog: TariffCatalogEntry[] = [];
-  let singleTariffMode = false;
-  let hasMultipleTariffs = false;
-  let selectedTariff: TariffCatalogEntry | null = null;
-  let selectedTariffPlans: BillingPlan[] = [];
-  let hasActiveTariffSubscription = false;
-  let canChangeTariff = false;
-  let currentTariffName = "";
-  let regularTrafficTopupUnlocked = false;
-  let premiumTrafficTopupUnlocked = false;
-  let regularTrafficTopupBarClickable = false;
-  let premiumTrafficTopupBarClickable = false;
-  $: {
-    const billingView = computeBillingView({
-      appSettings,
-      plans,
+      mockEnabled: Boolean(MOCK),
+      normalizeLangCode,
+      readTelegramMiniAppInitDataFromLocation,
+      screen,
       selectedTariffKey,
-      subscription,
-      topupUnlockPercent: TRAFFIC_TOPUP_UNLOCK_PERCENT,
-    });
-    trafficMode = billingView.trafficMode;
-    tariffMode = billingView.tariffMode;
-    tariffCatalog = billingView.tariffCatalog;
-    singleTariffMode = billingView.singleTariffMode;
-    hasMultipleTariffs = billingView.hasMultipleTariffs;
-    selectedTariff = billingView.selectedTariff;
-    selectedTariffPlans = billingView.selectedTariffPlans;
-    hasActiveTariffSubscription = billingView.hasActiveTariffSubscription;
-    canChangeTariff = billingView.canChangeTariff;
-    currentTariffName = billingView.currentTariffName;
-    regularTrafficTopupUnlocked = billingView.regularTrafficTopupUnlocked;
-    premiumTrafficTopupUnlocked = billingView.premiumTrafficTopupUnlocked;
-    regularTrafficTopupBarClickable = billingView.regularTrafficTopupBarClickable;
-    premiumTrafficTopupBarClickable = billingView.premiumTrafficTopupBarClickable;
-  }
-  $: user = (data?.user || {}) as AnyRecord;
-  let resolvedThemeKey = "";
-  let effectiveThemeEntry: AnyRecord | null = null;
-  let shellStyle = "";
-  let shellToneClass = "";
-  let shellThemeClass = "";
-  let shellThemeCssHref: string | null = null;
-  let toastTheme: "dark" | "light" = "dark";
-  $: {
-    const themeView = computeThemeView({
+      telegramLoginBusy,
+      telegramSdkStatus,
+      tg,
       themePreviewDraft,
       themePreviewKey,
-      data,
-      user,
-      screen,
-      cfgThemesCatalog: CFG.themesCatalog,
-      primaryColor: CFG.primaryColor,
+      topupUnlockPercent: TRAFFIC_TOPUP_UNLOCK_PERCENT,
+      t,
     });
-    resolvedThemeKey = themeView.resolvedThemeKey;
-    effectiveThemeEntry = themeView.effectiveThemeEntry;
-    shellStyle = themeView.shellStyle;
-    shellToneClass = themeView.shellToneClass;
-    shellThemeClass = themeView.shellThemeClass;
-    shellThemeCssHref = themeView.shellThemeCssHref;
-    toastTheme = themeView.toastTheme;
   }
+
+  $: ({
+    accountView: {
+      emailLinkStatus,
+      hasUnlinkedIdentity,
+      privacyPolicyUrl,
+      profileAvatarUrl,
+      profileEmail,
+      profileTelegramId,
+      serverStatusUrl,
+      supportUrl,
+      telegramNotificationsNeedPrompt,
+      telegramNotificationsStartLink,
+      telegramNotificationsStatus,
+      telegramProfileName,
+      userAgreementUrl,
+    },
+    appDataView: {
+      appSettings,
+      brand,
+      brandTitle,
+      devicesEnabled,
+      emailAuthEnabled,
+      faviconBrand,
+      installGuidesEnabled,
+      methods,
+      plans,
+      referral,
+      referralBonusDetails,
+      referralOneBonusPerReferee,
+      referralWelcomeBonusDays,
+      subscription,
+      subscriptionPurchaseDescription,
+      supportEnabled,
+    },
+    billingView: {
+      canChangeTariff,
+      currentTariffName,
+      hasActiveTariffSubscription,
+      hasMultipleTariffs,
+      premiumTrafficTopupBarClickable,
+      premiumTrafficTopupUnlocked,
+      regularTrafficTopupBarClickable,
+      regularTrafficTopupUnlocked,
+      selectedTariff,
+      selectedTariffPlans,
+      singleTariffMode,
+      tariffCatalog,
+      tariffMode,
+      trafficMode,
+    },
+    currentLang,
+    demoAuthLogin,
+    isAdmin,
+    languageView: { currentLanguageOption = null, languageOptions },
+    telegramLoginView: {
+      telegramLoginChecking,
+      telegramLoginLabel,
+      telegramLoginUnavailable,
+      telegramLoginUnavailableMessage,
+    },
+    telegramMiniAppContext,
+    telegramMiniAppInitData,
+    telegramOAuthClientId,
+    themeView: {
+      effectiveThemeEntry,
+      resolvedThemeKey,
+      shellStyle,
+      shellThemeClass,
+      shellThemeCssHref,
+      shellToneClass,
+      toastTheme,
+    },
+    user,
+    userLanguage,
+  } = computeCurrentShellView());
+  $: supportStore.setActive(Boolean(mode === "app" && screen === "support" && supportEnabled));
   $: applyThemeDocumentEffects(effectiveThemeEntry);
   $: syncThemeGoogleFonts(effectiveThemeEntry);
-  $: isAdmin = Boolean(user?.is_admin);
   $: if (screen === "admin" && !isAdmin) {
     screen = "settings";
     activeTab = "settings";
-  }
-  $: currentLang = normalizeLangCode(user?.language_code || guestLanguage || CFG.language || "ru");
-  let languageOptions: LanguageOption[] = [];
-  let currentLanguageOption: LanguageOption | null = null;
-  $: {
-    const languageView = computeLanguageView({
-      cfgLanguages: CFG.languages,
-      currentLang,
-      i18nMessages: I18N,
-    });
-    languageOptions = languageView.languageOptions;
-    currentLanguageOption = languageView.currentLanguageOption || null;
-  }
-  $: userLanguage = languageName(currentLang);
-  let emailLinkStatus = "";
-  let telegramNotificationsStatus = "unknown";
-  let telegramNotificationsNeedPrompt = false;
-  let telegramNotificationsStartLink = "";
-  let hasUnlinkedIdentity = false;
-  let telegramProfileName = "";
-  let profileEmail = "";
-  let profileTelegramId = "";
-  let profileAvatarUrl = "";
-  let privacyPolicyUrl = "";
-  let userAgreementUrl = "";
-  let supportUrl = "";
-  let serverStatusUrl = "";
-  $: {
-    const accountView = computeAccountView({
-      appSettings,
-      cfg: CFG,
-      emailAuthEnabled,
-      emailAvatarUrl,
-      t,
-      user,
-    });
-    emailLinkStatus = accountView.emailLinkStatus;
-    telegramNotificationsStatus = accountView.telegramNotificationsStatus;
-    telegramNotificationsNeedPrompt = accountView.telegramNotificationsNeedPrompt;
-    telegramNotificationsStartLink = accountView.telegramNotificationsStartLink;
-    hasUnlinkedIdentity = accountView.hasUnlinkedIdentity;
-    telegramProfileName = accountView.telegramProfileName;
-    profileEmail = accountView.profileEmail;
-    profileTelegramId = accountView.profileTelegramId;
-    profileAvatarUrl = accountView.profileAvatarUrl;
-    privacyPolicyUrl = accountView.privacyPolicyUrl;
-    userAgreementUrl = accountView.userAgreementUrl;
-    supportUrl = accountView.supportUrl;
-    serverStatusUrl = accountView.serverStatusUrl;
-  }
-  $: telegramLoginBotId = Number(CFG.telegramLoginBotId || 0);
-  $: telegramOAuthClientId = Number(CFG.telegramOAuthClientId || telegramLoginBotId || 0);
-  $: telegramMiniAppInitData = tg?.initData || readTelegramMiniAppInitDataFromLocation();
-  $: telegramMiniAppAuthAvailable = Boolean(telegramMiniAppInitData);
-  $: telegramMiniAppContext = hasTelegramLaunchParams();
-  $: demoAuthLogin = MOCK && demoAuth.isDemoAuthMock();
-  let telegramLoginUnavailable = false;
-  let telegramLoginChecking = false;
-  let telegramLoginLabel = "";
-  let telegramLoginUnavailableMessage = "";
-  $: {
-    const telegramLoginView = computeTelegramLoginView({
-      authBusy,
-      authStatus,
-      demoAuthLogin,
-      telegramLoginBusy,
-      telegramMiniAppAuthAvailable,
-      telegramOAuthClientId,
-      telegramSdkStatus,
-      t,
-    });
-    telegramLoginUnavailable = telegramLoginView.telegramLoginUnavailable;
-    telegramLoginChecking = telegramLoginView.telegramLoginChecking;
-    telegramLoginLabel = telegramLoginView.telegramLoginLabel;
-    telegramLoginUnavailableMessage = telegramLoginView.telegramLoginUnavailableMessage;
   }
   $: applyFavicon(faviconBrand);
   $: applyDocumentTitle(brandTitle);
