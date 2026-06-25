@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from config.settings_mixins import _split_csv
-from config.settings_models import SupportSettings
+from config.settings_models import PanelSettings, SupportSettings
 from config.webapp_themes_config import WebappThemesConfig
 
 DEFAULT_SETTINGS_VALUES: dict[str, Any] = {
@@ -41,6 +41,7 @@ DEFAULT_SETTINGS_VALUES: dict[str, Any] = {
     "PANEL_SYNC_LIFETIME_TRAFFIC_MIN_DELTA_BYTES": 104857600,
     "PANEL_SYNC_LIFETIME_TRAFFIC_MIN_INTERVAL_SECONDS": 3600,
     "PANEL_USER_CACHE_TTL_SECONDS": 5,
+    "PANEL_WRITE_MODE": "auto",
     "PROFILE_SYNC_CACHE_TTL_SECONDS": 900,
     "REDIS_KEY_PREFIX": "tests",
     "REDIS_URL": None,
@@ -139,6 +140,45 @@ class SettingsStub(SimpleNamespace):
     @property
     def trusted_proxies(self) -> list[str]:
         return _split_csv(getattr(self, "TRUSTED_PROXIES", None))
+
+    @property
+    def panel_settings(self) -> PanelSettings:
+        return PanelSettings(
+            api_url=getattr(self, "PANEL_API_URL", None),
+            api_key=getattr(self, "PANEL_API_KEY", None),
+            api_cookie=getattr(self, "PANEL_API_COOKIE", None),
+            webhook_secret=getattr(self, "PANEL_WEBHOOK_SECRET", None),
+            write_mode=getattr(self, "PANEL_WRITE_MODE", "auto"),
+            dry_run_enabled=self.panel_dry_run_enabled,
+            api_total_timeout_seconds=float(getattr(self, "PANEL_API_TOTAL_TIMEOUT_SECONDS", 25)),
+            api_connect_timeout_seconds=float(
+                getattr(self, "PANEL_API_CONNECT_TIMEOUT_SECONDS", 8)
+            ),
+            api_sock_connect_timeout_seconds=float(
+                getattr(self, "PANEL_API_SOCK_CONNECT_TIMEOUT_SECONDS", 8)
+            ),
+            api_sock_read_timeout_seconds=float(
+                getattr(self, "PANEL_API_SOCK_READ_TIMEOUT_SECONDS", 15)
+            ),
+        )
+
+    @property
+    def panel_dry_run_enabled(self) -> bool:
+        mode = (
+            str(getattr(self, "PANEL_WRITE_MODE", "auto") or "auto")
+            .strip()
+            .lower()
+            .replace(
+                "-",
+                "_",
+            )
+        )
+        if mode == "dry_run":
+            return True
+        if mode == "live":
+            return False
+        runtime = str(getattr(self, "APP_RUNTIME_MODE", "production") or "production").lower()
+        return runtime in {"dev", "development", "local", "test", "testing"}
 
     @property
     def support_settings(self) -> SupportSettings:
