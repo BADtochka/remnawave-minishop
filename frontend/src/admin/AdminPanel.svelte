@@ -163,7 +163,7 @@
   const stableOnThemesSaved = initialThemesSaved();
   const settingsStore = createSettingsStore({ api: stableApi, onToast: flash, at });
 
-  const featureSet = $derived(new Set<string>(($settingsStore?.features || []) as string[]));
+  const featureSet = $derived(new Set<string>((settingsStore.features || []) as string[]));
   const visibleSections: AdminSectionDescriptor[] = $derived(
     ADMIN_SECTIONS.filter((section) => !section.feature || featureSet.has(section.feature))
   );
@@ -342,13 +342,13 @@
     supportStore.setActive(active);
   });
 
-  const dirtyCount = $derived(Object.keys($settingsStore.settingsDirty || {}).length);
+  const dirtyCount = $derived(Object.keys(settingsStore.settingsDirty || {}).length);
   const translationsDirtyCount = $derived(
-    Object.keys($translationsStore.translationsDirty || {}).length
+    Object.keys(translationsStore.translationsDirty || {}).length
   );
   const syncBusy = $derived(statsStore.syncBusy);
-  const settingsSaving = $derived($settingsStore.settingsSaving);
-  const translationsSaving = $derived($translationsStore.translationsSaving);
+  const settingsSaving = $derived(settingsStore.settingsSaving);
+  const translationsSaving = $derived(translationsStore.translationsSaving);
   const meta = $derived(SECTION_META[active] || { title: active, subtitle: "" });
   const activeSection = $derived(SECTION_BY_ID.get(active));
   const openSectionUserCard = $derived(

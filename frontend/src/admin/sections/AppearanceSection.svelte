@@ -87,10 +87,10 @@
   let pendingObjectUrl = $state("");
   let pendingFaviconObjectUrl = $state("");
 
-  const settingsSections = $derived($settingsStore.settingsSections);
-  const settingsLoading = $derived($settingsStore.settingsLoading);
-  const settingsDirty: SettingsDirtyState = $derived($settingsStore.settingsDirty);
-  const settingsSaving = $derived($settingsStore.settingsSaving);
+  const settingsSections = $derived(settingsStore.settingsSections);
+  const settingsLoading = $derived(settingsStore.settingsLoading);
+  const settingsDirty: SettingsDirtyState = $derived(settingsStore.settingsDirty);
+  const settingsSaving = $derived(settingsStore.settingsSaving);
   const themesCatalog: ThemeCatalog = $derived($themesStore.themesCatalog);
   const savedThemesCatalog: ThemeCatalog = $derived($themesStore.savedThemesCatalog);
   const themesLoading = $derived($themesStore.themesLoading);

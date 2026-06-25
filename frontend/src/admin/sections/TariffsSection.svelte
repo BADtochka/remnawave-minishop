@@ -59,7 +59,6 @@
   const settingsStore = getContext<SettingsStore>("settingsStore");
 
   const tariffsState = $derived($tariffsStore);
-  const settingsState = $derived($settingsStore);
   const tariffsCatalog: TariffsCatalog = $derived(tariffsState.tariffsCatalog);
   const tariffsLoading = $derived(Boolean(tariffsState.tariffsLoading));
   const tariffsPath = $derived(String(tariffsState.tariffsPath || ""));
@@ -69,9 +68,9 @@
     tariffsState.providerCurrencySupport || []
   );
   const panelSquadsLoading = $derived(Boolean(tariffsState.panelSquadsLoading));
-  const settingsSections: SettingsSection[] = $derived(settingsState.settingsSections || []);
-  const settingsDirty: SettingsDirtyState = $derived(settingsState.settingsDirty || {});
-  const settingsSaving = $derived(Boolean(settingsState.settingsSaving));
+  const settingsSections: SettingsSection[] = $derived(settingsStore.settingsSections || []);
+  const settingsDirty: SettingsDirtyState = $derived(settingsStore.settingsDirty || {});
+  const settingsSaving = $derived(Boolean(settingsStore.settingsSaving));
 
   const enabledTariffs: Tariff[] = $derived(
     (tariffsCatalog.tariffs || []).filter((tariff) => tariff.enabled !== false)

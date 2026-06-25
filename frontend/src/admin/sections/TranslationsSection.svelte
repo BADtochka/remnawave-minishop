@@ -34,15 +34,14 @@
   const translationsStore = getContext<TranslationsStore>("translationsStore");
   const AUDIENCE_ORDER = ["user", "internal"];
   const AUDIENCE_FILTERS = ["all", ...AUDIENCE_ORDER];
-  const translationsState = $derived($translationsStore);
-  const translationGroups = $derived(translationsState.translationGroups as TranslationGroup[]);
+  const translationGroups = $derived(translationsStore.translationGroups as TranslationGroup[]);
   const translationLanguages = $derived(
-    translationsState.translationLanguages as TranslationLanguage[]
+    translationsStore.translationLanguages as TranslationLanguage[]
   );
-  const translationsLoading = $derived(Boolean(translationsState.translationsLoading));
-  const translationsDirty = $derived(translationsState.translationsDirty as TranslationDirtyState);
-  const translationsSaving = $derived(Boolean(translationsState.translationsSaving));
-  const translationsPath = $derived(String(translationsState.translationsPath || ""));
+  const translationsLoading = $derived(Boolean(translationsStore.translationsLoading));
+  const translationsDirty = $derived(translationsStore.translationsDirty as TranslationDirtyState);
+  const translationsSaving = $derived(Boolean(translationsStore.translationsSaving));
+  const translationsPath = $derived(String(translationsStore.translationsPath || ""));
 
   let openGroups = $state<string[]>([]);
   let readyGroups = $state<string[]>([]);

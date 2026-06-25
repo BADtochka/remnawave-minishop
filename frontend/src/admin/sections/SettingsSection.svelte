@@ -72,12 +72,11 @@
 
   const settingsStore = getContext<SettingsStore>("settingsStore");
 
-  const settingsState = $derived($settingsStore);
-  const rawSettingsSections = $derived((settingsState.settingsSections || []) as SettingsSection[]);
+  const rawSettingsSections = $derived((settingsStore.settingsSections || []) as SettingsSection[]);
   const settingsSections = $derived(rawSettingsSections as AdminSettingsSection[]);
-  const settingsLoading = $derived(Boolean(settingsState.settingsLoading));
-  const settingsDirty = $derived((settingsState.settingsDirty || {}) as SettingsDirtyState);
-  const settingsSaving = $derived(Boolean(settingsState.settingsSaving));
+  const settingsLoading = $derived(Boolean(settingsStore.settingsLoading));
+  const settingsDirty = $derived((settingsStore.settingsDirty || {}) as SettingsDirtyState);
+  const settingsSaving = $derived(Boolean(settingsStore.settingsSaving));
   const visibleSettingsSections = $derived(
     settingsSections.filter(
       (section) => !SETTINGS_SECTION_IDS_HIDDEN_IN_GENERAL_SETTINGS.has(section.id)
