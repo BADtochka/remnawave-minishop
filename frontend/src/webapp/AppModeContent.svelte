@@ -2,6 +2,7 @@
   import type { Readable, Writable } from "svelte/store";
 
   import BrandMark from "$lib/webapp/BrandMark.svelte";
+  import type { AppShellView } from "../lib/webapp/appShellView.js";
   import type { LanguageOption } from "../lib/webapp/languageView.js";
   import AppLaunchScreen from "./screens/AppLaunchScreen.svelte";
   import AuthenticatedDialogs from "./AuthenticatedDialogs.svelte";
@@ -16,6 +17,7 @@
   type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 
   export let accountStore: WritableStoreLike;
+  export let shellView: AppShellView | null = null;
   export let activateTrial: Action;
   export let activationSuccessDialogOpen = false;
   export let activationSuccessUseInstallGuides = false;
@@ -167,6 +169,71 @@
   export let userAgreementUrl = "";
   export let userLanguage = "";
   export let updateGuestLanguage: (language: string) => void;
+
+  $: if (shellView) {
+    ({
+      accountView: {
+        emailLinkStatus,
+        hasUnlinkedIdentity,
+        privacyPolicyUrl,
+        profileAvatarUrl,
+        profileEmail,
+        profileTelegramId,
+        serverStatusUrl,
+        supportUrl,
+        telegramNotificationsNeedPrompt,
+        telegramNotificationsStartLink,
+        telegramNotificationsStatus,
+        telegramProfileName,
+        userAgreementUrl,
+      },
+      appDataView: {
+        appSettings,
+        brand,
+        brandTitle,
+        devicesEnabled,
+        emailAuthEnabled,
+        methods,
+        plans,
+        referral,
+        referralBonusDetails,
+        referralOneBonusPerReferee,
+        referralWelcomeBonusDays,
+        subscription,
+        subscriptionPurchaseDescription,
+        supportEnabled,
+      },
+      billingView: {
+        canChangeTariff,
+        currentTariffName,
+        hasActiveTariffSubscription,
+        hasMultipleTariffs,
+        premiumTrafficTopupBarClickable,
+        premiumTrafficTopupUnlocked,
+        regularTrafficTopupBarClickable,
+        regularTrafficTopupUnlocked,
+        selectedTariff,
+        selectedTariffPlans,
+        singleTariffMode,
+        tariffCatalog,
+        tariffMode,
+        trafficMode,
+      },
+      currentLang,
+      isAdmin,
+      languageView: { currentLanguageOption = null, languageOptions },
+      telegramLoginView: {
+        telegramLoginChecking,
+        telegramLoginLabel,
+        telegramLoginUnavailable,
+        telegramLoginUnavailableMessage,
+      },
+      telegramMiniAppContext,
+      themeView: { shellStyle, shellThemeClass, shellToneClass },
+      user,
+      userLanguage,
+    } = shellView);
+  }
 </script>
 
 <div class="app-shell {shellToneClass} {shellThemeClass}" style={shellStyle}>

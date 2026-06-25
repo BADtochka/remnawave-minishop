@@ -19,14 +19,37 @@ def test_telegram_init_data_login_runs_before_manual_logout_gate():
 def test_logout_button_is_controlled_by_telegram_context():
     app_source = _read("frontend/src/App.svelte")
     shell_view_source = _read("frontend/src/lib/webapp/appShellView.ts")
+    app_mode_source = _read("frontend/src/webapp/AppModeContent.svelte")
     authenticated_screens_source = _read("frontend/src/webapp/AuthenticatedScreens.svelte")
     settings_source = _read("frontend/src/webapp/screens/SettingsScreen.svelte")
 
     assert "const telegramMiniAppContext = hasTelegramLaunchParams();" in shell_view_source
-    assert "{telegramMiniAppContext}" in app_source
+    assert "{shellView}" in app_source
+    assert "{telegramMiniAppContext}" in app_mode_source
     assert "showLogout={!telegramMiniAppContext}" in authenticated_screens_source
     assert "export let showLogout = true;" in settings_source
     assert "{#if showLogout}" in settings_source
+
+
+def test_shell_view_reactivity_keeps_dependencies_visible():
+    app_source = _read("frontend/src/App.svelte")
+
+    assert "computeCurrentShellView" not in app_source
+    start = app_source.index("$: shellView = computeAppShellView({")
+    end = app_source.index("$: ({", start)
+    shell_view_block = app_source[start:end]
+
+    for dependency in (
+        "authBusy,",
+        "authStatus,",
+        "data,",
+        "screen,",
+        "selectedTariffKey,",
+        "telegramLoginBusy,",
+        "telegramSdkStatus,",
+        "tg,",
+    ):
+        assert dependency in shell_view_block
 
 
 def test_logout_handler_is_noop_inside_telegram_mini_app():

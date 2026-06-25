@@ -45,7 +45,7 @@
   import { createBillingDeeplinkEffects } from "./lib/webapp/billingDeeplinkEffects.js";
   import { createWebappSectionContext } from "./lib/webapp/webappSectionContext";
   import { readThemePreviewDraft, syncThemeGoogleFonts } from "./lib/webapp/themeStyle.js";
-  import { computeAppShellView } from "./lib/webapp/appShellView.js";
+  import { computeAppShellView, type AppShellView } from "./lib/webapp/appShellView.js";
   import { createWebappNavigation } from "./lib/webapp/webappNavigation.js";
   import { createBillingModalActions } from "./lib/webapp/billingModalActions.js";
   import { createAutoRenewAction } from "./lib/webapp/autoRenewAction.js";
@@ -473,6 +473,7 @@
   setContext("actionsStore", actionsStore);
   setContext("accountStore", accountStore);
 
+  let shellView: AppShellView;
   $: ({
     authStatus,
     authIsError,
@@ -515,51 +516,38 @@
     trialActivationError,
   } = $actionsStore);
 
-  function computeCurrentShellView() {
-    return computeAppShellView({
-      authBusy,
-      authStatus,
-      cfg: CFG,
-      data,
-      emailAvatarUrl,
-      fallbackBrandTitle: FALLBACK_BRAND_TITLE,
-      guestLanguage,
-      hasTelegramLaunchParams,
-      i18nMessages: I18N,
-      isDemoAuthMock: () => demoAuth.isDemoAuthMock(),
-      languageName,
-      mockData: MOCK_SOURCE.data,
-      mockEnabled: Boolean(MOCK),
-      normalizeLangCode,
-      readTelegramMiniAppInitDataFromLocation,
-      screen,
-      selectedTariffKey,
-      telegramLoginBusy,
-      telegramSdkStatus,
-      tg,
-      themePreviewDraft,
-      themePreviewKey,
-      topupUnlockPercent: TRAFFIC_TOPUP_UNLOCK_PERCENT,
-      t,
-    });
-  }
+  $: user = (data?.user || {}) as AnyRecord;
+  $: isAdmin = Boolean(user?.is_admin);
+
+  $: shellView = computeAppShellView({
+    authBusy,
+    authStatus,
+    cfg: CFG,
+    data,
+    emailAvatarUrl,
+    fallbackBrandTitle: FALLBACK_BRAND_TITLE,
+    guestLanguage,
+    hasTelegramLaunchParams,
+    i18nMessages: I18N,
+    isDemoAuthMock: () => demoAuth.isDemoAuthMock(),
+    languageName,
+    mockData: MOCK_SOURCE.data,
+    mockEnabled: Boolean(MOCK),
+    normalizeLangCode,
+    readTelegramMiniAppInitDataFromLocation,
+    screen,
+    selectedTariffKey,
+    telegramLoginBusy,
+    telegramSdkStatus,
+    tg,
+    themePreviewDraft,
+    themePreviewKey,
+    topupUnlockPercent: TRAFFIC_TOPUP_UNLOCK_PERCENT,
+    t,
+  });
 
   $: ({
-    accountView: {
-      emailLinkStatus,
-      hasUnlinkedIdentity,
-      privacyPolicyUrl,
-      profileAvatarUrl,
-      profileEmail,
-      profileTelegramId,
-      serverStatusUrl,
-      supportUrl,
-      telegramNotificationsNeedPrompt,
-      telegramNotificationsStartLink,
-      telegramNotificationsStatus,
-      telegramProfileName,
-      userAgreementUrl,
-    },
+    accountView: { telegramNotificationsNeedPrompt, telegramNotificationsStartLink },
     appDataView: {
       appSettings,
       brand,
@@ -570,55 +558,17 @@
       installGuidesEnabled,
       methods,
       plans,
-      referral,
-      referralBonusDetails,
-      referralOneBonusPerReferee,
-      referralWelcomeBonusDays,
       subscription,
-      subscriptionPurchaseDescription,
       supportEnabled,
     },
-    billingView: {
-      canChangeTariff,
-      currentTariffName,
-      hasActiveTariffSubscription,
-      hasMultipleTariffs,
-      premiumTrafficTopupBarClickable,
-      premiumTrafficTopupUnlocked,
-      regularTrafficTopupBarClickable,
-      regularTrafficTopupUnlocked,
-      selectedTariff,
-      selectedTariffPlans,
-      singleTariffMode,
-      tariffCatalog,
-      tariffMode,
-      trafficMode,
-    },
+    billingView: { selectedTariffPlans, singleTariffMode, tariffCatalog, tariffMode, trafficMode },
     currentLang,
     demoAuthLogin,
-    isAdmin,
-    languageView: { currentLanguageOption = null, languageOptions },
-    telegramLoginView: {
-      telegramLoginChecking,
-      telegramLoginLabel,
-      telegramLoginUnavailable,
-      telegramLoginUnavailableMessage,
-    },
-    telegramMiniAppContext,
+    languageView: { languageOptions },
     telegramMiniAppInitData,
     telegramOAuthClientId,
-    themeView: {
-      effectiveThemeEntry,
-      resolvedThemeKey,
-      shellStyle,
-      shellThemeClass,
-      shellThemeCssHref,
-      shellToneClass,
-      toastTheme,
-    },
-    user,
-    userLanguage,
-  } = computeCurrentShellView());
+    themeView: { effectiveThemeEntry, resolvedThemeKey, shellStyle, shellThemeCssHref, toastTheme },
+  } = shellView);
   $: supportStore.setActive(Boolean(mode === "app" && screen === "support" && supportEnabled));
   $: applyThemeDocumentEffects(effectiveThemeEntry);
   $: syncThemeGoogleFonts(effectiveThemeEntry);
@@ -1121,6 +1071,7 @@
     {:else}
       <AppModeContent
         {accountStore}
+        {shellView}
         {activateTrial}
         {activationSuccessDialogOpen}
         {activationSuccessUseInstallGuides}
@@ -1129,7 +1080,6 @@
         {adminBundleError}
         bind:adminMountTarget
         {appLaunchTarget}
-        {appSettings}
         {applyPromo}
         {authBusy}
         {authIsError}
@@ -1139,43 +1089,29 @@
         {autoRenewBusy}
         {backToTariffList}
         {billingStore}
-        {brand}
-        {brandTitle}
-        {canChangeTariff}
         cfg={CFG}
         {clearPromoFieldError}
         {closeActivationSuccessDialog}
         {closeDeviceTopupModal}
         {continueWithSelectedTariff}
         {copyText}
-        {currentLang}
-        {currentLanguageOption}
-        {currentTariffName}
         {devicesBusy}
         {devicesData}
-        {devicesEnabled}
         {devicesErrorCode}
         {devicesIsError}
         {devicesLoaded}
         {devicesStatus}
         {devicesStore}
         {disconnectDevice}
-        {emailAuthEnabled}
-        {emailLinkStatus}
         {goDevices}
         {goHome}
         {goInvite}
         {goSettings}
         {goSupport}
-        {hasActiveTariffSubscription}
-        {hasMultipleTariffs}
-        {hasUnlinkedIdentity}
-        {isAdmin}
         {languageBusy}
         {languageClickGuard}
         {languageClickGuardArmed}
         bind:languageMenuOpen
-        {languageOptions}
         {linkEmailBusy}
         {linkTelegramAndActivateTrial}
         {linkTelegramAndClaimReferralWelcome}
@@ -1183,7 +1119,6 @@
         {loadDevices}
         {loginEmailFieldError}
         {loginEmailTooltipOpen}
-        {methods}
         {mode}
         {openAdminPanel}
         {openAppLaunchTarget}
@@ -1205,14 +1140,7 @@
         {passwordLoginFallback}
         {passwordLoginMode}
         {pendingEmail}
-        {plans}
-        {premiumTrafficTopupBarClickable}
-        {premiumTrafficTopupUnlocked}
         {primaryPayActionLabel}
-        {privacyPolicyUrl}
-        {profileAvatarUrl}
-        {profileEmail}
-        {profileTelegramId}
         {promoBusy}
         {promoCode}
         {promoFieldError}
@@ -1220,57 +1148,25 @@
         {promoStatus}
         {publicInstallSubscription}
         {publicInstallToken}
-        {referral}
-        {referralBonusDetails}
-        {referralOneBonusPerReferee}
-        {referralWelcomeBonusDays}
         {refreshAppLaunchTarget}
-        {regularTrafficTopupBarClickable}
-        {regularTrafficTopupUnlocked}
         bind:screen
-        {selectedTariff}
-        {selectedTariffPlans}
         {selectTariff}
-        {serverStatusUrl}
         {setLanguageMenuOpen}
         {setPasswordLoginMode}
         {setPromoCode}
-        {shellStyle}
-        {shellThemeClass}
-        {shellToneClass}
-        {singleTariffMode}
         {submitEmailOnEnter}
-        {subscription}
-        {subscriptionPurchaseDescription}
-        {supportEnabled}
         {supportStore}
         {supportUnreadCount}
         {supportUnreadLoaded}
         {supportUnreadLoading}
-        {supportUrl}
         {t}
-        {tariffCatalog}
-        {tariffMode}
         {telegramLoginBusy}
-        {telegramLoginChecking}
-        {telegramLoginLabel}
-        {telegramLoginUnavailable}
-        {telegramLoginUnavailableMessage}
-        {telegramMiniAppContext}
-        {telegramNotificationsNeedPrompt}
-        {telegramNotificationsStartLink}
-        {telegramNotificationsStatus}
         telegramPlatform={tg?.platform || ""}
-        {telegramProfileName}
         {termUnitLabel}
         {toggleAutoRenew}
-        {trafficMode}
         {trialActivationError}
         {trialActivationResult}
         {trialBusy}
-        {user}
-        {userAgreementUrl}
-        {userLanguage}
         {updateGuestLanguage}
       />
     {/if}

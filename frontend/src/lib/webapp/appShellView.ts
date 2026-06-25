@@ -137,3 +137,5 @@ export function computeAppShellView({
     userLanguage: languageName(currentLang),
   };
 }
+
+export type AppShellView = ReturnType<typeof computeAppShellView>;

@@ -345,9 +345,12 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("display: none;", css)
 
     def test_settings_screen_places_server_status_between_legal_and_support_links(self):
-        source = (Path(__file__).resolve().parents[2] / "frontend/src/App.svelte").read_text(
+        app_source = (Path(__file__).resolve().parents[2] / "frontend/src/App.svelte").read_text(
             encoding="utf-8"
         )
+        app_mode_source = (
+            Path(__file__).resolve().parents[2] / "frontend/src/webapp/AppModeContent.svelte"
+        ).read_text(encoding="utf-8")
         account_view_source = (
             Path(__file__).resolve().parents[2] / "frontend/src/lib/webapp/accountView.ts"
         ).read_text(encoding="utf-8")
@@ -358,7 +361,10 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("cfg.serverStatusUrl", account_view_source)
         self.assertIn("appSettings?.server_status_url", account_view_source)
-        self.assertIn("{serverStatusUrl}", source)
+        self.assertIn("{shellView}", app_source)
+        self.assertIn("accountView: {", app_mode_source)
+        self.assertIn("serverStatusUrl,", app_mode_source)
+        self.assertIn("{serverStatusUrl}", app_mode_source)
         self.assertIn('t("menu_server_status_button")', settings_source)
 
         agreement_pos = settings_source.index("{#if userAgreementUrl}")
