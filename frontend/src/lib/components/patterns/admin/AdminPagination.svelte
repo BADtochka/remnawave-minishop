@@ -16,62 +16,91 @@
     | { type: "ellipsis"; key: string }
     | { type: "page"; key: string; index: number; label: number };
 
-  export let meta = "";
-  export let prevLabel = "Back";
-  export let nextLabel = "Next";
-  export let table: AdminTableLike | null = null;
-  export let page: number | null = null;
-  export let pageCount: number | null = null;
-  export let total: number | string | null = null;
-  export let pageLabel = "Page";
-  export let ofLabel = "of";
-  export let totalLabel = "Total";
-  export let jumpLabel = "Page";
-  export let jumpAriaLabel = "Go to page";
-  export let goLabel = "Go";
-  export let disabled = false;
-  export let prevDisabled = false;
-  export let nextDisabled = false;
-  export let onPrev: () => void = () => {};
-  export let onNext: () => void = () => {};
-  export let onPageChange: ((page: number) => void) | null = null;
+  let {
+    meta = "",
+    prevLabel = "Back",
+    nextLabel = "Next",
+    table = null,
+    page = null,
+    pageCount = null,
+    total = null,
+    pageLabel = "Page",
+    ofLabel = "of",
+    totalLabel = "Total",
+    jumpLabel = "Page",
+    jumpAriaLabel = "Go to page",
+    goLabel = "Go",
+    disabled = false,
+    prevDisabled = false,
+    nextDisabled = false,
+    onPrev = () => {},
+    onNext = () => {},
+    onPageChange = null,
+  }: {
+    meta?: string;
+    prevLabel?: string;
+    nextLabel?: string;
+    table?: AdminTableLike | null;
+    page?: number | null;
+    pageCount?: number | null;
+    total?: number | string | null;
+    pageLabel?: string;
+    ofLabel?: string;
+    totalLabel?: string;
+    jumpLabel?: string;
+    jumpAriaLabel?: string;
+    goLabel?: string;
+    disabled?: boolean;
+    prevDisabled?: boolean;
+    nextDisabled?: boolean;
+    onPrev?: () => void;
+    onNext?: () => void;
+    onPageChange?: ((page: number) => void) | null;
+  } = $props();
 
-  let jumpValue = "";
+  let jumpValue = $state("");
 
-  // Bridge the runes-based handler into a store so paging re-renders this
-  // legacy component (direct reads of table.* are untracked by Svelte).
-  $: tableSignal = watchAdminDatatable(table) as TableSignal;
-  $: liveTable = $tableSignal;
-  $: tablePage = liveTable ? Number(liveTable.currentPage || 1) - 1 : null;
-  $: tablePageCount = liveTable ? Number(liveTable.pageCount || 0) : null;
-  $: tableTotal = liveTable ? liveTable.rowCount?.total : total;
-  $: normalizedPage = Number(table ? tablePage : page);
-  $: normalizedPageCount = Math.max(1, Math.ceil(Number(table ? tablePageCount : pageCount) || 1));
-  $: hasPageNavigation =
-    Number.isFinite(normalizedPage) && (table || typeof onPageChange === "function");
-  $: currentPage = hasPageNavigation
-    ? Math.min(Math.max(0, Math.floor(normalizedPage)), normalizedPageCount - 1)
-    : 0;
-  $: pages = hasPageNavigation ? visiblePages(currentPage, normalizedPageCount) : [];
-  $: paginationDisabled = Boolean(disabled);
-  $: computedPrevDisabled =
-    paginationDisabled || prevDisabled || (hasPageNavigation ? currentPage <= 0 : false);
-  $: computedNextDisabled =
+  // Bridge the runes-based handler into a store so direct table.* reads stay tracked.
+  const tableSignal = $derived(watchAdminDatatable(table) as TableSignal);
+  const liveTable = $derived($tableSignal);
+  const tablePage = $derived(liveTable ? Number(liveTable.currentPage || 1) - 1 : null);
+  const tablePageCount = $derived(liveTable ? Number(liveTable.pageCount || 0) : null);
+  const tableTotal = $derived(liveTable ? liveTable.rowCount?.total : total);
+  const normalizedPage = $derived(Number(table ? tablePage : page));
+  const normalizedPageCount = $derived(
+    Math.max(1, Math.ceil(Number(table ? tablePageCount : pageCount) || 1))
+  );
+  const hasPageNavigation = $derived(
+    Number.isFinite(normalizedPage) && (table || typeof onPageChange === "function")
+  );
+  const currentPage = $derived(
+    hasPageNavigation
+      ? Math.min(Math.max(0, Math.floor(normalizedPage)), normalizedPageCount - 1)
+      : 0
+  );
+  const pages = $derived(hasPageNavigation ? visiblePages(currentPage, normalizedPageCount) : []);
+  const paginationDisabled = $derived(Boolean(disabled));
+  const computedPrevDisabled = $derived(
+    paginationDisabled || prevDisabled || (hasPageNavigation ? currentPage <= 0 : false)
+  );
+  const computedNextDisabled = $derived(
     paginationDisabled ||
-    nextDisabled ||
-    (hasPageNavigation ? currentPage >= normalizedPageCount - 1 : false);
-  $: hasTotal = tableTotal !== null && tableTotal !== undefined && tableTotal !== "";
-  $: totalValue = Number(tableTotal);
-  $: showTotal = hasTotal && Number.isFinite(totalValue) && totalValue >= 0;
-  $: jumpTarget = Number(jumpValue);
-  $: canJump =
+      nextDisabled ||
+      (hasPageNavigation ? currentPage >= normalizedPageCount - 1 : false)
+  );
+  const hasTotal = $derived(tableTotal !== null && tableTotal !== undefined && tableTotal !== "");
+  const totalValue = $derived(Number(tableTotal));
+  const showTotal = $derived(hasTotal && Number.isFinite(totalValue) && totalValue >= 0);
+  const jumpTarget = $derived(Number(jumpValue));
+  const canJump = $derived(
     hasPageNavigation &&
-    !paginationDisabled &&
-    jumpValue !== "" &&
-    Number.isFinite(jumpTarget) &&
-    Number.isInteger(jumpTarget) &&
-    jumpTarget >= 1 &&
-    jumpTarget <= normalizedPageCount;
+      !paginationDisabled &&
+      jumpValue !== "" &&
+      Number.isFinite(jumpTarget) &&
+      Number.isInteger(jumpTarget) &&
+      jumpTarget >= 1 &&
+      jumpTarget <= normalizedPageCount
+  );
 
   function visiblePages(activePage: number, count: number): PageItem[] {
     const pageIndexes = new Set([0, count - 1, activePage - 1, activePage, activePage + 1]);
@@ -190,7 +219,13 @@
     </AdminButton>
   </div>
   {#if hasPageNavigation}
-    <form class="admin-pagination-jump" on:submit|preventDefault={submitJump}>
+    <form
+      class="admin-pagination-jump"
+      onsubmit={(event) => {
+        event.preventDefault();
+        submitJump();
+      }}
+    >
       <label class="admin-pagination-jump-label">
         <span>{jumpLabel}</span>
         <input
@@ -203,7 +238,7 @@
           aria-label={jumpAriaLabel}
           placeholder={String(currentPage + 1)}
           value={jumpValue}
-          on:input={(event) => (jumpValue = event.currentTarget.value)}
+          oninput={(event) => (jumpValue = event.currentTarget.value)}
           disabled={paginationDisabled}
         />
       </label>
