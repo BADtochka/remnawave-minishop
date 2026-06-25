@@ -25,17 +25,25 @@
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 
-  export let at: TranslateFn;
-  export let settingsDirty: SettingsDirtyState = {};
-  export let settingsFieldMap = new Map<string, SettingField>();
-  export let settingsSaving = false;
-  export let onSettingsSaved: (payload: SettingsSavedPayload) => void | Promise<void> = () => {};
+  let {
+    at,
+    settingsDirty = {},
+    settingsFieldMap = new Map<string, SettingField>(),
+    settingsSaving = false,
+    onSettingsSaved = () => {},
+  }: {
+    at: TranslateFn;
+    settingsDirty?: SettingsDirtyState;
+    settingsFieldMap?: Map<string, SettingField>;
+    settingsSaving?: boolean;
+    onSettingsSaved?: (payload: SettingsSavedPayload) => void | Promise<void>;
+  } = $props();
 
   const settingsStore = getContext<SettingsStore>("settingsStore");
 
-  let referralDirtyCount = 0;
-
-  $: referralDirtyCount = REFERRAL_SETTING_KEYS.filter((key) => Boolean(settingsDirty[key])).length;
+  const referralDirtyCount = $derived(
+    REFERRAL_SETTING_KEYS.filter((key) => Boolean(settingsDirty[key])).length
+  );
 
   function valueForKey(
     key: string,
