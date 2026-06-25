@@ -280,12 +280,6 @@
       csrfCookieName: CSRF_COOKIE_NAME,
       isMock: () => Boolean(MOCK),
       manualLogoutFlagKey: MANUAL_LOGOUT_FLAG_KEY,
-      setCsrfToken: (nextToken) => {
-        shellState.csrfToken = nextToken;
-      },
-      setToken: (nextToken) => {
-        shellState.token = nextToken;
-      },
     });
   const dataClient = createWebappDataClient({
     apiBase: CFG.apiBase,
