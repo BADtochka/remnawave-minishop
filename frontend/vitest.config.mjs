@@ -7,14 +7,16 @@ import { defineConfig } from "vitest/config";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, "src");
 
+function firstPartyRunesOptions({ filename }) {
+  if (filename && path.resolve(filename).startsWith(srcDir)) {
+    return { runes: true };
+  }
+}
+
 export default defineConfig({
   plugins: [
     svelte({
-      dynamicCompileOptions({ filename }) {
-        if (filename && path.resolve(filename).startsWith(srcDir)) {
-          return { runes: true };
-        }
-      },
+      dynamicCompileOptions: firstPartyRunesOptions,
     }),
   ],
   resolve: {
