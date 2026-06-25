@@ -528,7 +528,7 @@
   const authStatus = $derived(authState.authStatus);
   const authBusy = $derived(Boolean(authState.authBusy));
   const telegramLoginBusy = $derived(Boolean(authState.telegramLoginBusy));
-  const billingState = $derived($billingStore);
+  const billingState = $derived(billingStore);
   const paymentModalOpen = $derived(Boolean(billingState.paymentModalOpen));
   const selectedTariffKey = $derived(String(billingState.selectedTariffKey || ""));
   const selectedPlan = $derived(billingState.selectedPlan);

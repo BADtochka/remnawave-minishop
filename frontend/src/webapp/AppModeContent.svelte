@@ -7,6 +7,7 @@
   import type { LanguageOption } from "../lib/webapp/languageView.js";
   import type { AccountStore } from "../lib/webapp/stores/accountStore.js";
   import type { ActionsStore } from "../lib/webapp/stores/actionsStore.js";
+  import type { BillingStore } from "../lib/webapp/stores/billingStore.js";
   import type { DevicesStore } from "../lib/webapp/stores/devicesStore.js";
   import type { SupportStore } from "../lib/webapp/stores/supportStore.js";
   import AppLaunchScreen from "./screens/AppLaunchScreen.svelte";
@@ -44,7 +45,7 @@
     authStore: WritableStoreLike;
     autoRenewBusy?: boolean;
     backToTariffList?: Action;
-    billingStore: WritableStoreLike;
+    billingStore: BillingStore;
     brand?: AnyRecord;
     brandTitle?: string;
     canChangeTariff?: boolean;

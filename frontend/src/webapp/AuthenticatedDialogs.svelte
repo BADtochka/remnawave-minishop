@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { Writable } from "svelte/store";
   import type { AccountStore } from "../lib/webapp/stores/accountStore.js";
+  import type { BillingStore } from "../lib/webapp/stores/billingStore.js";
 
   import { CheckCircle2 } from "$components/ui/icons.js";
   import Button from "$components/ui/button.svelte";
@@ -10,7 +10,6 @@
   import TariffDialogs from "./TariffDialogs.svelte";
 
   type AnyRecord = Record<string, any>;
-  type StoreLike = Writable<AnyRecord> & Record<string, any>;
   type Action = (...args: any[]) => any;
   type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 
@@ -19,7 +18,7 @@
     activationSuccessDialogOpen?: boolean;
     activationSuccessUseInstallGuides?: boolean;
     backToTariffList: Action;
-    billingStore: StoreLike;
+    billingStore: BillingStore;
     closeActivationSuccessDialog: Action;
     closeDeviceTopupModal: Action;
     continueWithSelectedTariff: Action;
@@ -77,12 +76,12 @@
   bind:linkEmailCode={accountStore.linkEmailCode}
   bind:linkEmailFieldError={accountStore.linkEmailFieldError}
   bind:linkEmailValue={accountStore.linkEmailValue}
-  bind:paymentModalOpen={$billingStore.paymentModalOpen}
-  bind:paymentStep={$billingStore.paymentStep}
-  bind:selectedMethod={$billingStore.selectedMethod}
-  bind:selectedPlan={$billingStore.selectedPlan}
-  bind:renewHwidDevices={$billingStore.renewHwidDevices}
-  bind:selectedTariffKey={$billingStore.selectedTariffKey}
+  bind:paymentModalOpen={billingStore.paymentModalOpen}
+  bind:paymentStep={billingStore.paymentStep}
+  bind:selectedMethod={billingStore.selectedMethod}
+  bind:selectedPlan={billingStore.selectedPlan}
+  bind:renewHwidDevices={billingStore.renewHwidDevices}
+  bind:selectedTariffKey={billingStore.selectedTariffKey}
   bind:setPasswordCode={accountStore.setPasswordCode}
   bind:setPasswordConfirm={accountStore.setPasswordConfirm}
   bind:setPasswordValue={accountStore.setPasswordValue}
@@ -106,7 +105,7 @@
   setPasswordStatus={accountStore.setPasswordStatus}
   {hasMultipleTariffs}
   {methods}
-  payBusy={$billingStore.payBusy}
+  payBusy={billingStore.payBusy}
   {plans}
   {selectedTariff}
   {selectedTariffPlans}
@@ -131,32 +130,32 @@
 />
 
 <TariffDialogs
-  bind:changeConfirmOpen={$billingStore.changeConfirmOpen}
-  bind:changeModalOpen={$billingStore.changeModalOpen}
-  bind:deviceTopupModalOpen={$billingStore.deviceTopupModalOpen}
-  bind:selectedChangeAction={$billingStore.selectedChangeAction}
-  bind:selectedChangeTarget={$billingStore.selectedChangeTarget}
-  bind:selectedDeviceTopupPlan={$billingStore.selectedDeviceTopupPlan}
-  bind:selectedMethod={$billingStore.selectedMethod}
-  bind:selectedTopupPlan={$billingStore.selectedTopupPlan}
-  bind:topupModalOpen={$billingStore.topupModalOpen}
+  bind:changeConfirmOpen={billingStore.changeConfirmOpen}
+  bind:changeModalOpen={billingStore.changeModalOpen}
+  bind:deviceTopupModalOpen={billingStore.deviceTopupModalOpen}
+  bind:selectedChangeAction={billingStore.selectedChangeAction}
+  bind:selectedChangeTarget={billingStore.selectedChangeTarget}
+  bind:selectedDeviceTopupPlan={billingStore.selectedDeviceTopupPlan}
+  bind:selectedMethod={billingStore.selectedMethod}
+  bind:selectedTopupPlan={billingStore.selectedTopupPlan}
+  bind:topupModalOpen={billingStore.topupModalOpen}
   applyTariffChange={billingStore.applyTariffChange}
-  changeOptions={$billingStore.changeOptions}
+  changeOptions={billingStore.changeOptions}
   {closeDeviceTopupModal}
   closeTariffChangeConfirm={billingStore.closeTariffChangeConfirm}
   closeTariffChangeModal={billingStore.closeTariffChangeModal}
   closeTopupModal={billingStore.closeTopupModal}
   createDeviceTopupPayment={billingStore.createDeviceTopupPayment}
   createTopupPayment={billingStore.createTopupPayment}
-  deviceTopupOptions={$billingStore.deviceTopupOptions}
+  deviceTopupOptions={billingStore.deviceTopupOptions}
   {methods}
   openTariffChangeConfirm={billingStore.openTariffChangeConfirm}
-  payBusy={$billingStore.payBusy}
+  payBusy={billingStore.payBusy}
   {singleTariffMode}
   {subscription}
-  tariffActionBusy={$billingStore.tariffActionBusy}
-  topupKind={$billingStore.topupKind}
-  topupOptions={$billingStore.topupOptions}
+  tariffActionBusy={billingStore.tariffActionBusy}
+  topupKind={billingStore.topupKind}
+  topupOptions={billingStore.topupOptions}
   {trafficMode}
   {t}
 />
