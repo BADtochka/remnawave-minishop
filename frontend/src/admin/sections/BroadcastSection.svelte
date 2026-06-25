@@ -11,15 +11,14 @@
   let { at }: { at: TranslateFn } = $props();
   const broadcastStore = getContext<BroadcastStore>("broadcastStore");
 
-  const broadcastState = $derived($broadcastStore);
-  const broadcastTarget = $derived(broadcastState.broadcastTarget);
-  const broadcastText = $derived(broadcastState.broadcastText);
-  const broadcastBusy = $derived(broadcastState.broadcastBusy);
+  const broadcastTarget = $derived(broadcastStore.broadcastTarget);
+  const broadcastText = $derived(broadcastStore.broadcastText);
+  const broadcastBusy = $derived(broadcastStore.broadcastBusy);
   const broadcastResult = $derived(
-    broadcastState.broadcastResult as { queued: number; failed: number } | null
+    broadcastStore.broadcastResult as { queued: number; failed: number } | null
   );
-  const broadcastCounts = $derived(broadcastState.broadcastCounts as Record<string, number> | null);
-  const broadcastCountsLoading = $derived(Boolean(broadcastState.broadcastCountsLoading));
+  const broadcastCounts = $derived(broadcastStore.broadcastCounts as Record<string, number> | null);
+  const broadcastCountsLoading = $derived(Boolean(broadcastStore.broadcastCountsLoading));
   const handleTargetChange = (value: string) => {
     broadcastStore.updateField({ broadcastTarget: value });
   };

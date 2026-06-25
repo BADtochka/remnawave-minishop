@@ -45,14 +45,13 @@
   let restoreCompose = $state(false);
   let fileInput = $state<HTMLInputElement | null>(null);
 
-  const backupsState = $derived($backupsStore);
-  const archives = $derived((backupsState.archives || []) as BackupArchive[]);
-  const backupDir = $derived(String(backupsState.backupDir || ""));
-  const backupsCreating = $derived(Boolean(backupsState.backupsCreating));
-  const backupsLoading = $derived(Boolean(backupsState.backupsLoading));
-  const backupsUploading = $derived(Boolean(backupsState.backupsUploading));
-  const backupsRestoring = $derived(Boolean(backupsState.backupsRestoring));
-  const lastRestore = $derived(backupsState.lastRestore as BackupRestoreResult | null);
+  const archives = $derived((backupsStore.archives || []) as BackupArchive[]);
+  const backupDir = $derived(String(backupsStore.backupDir || ""));
+  const backupsCreating = $derived(Boolean(backupsStore.backupsCreating));
+  const backupsLoading = $derived(Boolean(backupsStore.backupsLoading));
+  const backupsUploading = $derived(Boolean(backupsStore.backupsUploading));
+  const backupsRestoring = $derived(Boolean(backupsStore.backupsRestoring));
+  const lastRestore = $derived(backupsStore.lastRestore as BackupRestoreResult | null);
   const totalArchives = $derived(archives?.length || 0);
 
   $effect(() => {
