@@ -30,14 +30,13 @@
   const promosStore = getContext<PromosStore>("promosStore");
   const promosTable = createAdminDatatable();
 
-  const promosState = $derived($promosStore);
-  const promos = $derived(promosState.promos as Promo[]);
-  const promosTotal = $derived(Number(promosState.promosTotal || 0));
-  const promosPage = $derived(Number(promosState.promosPage || 0));
-  const promosLoading = $derived(Boolean(promosState.promosLoading));
-  const promoCreateOpen = $derived(Boolean(promosState.promoCreateOpen));
+  const promos = $derived(promosStore.promos as Promo[]);
+  const promosTotal = $derived(Number(promosStore.promosTotal || 0));
+  const promosPage = $derived(Number(promosStore.promosPage || 0));
+  const promosLoading = $derived(Boolean(promosStore.promosLoading));
+  const promoCreateOpen = $derived(Boolean(promosStore.promoCreateOpen));
   const promoDraft = $derived(
-    (promosState.promoDraft || {
+    (promosStore.promoDraft || {
       code: "",
       bonus_days: 7,
       max_activations: 1,

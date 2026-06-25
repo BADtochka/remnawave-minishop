@@ -32,12 +32,11 @@
   const adsStore = getContext<AdsStore>("adsStore");
   const adsTable = createAdminDatatable([], { rowsPerPage: ADS_PAGE_SIZE });
 
-  const adsState = $derived($adsStore);
-  const ads = $derived(adsState.ads as Ad[]);
-  const adsLoading = $derived(Boolean(adsState.adsLoading));
-  const adCreateOpen = $derived(Boolean(adsState.adCreateOpen));
+  const ads = $derived(adsStore.ads as Ad[]);
+  const adsLoading = $derived(Boolean(adsStore.adsLoading));
+  const adCreateOpen = $derived(Boolean(adsStore.adCreateOpen));
   const adDraft = $derived(
-    (adsState.adDraft || { source: "", start_param: "", cost: 0 }) as AdDraft
+    (adsStore.adDraft || { source: "", start_param: "", cost: 0 }) as AdDraft
   );
   const adRows = $derived(adsTable.rows as Ad[]);
 

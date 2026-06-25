@@ -36,10 +36,9 @@
 
   const paymentsStore = getContext<PaymentsStore>("paymentsStore");
   const closePayment = (): void => paymentsStore.closePayment();
-  const paymentState = $derived($paymentsStore);
-  const openedPaymentId = $derived(paymentState.openedPaymentId as number | null);
-  const openedPayment = $derived(paymentState.openedPayment as AdminPayment | null);
-  const paymentDetailLoading = $derived(Boolean(paymentState.paymentDetailLoading));
+  const openedPaymentId = $derived(paymentsStore.openedPaymentId as number | null);
+  const openedPayment = $derived(paymentsStore.openedPayment as AdminPayment | null);
+  const paymentDetailLoading = $derived(Boolean(paymentsStore.paymentDetailLoading));
   const payment = $derived(
     (openedPayment ||
       (openedPaymentId ? { payment_id: openedPaymentId } : null)) as AdminPayment | null

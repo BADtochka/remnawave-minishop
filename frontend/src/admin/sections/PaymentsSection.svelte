@@ -31,11 +31,10 @@
   const paymentsStore = getContext<PaymentsStore>("paymentsStore");
   const paymentsTable = createAdminDatatable();
   const PAYMENTS_PAGE_SIZE = 25;
-  const paymentsState = $derived($paymentsStore);
-  const payments = $derived(paymentsState.payments as PaymentOut[]);
-  const paymentsTotal = $derived(Number(paymentsState.paymentsTotal || 0));
-  const paymentsPage = $derived(Number(paymentsState.paymentsPage || 0));
-  const paymentsLoading = $derived(Boolean(paymentsState.paymentsLoading));
+  const payments = $derived(paymentsStore.payments as PaymentOut[]);
+  const paymentsTotal = $derived(Number(paymentsStore.paymentsTotal || 0));
+  const paymentsPage = $derived(Number(paymentsStore.paymentsPage || 0));
+  const paymentsLoading = $derived(Boolean(paymentsStore.paymentsLoading));
 
   $effect(() => syncAdminDatatable(paymentsTable, payments));
 

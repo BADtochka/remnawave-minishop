@@ -466,10 +466,10 @@
     }
     const paymentId = readPaymentIdFromPath();
     if (active === "payments" && paymentId) {
-      if (!$paymentsStore.openedPaymentId || $paymentsStore.openedPaymentId !== paymentId) {
+      if (!paymentsStore.openedPaymentId || paymentsStore.openedPaymentId !== paymentId) {
         void paymentsStore.openPayment(paymentId, { skipPush: true });
       }
-    } else if ($paymentsStore.openedPaymentId) {
+    } else if (paymentsStore.openedPaymentId) {
       paymentsStore.closePayment({ skipPush: true });
     }
     const ticketId = readSupportTicketIdFromPath();
@@ -693,7 +693,7 @@
     if (
       active === "payments" &&
       initialPaymentId &&
-      (!$paymentsStore.openedPaymentId || $paymentsStore.openedPaymentId !== initialPaymentId)
+      (!paymentsStore.openedPaymentId || paymentsStore.openedPaymentId !== initialPaymentId)
     ) {
       void paymentsStore.openPayment(initialPaymentId, { skipPush: true });
     }
