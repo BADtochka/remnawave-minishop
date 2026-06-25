@@ -23,34 +23,45 @@
   type Promo = components["schemas"]["PromoOut"];
   type PromoDraft = components["schemas"]["PromoCreateBody"];
 
-  export let at: TranslateFn;
-  export let fmtDateShort: (value: string) => string;
+  let {
+    at,
+    fmtDateShort,
+  }: {
+    at: TranslateFn;
+    fmtDateShort: (value: string) => string;
+  } = $props();
 
   const promosStore = getContext<PromosStore>("promosStore");
   const promosTable = createAdminDatatable();
   const promosTableSignal = watchAdminDatatable(promosTable);
 
-  let promos: Promo[] = [];
-  let promosTotal = 0;
-  let promosPage = 0;
-  let promosLoading = false;
-  let promoCreateOpen = false;
-  let promoDraft: PromoDraft = { code: "", bonus_days: 7, max_activations: 1, valid_days: 30 };
+  const promosState = $derived($promosStore);
+  const promos = $derived(promosState.promos as Promo[]);
+  const promosTotal = $derived(Number(promosState.promosTotal || 0));
+  const promosPage = $derived(Number(promosState.promosPage || 0));
+  const promosLoading = $derived(Boolean(promosState.promosLoading));
+  const promoCreateOpen = $derived(Boolean(promosState.promoCreateOpen));
+  const promoDraft = $derived(
+    (promosState.promoDraft || {
+      code: "",
+      bonus_days: 7,
+      max_activations: 1,
+      valid_days: 30,
+    }) as PromoDraft
+  );
+  const promoRows = $derived($promosTableSignal.rows as Promo[]);
 
-  $: ({ promos, promosTotal, promosPage, promosLoading, promoCreateOpen, promoDraft } =
-    $promosStore);
-  $: syncAdminDatatable(promosTable, promos);
-  $: promoRows = $promosTableSignal.rows as Promo[];
+  $effect(() => syncAdminDatatable(promosTable, promos));
 
-  $: promosHasMore = promos.length < promosTotal;
-  $: promoHeaders = [
+  const promosHasMore = $derived(promos.length < promosTotal);
+  const promoHeaders = $derived([
     at("promo_col_code", {}, "Код"),
     at("promo_col_bonus", {}, "Бонус"),
     at("promo_col_activations", {}, "Активаций"),
     at("promo_col_valid_until", {}, "Действует до"),
     at("promo_col_status", {}, "Статус"),
     at("actions", {}, "Действия"),
-  ];
+  ]);
 
   onMount(() => {
     promosStore.loadPromos();

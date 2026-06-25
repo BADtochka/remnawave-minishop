@@ -18,26 +18,35 @@
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 
-  export let at: TranslateFn = (key) => key;
-  export let fmtDate: (value: string | null | undefined) => string = (value) => String(value || "");
-  export let fmtMoney: (value: number, currency?: string | null) => string = (value) =>
-    String(value);
-  export let paymentStatusVariant: (status: string | null | undefined) => string = () => "muted";
-  export let onOpenUserCard: (userId: number) => void = () => {};
+  let {
+    at = (key) => key,
+    fmtDate = (value) => String(value || ""),
+    fmtMoney = (value) => String(value),
+    paymentStatusVariant = () => "muted",
+    onOpenUserCard = () => {},
+  }: {
+    at?: TranslateFn;
+    fmtDate?: (value: string | null | undefined) => string;
+    fmtMoney?: (value: number, currency?: string | null) => string;
+    paymentStatusVariant?: (status: string | null | undefined) => string;
+    onOpenUserCard?: (userId: number) => void;
+  } = $props();
 
   const paymentsStore = getContext<PaymentsStore>("paymentsStore");
   const paymentsTable = createAdminDatatable();
   const paymentsTableSignal = watchAdminDatatable(paymentsTable);
   const PAYMENTS_PAGE_SIZE = 25;
-  let payments: PaymentOut[] = [];
-  let paymentsTotal = 0;
-  let paymentsPage = 0;
-  let paymentsLoading = false;
+  const paymentsState = $derived($paymentsStore);
+  const payments = $derived(paymentsState.payments as PaymentOut[]);
+  const paymentsTotal = $derived(Number(paymentsState.paymentsTotal || 0));
+  const paymentsPage = $derived(Number(paymentsState.paymentsPage || 0));
+  const paymentsLoading = $derived(Boolean(paymentsState.paymentsLoading));
 
-  $: ({ payments, paymentsTotal, paymentsPage, paymentsLoading } = $paymentsStore);
-  $: syncAdminDatatable(paymentsTable, payments);
+  $effect(() => syncAdminDatatable(paymentsTable, payments));
 
-  $: paymentsPageCount = Math.max(1, Math.ceil(Number(paymentsTotal || 0) / PAYMENTS_PAGE_SIZE));
+  const paymentsPageCount = $derived(
+    Math.max(1, Math.ceil(Number(paymentsTotal || 0) / PAYMENTS_PAGE_SIZE))
+  );
 
   function formatTrafficGbCell(v: number | string | null | undefined): string {
     if (v == null || v === "") return "—";
@@ -83,7 +92,7 @@
     return raw || "—";
   }
 
-  $: paymentHeaders = [
+  const paymentHeaders = $derived([
     at("id", {}, "ID"),
     at("user", {}, "Пользователь"),
     at("payments_col_user_id", {}, "ID"),
@@ -94,7 +103,7 @@
     at("description", {}, "Описание"),
     at("status", {}, "Статус"),
     at("date", {}, "Дата"),
-  ];
+  ]);
 
   onMount(() => {
     paymentsStore.loadPayments();
