@@ -177,15 +177,6 @@
     bootTimeoutMs: TELEGRAM_SDK_BOOT_TIMEOUT_MS,
     actionTimeoutMs: TELEGRAM_SDK_ACTION_TIMEOUT_MS,
     miniAppAuthTimeoutMs: TELEGRAM_MINI_APP_AUTH_TIMEOUT_MS,
-    setInitData: (initData) => {
-      shellState.telegramMiniAppInitData = initData || "";
-    },
-    setStatus: (status) => {
-      shellState.telegramSdkStatus = status;
-    },
-    setTelegram: (value) => {
-      shellState.tg = value;
-    },
   });
   const telegramSdk = telegramRuntime.telegramSdk;
   const readTelegramMiniAppInitDataFromLocation = telegramRuntime.readInitDataFromLocation;
