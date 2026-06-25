@@ -24,26 +24,33 @@
   type Ad = components["schemas"]["AdOut"];
   type AdDraft = components["schemas"]["AdCreateBody"];
 
-  export let at: TranslateFn;
-  export let fmtMoney: (value: number) => string;
+  let {
+    at,
+    fmtMoney,
+  }: {
+    at: TranslateFn;
+    fmtMoney: (value: number) => string;
+  } = $props();
 
   const ADS_PAGE_SIZE = 10;
   const adsStore = getContext<AdsStore>("adsStore");
   const adsTable = createAdminDatatable([], { rowsPerPage: ADS_PAGE_SIZE });
   const adsSignal = watchAdminDatatable(adsTable);
 
-  let ads: Ad[] = [];
-  let adsLoading = false;
-  let adCreateOpen = false;
-  let adDraft: AdDraft = { source: "", start_param: "", cost: 0 };
+  const adsState = $derived($adsStore);
+  const ads = $derived(adsState.ads as Ad[]);
+  const adsLoading = $derived(Boolean(adsState.adsLoading));
+  const adCreateOpen = $derived(Boolean(adsState.adCreateOpen));
+  const adDraft = $derived(
+    (adsState.adDraft || { source: "", start_param: "", cost: 0 }) as AdDraft
+  );
+  const adRows = $derived($adsSignal.rows as Ad[]);
 
-  $: ({ ads, adsLoading, adCreateOpen, adDraft } = $adsStore);
-  $: {
+  $effect(() => {
     syncAdminDatatable(adsTable, ads);
     if (adsTable.currentPage > (adsTable.pageCount || 1)) adsTable.setPage(adsTable.pageCount || 1);
-  }
-  $: adRows = $adsSignal.rows as Ad[];
-  $: adHeaders = [
+  });
+  const adHeaders = $derived([
     at("id", {}, "ID"),
     at("ads_col_source", {}, "Источник"),
     at("ads_col_param", {}, "Параметр"),
@@ -52,7 +59,7 @@
     at("ads_col_conversions", {}, "Конверсии"),
     at("ads_col_status", {}, "Статус"),
     at("actions", {}, "Действия"),
-  ];
+  ]);
 
   onMount(() => {
     adsStore.loadAds();

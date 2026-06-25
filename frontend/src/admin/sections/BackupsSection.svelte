@@ -32,76 +32,87 @@
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 
-  export let at: TranslateFn = (key) => key;
-  export let fmtDate: (value: string) => string = (value) => value;
+  let {
+    at = (key) => key,
+    fmtDate = (value) => value,
+  }: {
+    at?: TranslateFn;
+    fmtDate?: (value: string) => string;
+  } = $props();
 
   const BACKUPS_PAGE_SIZE = 10;
   const backupsTable = createAdminDatatable([], { rowsPerPage: BACKUPS_PAGE_SIZE });
   const backupsSignal = watchAdminDatatable(backupsTable);
   const backupsStore = getContext<BackupsStore>("backupsStore");
 
-  let selectedName = "";
-  let restoreDatabase = true;
-  let restoreCompose = false;
-  let fileInput: HTMLInputElement | null = null;
-  let archives: BackupArchive[] = [];
-  let backupDir = "";
-  let backupsCreating = false;
-  let backupsLoading = false;
-  let backupsUploading = false;
-  let backupsRestoring = false;
-  let lastRestore: BackupRestoreResult | null = null;
+  let selectedName = $state("");
+  let restoreDatabase = $state(true);
+  let restoreCompose = $state(false);
+  let fileInput = $state<HTMLInputElement | null>(null);
 
-  $: ({
-    archives,
-    backupDir,
-    backupsCreating,
-    backupsLoading,
-    backupsUploading,
-    backupsRestoring,
-    lastRestore,
-  } = $backupsStore);
-  $: totalArchives = archives?.length || 0;
-  $: {
+  const backupsState = $derived($backupsStore);
+  const archives = $derived((backupsState.archives || []) as BackupArchive[]);
+  const backupDir = $derived(String(backupsState.backupDir || ""));
+  const backupsCreating = $derived(Boolean(backupsState.backupsCreating));
+  const backupsLoading = $derived(Boolean(backupsState.backupsLoading));
+  const backupsUploading = $derived(Boolean(backupsState.backupsUploading));
+  const backupsRestoring = $derived(Boolean(backupsState.backupsRestoring));
+  const lastRestore = $derived(backupsState.lastRestore as BackupRestoreResult | null);
+  const totalArchives = $derived(archives?.length || 0);
+
+  $effect(() => {
     syncAdminDatatable(backupsTable, archives || []);
     if (backupsTable.currentPage > (backupsTable.pageCount || 1))
       backupsTable.setPage(backupsTable.pageCount || 1);
-  }
-  $: backupsMeta = (() => {
+  });
+  const backupsMeta = $derived.by(() => {
     const { start, end, total } = $backupsSignal.rowCount;
     return at(
       "backups_pagination_meta",
       { from: start, to: end, total },
       `${start}-${end} / ${total}`
     );
-  })();
-  $: if (!selectedName && archives?.length) {
+  });
+  $effect(() => {
+    if (selectedName || !archives?.length) return;
     selectedName = archives[0].name;
     backupsTable.setPage(1);
-  }
-  $: if (selectedName && archives?.length && !archives.some((item) => item.name === selectedName)) {
+  });
+  $effect(() => {
+    if (!selectedName || !archives?.length) return;
+    if (archives.some((item) => item.name === selectedName)) return;
     selectedName = archives[0].name;
     backupsTable.setPage(1);
-  }
-  $: selectedArchive = (archives || []).find((item) => item.name === selectedName) || null;
-  $: if (selectedArchive && restoreDatabase && !selectedArchive.has_database)
-    restoreDatabase = false;
-  $: if (selectedArchive && restoreCompose && !selectedArchive.has_compose) restoreCompose = false;
-  $: if (selectedArchive && !restoreDatabase && !restoreCompose) {
+  });
+  const selectedArchive = $derived(
+    (archives || []).find((item) => item.name === selectedName) || null
+  );
+  $effect(() => {
+    if (!selectedArchive) return;
+    if (restoreDatabase && !selectedArchive.has_database) restoreDatabase = false;
+    if (restoreCompose && !selectedArchive.has_compose) restoreCompose = false;
+  });
+  $effect(() => {
+    if (!selectedArchive || restoreDatabase || restoreCompose) return;
     if (selectedArchive.has_database) restoreDatabase = true;
     else if (selectedArchive.has_compose) restoreCompose = true;
-  }
-  $: canRestore = Boolean(
-    selectedArchive && (restoreDatabase || restoreCompose) && !backupsRestoring && !backupsCreating
+  });
+  const canRestore = $derived(
+    Boolean(
+      selectedArchive &&
+      (restoreDatabase || restoreCompose) &&
+      !backupsRestoring &&
+      !backupsCreating
+    )
   );
-  $: backupHeaders = [
+  const backupHeaders = $derived([
     "",
     at("backups_col_archive", {}, "Архив"),
     at("backups_col_created", {}, "Создан"),
     at("backups_col_size", {}, "Размер"),
     at("backups_col_contents", {}, "Состав"),
     at("backups_col_warnings", {}, "Предупреждения"),
-  ];
+  ]);
 
   function formatSize(sizeBytes: number): string {
     const units = ["B", "KB", "MB", "GB"];
