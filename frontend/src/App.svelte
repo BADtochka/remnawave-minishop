@@ -149,7 +149,6 @@
   const mode = $derived(shellState.mode);
   const activeTab = $derived(shellState.activeTab);
   const screen = $derived(shellState.screen);
-  const emailLoginDeeplinkConsumed = $derived(shellState.emailLoginDeeplinkConsumed);
   const data: AnyRecord | null = $derived(shellState.data as AnyRecord | null);
   const user: AnyRecord = $derived((data?.user || {}) as AnyRecord);
   const isAdmin = $derived(Boolean(user?.is_admin));
@@ -376,22 +375,9 @@
   const authRuntime = createAuthRuntime({
     authStore,
     cleanDocsDemoRouteQuery,
-    getEmailLoginDeeplinkConsumed: () => emailLoginDeeplinkConsumed,
     isDocsDemo,
     routePathnameFromLocation,
     routePrefix,
-    setActiveTab: (tab) => {
-      shellState.activeTab = tab;
-    },
-    setEmailLoginDeeplinkConsumed: (consumed) => {
-      shellState.emailLoginDeeplinkConsumed = consumed;
-    },
-    setMode: (nextMode) => {
-      shellState.mode = nextMode;
-    },
-    setScreen: (nextScreen) => {
-      shellState.screen = nextScreen;
-    },
     tick,
   });
   const { setPasswordLoginMode, showLogin, submitEmailOnEnter } = authRuntime;
