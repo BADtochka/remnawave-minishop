@@ -753,11 +753,6 @@
       topupKind,
       topupModalOpen,
     }),
-    getRouteState: () => ({
-      activeTab,
-      adminActiveSection,
-      screen,
-    }),
     getWindowSearch: () => window.location.search,
     hydrateSupportUnread,
     initialAdminSectionFromLocation,
@@ -780,19 +775,6 @@
     },
     routePathnameFromLocation,
     routePrefix,
-    setData: (payload) => {
-      shellState.data = payload;
-    },
-    setDocsDemoParentRouteConsumed: () => {
-      shellState.docsDemoParentRouteConsumed = true;
-    },
-    setRouteState: (patch) => {
-      if (patch.activeTab !== undefined) shellState.activeTab = patch.activeTab;
-      if (patch.adminActiveSection !== undefined)
-        shellState.adminActiveSection = patch.adminActiveSection;
-      if (patch.mode !== undefined) shellState.mode = patch.mode;
-      if (patch.screen !== undefined) shellState.screen = patch.screen;
-    },
     showAdminUnavailable: () => {
       showToast(t("wa_unavailable"));
     },

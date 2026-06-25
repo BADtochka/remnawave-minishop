@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createAppLoadExecutor } from "./appLoadExecutor.js";
+import { resetShellState, shellState } from "./shellState.svelte.ts";
 
 function createPayload(overrides = {}) {
   return {
@@ -23,8 +24,6 @@ function createDeps(overrides = {}) {
   const state = {
     activeTab: "home",
     adminActiveSection: "stats",
-    data: null,
-    docsDemoConsumed: false,
     modal: {
       changeModalOpen: false,
       deviceTopupModalOpen: false,
@@ -37,6 +36,12 @@ function createDeps(overrides = {}) {
     windowSearch: "",
     ...overrides.state,
   };
+  resetShellState({
+    activeTab: state.activeTab,
+    adminActiveSection: state.adminActiveSection,
+    mode: state.mode || "loading",
+    screen: state.screen,
+  });
   const adminRuntime = {
     cancelAdminAssetsPrefetch: vi.fn(),
     ensureAdminBundle: vi.fn(() => Promise.resolve({})),
@@ -64,11 +69,6 @@ function createDeps(overrides = {}) {
     currentSearchParams: () => new URLSearchParams(state.search),
     dataClientLoadData: vi.fn(() => Promise.resolve(createPayload())),
     getModalState: () => state.modal,
-    getRouteState: () => ({
-      activeTab: state.activeTab,
-      adminActiveSection: state.adminActiveSection,
-      screen: state.screen,
-    }),
     getWindowSearch: () => state.windowSearch,
     hydrateSupportUnread: vi.fn(),
     initialAdminSectionFromLocation: vi.fn(() => "stats"),
@@ -91,15 +91,6 @@ function createDeps(overrides = {}) {
     }),
     routePathnameFromLocation: () => state.pathname,
     routePrefix: "",
-    setData: vi.fn((payload) => {
-      state.data = payload;
-    }),
-    setDocsDemoParentRouteConsumed: vi.fn(() => {
-      state.docsDemoConsumed = true;
-    }),
-    setRouteState: vi.fn((patch) => {
-      Object.assign(state, patch);
-    }),
     showAdminUnavailable: vi.fn(),
     syncLoadedRoute: vi.fn(),
     ...overrides.deps,
@@ -117,7 +108,7 @@ function createDeps(overrides = {}) {
 describe("createAppLoadExecutor", () => {
   it("loads app data and applies route, billing, support, and section effects", async () => {
     const payload = createPayload();
-    const { billingState, deps, executor, state } = createDeps({
+    const { billingState, deps, executor } = createDeps({
       deps: {
         dataClientLoadData: vi.fn(() => Promise.resolve(payload)),
       },
@@ -127,7 +118,7 @@ describe("createAppLoadExecutor", () => {
     await expect(executor.loadData({ fresh: true })).resolves.toBe(payload);
 
     expect(deps.dataClientLoadData).toHaveBeenCalledWith({ fresh: true });
-    expect(state.data).toBe(payload);
+    expect(shellState.data).toBe(payload);
     expect(billingState()).toMatchObject({
       paymentStep: "tariff",
       renewHwidDevices: true,
@@ -135,7 +126,7 @@ describe("createAppLoadExecutor", () => {
       selectedPlan: null,
       selectedTariffKey: "",
     });
-    expect(state).toMatchObject({ activeTab: "support", mode: "app", screen: "support" });
+    expect(shellState).toMatchObject({ activeTab: "support", mode: "app", screen: "support" });
     expect(deps.hydrateSupportUnread).toHaveBeenCalledWith({
       supportEnabled: true,
       unreadCount: 3,
@@ -163,7 +154,7 @@ describe("createAppLoadExecutor", () => {
 
   it("loads the admin bundle for admin routes", async () => {
     const payload = createPayload({ user: { is_admin: true } });
-    const { adminRuntime, deps, executor, state } = createDeps({
+    const { adminRuntime, deps, executor } = createDeps({
       deps: {
         dataClientLoadData: vi.fn(() => Promise.resolve(payload)),
       },
@@ -175,7 +166,7 @@ describe("createAppLoadExecutor", () => {
     expect(adminRuntime.cancelAdminAssetsPrefetch).toHaveBeenCalledOnce();
     expect(adminRuntime.ensureI18nScope).toHaveBeenCalledWith("admin");
     expect(adminRuntime.ensureAdminBundle).toHaveBeenCalledOnce();
-    expect(state).toMatchObject({
+    expect(shellState).toMatchObject({
       activeTab: "settings",
       adminActiveSection: "stats",
       mode: "app",
@@ -191,7 +182,7 @@ describe("createAppLoadExecutor", () => {
 
   it("falls back to settings when admin bundle loading fails", async () => {
     const payload = createPayload({ user: { is_admin: true } });
-    const { adminRuntime, deps, executor, state } = createDeps({
+    const { adminRuntime, deps, executor } = createDeps({
       deps: {
         dataClientLoadData: vi.fn(() => Promise.resolve(payload)),
       },
@@ -201,7 +192,7 @@ describe("createAppLoadExecutor", () => {
 
     await executor.loadData();
 
-    expect(state).toMatchObject({
+    expect(shellState).toMatchObject({
       activeTab: "settings",
       mode: "app",
       screen: "settings",
