@@ -67,6 +67,7 @@
   import { invalidateWebappTariffOptionCaches } from "./lib/webapp/billingOptionCache.js";
   import { CSRF_COOKIE_NAME, readCookie } from "./lib/webapp/session.js";
   import { createTelegramRuntime, type TelegramWebApp } from "./lib/webapp/telegramRuntime.js";
+  import { resetShellState, shellState } from "./lib/webapp/shellState.svelte";
 
   type AnyRecord = Record<string, any>;
   let { mockRuntime = null }: { mockRuntime?: AnyRecord | null } = $props();
@@ -99,7 +100,6 @@
   const previewBoardComponent = stableMockRuntime?.PreviewBoard || null;
   const isDocsDemo = stableMockRuntime?.docsDemo === true;
   const routePrefix = isDocsDemo ? "/demo/runtime" : "";
-  let docsDemoParentRouteConsumed = $state(false);
   const query = new URLSearchParams(window.location.search);
   const isAppLaunchRoute = isExternalAppLaunchPath(window.location.pathname);
   stableMockRuntime?.applyPreviewMock?.(query.get("mock"));
@@ -133,55 +133,67 @@
   const themePreviewKey = String(CFG.themePreviewKey || query.get("theme_preview") || "").trim();
   const themePreviewDraft = readThemePreviewDraft(themePreviewKey);
   const I18N: AnyRecord = injectedI18n || {};
-  let telegramSdkStatus = $state("idle");
-  let telegramMiniAppInitData = $state("");
-  let telegramHasLaunchParams = $state(false);
 
-  let mode = $state(isAppLaunchRoute ? "appLaunch" : isPreviewBoard ? "preview" : "loading");
-  let activeTab = $state("home");
-  let screen = $state("home");
-  let emailLoginDeeplinkConsumed = $state(false);
-  let data = $state<AnyRecord | null>(
-    isPreviewBoard ? structuredCloneSafe(MOCK_SOURCE.data) : null
-  );
+  resetShellState({
+    appLaunchTarget: isAppLaunchRoute ? readExternalAppLaunchTarget() : "",
+    csrfToken: MOCK ? "" : readCookie(CSRF_COOKIE_NAME) || "",
+    data: isPreviewBoard ? structuredCloneSafe(MOCK_SOURCE.data) : null,
+    mode: isAppLaunchRoute ? "appLaunch" : isPreviewBoard ? "preview" : "loading",
+    token: MOCK ? "local-preview" : "",
+  });
+
+  const docsDemoParentRouteConsumed = $derived(shellState.docsDemoParentRouteConsumed);
+  const telegramSdkStatus = $derived(shellState.telegramSdkStatus);
+  const telegramMiniAppInitData = $derived(shellState.telegramMiniAppInitData);
+  const telegramHasLaunchParams = $derived(shellState.telegramHasLaunchParams);
+  const mode = $derived(shellState.mode);
+  const activeTab = $derived(shellState.activeTab);
+  const screen = $derived(shellState.screen);
+  const emailLoginDeeplinkConsumed = $derived(shellState.emailLoginDeeplinkConsumed);
+  const data: AnyRecord | null = $derived(shellState.data as AnyRecord | null);
   const user: AnyRecord = $derived((data?.user || {}) as AnyRecord);
   const isAdmin = $derived(Boolean(user?.is_admin));
-  let appLaunchTarget = $state(isAppLaunchRoute ? readExternalAppLaunchTarget() : "");
-  let publicInstallSubscription = $state<AnyRecord | null>(null);
-  let publicInstallToken = $state("");
-  let autoRenewBusy = $state(false);
-  let activationSuccessDialogOpen = $state(false);
-  let activationSuccessUseInstallGuides = $state(false);
-  let telegramNotificationsBotOpenedAt = $state(0);
-  let telegramNotificationsResumeRefreshBusy = $state(false);
-  let telegramNotificationsResumeLastCheckAt = $state(0);
-  let languageMenuOpen = $state(false);
-  let languageClickGuard = $state(false);
-  let languageClickGuardArmed = $state(false);
-  let guestLanguage = $state("");
-  let emailAvatarUrl = $state("");
-  let token = $state(MOCK ? "local-preview" : "");
-  let csrfToken = $state(MOCK ? "" : readCookie(CSRF_COOKIE_NAME) || "");
-  let adminBundleApi = $state<AnyRecord | null>(null);
-  let adminBundleError = $state("");
-  let adminMountTarget = $state<HTMLElement | null>(null);
-  let adminActiveSection = $state("stats");
-  let tg = $state<TelegramWebApp | null>(null);
-  let demoAuthLogin = $state<unknown>(false);
-  let appActions = $state<AppActionRuntime>(undefined as unknown as AppActionRuntime);
+  const appLaunchTarget = $derived(shellState.appLaunchTarget);
+  const publicInstallSubscription: AnyRecord | null = $derived(
+    shellState.publicInstallSubscription as AnyRecord | null
+  );
+  const publicInstallToken = $derived(shellState.publicInstallToken);
+  const autoRenewBusy = $derived(shellState.autoRenewBusy);
+  const activationSuccessDialogOpen = $derived(shellState.activationSuccessDialogOpen);
+  const activationSuccessUseInstallGuides = $derived(shellState.activationSuccessUseInstallGuides);
+  const telegramNotificationsBotOpenedAt = $derived(shellState.telegramNotificationsBotOpenedAt);
+  const telegramNotificationsResumeRefreshBusy = $derived(
+    shellState.telegramNotificationsResumeRefreshBusy
+  );
+  const telegramNotificationsResumeLastCheckAt = $derived(
+    shellState.telegramNotificationsResumeLastCheckAt
+  );
+  const languageClickGuard = $derived(shellState.languageClickGuard);
+  const languageClickGuardArmed = $derived(shellState.languageClickGuardArmed);
+  const guestLanguage = $derived(shellState.guestLanguage);
+  const emailAvatarUrl = $derived(shellState.emailAvatarUrl);
+  const token = $derived(shellState.token);
+  const csrfToken = $derived(shellState.csrfToken);
+  const adminBundleApi: AnyRecord | null = $derived(shellState.adminBundleApi as AnyRecord | null);
+  const adminBundleError = $derived(shellState.adminBundleError);
+  const adminMountTarget = $derived(shellState.adminMountTarget);
+  const adminActiveSection = $derived(shellState.adminActiveSection);
+  const tg: TelegramWebApp | null = $derived(shellState.tg);
+  const demoAuthLogin = $derived(shellState.demoAuthLogin);
+  const appActions: AppActionRuntime = $derived(shellState.appActions as AppActionRuntime);
   const telegramRuntime = createTelegramRuntime<TelegramWebApp | null>({
     scriptUrl: TELEGRAM_WEBAPP_SCRIPT_URL,
     bootTimeoutMs: TELEGRAM_SDK_BOOT_TIMEOUT_MS,
     actionTimeoutMs: TELEGRAM_SDK_ACTION_TIMEOUT_MS,
     miniAppAuthTimeoutMs: TELEGRAM_MINI_APP_AUTH_TIMEOUT_MS,
     setInitData: (initData) => {
-      telegramMiniAppInitData = initData || "";
+      shellState.telegramMiniAppInitData = initData || "";
     },
     setStatus: (status) => {
-      telegramSdkStatus = status;
+      shellState.telegramSdkStatus = status;
     },
     setTelegram: (value) => {
-      tg = value;
+      shellState.tg = value;
     },
   });
   const telegramSdk = telegramRuntime.telegramSdk;
@@ -201,10 +213,10 @@
       hasTelegramLaunchParams,
       refreshTelegram: telegramRuntime.refreshTelegram,
       setAppLaunchTarget: (target) => {
-        appLaunchTarget = target;
+        shellState.appLaunchTarget = target;
       },
       setTelegram: (value) => {
-        tg = value;
+        shellState.tg = value;
       },
     });
   const i18n = createI18n({
@@ -217,7 +229,7 @@
   const termUnitLabel = i18n.termUnitLabel;
   const languageName = i18n.languageName;
   $effect(() => {
-    telegramHasLaunchParams = hasTelegramLaunchParams();
+    shellState.telegramHasLaunchParams = hasTelegramLaunchParams();
   });
   const adminRuntime = createAdminRuntime({
     fetchI18nScope: async (scope) => {
@@ -249,26 +261,26 @@
     },
     setBundleState: (api, error) => {
       const nextApi = api as AnyRecord | null;
-      if (adminBundleApi !== nextApi) adminBundleApi = nextApi;
-      if (adminBundleError !== error) adminBundleError = error;
+      if (adminBundleApi !== nextApi) shellState.adminBundleApi = nextApi;
+      if (adminBundleError !== error) shellState.adminBundleError = error;
     },
   });
-  guestLanguage = normalizeLangCode(CFG.language || "ru");
+  shellState.guestLanguage = normalizeLangCode(CFG.language || "ru");
   const { clearLanguageClickGuard, setLanguageMenuOpen, syncBodyScrollLock, updateGuestLanguage } =
     createUiChrome({
       normalizeLangCode,
       getCurrentLang: () => currentLang,
       setGuestLanguage: (value) => {
-        guestLanguage = value;
+        shellState.guestLanguage = value;
       },
       setLanguageMenuOpenState: (value) => {
-        languageMenuOpen = value;
+        shellState.languageMenuOpen = value;
       },
       setLanguageClickGuard: (value) => {
-        languageClickGuard = value;
+        shellState.languageClickGuard = value;
       },
       setLanguageClickGuardArmed: (value) => {
-        languageClickGuardArmed = value;
+        shellState.languageClickGuardArmed = value;
       },
     });
   const { clearManualLogoutFlag, clearToken, isManuallyLoggedOut, markManualLogout, setToken } =
@@ -277,10 +289,10 @@
       isMock: () => Boolean(MOCK),
       manualLogoutFlagKey: MANUAL_LOGOUT_FLAG_KEY,
       setCsrfToken: (nextToken) => {
-        csrfToken = nextToken;
+        shellState.csrfToken = nextToken;
       },
       setToken: (nextToken) => {
-        token = nextToken;
+        shellState.token = nextToken;
       },
     });
   const dataClient = createWebappDataClient({
@@ -327,16 +339,16 @@
     getChangeModalOpen: () => changeModalOpen,
     getChangeConfirmOpen: () => changeConfirmOpen,
     setActivationSuccessDialogOpen: (open) => {
-      activationSuccessDialogOpen = open;
+      shellState.activationSuccessDialogOpen = open;
     },
     setActivationSuccessUseInstallGuides: (useInstallGuides) => {
-      activationSuccessUseInstallGuides = useInstallGuides;
+      shellState.activationSuccessUseInstallGuides = useInstallGuides;
     },
     setActiveTab: (tab) => {
-      activeTab = tab;
+      shellState.activeTab = tab;
     },
     setScreen: (nextScreen) => {
-      screen = nextScreen;
+      shellState.screen = nextScreen;
     },
     canUseInstallGuides,
     closePaymentModal: () => billingStore.closePaymentModal(),
@@ -376,8 +388,8 @@
     billingStore,
     readRenewalDeeplink,
     setHomeRoute: () => {
-      activeTab = "home";
-      screen = "home";
+      shellState.activeTab = "home";
+      shellState.screen = "home";
       syncAppSectionPath("home", true);
     },
     stripRenewalLoginQueryFromUrl,
@@ -413,16 +425,16 @@
     routePathnameFromLocation,
     routePrefix,
     setActiveTab: (tab) => {
-      activeTab = tab;
+      shellState.activeTab = tab;
     },
     setEmailLoginDeeplinkConsumed: (consumed) => {
-      emailLoginDeeplinkConsumed = consumed;
+      shellState.emailLoginDeeplinkConsumed = consumed;
     },
     setMode: (nextMode) => {
-      mode = nextMode;
+      shellState.mode = nextMode;
     },
     setScreen: (nextScreen) => {
-      screen = nextScreen;
+      shellState.screen = nextScreen;
     },
     tick,
   });
@@ -434,7 +446,7 @@
     mock: MOCK,
     getTelegram: () => tg,
     setMode: (next) => {
-      mode = next;
+      shellState.mode = next;
     },
     hasTelegramLaunchParams,
     loadTelegramSdk,
@@ -467,13 +479,13 @@
       refreshBusy: telegramNotificationsResumeRefreshBusy,
     }),
     setTelegramNotificationsBotOpenedAt: (openedAt) => {
-      telegramNotificationsBotOpenedAt = openedAt;
+      shellState.telegramNotificationsBotOpenedAt = openedAt;
     },
     setTelegramNotificationsResumeLastCheckAt: (checkedAt) => {
-      telegramNotificationsResumeLastCheckAt = checkedAt;
+      shellState.telegramNotificationsResumeLastCheckAt = checkedAt;
     },
     setTelegramNotificationsResumeRefreshBusy: (busy) => {
-      telegramNotificationsResumeRefreshBusy = busy;
+      shellState.telegramNotificationsResumeRefreshBusy = busy;
     },
   });
   const resumeLifecycle = createResumeLifecycle({
@@ -510,7 +522,7 @@
     normalizeLangCode,
     updateLocalData: (updatedLanguage) => {
       if (!data?.user) return;
-      data = { ...data, user: { ...data.user, language_code: updatedLanguage } };
+      shellState.data = { ...data, user: { ...data.user, language_code: updatedLanguage } };
     },
     activateTrial: () => actionsStore.activateTrial(),
     claimReferralWelcomeBonus: () => actionsStore.claimReferralWelcomeBonus(),
@@ -603,8 +615,8 @@
   const toastTheme = $derived(shellView.themeView.toastTheme);
 
   $effect(() => {
-    demoAuthLogin = shellView.demoAuthLogin;
-    telegramMiniAppInitData = shellView.telegramMiniAppInitData;
+    shellState.demoAuthLogin = shellView.demoAuthLogin;
+    shellState.telegramMiniAppInitData = shellView.telegramMiniAppInitData;
   });
 
   $effect(() => {
@@ -618,8 +630,8 @@
 
   $effect(() => {
     if (screen === "admin" && !isAdmin) {
-      screen = "settings";
-      activeTab = "settings";
+      shellState.screen = "settings";
+      shellState.activeTab = "settings";
     }
   });
 
@@ -675,7 +687,7 @@
       email: user?.email,
       emailAvatarSync,
       setEmailAvatarUrl: (url) => {
-        emailAvatarUrl = url;
+        shellState.emailAvatarUrl = url;
       },
     });
   });
@@ -712,14 +724,14 @@
     routePathnameFromLocation,
     routePrefix,
     setActiveTab: (tab) => {
-      activeTab = tab;
+      shellState.activeTab = tab;
     },
     setAdminActiveSection: (section) => {
-      adminActiveSection = section;
+      shellState.adminActiveSection = section;
     },
     setPasswordLoginMode,
     setScreen: (nextScreen) => {
-      screen = nextScreen;
+      shellState.screen = nextScreen;
     },
     showAdminUnavailable: () => {
       showToast(t("wa_unavailable"));
@@ -769,16 +781,17 @@
     routePathnameFromLocation,
     routePrefix,
     setData: (payload) => {
-      data = payload;
+      shellState.data = payload;
     },
     setDocsDemoParentRouteConsumed: () => {
-      docsDemoParentRouteConsumed = true;
+      shellState.docsDemoParentRouteConsumed = true;
     },
     setRouteState: (patch) => {
-      if (patch.activeTab !== undefined) activeTab = patch.activeTab;
-      if (patch.adminActiveSection !== undefined) adminActiveSection = patch.adminActiveSection;
-      if (patch.mode !== undefined) mode = patch.mode;
-      if (patch.screen !== undefined) screen = patch.screen;
+      if (patch.activeTab !== undefined) shellState.activeTab = patch.activeTab;
+      if (patch.adminActiveSection !== undefined)
+        shellState.adminActiveSection = patch.adminActiveSection;
+      if (patch.mode !== undefined) shellState.mode = patch.mode;
+      if (patch.screen !== undefined) shellState.screen = patch.screen;
     },
     showAdminUnavailable: () => {
       showToast(t("wa_unavailable"));
@@ -809,7 +822,7 @@
     };
   });
 
-  appActions = createAppActionRuntime({
+  shellState.appActions = createAppActionRuntime({
     accountStore,
     actionsStore,
     adminRuntime,
@@ -858,33 +871,33 @@
     isDemoAuthLogin: () => Boolean(demoAuthLogin),
     loadData,
     markTelegramNotificationsBotOpened: (openedAt) => {
-      telegramNotificationsBotOpenedAt = openedAt;
+      shellState.telegramNotificationsBotOpenedAt = openedAt;
     },
     refreshTelegram: telegramRuntime.refreshTelegram,
     routePrefix,
     setActiveTab: (tab) => {
-      activeTab = tab;
+      shellState.activeTab = tab;
     },
     setAdminActiveSection: (section) => {
-      adminActiveSection = section;
+      shellState.adminActiveSection = section;
     },
     setAutoRenewBusy: (busy) => {
-      autoRenewBusy = busy;
+      shellState.autoRenewBusy = busy;
     },
     setMode: (nextMode) => {
-      mode = nextMode;
+      shellState.mode = nextMode;
     },
     setPublicInstallSubscription: (subscription) => {
-      publicInstallSubscription = subscription;
+      shellState.publicInstallSubscription = subscription;
     },
     setPublicInstallToken: (nextToken) => {
-      publicInstallToken = nextToken;
+      shellState.publicInstallToken = nextToken;
     },
     setScreen: (nextScreen) => {
-      screen = nextScreen;
+      shellState.screen = nextScreen;
     },
     setTelegram: (value) => {
-      tg = value;
+      shellState.tg = value;
     },
     showToast,
     supportStore,
@@ -996,7 +1009,7 @@
         {activeTab}
         {adminBundleApi}
         {adminBundleError}
-        bind:adminMountTarget
+        bind:adminMountTarget={shellState.adminMountTarget}
         {appLaunchTarget}
         {actionsStore}
         {authStore}
@@ -1008,11 +1021,11 @@
         {languageBusy}
         {languageClickGuard}
         {languageClickGuardArmed}
-        bind:languageMenuOpen
+        bind:languageMenuOpen={shellState.languageMenuOpen}
         {mode}
         {publicInstallSubscription}
         {publicInstallToken}
-        bind:screen
+        bind:screen={shellState.screen}
         {setLanguageMenuOpen}
         {setPasswordLoginMode}
         {submitEmailOnEnter}
