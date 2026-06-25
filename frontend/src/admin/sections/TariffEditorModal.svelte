@@ -21,62 +21,54 @@
   type ComponentCallback = (...args: never[]) => void;
   type DraftRow = Record<string, string | number | undefined>;
 
-  export let at: TranslateFn;
+  let { at }: { at: TranslateFn } = $props();
   const tariffsStore = getContext<TariffsStore>("tariffsStore");
 
-  let tariffEditorOpen = false;
-  let tariffEditingKey = "";
-  let tariffDraft: TariffDraft;
-  let tariffsSaving = false;
-  let tariffDeleteOpen = false;
-  let tariffDeleteTarget: Tariff | null = null;
-  let panelSquadsLoading = false;
-  let panelSquads: PanelSquad[] = [];
-  let tariffsCatalog: TariffsCatalog;
-  let billingModelOptions: SelectOption[] = [];
-  let panelSquadOptions: SelectOption[] = [];
-  let defaultCurrencyKey = "rub";
-  let defaultCurrencyCode = "RUB";
-  let currencyPriceColumnLabel = "";
-  let currencyPriceAriaLabel = "";
-  let conversionCurrencyLabel = "";
+  const tariffsState = $derived($tariffsStore);
+  const tariffEditorOpen = $derived(Boolean(tariffsState.tariffEditorOpen));
+  const tariffEditingKey = $derived(String(tariffsState.tariffEditingKey || ""));
+  const tariffDraft: TariffDraft = $derived(tariffsState.tariffDraft);
+  const tariffsSaving = $derived(Boolean(tariffsState.tariffsSaving));
+  const tariffDeleteOpen = $derived(Boolean(tariffsState.tariffDeleteOpen));
+  const tariffDeleteTarget: Tariff | null = $derived(tariffsState.tariffDeleteTarget);
+  const panelSquadsLoading = $derived(Boolean(tariffsState.panelSquadsLoading));
+  const panelSquads: PanelSquad[] = $derived(tariffsState.panelSquads || []);
+  const tariffsCatalog: TariffsCatalog = $derived(tariffsState.tariffsCatalog);
 
-  $: ({
-    tariffEditorOpen,
-    tariffEditingKey,
-    tariffDraft,
-    tariffsSaving,
-    tariffDeleteOpen,
-    tariffDeleteTarget,
-    panelSquadsLoading,
-    panelSquads,
-    tariffsCatalog,
-  } = $tariffsStore);
-
-  $: billingModelOptions = [
+  const billingModelOptions: SelectOption[] = $derived([
     { value: "period", label: at("tariff_model_period_label", {}, "Период") },
     { value: "traffic", label: at("tariff_model_traffic_label", {}, "Трафик") },
-  ];
-  $: panelSquadOptions = (panelSquads || []).map((squad) => ({
-    value: squad.uuid,
-    label: squad.name,
-  }));
-  $: defaultCurrencyKey = normalizeCurrencyKey(tariffsCatalog?.default_currency || "rub") as string;
-  $: defaultCurrencyCode = defaultCurrencyKey.toUpperCase();
-  $: currencyPriceColumnLabel = at(
-    "tariff_col_price_currency",
-    { currency: defaultCurrencyCode },
-    `Цена, ${defaultCurrencyCode}`
+  ]);
+  const panelSquadOptions: SelectOption[] = $derived(
+    (panelSquads || []).map((squad) => ({
+      value: squad.uuid,
+      label: squad.name,
+    }))
   );
-  $: currencyPriceAriaLabel = at(
-    "tariff_label_price_currency",
-    { currency: defaultCurrencyCode },
-    `Цена в ${defaultCurrencyCode}`
+  const defaultCurrencyKey = $derived(
+    normalizeCurrencyKey(tariffsCatalog?.default_currency || "rub") as string
   );
-  $: conversionCurrencyLabel = at(
-    "tariff_label_conversion_currency",
-    { currency: defaultCurrencyCode },
-    `Курс конвертации, ${defaultCurrencyCode} за 1 GB`
+  const defaultCurrencyCode = $derived(defaultCurrencyKey.toUpperCase());
+  const currencyPriceColumnLabel = $derived(
+    at(
+      "tariff_col_price_currency",
+      { currency: defaultCurrencyCode },
+      `Цена, ${defaultCurrencyCode}`
+    )
+  );
+  const currencyPriceAriaLabel = $derived(
+    at(
+      "tariff_label_price_currency",
+      { currency: defaultCurrencyCode },
+      `Цена в ${defaultCurrencyCode}`
+    )
+  );
+  const conversionCurrencyLabel = $derived(
+    at(
+      "tariff_label_conversion_currency",
+      { currency: defaultCurrencyCode },
+      `Курс конвертации, ${defaultCurrencyCode} за 1 GB`
+    )
   );
   function addDraftSquad(field: DraftSquadField, value: string): void {
     tariffsStore.addSquadToDraft(field, value);
@@ -270,7 +262,7 @@
             <button
               type="button"
               class="admin-chip"
-              on:click={() => tariffsStore.removeSquadFromDraft("squadUuids", uuid)}
+              onclick={() => tariffsStore.removeSquadFromDraft("squadUuids", uuid)}
             >
               {tariffsStore.squadLabel(uuid)}
               <X size={12} />
@@ -411,7 +403,7 @@
                 <button
                   type="button"
                   class="admin-chip"
-                  on:click={() => tariffsStore.removeSquadFromDraft("premiumSquadUuids", uuid)}
+                  onclick={() => tariffsStore.removeSquadFromDraft("premiumSquadUuids", uuid)}
                 >
                   {tariffsStore.squadLabel(uuid)}
                   <X size={12} />
