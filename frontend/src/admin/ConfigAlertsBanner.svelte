@@ -6,9 +6,15 @@
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 
-  export let at: TranslateFn = (key, _params = {}, fallback = "") => fallback || key;
-  export let section = "stats";
-  export let onNavigate: (section: string) => void = () => {};
+  let {
+    at = (key, _params = {}, fallback = "") => fallback || key,
+    section = "stats",
+    onNavigate = () => {},
+  }: {
+    at?: TranslateFn;
+    section?: string;
+    onNavigate?: (section: string) => void;
+  } = $props();
 
   const healthStore = getContext<HealthStore>("healthStore");
 
@@ -74,13 +80,13 @@
     return at(`nav_${id}`, {}, SECTION_FALLBACK_LABELS[id] || id);
   }
 
-  $: alerts = $healthStore.alerts;
-  $: healthLoading = $healthStore.healthLoading;
-  $: isDashboard = section === "stats";
-  $: visibleAlerts = (
+  const alerts = $derived($healthStore.alerts);
+  const healthLoading = $derived($healthStore.healthLoading);
+  const isDashboard = $derived(section === "stats");
+  const visibleAlerts: HealthAlert[] = $derived(
     isDashboard ? alerts : alerts.filter((alert) => alert.sections.includes(section))
-  ) as HealthAlert[];
-  $: errorCount = visibleAlerts.filter((alert) => alert.severity === "error").length;
+  );
+  const errorCount = $derived(visibleAlerts.filter((alert) => alert.severity === "error").length);
 </script>
 
 {#if visibleAlerts.length}
@@ -116,7 +122,7 @@
                 <button
                   type="button"
                   class="admin-config-alert-link"
-                  on:click={() => onNavigate(sectionId)}
+                  onclick={() => onNavigate(sectionId)}
                 >
                   {sectionLabel(sectionId)}
                 </button>

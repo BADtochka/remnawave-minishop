@@ -12,11 +12,7 @@
     AdminTable,
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
   import type { AdsStore } from "../../lib/admin/stores/adsStore";
   import type { components } from "../../lib/api/openapi.generated";
 
@@ -35,7 +31,6 @@
   const ADS_PAGE_SIZE = 10;
   const adsStore = getContext<AdsStore>("adsStore");
   const adsTable = createAdminDatatable([], { rowsPerPage: ADS_PAGE_SIZE });
-  const adsSignal = watchAdminDatatable(adsTable);
 
   const adsState = $derived($adsStore);
   const ads = $derived(adsState.ads as Ad[]);
@@ -44,7 +39,7 @@
   const adDraft = $derived(
     (adsState.adDraft || { source: "", start_param: "", cost: 0 }) as AdDraft
   );
-  const adRows = $derived($adsSignal.rows as Ad[]);
+  const adRows = $derived(adsTable.rows as Ad[]);
 
   $effect(() => {
     syncAdminDatatable(adsTable, ads);

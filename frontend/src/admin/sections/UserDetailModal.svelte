@@ -7,11 +7,7 @@
   import { AdminBadge, AdminButton, AdminTrafficCard } from "$components/patterns/admin/index.js";
   import { Copy, ExternalLink, UsersRound } from "$components/ui/icons.js";
   import { getContext } from "svelte";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
 
   import type { Tariff, TariffsStore } from "$lib/admin/stores/tariffsStore";
   import type { AdminUser, UsersStore } from "$lib/admin/stores/usersStore";
@@ -29,8 +25,6 @@
   const tariffsStore = getContext<TariffsStore>("tariffsStore");
   const userLogsTable = createAdminDatatable();
   const userReferralsTable = createAdminDatatable();
-  const userLogsTableSignal = watchAdminDatatable(userLogsTable);
-  const userReferralsTableSignal = watchAdminDatatable(userReferralsTable);
 
   let {
     at,
@@ -891,7 +885,7 @@
               {at}
               {fmtDate}
               {openedUser}
-              userLogsRows={$userLogsTableSignal.rows}
+              userLogsRows={userLogsTable.rows}
               {userLogsTotal}
               {userLogsPage}
               {userLogsPageCount}
@@ -947,7 +941,7 @@
   {openedUser}
   {userReferralsOpen}
   {userReferralsLoading}
-  userReferralsRows={$userReferralsTableSignal.rows}
+  userReferralsRows={userReferralsTable.rows}
   {userReferralsTotal}
   {userReferralsPage}
   {userReferralsPageCount}

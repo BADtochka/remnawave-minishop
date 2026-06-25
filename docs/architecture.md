@@ -83,6 +83,7 @@ backend/              Python-код приложения
 
 frontend/             Svelte/Vite Mini App и админка
   src/                исходный код Svelte (типизированный API-клиент в lib/webapp/publicApi.ts)
+  src/                first-party Svelte code is Svelte 5 runes-only; Vite enforces runes for src files
   src/lib/api/        сгенерированные из OpenAPI TypeScript-типы
   scripts/            вспомогательные скрипты сборки frontend
   package.json        Node-скрипты и зависимости

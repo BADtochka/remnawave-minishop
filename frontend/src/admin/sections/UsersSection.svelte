@@ -22,11 +22,7 @@
   } from "$components/patterns/admin/index.js";
   import { getContext, onMount } from "svelte";
   import { trafficOfLabel } from "../../lib/admin/format.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
   import type { AdminUser, UsersStore } from "../../lib/admin/stores/usersStore";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
@@ -77,7 +73,6 @@
 
   const usersStore = getContext<UsersStore>("usersStore");
   const usersTable = createAdminDatatable();
-  const usersTableSignal = watchAdminDatatable(usersTable);
   const usersState = $derived($usersStore);
   const users = $derived(usersState.users);
   const usersTotal = $derived(usersState.usersTotal);
@@ -510,7 +505,7 @@
       rows={USERS_PAGE_SIZE}
       widths={["220px", "128px", "112px", "78px", "88px", "96px", "112px", "112px"]}
     />
-  {:else if !$usersTableSignal.rows.length}
+  {:else if !usersTable.rows.length}
     <AdminEmptyState tone="card"
       ><span class="admin-muted">{at("users_empty", {}, "Никого не найдено")}</span
       ></AdminEmptyState
@@ -551,7 +546,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each $usersTableSignal.rows as user (user.user_id)}
+        {#each usersTable.rows as user (user.user_id)}
           {@const avatar = resolvedAvatarUrl(user)}
           {@const badge = panelStatusBadge(user)}
           <tr

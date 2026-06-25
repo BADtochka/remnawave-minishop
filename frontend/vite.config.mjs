@@ -7,6 +7,7 @@ import { defineConfig } from "vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const templateDir = path.resolve(__dirname, "../backend/bot/app/web/templates");
+const srcDir = path.resolve(__dirname, "src");
 
 export default defineConfig(({ command, mode }) => {
   const isAdminBuild = mode === "admin";
@@ -36,7 +37,11 @@ export default defineConfig(({ command, mode }) => {
     plugins: [
       tailwindcss(),
       svelte({
-        compilerOptions: isAdminBuild ? { compatibility: { componentApi: 4 } } : {},
+        dynamicCompileOptions({ filename }) {
+          if (filename && path.resolve(filename).startsWith(srcDir)) {
+            return { runes: true };
+          }
+        },
       }),
     ],
     build: {

@@ -9,11 +9,7 @@
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
   import { FileText, User } from "$components/ui/icons.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
   import type { PaymentOut, PaymentsStore } from "../../lib/admin/stores/paymentsStore";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
@@ -34,7 +30,6 @@
 
   const paymentsStore = getContext<PaymentsStore>("paymentsStore");
   const paymentsTable = createAdminDatatable();
-  const paymentsTableSignal = watchAdminDatatable(paymentsTable);
   const PAYMENTS_PAGE_SIZE = 25;
   const paymentsState = $derived($paymentsStore);
   const payments = $derived(paymentsState.payments as PaymentOut[]);
@@ -117,7 +112,7 @@
       rows={8}
       widths={["48px", "148px", "88px", "72px", "72px", "78px", "82px", "140px", "72px", "96px"]}
     />
-  {:else if !$paymentsTableSignal.rows.length}
+  {:else if !paymentsTable.rows.length}
     <AdminEmptyState tone="card"
       ><span class="admin-muted">{at("payments_empty", {}, "Нет платежей")}</span></AdminEmptyState
     >
@@ -138,7 +133,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each $paymentsTableSignal.rows as p (p.payment_id)}
+        {#each paymentsTable.rows as p (p.payment_id)}
           <tr>
             <td class="admin-cell-id" data-label="ID">
               <AdminButton

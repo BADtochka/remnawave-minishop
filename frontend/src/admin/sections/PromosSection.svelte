@@ -11,11 +11,7 @@
     AdminTable,
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
   import type { PromosStore } from "../../lib/admin/stores/promosStore";
   import type { components } from "../../lib/api/openapi.generated";
 
@@ -33,7 +29,6 @@
 
   const promosStore = getContext<PromosStore>("promosStore");
   const promosTable = createAdminDatatable();
-  const promosTableSignal = watchAdminDatatable(promosTable);
 
   const promosState = $derived($promosStore);
   const promos = $derived(promosState.promos as Promo[]);
@@ -49,7 +44,7 @@
       valid_days: 30,
     }) as PromoDraft
   );
-  const promoRows = $derived($promosTableSignal.rows as Promo[]);
+  const promoRows = $derived(promosTable.rows as Promo[]);
 
   $effect(() => syncAdminDatatable(promosTable, promos));
 

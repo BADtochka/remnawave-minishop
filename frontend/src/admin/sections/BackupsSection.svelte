@@ -19,11 +19,7 @@
     Upload,
   } from "$components/ui/icons.js";
   import { Tooltip } from "$components/ui/primitives.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
   import type {
     BackupArchive,
     BackupRestoreResult,
@@ -42,7 +38,6 @@
 
   const BACKUPS_PAGE_SIZE = 10;
   const backupsTable = createAdminDatatable([], { rowsPerPage: BACKUPS_PAGE_SIZE });
-  const backupsSignal = watchAdminDatatable(backupsTable);
   const backupsStore = getContext<BackupsStore>("backupsStore");
 
   let selectedName = $state("");
@@ -66,7 +61,7 @@
       backupsTable.setPage(backupsTable.pageCount || 1);
   });
   const backupsMeta = $derived.by(() => {
-    const { start, end, total } = $backupsSignal.rowCount;
+    const { start, end, total } = backupsTable.rowCount;
     return at(
       "backups_pagination_meta",
       { from: start, to: end, total },
@@ -305,7 +300,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each $backupsSignal.rows as archive (archive.name)}
+            {#each backupsTable.rows as archive (archive.name)}
               <tr class:is-selected={archive.name === selectedName}>
                 <td data-label={at("select", {}, "Выбрать")}>
                   <RadioGroupItem

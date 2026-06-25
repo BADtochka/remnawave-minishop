@@ -1,6 +1,5 @@
 <script lang="ts">
   import { ArrowRight, ChevronLeft, ChevronRight } from "$components/ui/icons.js";
-  import { watchAdminDatatable } from "$lib/admin/datatables.js";
   import AdminButton from "./AdminButton.svelte";
 
   type AdminTableLike = {
@@ -8,9 +7,6 @@
     pageCount?: number;
     rowCount?: { total?: number | string | null };
     setPage: (page: number) => void;
-  };
-  type TableSignal = {
-    subscribe: (run: (value: AdminTableLike | null) => void) => () => void;
   };
   type PageItem =
     | { type: "ellipsis"; key: string }
@@ -60,9 +56,7 @@
 
   let jumpValue = $state("");
 
-  // Bridge the runes-based handler into a store so direct table.* reads stay tracked.
-  const tableSignal = $derived(watchAdminDatatable(table) as TableSignal);
-  const liveTable = $derived($tableSignal);
+  const liveTable = $derived(table);
   const tablePage = $derived(liveTable ? Number(liveTable.currentPage || 1) - 1 : null);
   const tablePageCount = $derived(liveTable ? Number(liveTable.pageCount || 0) : null);
   const tableTotal = $derived(liveTable ? liveTable.rowCount?.total : total);

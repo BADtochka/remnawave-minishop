@@ -9,11 +9,7 @@
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
   import { RefreshCw, TriangleAlert, User } from "$components/ui/icons.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { createAdminDatatable, syncAdminDatatable } from "../../lib/admin/datatables.js";
   import type { LogsStore } from "../../lib/admin/stores/logsStore";
   import type { components } from "../../lib/api/openapi.generated";
 
@@ -33,7 +29,6 @@
 
   const logsStore = getContext<LogsStore>("logsStore");
   const logsTable = createAdminDatatable();
-  const logsTableSignal = watchAdminDatatable(logsTable);
   const LOGS_PAGE_SIZE = 50;
 
   const logsState = $derived($logsStore);
@@ -43,7 +38,7 @@
   const logsUserFilter = $derived(String(logsState.logsUserFilter || ""));
   const logsLoading = $derived(Boolean(logsState.logsLoading));
   const logsError = $derived(String(logsState.logsError || ""));
-  const logRows = $derived($logsTableSignal.rows as LogEntry[]);
+  const logRows = $derived(logsTable.rows as LogEntry[]);
 
   $effect(() => syncAdminDatatable(logsTable, logs));
 
