@@ -370,7 +370,13 @@ async def _request_email_code(
                     status=status,
                 )
             await session.commit()
-            return json_response({"ok": True})
+            payload: Dict[str, Any] = {"ok": True}
+            if result.code:
+                payload["code"] = result.code
+                payload["email_code"] = result.code
+            if result.magic_link:
+                payload["magic_link"] = result.magic_link
+            return json_response(payload)
         except Exception:
             await session.rollback()
             logger.exception("Failed to send email verification code")

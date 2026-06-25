@@ -34,7 +34,8 @@ Remnawave Minishop - Telegram-бот и Web App (Mini App) для продажи
 
 - [Входная страница документации](docs/index.md) - маршрут по установке, настройке, платежам, админке и диагностике.
 - [Единый dev stand](docs/development/dev-stand.md) - локальный Docker Compose стенд
-  с Mini Shop, Remnawave Panel, Subscription Page и тестовыми сидами.
+  с Mini Shop, Remnawave Panel, Subscription Page, тестовыми сидами и
+  full-stack QA (`npm run qa:fullstack`).
 - [Развертывание](docs/getting-started/deployment.md) - Docker Compose, Caddy, Nginx, Pangolin/Newt и запуск без обратного прокси.
 - [Настройка окружения](docs/getting-started/configuration.md) - bootstrap `.env` и рекомендуемая настройка через Web App админку.
 - [Переменные `.env`](docs/configuration/env-vars.md) - полный справочник всех env-ключей по разделам.

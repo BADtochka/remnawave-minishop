@@ -39,6 +39,8 @@ class EmailCodeRequestResult:
     ok: bool
     error: Optional[str] = None
     retry_after: Optional[int] = None
+    code: Optional[str] = None
+    magic_link: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -244,13 +246,20 @@ class EmailAuthService:
         session.add(code_model)
         await session.flush()
 
-        await self._send_code_email(
-            email=normalized_email,
-            code=code,
-            language_code=language_code,
-            magic_link=magic_link,
-            purpose=purpose,
-        )
+        qa_auth_enabled = bool(getattr(self.settings, "qa_auth_enabled", False))
+        if not qa_auth_enabled:
+            await self._send_code_email(
+                email=normalized_email,
+                code=code,
+                language_code=language_code,
+                magic_link=magic_link,
+                purpose=purpose,
+            )
+        else:
+            logger.info(
+                "QA email auth code generated without SMTP delivery for %s.",
+                normalized_email,
+            )
         resolved_target_user_id = target_user_id
         if resolved_target_user_id is None:
             try:
@@ -273,7 +282,11 @@ class EmailAuthService:
             recipient=normalized_email,
             content=f"purpose={purpose} magic_link={bool(magic_link)}",
         )
-        return EmailCodeRequestResult(ok=True)
+        return EmailCodeRequestResult(
+            ok=True,
+            code=code if qa_auth_enabled else None,
+            magic_link=magic_link if qa_auth_enabled else None,
+        )
 
     async def verify_code(
         self,

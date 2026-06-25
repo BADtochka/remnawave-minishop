@@ -251,6 +251,7 @@ class PaymentSuccessRequest:
     log_prefix: str = "payment_providers"
     activation_extra_kwargs: dict = field(default_factory=dict)
     skip_keyboard: bool = False
+    skip_user_notification: bool = False
     text_prefix: Optional[str] = None
 
 
@@ -462,19 +463,20 @@ async def finalize_successful_payment(
                 )
                 install_share_url = None
 
-    await send_success_message_to_user(
-        bot=req.bot,
-        user_id=req.user_id,
-        text=success_text,
-        language=language,
-        i18n=req.i18n,
-        settings=req.settings,
-        config_link_display=config_link_display,
-        connect_button_url=connect_button_url,
-        install_share_url=install_share_url,
-        include_keyboard=not req.skip_keyboard,
-        log_prefix=req.log_prefix,
-    )
+    if not req.skip_user_notification:
+        await send_success_message_to_user(
+            bot=req.bot,
+            user_id=req.user_id,
+            text=success_text,
+            language=language,
+            i18n=req.i18n,
+            settings=req.settings,
+            config_link_display=config_link_display,
+            connect_button_url=connect_button_url,
+            install_share_url=install_share_url,
+            include_keyboard=not req.skip_keyboard,
+            log_prefix=req.log_prefix,
+        )
 
     return PaymentSuccessOutcome(
         activation=activation,

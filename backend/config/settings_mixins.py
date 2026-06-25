@@ -101,6 +101,10 @@ if TYPE_CHECKING:
         PANEL_API_SOCK_CONNECT_TIMEOUT_SECONDS: float
         PANEL_API_SOCK_READ_TIMEOUT_SECONDS: float
         APP_RUNTIME_MODE: str
+        QA_AUTH_ENABLED: bool
+        QA_PAYMENT_ENABLED: bool
+        QA_PAYMENT_ADMIN_ONLY_ENABLED: bool
+        QA_PAYMENT_SECRET: str
         TRIAL_TRAFFIC_LIMIT_GB: Optional[float]
         TRIAL_PREMIUM_TRAFFIC_LIMIT_GB: Optional[float]
         USER_TRAFFIC_LIMIT_GB: Optional[float]
@@ -330,6 +334,13 @@ class SettingsComputedMixin(_SettingsComputedMixinBase):
             return False
         runtime = str(self.APP_RUNTIME_MODE or "production").strip().lower()
         return runtime in {"dev", "development", "local", "test", "testing"}
+
+    @computed_field
+    def qa_auth_enabled(self) -> bool:
+        runtime = str(self.APP_RUNTIME_MODE or "production").strip().lower()
+        return bool(
+            self.QA_AUTH_ENABLED and runtime in {"dev", "development", "local", "test", "testing"}
+        )
 
     @computed_field
     def trial_traffic_limit_bytes(self) -> int:
@@ -673,6 +684,10 @@ class SettingsComputedMixin(_SettingsComputedMixinBase):
 
     @computed_field
     def email_auth_configured(self) -> bool:
+        return bool(self.qa_auth_enabled or self.smtp_delivery_configured)
+
+    @computed_field
+    def smtp_delivery_configured(self) -> bool:
         return bool(
             self.SMTP_HOST
             and self.SMTP_PORT

@@ -1,6 +1,6 @@
 # Единый dev stand
 
-Единый dev stand - это локальный Docker Compose стенд для ручной и будущей
+Единый dev stand - это локальный Docker Compose стенд для ручной и
 автоматизированной full-stack QA. Он поднимает Mini Shop, PostgreSQL, Redis,
 локальную Remnawave Panel, Remnawave Subscription Page и сиды для тестовых
 пользователей.
@@ -37,6 +37,9 @@ REMNAWAVE_DEV_VERSION=2.7.4
 REMNAWAVE_SUBSCRIPTION_PAGE_VERSION=7.2.4
 ```
 
+Эти же версии зафиксированы в `deploy/dev/remnawave-versions.lock.json`.
+Full-stack QA проверяет, что env example и lock-файл не разъехались.
+
 ## Переменные окружения
 
 Файл `deploy/dev/remnawave-dev.env.example` уже содержит локальные безопасные
@@ -70,6 +73,19 @@ PANEL_DRY_RUN_VALIDATE_REMOTE=True
 `deploy/dev/seed-remnawave.sql`. Не меняйте
 `REMNAWAVE_DEV_JWT_AUTH_SECRET`, если не заменяете этот токен.
 
+Для автоматизированной QA в example включены только dev/test-safe хуки:
+
+```env
+QA_AUTH_ENABLED=True
+QA_PAYMENT_ENABLED=True
+QA_PAYMENT_SECRET=dev_qa_payment_secret_change_me
+```
+
+`QA_AUTH_ENABLED` возвращает одноразовый email-код в ответе
+`/api/auth/email/request`, но только в `APP_RUNTIME_MODE=development|test`.
+`QA_PAYMENT_ENABLED` включает локальный provider `qa`; его webhook принимает
+только HMAC-подписанные payload через `X-QA-Payment-Signature`.
+
 ## Запуск
 
 ```powershell
@@ -83,6 +99,22 @@ npm run dev:stand:ps
 ```powershell
 npm run dev:stand:logs
 ```
+
+Full-stack QA поверх поднятого стенда:
+
+```powershell
+$env:QA_FULLSTACK = "1"
+$env:QA_API_BASE_URL = "http://127.0.0.1:8082"
+$env:QA_WEBHOOK_BASE_URL = "http://127.0.0.1:8080"
+$env:QA_FRONTEND_URL = "http://127.0.0.1:8082"
+$env:QA_REMNAWAVE_HEALTH_URL = "http://127.0.0.1:3001/health"
+$env:QA_DB_DSN = "postgresql://remnawave_minishop:remnawave_minishop@127.0.0.1:6768/remnawave_minishop"
+$env:QA_PAYMENT_SECRET = "dev_qa_payment_secret_change_me"
+npm run qa:fullstack
+```
+
+Без `QA_FULLSTACK=1` `tests/qa` пропускаются, чтобы обычный `pytest` не
+зависел от Docker Compose.
 
 Остановка без удаления БД:
 
@@ -105,6 +137,7 @@ docker compose --env-file .env.remnawave-dev `
 
 - Mini Shop frontend: `http://127.0.0.1:8082`
 - Mini Shop backend health: `http://127.0.0.1:8080/healthz`
+- Mini Shop PostgreSQL: `127.0.0.1:6768`
 - Remnawave Panel: `http://127.0.0.1:3000`
 - Remnawave metrics health: `http://127.0.0.1:3001/health`
 - Remnawave Subscription Page upstream: `http://127.0.0.1:3010`
@@ -126,9 +159,9 @@ Remnawave Panel.
 
 | Telegram/user ID | Email | Состояние |
 | --- | --- | --- |
-| `910000001` | `runes_admin@example.test` | активная standard-подписка, admin ID |
-| `910000002` | `runes_active@example.test` | активная premium-подписка около лимита трафика |
-| `910000003` | `runes_expired@example.test` | истекшая подписка |
+| `910000001` | `runes.admin@example.com` | активная standard-подписка, admin ID |
+| `910000002` | `runes.active@example.com` | активная premium-подписка около лимита трафика |
+| `910000003` | `runes.expired@example.com` | истекшая подписка |
 
 Повторный запуск сидов:
 
@@ -169,26 +202,27 @@ docker compose --env-file .env.remnawave-dev `
 
 ## Автоматизация реальных QA-сценариев
 
-Автоматизировать auth/payment/admin-save поверх этого стенда можно. Причина,
-почему Playwright mock-smoke из runes-плана этого не делал, не технический
-запрет, а граница объема: mock-smoke проверяет статическую demo-сборку без
-backend, а реальные сценарии требуют управляемого backend-состояния,
-платежных webhook, auth-токенов, CSRF, seed/reset и проверки БД.
+Реальный QA-слой находится в `tests/qa` и запускается командой
+`npm run qa:fullstack` поверх единого dev stand. Он покрывает сценарии, которые
+не должен был покрывать mock-smoke из runes-плана: mock-smoke проверяет
+статическую demo-сборку без backend, а full-stack QA проверяет живые auth,
+CSRF, платежный webhook, admin-save и состояние БД.
 
-Рекомендуемый следующий слой QA:
+Текущие сценарии:
 
-1. **API-level full-stack tests**: pytest поднимает стенд или использует уже
-   поднятый, создает платеж через backend API, затем отправляет в локальный
-   webhook payload выбранного провайдера. Для позитивного сценария достаточно
-   считать, что провайдер прислал успешный webhook.
-2. **Browser E2E against real backend**: Playwright открывает
-   `http://127.0.0.1:8082`, логинится через тестовый email/code или заранее
-   выданную dev-сессию, проходит покупку до pending/success и проверяет UI.
-3. **Admin-save E2E**: Playwright входит тестовым admin user и сохраняет
-   настройки/тариф/перевод, затем проверяет API или БД после F5.
+- Email auth через `/api/auth/email/request` и `/api/auth/email/verify`.
+- CSRF-protected пользовательский запрос `/api/account/language`.
+- Создание платежа через `/api/payments` с provider `qa`.
+- HMAC webhook `/webhook/qa-payment` и настоящий
+  `finalize_successful_payment` с активацией подписки.
+- Проверка `payments` и `subscriptions` в PostgreSQL после webhook.
+- Admin login и сохранение `SERVER_STATUS_URL` через `/api/admin/settings`.
+- Проверка Remnawave health и пина версий Panel/Subscription Page.
 
-Чтобы это стало стабильным CI-гейтом, нужно добавить reset фикстур, единый
-тестовый payment-provider/webhook fixture и dev-only способ получить email code
-или session token без реального Telegram/SMTP. Сам стенд уже содержит основу
-для этого: изолированные volumes, сиды, локальную Remnawave и dry-run/live
-переключатель панели.
+CI workflow `.github/workflows/fullstack-qa.yml` запускает этот слой на:
+
+- `pull_request` в `main` и `dev`;
+- `push` в `main` и `dev`;
+- ручной `workflow_dispatch`.
+
+При падении workflow прикладывает Docker Compose logs как artifact.

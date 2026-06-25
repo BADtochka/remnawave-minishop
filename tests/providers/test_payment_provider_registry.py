@@ -72,6 +72,7 @@ _PROVIDER_MODULES = {
     "pally": "PallyService",
     "cloudpayments": "CloudPaymentsService",
     "stripe": "StripeService",
+    "qa": "QaPaymentService",
 }
 
 
@@ -167,6 +168,7 @@ def test_service_keys_and_statuses_come_from_provider_specs():
         "pally_service",
         "cloudpayments_service",
         "stripe_service",
+        "qa_service",
     }
     assert set(pending_statuses()) >= {
         "pending",
@@ -183,7 +185,40 @@ def test_service_keys_and_statuses_come_from_provider_specs():
         "pending_pally",
         "pending_cloudpayments",
         "pending_stripe",
+        "pending_qa",
     }
+
+
+def test_qa_provider_is_runtime_gated(monkeypatch):
+    from bot.payment_providers.qa import QaPaymentConfig, QaPaymentService
+
+    monkeypatch.setenv("QA_PAYMENT_ENABLED", "True")
+    monkeypatch.setenv("QA_PAYMENT_SECRET", "qa-secret")
+    config = QaPaymentConfig()
+
+    common = {
+        "bot": SimpleNamespace(),
+        "async_session_factory": SimpleNamespace(),
+        "i18n": SimpleNamespace(),
+        "subscription_service": SimpleNamespace(),
+        "referral_service": SimpleNamespace(),
+        "config": config,
+    }
+
+    production = QaPaymentService(
+        settings=SimpleNamespace(APP_RUNTIME_MODE="production"),
+        **common,
+    )
+    development = QaPaymentService(
+        settings=SimpleNamespace(APP_RUNTIME_MODE="development"),
+        **common,
+    )
+
+    assert not production.configured
+    assert development.configured
+
+    monkeypatch.setenv("QA_PAYMENT_ENABLED", "False")
+    monkeypatch.delenv("QA_PAYMENT_SECRET", raising=False)
 
 
 def test_provider_labels_and_emojis_include_storage_keys_and_method_aliases():
@@ -202,6 +237,7 @@ def test_provider_labels_and_emojis_include_storage_keys_and_method_aliases():
     assert emojis["cryptopay"] == get_provider_spec("cryptopay").default_telegram_emoji
     assert labels["paykilla"] == "PayKilla"
     assert labels["pally"] == "Pally"
+    assert labels["qa"] == "QA Payment"
 
 
 def test_provider_presentation_resolves_defaults_and_overrides():

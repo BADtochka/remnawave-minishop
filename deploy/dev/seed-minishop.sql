@@ -16,7 +16,7 @@ INSERT INTO users (
     (
         910000001,
         'runes_admin',
-        'runes.admin@example.test',
+        'runes.admin@example.com',
         now(),
         910000001,
         'Runes',
@@ -31,7 +31,7 @@ INSERT INTO users (
     (
         910000002,
         'runes_active',
-        'runes.active@example.test',
+        'runes.active@example.com',
         now(),
         910000002,
         'Runes',
@@ -46,7 +46,7 @@ INSERT INTO users (
     (
         910000003,
         'runes_expired',
-        'runes.expired@example.test',
+        'runes.expired@example.com',
         now() - interval '45 days',
         910000003,
         'Runes',
