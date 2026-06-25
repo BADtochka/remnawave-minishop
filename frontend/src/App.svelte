@@ -46,19 +46,8 @@
   import { createWebappSectionContext } from "./lib/webapp/webappSectionContext";
   import { readThemePreviewDraft, syncThemeGoogleFonts } from "./lib/webapp/themeStyle.js";
   import { computeAppShellView, type AppShellView } from "./lib/webapp/appShellView.js";
-  import { createWebappNavigation } from "./lib/webapp/webappNavigation.js";
-  import { createBillingModalActions } from "./lib/webapp/billingModalActions.js";
-  import { createAutoRenewAction } from "./lib/webapp/autoRenewAction.js";
-  import { createAdminPanelActions } from "./lib/webapp/adminPanelActions.js";
+  import { createAppActionRuntime, type AppActionRuntime } from "./lib/webapp/appActionRuntime.js";
   import { createWebappSessionActions } from "./lib/webapp/webappSessionActions.js";
-  import { createAccountUiActions } from "./lib/webapp/accountUiActions.js";
-  import { createConnectActions } from "./lib/webapp/connectActions.js";
-  import { createInstallRuntime } from "./lib/webapp/installRuntime.js";
-  import { createClipboardActions } from "./lib/webapp/clipboardActions.js";
-  import { createPromoTrialActions } from "./lib/webapp/promoTrialActions.js";
-  import { createTariffActions } from "./lib/webapp/tariffActions.js";
-  import { createPrimaryPayActionLabel } from "./lib/webapp/primaryPayActionLabel.js";
-  import { createTelegramLoginActions } from "./lib/webapp/telegramLoginActions.js";
   import { buildAdminPanelProps } from "./lib/webapp/adminPanelProps.js";
   import { createAdminRuntime } from "./lib/webapp/adminRuntime.js";
   import { createExternalLinkRuntime } from "./lib/webapp/externalLinkRuntime.js";
@@ -339,7 +328,7 @@
     canUseInstallGuides,
     closePaymentModal: () => billingStore.closePaymentModal(),
     loadInstallGuides: (force) => installGuidesStore.load(force),
-    openActivationConnectLink: () => openActivationConnectLink(),
+    openActivationConnectLink: () => appActions.openActivationConnectLink(),
     syncAppSectionPath,
   });
   const authStore = createAuthStore({
@@ -473,6 +462,7 @@
   setContext("actionsStore", actionsStore);
   setContext("accountStore", accountStore);
 
+  let appActions: AppActionRuntime;
   let shellView: AppShellView;
   $: ({
     authStatus,
@@ -667,7 +657,7 @@
     loadInstallGuides: () => {
       installGuidesStore.load();
     },
-    loadPublicInstall: (shareToken) => loadPublicInstall(shareToken),
+    loadPublicInstall: (shareToken) => appActions.loadPublicInstall(shareToken),
     loadSupport: () => {
       supportStore.loadList();
     },
@@ -771,37 +761,86 @@
     };
   });
 
-  const { openLoginTelegram } = createTelegramLoginActions({
-    authStore,
-    getDemoTelegramAuthPayload: () => demoAuth.telegramAuthPayload(),
-    getTelegramMiniAppInitData: () => telegramMiniAppInitData,
-    getTelegramOAuthClientId: () => telegramOAuthClientId,
-    isDemoAuthLogin: () => Boolean(demoAuthLogin),
-  });
-
-  const {
-    continueTelegramLinkPendingAction,
-    linkTelegramAndActivateTrial,
-    linkTelegramAndClaimReferralWelcome,
-    openSettingsLinkEmailDialog,
-    openSettingsSetPasswordDialog,
-    openTelegramNotificationsBot,
-  } = createAccountUiActions({
+  appActions = createAppActionRuntime({
     accountStore,
+    actionsStore,
+    adminRuntime,
+    authStore,
+    billing,
+    billingStore,
+    canUseInstallGuides,
+    clearLanguageClickGuard,
     demoEmail: () => demoAuth.demoEmail(),
-    emailAuthEnabled: () => emailAuthEnabled,
+    devicesStore,
+    externalLinkActions: {
+      openAppLaunchTarget,
+      openAppLink,
+      openExternalLink,
+      refreshAppLaunchTarget,
+    },
+    getAdminActiveSection: () => adminActiveSection,
+    getAppSettings: () => appSettings,
+    getAutoRenewBusy: () => autoRenewBusy,
+    getDevicesEnabled: () => devicesEnabled,
+    getDemoTelegramAuthPayload: () => demoAuth.telegramAuthPayload(),
+    getEmailAuthEnabled: () => emailAuthEnabled,
+    getIsAdmin: () => isAdmin,
+    getIsFileProtocol: () => window.location.protocol === "file:",
+    getMethods: () => methods,
+    getOrigin: () => (typeof window !== "undefined" ? window.location.origin : ""),
+    getPlans: () => plans,
+    getPreloadHost: () => (typeof window !== "undefined" ? (window as unknown as AnyRecord) : null),
+    getPublicInstallSubscription: () => publicInstallSubscription,
+    getRoutePathname: routePathnameFromLocation,
+    getScreen: () => screen,
+    getSelectedPlan: () => selectedPlan,
+    getSelectedTariffPlans: () => selectedTariffPlans,
+    getSingleTariffMode: () => singleTariffMode,
+    getSubscription: () => subscription,
+    getSupportEnabled: () => supportEnabled,
+    getTariffCatalog: () => tariffCatalog,
+    getTariffMode: () => tariffMode,
     getTelegram: () => tg,
+    getTelegramMiniAppInitData: () => telegramMiniAppInitData,
     getTelegramNotificationsStartLink: () => telegramNotificationsStartLink,
+    getTelegramOAuthClientId: () => telegramOAuthClientId,
+    getTrafficMode: () => trafficMode,
+    getTrialActivationResult: () => trialActivationResult,
+    installGuidesStore,
     isDemoAuthLogin: () => Boolean(demoAuthLogin),
+    loadData,
     markTelegramNotificationsBotOpened: (openedAt) => {
       telegramNotificationsBotOpenedAt = openedAt;
     },
-    openExternalLink,
     refreshTelegram: telegramRuntime.refreshTelegram,
+    routePrefix,
+    setActiveTab: (tab) => {
+      activeTab = tab;
+    },
+    setAdminActiveSection: (section) => {
+      adminActiveSection = section;
+    },
+    setAutoRenewBusy: (busy) => {
+      autoRenewBusy = busy;
+    },
+    setMode: (nextMode) => {
+      mode = nextMode;
+    },
+    setPublicInstallSubscription: (subscription) => {
+      publicInstallSubscription = subscription;
+    },
+    setPublicInstallToken: (nextToken) => {
+      publicInstallToken = nextToken;
+    },
+    setScreen: (nextScreen) => {
+      screen = nextScreen;
+    },
     setTelegram: (value) => {
       tg = value;
     },
     showToast,
+    supportStore,
+    syncAppSectionPath,
     t,
   });
 
@@ -818,9 +857,9 @@
     fallbackAdminSection: initialAdminSectionFromLocation(),
     languageBusy,
     languageOptions,
-    onClose: closeAdminPanel,
+    onClose: appActions.closeAdminPanel,
     onLanguageChange: accountStore.updateAccountLanguage,
-    onSectionChange: handleAdminSectionChange,
+    onSectionChange: appActions.handleAdminSectionChange,
     onSettingsSaved: adminRuntime.handleAdminPersistedSaved,
     onTariffsSaved: adminRuntime.handleAdminPersistedSaved,
     onThemesSaved: adminRuntime.handleAdminPersistedSaved,
@@ -843,7 +882,7 @@
   async function boot() {
     const shareToken = publicInstallTokenFromPath(window.location.pathname);
     if (shareToken) {
-      await loadPublicInstall(shareToken);
+      await appActions.loadPublicInstall(shareToken);
       return;
     }
     if (MOCK && demoAuth.isDemoAuthMock()) {
@@ -885,7 +924,7 @@
       getCsrfToken: () => csrfToken,
     });
     if (mode === "app" && screen !== "admin") {
-      const telegramActionHandled = await continueTelegramLinkPendingAction();
+      const telegramActionHandled = await appActions.continueTelegramLinkPendingAction();
       if (!telegramActionHandled) {
         if (hasPendingActivationHandoff()) await loadData({ fresh: true });
         const shown = await maybeShowActivationSuccessDialog({ source: "boot" });
@@ -898,153 +937,11 @@
     return appLoadExecutor.loadData(options) as Promise<AnyRecord>;
   }
 
-  const {
-    openActivationConnectLink,
-    openConnectLink,
-    openPublicConnectLink,
-    openTrialConnectLink,
-  } = createConnectActions({
-    getPublicInstallSubscription: () => publicInstallSubscription,
-    getSubscription: () => subscription,
-    getTrialActivationResult: () => trialActivationResult,
-    openExternalLink,
-    showToast,
-    t,
-  });
-
-  const { copyText } = createClipboardActions({ showToast, t });
-
-  const { activateTrial, applyPromo, clearPromoFieldError, setPromoCode } = createPromoTrialActions(
-    {
-      actionsStore,
-    }
-  );
-
   function showToast(message: unknown) {
     const text = String(message ?? "").trim();
     if (!text) return;
     sonnerToast(text, { duration: 2400 });
   }
-
-  const { toggleAutoRenew } = createAutoRenewAction({
-    billing,
-    getBusy: () => autoRenewBusy,
-    loadData,
-    setBusy: (busy) => {
-      autoRenewBusy = busy;
-    },
-    showToast,
-    t,
-  });
-
-  const { goDevices, goHome, goInstall, goInvite, goSettings, goSupport } = createWebappNavigation({
-    canUseInstallGuides,
-    closePaymentModal: () => billingStore.closePaymentModal(),
-    devicesEnabled: () => devicesEnabled,
-    loadDevices: () => devicesStore.loadDevices(devicesEnabled),
-    loadInstallGuides: () => installGuidesStore.load(),
-    loadSupport: () => {
-      supportStore.loadList();
-      supportStore.startPolling({ includeList: true });
-    },
-    openConnectLink,
-    setActiveTab: (tab) => {
-      activeTab = tab;
-    },
-    setScreen: (nextScreen) => {
-      screen = nextScreen;
-    },
-    supportEnabled: () => supportEnabled,
-    syncSectionPath: syncAppSectionPath,
-  });
-  const { loadPublicInstall, openInstallOrConnect, openTrialInstallOrConnect } =
-    createInstallRuntime({
-      canUseInstallGuides,
-      getOrigin: () => (typeof window !== "undefined" ? window.location.origin : ""),
-      getPreloadHost: () =>
-        typeof window !== "undefined" ? (window as unknown as AnyRecord) : null,
-      goInstall,
-      installGuidesStore,
-      openConnectLink,
-      openTrialConnectLink,
-      setActiveTab: (tab) => {
-        activeTab = tab;
-      },
-      setMode: (nextMode) => {
-        mode = nextMode;
-      },
-      setPublicInstallSubscription: (subscription) => {
-        publicInstallSubscription = subscription;
-      },
-      setPublicInstallToken: (nextToken) => {
-        publicInstallToken = nextToken;
-      },
-      setScreen: (nextScreen) => {
-        screen = nextScreen;
-      },
-    });
-
-  const {
-    closeDeviceTopupModal,
-    disconnectDevice,
-    loadDevices,
-    openDeviceTopupModal,
-    openPaymentModal,
-    openPremiumTopupModal,
-    openRegularTopupModal,
-    openTariffChangeModal,
-  } = createBillingModalActions({
-    billingStore,
-    devicesEnabled: () => devicesEnabled,
-    devicesStore,
-    methods: () => methods,
-    plans: () => plans,
-    singleTariffMode: () => singleTariffMode,
-    subscription: () => subscription,
-    tariffCatalog: () => tariffCatalog,
-    tariffMode: () => tariffMode,
-  });
-
-  const { closeAdminPanel, handleAdminSectionChange, openAdminPanel } = createAdminPanelActions({
-    cancelAdminAssetsPrefetch: adminRuntime.cancelAdminAssetsPrefetch,
-    clearLanguageClickGuard,
-    closePaymentModal: () => billingStore.closePaymentModal(),
-    ensureAdminBundle: adminRuntime.ensureAdminBundle,
-    ensureI18nScope: adminRuntime.ensureI18nScope,
-    getAdminActiveSection: () => adminActiveSection,
-    getRoutePathname: routePathnameFromLocation,
-    getScreen: () => screen,
-    isAdmin: () => isAdmin,
-    isFileProtocol: () => window.location.protocol === "file:",
-    routePrefix,
-    setActiveTab: (tab) => {
-      activeTab = tab;
-    },
-    setAdminActiveSection: (section) => {
-      adminActiveSection = section;
-    },
-    setScreen: (nextScreen) => {
-      screen = nextScreen;
-    },
-    showToast,
-    syncAppSectionPath,
-    t,
-  });
-
-  const { backToTariffList, continueWithSelectedTariff, selectTariff } = createTariffActions({
-    billingStore,
-    getPlans: () => plans,
-    getSelectedTariffPlans: () => selectedTariffPlans,
-    getSubscription: () => subscription,
-    getTariffCatalog: () => tariffCatalog,
-  });
-  const primaryPayActionLabel = createPrimaryPayActionLabel({
-    getAppSettings: () => appSettings,
-    getSelectedPlan: () => selectedPlan,
-    getSubscription: () => subscription,
-    getTrafficMode: () => trafficMode,
-    t,
-  });
 </script>
 
 <svelte:head>
@@ -1072,7 +969,7 @@
       <AppModeContent
         {accountStore}
         {shellView}
-        {activateTrial}
+        {appActions}
         {activationSuccessDialogOpen}
         {activationSuccessUseInstallGuides}
         {activeTab}
@@ -1080,21 +977,15 @@
         {adminBundleError}
         bind:adminMountTarget
         {appLaunchTarget}
-        {applyPromo}
         {authBusy}
         {authIsError}
         {authResendCooldown}
         {authStatus}
         {authStore}
         {autoRenewBusy}
-        {backToTariffList}
         {billingStore}
         cfg={CFG}
-        {clearPromoFieldError}
         {closeActivationSuccessDialog}
-        {closeDeviceTopupModal}
-        {continueWithSelectedTariff}
-        {copyText}
         {devicesBusy}
         {devicesData}
         {devicesErrorCode}
@@ -1102,45 +993,18 @@
         {devicesLoaded}
         {devicesStatus}
         {devicesStore}
-        {disconnectDevice}
-        {goDevices}
-        {goHome}
-        {goInvite}
-        {goSettings}
-        {goSupport}
         {languageBusy}
         {languageClickGuard}
         {languageClickGuardArmed}
         bind:languageMenuOpen
         {linkEmailBusy}
-        {linkTelegramAndActivateTrial}
-        {linkTelegramAndClaimReferralWelcome}
         {linkTelegramBusy}
-        {loadDevices}
         {loginEmailFieldError}
         {loginEmailTooltipOpen}
         {mode}
-        {openAdminPanel}
-        {openAppLaunchTarget}
-        {openAppLink}
-        {openConnectLink}
-        {openDeviceTopupModal}
-        {openExternalLink}
-        {openInstallOrConnect}
-        {openLoginTelegram}
-        {openPaymentModal}
-        {openPremiumTopupModal}
-        {openPublicConnectLink}
-        {openRegularTopupModal}
-        {openSettingsLinkEmailDialog}
-        {openSettingsSetPasswordDialog}
-        {openTariffChangeModal}
-        {openTelegramNotificationsBot}
-        {openTrialInstallOrConnect}
         {passwordLoginFallback}
         {passwordLoginMode}
         {pendingEmail}
-        {primaryPayActionLabel}
         {promoBusy}
         {promoCode}
         {promoFieldError}
@@ -1148,12 +1012,9 @@
         {promoStatus}
         {publicInstallSubscription}
         {publicInstallToken}
-        {refreshAppLaunchTarget}
         bind:screen
-        {selectTariff}
         {setLanguageMenuOpen}
         {setPasswordLoginMode}
-        {setPromoCode}
         {submitEmailOnEnter}
         {supportStore}
         {supportUnreadCount}
@@ -1163,7 +1024,6 @@
         {telegramLoginBusy}
         telegramPlatform={tg?.platform || ""}
         {termUnitLabel}
-        {toggleAutoRenew}
         {trialActivationError}
         {trialActivationResult}
         {trialBusy}

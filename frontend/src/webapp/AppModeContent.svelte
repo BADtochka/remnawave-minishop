@@ -2,6 +2,7 @@
   import type { Readable, Writable } from "svelte/store";
 
   import BrandMark from "$lib/webapp/BrandMark.svelte";
+  import type { AppActionRuntime } from "../lib/webapp/appActionRuntime.js";
   import type { AppShellView } from "../lib/webapp/appShellView.js";
   import type { LanguageOption } from "../lib/webapp/languageView.js";
   import AppLaunchScreen from "./screens/AppLaunchScreen.svelte";
@@ -15,10 +16,13 @@
   type WritableStoreLike = Writable<AnyRecord> & Record<string, any>;
   type Action = (...args: any[]) => any;
   type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
+  const noopAction: Action = () => {};
+  const noopPrimaryPayActionLabel = () => "";
 
   export let accountStore: WritableStoreLike;
   export let shellView: AppShellView | null = null;
-  export let activateTrial: Action;
+  export let appActions: AppActionRuntime | null = null;
+  export let activateTrial: Action = noopAction;
   export let activationSuccessDialogOpen = false;
   export let activationSuccessUseInstallGuides = false;
   export let activeTab = "home";
@@ -27,24 +31,24 @@
   export let adminMountTarget: HTMLElement | null = null;
   export let appLaunchTarget = "";
   export let appSettings: AnyRecord = {};
-  export let applyPromo: Action;
+  export let applyPromo: Action = noopAction;
   export let authBusy = false;
   export let authIsError = false;
   export let authResendCooldown = 0;
   export let authStatus = "";
   export let authStore: WritableStoreLike;
   export let autoRenewBusy = false;
-  export let backToTariffList: Action;
+  export let backToTariffList: Action = noopAction;
   export let billingStore: WritableStoreLike;
   export let brand: AnyRecord = {};
   export let brandTitle = "";
   export let canChangeTariff = false;
   export let cfg: AnyRecord = {};
-  export let clearPromoFieldError: Action;
-  export let closeActivationSuccessDialog: Action;
-  export let closeDeviceTopupModal: Action;
-  export let continueWithSelectedTariff: Action;
-  export let copyText: Action;
+  export let clearPromoFieldError: Action = noopAction;
+  export let closeActivationSuccessDialog: Action = noopAction;
+  export let closeDeviceTopupModal: Action = noopAction;
+  export let continueWithSelectedTariff: Action = noopAction;
+  export let copyText: Action = noopAction;
   export let currentLang = "ru";
   export let currentLanguageOption: LanguageOption | null = null;
   export let currentTariffName = "";
@@ -56,14 +60,14 @@
   export let devicesLoaded = false;
   export let devicesStatus = "";
   export let devicesStore: WritableStoreLike;
-  export let disconnectDevice: Action;
+  export let disconnectDevice: Action = noopAction;
   export let emailAuthEnabled = true;
   export let emailLinkStatus = "";
-  export let goDevices: Action;
-  export let goHome: Action;
-  export let goInvite: Action;
-  export let goSettings: Action;
-  export let goSupport: Action;
+  export let goDevices: Action = noopAction;
+  export let goHome: Action = noopAction;
+  export let goInvite: Action = noopAction;
+  export let goSettings: Action = noopAction;
+  export let goSupport: Action = noopAction;
   export let hasActiveTariffSubscription = false;
   export let hasMultipleTariffs = false;
   export let hasUnlinkedIdentity = false;
@@ -74,38 +78,38 @@
   export let languageMenuOpen = false;
   export let languageOptions: LanguageOption[] = [];
   export let linkEmailBusy = false;
-  export let linkTelegramAndActivateTrial: Action;
-  export let linkTelegramAndClaimReferralWelcome: Action;
+  export let linkTelegramAndActivateTrial: Action = noopAction;
+  export let linkTelegramAndClaimReferralWelcome: Action = noopAction;
   export let linkTelegramBusy = false;
-  export let loadDevices: Action;
+  export let loadDevices: Action = noopAction;
   export let loginEmailFieldError = "";
   export let loginEmailTooltipOpen = false;
   export let methods: AnyRecord[] = [];
   export let mode = "loading";
-  export let openAdminPanel: Action;
-  export let openAppLaunchTarget: Action;
-  export let openAppLink: Action;
-  export let openConnectLink: Action;
-  export let openDeviceTopupModal: Action;
-  export let openExternalLink: Action;
-  export let openInstallOrConnect: Action;
-  export let openLoginTelegram: Action;
-  export let openPaymentModal: Action;
-  export let openPremiumTopupModal: Action;
-  export let openPublicConnectLink: Action;
-  export let openRegularTopupModal: Action;
-  export let openSettingsLinkEmailDialog: Action;
-  export let openSettingsSetPasswordDialog: Action;
-  export let openTariffChangeModal: Action;
-  export let openTelegramNotificationsBot: Action;
-  export let openTrialInstallOrConnect: Action;
+  export let openAdminPanel: Action = noopAction;
+  export let openAppLaunchTarget: Action = noopAction;
+  export let openAppLink: Action = noopAction;
+  export let openConnectLink: Action = noopAction;
+  export let openDeviceTopupModal: Action = noopAction;
+  export let openExternalLink: Action = noopAction;
+  export let openInstallOrConnect: Action = noopAction;
+  export let openLoginTelegram: Action = noopAction;
+  export let openPaymentModal: Action = noopAction;
+  export let openPremiumTopupModal: Action = noopAction;
+  export let openPublicConnectLink: Action = noopAction;
+  export let openRegularTopupModal: Action = noopAction;
+  export let openSettingsLinkEmailDialog: Action = noopAction;
+  export let openSettingsSetPasswordDialog: Action = noopAction;
+  export let openTariffChangeModal: Action = noopAction;
+  export let openTelegramNotificationsBot: Action = noopAction;
+  export let openTrialInstallOrConnect: Action = noopAction;
   export let passwordLoginFallback = false;
   export let passwordLoginMode = false;
   export let pendingEmail = "";
   export let plans: AnyRecord[] = [];
   export let premiumTrafficTopupBarClickable = false;
   export let premiumTrafficTopupUnlocked = false;
-  export let primaryPayActionLabel: () => string;
+  export let primaryPayActionLabel: () => string = noopPrimaryPayActionLabel;
   export let privacyPolicyUrl = "";
   export let profileAvatarUrl = "";
   export let profileEmail = "";
@@ -121,22 +125,22 @@
   export let referralBonusDetails: AnyRecord[] = [];
   export let referralOneBonusPerReferee = false;
   export let referralWelcomeBonusDays = 0;
-  export let refreshAppLaunchTarget: Action;
+  export let refreshAppLaunchTarget: Action = noopAction;
   export let regularTrafficTopupBarClickable = false;
   export let regularTrafficTopupUnlocked = false;
   export let screen = "home";
   export let selectedTariff: AnyRecord | null = null;
   export let selectedTariffPlans: AnyRecord[] = [];
-  export let selectTariff: Action;
+  export let selectTariff: Action = noopAction;
   export let serverStatusUrl = "";
   export let setLanguageMenuOpen: (open: boolean) => void;
   export let setPasswordLoginMode: (enabled: boolean) => void;
-  export let setPromoCode: (value: string) => void;
+  export let setPromoCode: (value: string) => void = noopAction;
   export let shellStyle = "";
   export let shellThemeClass = "";
   export let shellToneClass = "";
   export let singleTariffMode = false;
-  export let submitEmailOnEnter: Action;
+  export let submitEmailOnEnter: Action = noopAction;
   export let subscription: AnyRecord = {};
   export let subscriptionPurchaseDescription = "";
   export let supportEnabled = false;
@@ -159,8 +163,8 @@
   export let telegramNotificationsStatus = "unknown";
   export let telegramPlatform = "";
   export let telegramProfileName = "";
-  export let termUnitLabel: Action;
-  export let toggleAutoRenew: Action;
+  export let termUnitLabel: Action = noopAction;
+  export let toggleAutoRenew: Action = noopAction;
   export let trafficMode = false;
   export let trialActivationError = "";
   export let trialActivationResult: AnyRecord | null = null;
@@ -233,6 +237,49 @@
       user,
       userLanguage,
     } = shellView);
+  }
+
+  $: if (appActions) {
+    ({
+      activateTrial,
+      applyPromo,
+      backToTariffList,
+      clearPromoFieldError,
+      closeDeviceTopupModal,
+      continueWithSelectedTariff,
+      copyText,
+      disconnectDevice,
+      goDevices,
+      goHome,
+      goInvite,
+      goSettings,
+      goSupport,
+      linkTelegramAndActivateTrial,
+      linkTelegramAndClaimReferralWelcome,
+      loadDevices,
+      openAdminPanel,
+      openAppLaunchTarget,
+      openAppLink,
+      openConnectLink,
+      openDeviceTopupModal,
+      openExternalLink,
+      openInstallOrConnect,
+      openLoginTelegram,
+      openPaymentModal,
+      openPremiumTopupModal,
+      openPublicConnectLink,
+      openRegularTopupModal,
+      openSettingsLinkEmailDialog,
+      openSettingsSetPasswordDialog,
+      openTariffChangeModal,
+      openTelegramNotificationsBot,
+      openTrialInstallOrConnect,
+      primaryPayActionLabel,
+      refreshAppLaunchTarget,
+      selectTariff,
+      setPromoCode,
+      toggleAutoRenew,
+    } = appActions);
   }
 </script>
 
