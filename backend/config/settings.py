@@ -379,7 +379,7 @@ class Settings(SettingsComputedMixin, SettingsValidationMixin, BaseSettings):
     # Referral program configuration
     REFERRAL_ONE_BONUS_PER_REFEREE: bool = Field(
         default=True,
-        description="When true, referral bonuses (for inviter and referee) are applied only once per invited user - on their first successful payment.",  # noqa: E501
+        description="When true, referral payment bonuses are applied only on the invited user's first successful payment.",  # noqa: E501
     )
     REFERRAL_WELCOME_BONUS_DAYS: int = Field(
         default=3,
@@ -394,7 +394,7 @@ class Settings(SettingsComputedMixin, SettingsValidationMixin, BaseSettings):
     )
     LEGACY_REFS: bool = Field(
         default=True,
-        description="Allow legacy referral links like ref_<telegram_id> to continue working. Defaults to True when unset.",  # noqa: E501
+        description="Allow legacy referral links like /start ref_<telegram_id>, where the payload contains the inviter's Telegram/user ID.",  # noqa: E501
     )
     MIGRATION_REMNASHOP_REFERRAL_CODE_COMPAT_ENABLED: bool = Field(
         default=False,

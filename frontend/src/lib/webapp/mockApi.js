@@ -2353,15 +2353,19 @@ export async function mockApi(path, options = {}, context = {}) {
               type: "bool",
               section: "pricing",
               subsection: "referral",
-              label: "Один бонус на приглашённого",
+              label: "Бонусы только за первый платёж приглашённого",
+              description:
+                "Если включено, повторные покупки того же приглашённого пользователя больше не начисляют реферальные бонусы ни ему, ни пригласившему. Первый успешный платёж остаётся бонусным.",
               value: Boolean(DEV_MOCK.config.referralOneBonusPerReferee),
             },
             {
               key: "LEGACY_REFS",
               type: "bool",
               section: "pricing",
-              subsection: "referral",
-              label: "Поддержка старых ref-ссылок",
+              subsection: "legacy_tariffs",
+              label: "Legacy ref-ссылки с ID пользователя",
+              description:
+                "Принимать старые ссылки вида /start ref_<telegram_id>, где payload содержит Telegram/user ID пригласившего.",
               value: DEV_MOCK.config.legacyRefs ?? true,
             },
             {

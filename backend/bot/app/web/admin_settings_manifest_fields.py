@@ -483,7 +483,12 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "REFERRAL_ONE_BONUS_PER_REFEREE",
         "bool",
         "pricing",
-        "Один бонус на приглашённого",
+        "Бонусы только за первый платёж приглашённого",
+        (
+            "Если включено, повторные покупки того же приглашённого пользователя больше не "
+            "начисляют реферальные бонусы ни ему, ни пригласившему. Первый успешный платёж "
+            "остаётся бонусным."
+        ),
         subsection="referral",
     ),
     SettingField(
@@ -509,8 +514,12 @@ SETTINGS_MANIFEST: List[SettingField] = [
         "LEGACY_REFS",
         "bool",
         "pricing",
-        "Поддержка старых ref-ссылок",
-        subsection="referral",
+        "Legacy ref-ссылки с ID пользователя",
+        (
+            "Принимать старые ссылки вида /start ref_<telegram_id>, где payload содержит "
+            "Telegram/user ID пригласившего."
+        ),
+        subsection="legacy_tariffs",
     ),
     SettingField(
         "DISPOSABLE_EMAIL_DOMAINS",

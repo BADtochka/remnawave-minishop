@@ -7,6 +7,7 @@
     Plus,
     Save,
     TriangleAlert,
+    X,
   } from "$components/ui/icons.js";
   import { getContext, onMount } from "svelte";
   import { AdminBadge, AdminButton, AdminEmptyState } from "$components/patterns/admin/index.js";
@@ -576,6 +577,56 @@
                   "These settings are ignored when tariffs are configured in the dedicated Tariffs section."
                 )}
               </p>
+            </div>
+          </div>
+
+          <div
+            class="admin-setting admin-trial-setting-row"
+            class:is-dirty={Boolean(settingsDirty.LEGACY_REFS)}
+          >
+            <div class="admin-setting-meta">
+              <strong>
+                {at("tariffs_legacy_refs", {}, "Старые ref-ссылки с ID пользователя")}
+                {#if settingsDirty.LEGACY_REFS}
+                  <AdminBadge variant="warning"
+                    >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
+                  >
+                {/if}
+              </strong>
+              <code>LEGACY_REFS</code>
+              <small>
+                {at(
+                  "tariffs_legacy_refs_hint",
+                  {},
+                  "Принимать ссылки вида /start ref_<telegram_id>, где в payload записан Telegram/user ID пригласившего. Оставляйте включённым только для старых раздач ссылок."
+                )}
+              </small>
+            </div>
+            <div class="admin-setting-control">
+              <div class="admin-setting-switch">
+                <Switch.Root
+                  checked={boolValue("LEGACY_REFS", settingsDirty, settingsFieldMap)}
+                  onCheckedChange={(checked) => setSetting("LEGACY_REFS", checked)}
+                  class="admin-switch-root"
+                >
+                  <Switch.Thumb class="admin-switch-thumb" />
+                </Switch.Root>
+                <span
+                  >{boolValue("LEGACY_REFS", settingsDirty, settingsFieldMap)
+                    ? at("enabled", {}, "Включено")
+                    : at("disabled", {}, "Выключено")}</span
+                >
+              </div>
+              {#if settingsDirty.LEGACY_REFS}
+                <AdminButton
+                  size="sm"
+                  variant="ghost"
+                  onclick={() => settingsStore.clearDirty("LEGACY_REFS")}
+                >
+                  <X size={12} />
+                  {at("reset", {}, "Сбросить")}
+                </AdminButton>
+              {/if}
             </div>
           </div>
 

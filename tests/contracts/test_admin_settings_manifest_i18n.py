@@ -99,11 +99,13 @@ ADMIN_TARIFF_SETTINGS_PAGE_KEYS = {
     "admin_tariffs_referral_group_rules",
     "admin_tariffs_referral_group_rules_hint",
     "admin_tariffs_referral_one_bonus_per_referee",
-    "admin_tariffs_referral_legacy_refs",
+    "admin_tariffs_referral_one_bonus_per_referee_hint",
     "admin_tariffs_referral_disposable_domains",
     "admin_tariffs_referral_disposable_domains_hint",
     "admin_tariffs_legacy_title",
     "admin_tariffs_legacy_subtitle",
+    "admin_tariffs_legacy_refs",
+    "admin_tariffs_legacy_refs_hint",
     "admin_tariffs_legacy_period",
     "admin_tariffs_legacy_enabled",
     "admin_tariffs_legacy_ref_inviter",
@@ -447,7 +449,7 @@ def test_legacy_tariff_settings_are_separated_from_payment_settings():
     assert manifest["REFERRAL_ONE_BONUS_PER_REFEREE"]["section"] == "pricing"
     assert manifest["REFERRAL_ONE_BONUS_PER_REFEREE"]["subsection"] == "referral"
     assert manifest["LEGACY_REFS"]["section"] == "pricing"
-    assert manifest["LEGACY_REFS"]["subsection"] == "referral"
+    assert manifest["LEGACY_REFS"]["subsection"] == "legacy_tariffs"
     assert manifest["DISPOSABLE_EMAIL_DOMAINS"]["section"] == "pricing"
     assert manifest["DISPOSABLE_EMAIL_DOMAINS"]["subsection"] == "referral"
 

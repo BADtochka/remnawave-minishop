@@ -96,7 +96,6 @@ LOCALE_KEY_ALIASES: Dict[str, str] = {
     "admin_support_status_resolved": "wa_support_status_resolved",
     "admin_support_ticket_number": "wa_support_ticket_number",
     "admin_support_user_context": "admin_user",
-    "admin_tariffs_legacy_traffic_packages": "admin_tariff_traffic_packages",
     "admin_tariffs_stat_enabled": "admin_enabled",
     "admin_user_btn_cancel": "wa_cancel",
     "admin_user_history_until": "wa_until_date",

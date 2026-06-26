@@ -302,7 +302,11 @@
           >
             <div class="admin-setting-meta">
               <strong>
-                {at("tariffs_referral_one_bonus_per_referee", {}, "Один бонус на приглашённого")}
+                {at(
+                  "tariffs_referral_one_bonus_per_referee",
+                  {},
+                  "Бонусы только за первый платёж приглашённого"
+                )}
                 {#if isSettingDirty("REFERRAL_ONE_BONUS_PER_REFEREE", settingsDirty)}
                   <AdminBadge variant="warning"
                     >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
@@ -310,6 +314,13 @@
                 {/if}
               </strong>
               <code>REFERRAL_ONE_BONUS_PER_REFEREE</code>
+              <small>
+                {at(
+                  "tariffs_referral_one_bonus_per_referee_hint",
+                  {},
+                  "Если включено, повторные покупки того же приглашённого пользователя больше не начисляют бонусы ни ему, ни пригласившему. Первый успешный платёж остаётся бонусным."
+                )}
+              </small>
             </div>
             <div class="admin-setting-control">
               <div class="admin-setting-switch">
@@ -337,45 +348,6 @@
                   variant="ghost"
                   onclick={() => resetSetting("REFERRAL_ONE_BONUS_PER_REFEREE")}
                 >
-                  <X size={12} />
-                  {at("reset", {}, "Сбросить")}
-                </AdminButton>
-              {/if}
-            </div>
-          </div>
-
-          <div
-            class="admin-setting admin-trial-setting-row"
-            class:is-dirty={isSettingDirty("LEGACY_REFS", settingsDirty)}
-          >
-            <div class="admin-setting-meta">
-              <strong>
-                {at("tariffs_referral_legacy_refs", {}, "Старые ref-ссылки")}
-                {#if isSettingDirty("LEGACY_REFS", settingsDirty)}
-                  <AdminBadge variant="warning"
-                    >{at("settings_badge_dirty", {}, "Изменено")}</AdminBadge
-                  >
-                {/if}
-              </strong>
-              <code>LEGACY_REFS</code>
-            </div>
-            <div class="admin-setting-control">
-              <div class="admin-setting-switch">
-                <Switch.Root
-                  checked={boolValue("LEGACY_REFS", settingsDirty, settingsFieldMap)}
-                  onCheckedChange={(checked) => setSetting("LEGACY_REFS", checked)}
-                  class="admin-switch-root"
-                >
-                  <Switch.Thumb class="admin-switch-thumb" />
-                </Switch.Root>
-                <span
-                  >{boolValue("LEGACY_REFS", settingsDirty, settingsFieldMap)
-                    ? at("enabled", {}, "Включено")
-                    : at("disabled", {}, "Выключено")}</span
-                >
-              </div>
-              {#if isSettingDirty("LEGACY_REFS", settingsDirty)}
-                <AdminButton size="sm" variant="ghost" onclick={() => resetSetting("LEGACY_REFS")}>
                   <X size={12} />
                   {at("reset", {}, "Сбросить")}
                 </AdminButton>
