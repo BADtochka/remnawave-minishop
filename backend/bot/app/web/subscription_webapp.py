@@ -42,12 +42,6 @@ from bot.app.web.webapp import (
 from bot.app.web.webapp import (
     telegram_notifications as _telegram_notifications,  # noqa: F401
 )
-from bot.app.web.webapp._runtime import (
-    WEBAPP_DEFAULT_FAVICON_DIR,
-    WEBAPP_DEFAULT_FAVICON_URL,
-    WEBAPP_DEFAULT_LOGO_FILE,
-    WEBAPP_TELEGRAM_OAUTH_STATE_COOKIE_NAME,
-)
 from bot.app.web.webapp.application import (
     create_subscription_webapp_application,
 )
@@ -69,6 +63,11 @@ from bot.app.web.webapp.assets import (
     _warm_webapp_logo_cache,
     _write_webapp_logo_to_disk,
 )
+from bot.app.web.webapp.assets_branding import (
+    WEBAPP_DEFAULT_FAVICON_DIR,
+    WEBAPP_DEFAULT_FAVICON_URL,
+    WEBAPP_DEFAULT_LOGO_FILE,
+)
 from bot.app.web.webapp.auth import (
     _build_webapp_auth_response,
     _hash_email_password,
@@ -77,6 +76,9 @@ from bot.app.web.webapp.auth import (
     _read_telegram_oauth_state_payload,
     _verify_email_password,
     security_dal,
+)
+from bot.app.web.webapp.auth_common import (
+    WEBAPP_TELEGRAM_OAUTH_STATE_COOKIE_NAME,
 )
 from bot.app.web.webapp.common import (
     _resolve_telegram_oauth_client_id,

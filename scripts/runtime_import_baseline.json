@@ -25,7 +25,6 @@
     "backend\\bot/app/web/admin_api_impl/users_listing.py"
   ],
   "webapp_runtime": [
-    "backend\\bot/app/web/subscription_webapp.py",
     "backend\\bot/app/web/webapp/account.py",
     "backend\\bot/app/web/webapp/application.py",
     "backend\\bot/app/web/webapp/assets.py",
