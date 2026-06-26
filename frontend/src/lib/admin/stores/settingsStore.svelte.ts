@@ -1,5 +1,10 @@
 import { adminErrorMessage } from "../errors.js";
-import { unwrap, type ApiResponse, type GetResponse } from "../../webapp/publicApi";
+import {
+  buildAdminSettingsPath,
+  unwrap,
+  type ApiResponse,
+  type GetResponse,
+} from "../../webapp/publicApi";
 import type { components } from "../../api/openapi.generated";
 
 type AdminErrorResponse = {
@@ -130,7 +135,7 @@ export function createSettingsStore({ api, onToast, at }: SettingsStoreOptions):
   async function loadSettings(): Promise<void> {
     updateState((s) => ({ ...s, settingsLoading: true, settingsDirty: {} }));
     try {
-      const data = (await api("/admin/settings")) as SettingsResponse | AdminErrorResponse;
+      const data = (await api(buildAdminSettingsPath())) as SettingsResponse | AdminErrorResponse;
       if (isOkResponse(data)) {
         const result = unwrap(data);
         updateState((s) => ({
@@ -191,7 +196,7 @@ export function createSettingsStore({ api, onToast, at }: SettingsStoreOptions):
         else updates[key] = change.value;
       }
       const payload: SettingsPatchPayload = { updates, deletes };
-      const res = (await api("/admin/settings", {
+      const res = (await api(buildAdminSettingsPath(), {
         method: "PATCH",
         body: JSON.stringify(payload),
       })) as SettingsPatchResponse | AdminErrorResponse;

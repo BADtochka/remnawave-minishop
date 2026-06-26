@@ -4,6 +4,10 @@ import {
   type ApiResponse,
   type GetResponse,
   type PostResponse,
+  buildAdminSupportTicketMessagesPath,
+  buildAdminSupportTicketPath,
+  buildAdminSupportTicketReadPath,
+  buildAdminSupportTicketsPath,
 } from "../../webapp/publicApi";
 import { withRoutePrefix } from "../../webapp/routes.js";
 import { adminErrorMessage } from "../errors.js";
@@ -131,22 +135,6 @@ function mergeTicketValue(current: SupportTicket | null, value: unknown): Suppor
   return incoming ? mergeTicket(current, incoming) : current;
 }
 
-function adminSupportTicketsPath(params: URLSearchParams): "/admin/support/tickets" {
-  return `/admin/support/tickets?${params.toString()}` as "/admin/support/tickets";
-}
-
-function adminSupportTicketPath(_id: TicketId): "/admin/support/tickets/{id}" {
-  return `/admin/support/tickets/${_id}` as "/admin/support/tickets/{id}";
-}
-
-function adminSupportTicketMessagesPath(_id: TicketId): "/admin/support/tickets/{id}/messages" {
-  return `/admin/support/tickets/${_id}/messages` as "/admin/support/tickets/{id}/messages";
-}
-
-function adminSupportTicketReadPath(_id: TicketId): "/admin/support/tickets/{id}/read" {
-  return `/admin/support/tickets/${_id}/read` as "/admin/support/tickets/{id}/read";
-}
-
 export function createAdminSupportStore({
   api,
   onToast,
@@ -250,7 +238,7 @@ export function createAdminSupportStore({
       for (const [key, value] of Object.entries(filters || {})) {
         if (value) params.set(key, value);
       }
-      const res = await api(adminSupportTicketsPath(params));
+      const res = await api(buildAdminSupportTicketsPath(params));
       if (res?.ok) {
         const payload = unwrap(res);
         updateState((s) => ({ ...s, tickets: asTickets(payload.tickets) }));
@@ -263,7 +251,7 @@ export function createAdminSupportStore({
   async function refreshCurrentTicket(ticketId: TicketId) {
     const id = Number(ticketId);
     if (!id) return null;
-    const res = (await api(adminSupportTicketPath(id))) as
+    const res = (await api(buildAdminSupportTicketPath(id))) as
       | AdminSupportTicketDetailResponse
       | AdminErrorResponse;
     if (!res?.ok) return res;
@@ -290,7 +278,7 @@ export function createAdminSupportStore({
 
     if (currentOpenedTicketId() !== id) return res;
     if (shouldMarkRead) {
-      await api(adminSupportTicketReadPath(id), { method: "POST", body: "{}" });
+      await api(buildAdminSupportTicketReadPath(id), { method: "POST", body: "{}" });
       await loadStats();
       shouldRefreshList = true;
     }
@@ -311,7 +299,7 @@ export function createAdminSupportStore({
     }));
     if (!opts.skipPush) pushTicketPath(id);
     try {
-      const res = (await api(adminSupportTicketPath(id))) as
+      const res = (await api(buildAdminSupportTicketPath(id))) as
         | AdminSupportTicketDetailResponse
         | AdminErrorResponse;
       if (res?.ok) {
@@ -327,7 +315,7 @@ export function createAdminSupportStore({
             : s
         );
         if (currentOpenedTicketId() === id) {
-          await api(adminSupportTicketReadPath(id), { method: "POST", body: "{}" });
+          await api(buildAdminSupportTicketReadPath(id), { method: "POST", body: "{}" });
           await loadStats();
           await loadList({ silent: true });
           scheduleTicketPoll(OPEN_TICKET_POLL_MS);
@@ -364,7 +352,7 @@ export function createAdminSupportStore({
     }
     try {
       const payload: TicketReplyPayload = { body, is_internal_note: internal };
-      const res = (await api(adminSupportTicketMessagesPath(current), {
+      const res = (await api(buildAdminSupportTicketMessagesPath(current), {
         method: "POST",
         body: JSON.stringify(payload),
       })) as AdminSupportTicketReplyResponse | AdminErrorResponse;
@@ -396,7 +384,7 @@ export function createAdminSupportStore({
       return s;
     });
     if (!current) return;
-    const res = (await api(adminSupportTicketPath(current), {
+    const res = (await api(buildAdminSupportTicketPath(current), {
       method: "PATCH",
       body: JSON.stringify(updates),
     })) as AdminSupportTicketPatchResponse | AdminErrorResponse;

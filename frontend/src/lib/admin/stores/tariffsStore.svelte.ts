@@ -1,5 +1,11 @@
 import { adminErrorMessage } from "../errors.js";
-import { unwrap, type ApiResponse, type GetResponse } from "../../webapp/publicApi";
+import {
+  buildAdminPanelInternalSquadsPath,
+  buildAdminTariffsPath,
+  unwrap,
+  type ApiResponse,
+  type GetResponse,
+} from "../../webapp/publicApi";
 import type { components } from "../../api/openapi.generated";
 import {
   emptyTariffDraft,
@@ -188,7 +194,7 @@ export function createTariffsStore({
     updateStore((s) => ({ ...s, tariffsLoading: true }));
     try {
       void loadPanelSquads();
-      const data = (await api("/admin/tariffs")) as TariffsResponse | AdminErrorResponse;
+      const data = (await api(buildAdminTariffsPath())) as TariffsResponse | AdminErrorResponse;
       if (isOkResponse(data)) {
         const result = unwrap(data);
         updateStore((s) => ({
@@ -212,7 +218,7 @@ export function createTariffsStore({
 
     updateStore((s) => ({ ...s, panelSquadsLoading: true }));
     try {
-      const data = (await api("/admin/panel/internal-squads")) as
+      const data = (await api(buildAdminPanelInternalSquadsPath())) as
         | GetResponse<"/api/admin/panel/internal-squads">
         | AdminErrorResponse;
       if (isOkResponse(data)) {
@@ -261,7 +267,7 @@ export function createTariffsStore({
 
     try {
       const payload: TariffsSavePayload = { catalog: nextCatalog };
-      const res = (await api("/admin/tariffs", {
+      const res = (await api(buildAdminTariffsPath(), {
         method: "PUT",
         body: JSON.stringify(payload),
       })) as TariffsSaveResponse | AdminErrorResponse;

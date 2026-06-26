@@ -158,6 +158,92 @@ export function buildSupportTicketReadPath(ticketId: string | number): SupportTi
   return `/support/tickets/${encodeURIComponent(String(ticketId))}/read` as SupportTicketReadPath;
 }
 
+export type AdminSettingsPath = "/admin/settings";
+export function buildAdminSettingsPath(): AdminSettingsPath {
+  return "/admin/settings";
+}
+
+export type AdminTariffsPath = "/admin/tariffs";
+export function buildAdminTariffsPath(): AdminTariffsPath {
+  return "/admin/tariffs";
+}
+
+export type AdminPanelInternalSquadsPath = "/admin/panel/internal-squads";
+export function buildAdminPanelInternalSquadsPath(): AdminPanelInternalSquadsPath {
+  return "/admin/panel/internal-squads";
+}
+
+export type AdminUsersPath = "/admin/users" | `/admin/users?${string}`;
+export function buildAdminUsersPath(params?: URLSearchParams): AdminUsersPath {
+  const query = params?.toString();
+  return (query ? `/admin/users?${query}` : "/admin/users") as AdminUsersPath;
+}
+
+export type AdminUserPath = "/admin/users/{user_id}";
+export function buildAdminUserPath(userId: string | number): AdminUserPath {
+  return `/admin/users/${encodeURIComponent(String(userId))}` as AdminUserPath;
+}
+
+export type AdminUsersLogsPath = "/admin/logs" | `/admin/logs?${string}`;
+export function buildAdminUserLogsPath(params?: URLSearchParams): AdminUsersLogsPath {
+  const query = params?.toString();
+  return (query ? `/admin/logs?${query}` : "/admin/logs") as AdminUsersLogsPath;
+}
+
+export type AdminUserReferralsPath =
+  | "/admin/users/{user_id}/referrals"
+  | `/admin/users/{user_id}/referrals?${string}`;
+export function buildAdminUserReferralsPath(
+  userId: string | number,
+  params?: URLSearchParams
+): AdminUserReferralsPath {
+  const base = `/admin/users/${encodeURIComponent(String(userId))}/referrals`;
+  const query = params?.toString();
+  return (query ? `${base}?${query}` : base) as AdminUserReferralsPath;
+}
+
+export type AdminUserAction =
+  | "ban"
+  | "message"
+  | "message/preview"
+  | "telegram-profile-link"
+  | "extend"
+  | "tariff"
+  | "reset-trial"
+  | "premium-override"
+  | "regular-traffic-override"
+  | "hwid-device-limit"
+  | "traffic-grant";
+export type AdminUserActionPath = `/admin/users/{user_id}/${AdminUserAction}`;
+export function buildAdminUserActionPath(
+  userId: string | number,
+  action: AdminUserAction
+): AdminUserActionPath {
+  return `/admin/users/${encodeURIComponent(String(userId))}/${action}` as AdminUserActionPath;
+}
+
+export type AdminSupportTicketsPath = "/admin/support/tickets" | `/admin/support/tickets?${string}`;
+export function buildAdminSupportTicketsPath(params: URLSearchParams): AdminSupportTicketsPath {
+  return `/admin/support/tickets?${params.toString()}` as AdminSupportTicketsPath;
+}
+
+export type AdminSupportTicketPath = "/admin/support/tickets/{id}";
+export function buildAdminSupportTicketPath(ticketId: string | number): AdminSupportTicketPath {
+  return `/admin/support/tickets/${encodeURIComponent(String(ticketId))}` as AdminSupportTicketPath;
+}
+
+export type AdminSupportTicketMessagesPath = "/admin/support/tickets/{id}/messages";
+export function buildAdminSupportTicketMessagesPath(
+  ticketId: string | number
+): AdminSupportTicketMessagesPath {
+  return `/admin/support/tickets/${encodeURIComponent(String(ticketId))}/messages` as AdminSupportTicketMessagesPath;
+}
+
+export type AdminSupportTicketReadPath = "/admin/support/tickets/{id}/read";
+export function buildAdminSupportTicketReadPath(ticketId: string | number): AdminSupportTicketReadPath {
+  return `/admin/support/tickets/${encodeURIComponent(String(ticketId))}/read` as AdminSupportTicketReadPath;
+}
+
 export function unwrap<T extends { ok: boolean }>(response: T): Extract<T, { ok: true }> {
   if (!response.ok) throw response;
   return response as Extract<T, { ok: true }>;

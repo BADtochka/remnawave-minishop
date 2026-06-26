@@ -1,7 +1,15 @@
 import { adminErrorMessage } from "../errors.js";
 import { userDisplayName } from "../users.js";
 import { withRoutePrefix } from "../../webapp/routes.js";
-import type { ApiResponse, GetResponse } from "../../webapp/publicApi";
+import {
+  buildAdminUserActionPath,
+  buildAdminUserLogsPath,
+  buildAdminUserPath,
+  buildAdminUserReferralsPath,
+  buildAdminUsersPath,
+  type ApiResponse,
+  type GetResponse,
+} from "../../webapp/publicApi";
 import type { components } from "../../api/openapi.generated";
 
 type AdminErrorResponse = { ok?: false; error?: string; message?: string; detail?: string };
@@ -372,7 +380,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
         params.set("premium_traffic", s.usersPremiumTraffic);
       }
       if (s.usersSort) params.set("sort", s.usersSort);
-      const data = (await api(`/admin/users?${params.toString()}`)) as
+      const data = (await api(buildAdminUsersPath(params))) as
         | AdminUsersListResponse
         | AdminErrorResponse;
       if (data?.ok) {
@@ -406,7 +414,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
 
     if (!opts.skipPush) _pushUserPath(userId);
     try {
-      const res = (await api(`/admin/users/${userId}`)) as
+      const res = (await api(buildAdminUserPath(userId))) as
         | AdminUserDetailResponse
         | AdminErrorResponse;
       if (res?.ok) {
@@ -444,7 +452,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     const userId = Number(snapshot?.openedUser?.user_id || 0);
     if (!userId) return null;
     const requestId = _openUserRequestId;
-    const res = (await api(`/admin/users/${userId}`)) as
+    const res = (await api(buildAdminUserPath(userId))) as
       | AdminUserDetailResponse
       | AdminErrorResponse;
     if (res?.ok) {
@@ -493,7 +501,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
         page_size: String(USER_LOGS_PAGE_SIZE),
         user_id: String(userId),
       });
-      const data = (await api(`/admin/logs?${params.toString()}`)) as
+      const data = (await api(buildAdminUserLogsPath(params))) as
         | AdminLogsResponse
         | AdminErrorResponse;
       if (data?.ok) {
@@ -538,7 +546,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
         page: String(targetPage),
         page_size: String(s.userReferralsPageSize || USERS_PAGE_SIZE),
       });
-      const data = (await api(`/admin/users/${userId}/referrals?${params.toString()}`)) as
+      const data = (await api(buildAdminUserReferralsPath(userId, params))) as
         | AdminUserReferralsResponse
         | AdminErrorResponse;
       if (data?.ok) {
@@ -611,7 +619,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     if (!openedUser) return;
     applyState((st) => ({ ...st, userActionBusy: true }));
     try {
-      const res = await api(`/admin/users/${openedUser.user_id}/ban`, {
+      const res = await api(buildAdminUserActionPath(openedUser.user_id, "ban"), {
         method: "POST",
         body: JSON.stringify({ banned }),
       });
@@ -645,7 +653,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     if (!s.openedUser || !s.userMessageDraft.trim()) return;
     applyState((st) => ({ ...st, userActionBusy: true }));
     try {
-      const res = await api(`/admin/users/${s.openedUser.user_id}/message`, {
+      const res = await api(buildAdminUserActionPath(s.openedUser.user_id, "message"), {
         method: "POST",
         body: JSON.stringify({ text: s.userMessageDraft }),
       });
@@ -678,7 +686,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     if (!s.openedUser || !s.userMessageDraft.trim()) return;
     applyState((st) => ({ ...st, userActionBusy: true }));
     try {
-      const res = await api(`/admin/users/${s.openedUser.user_id}/message/preview`, {
+      const res = await api(buildAdminUserActionPath(s.openedUser.user_id, "message/preview"), {
         method: "POST",
         body: JSON.stringify({ text: s.userMessageDraft }),
       });
@@ -701,7 +709,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     if (!s.openedUser) return;
     applyState((st) => ({ ...st, userActionBusy: true }));
     try {
-      const res = await api(`/admin/users/${s.openedUser.user_id}/telegram-profile-link`, {
+      const res = await api(buildAdminUserActionPath(s.openedUser.user_id, "telegram-profile-link"), {
         method: "POST",
       });
       if (res?.ok) {
@@ -736,7 +744,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
         extend_hwid_devices: Boolean(s.userExtendHwidDevices),
       };
       if (s.userExtendTariffKey) body.tariff_key = s.userExtendTariffKey;
-      const res = await api(`/admin/users/${s.openedUser.user_id}/extend`, {
+      const res = await api(buildAdminUserActionPath(s.openedUser.user_id, "extend"), {
         method: "POST",
         body: JSON.stringify(body),
       });
@@ -763,7 +771,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     if (!s.openedUser || !s.userTariffActionKey) return;
     applyState((st) => ({ ...st, userActionBusy: true }));
     try {
-      const res = await api(`/admin/users/${s.openedUser.user_id}/tariff`, {
+      const res = await api(buildAdminUserActionPath(s.openedUser.user_id, "tariff"), {
         method: "POST",
         body: JSON.stringify({ tariff_key: s.userTariffActionKey }),
       });
@@ -793,7 +801,9 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     if (!s.openedUser) return;
     applyState((st) => ({ ...st, userActionBusy: true }));
     try {
-      const res = await api(`/admin/users/${s.openedUser.user_id}/reset-trial`, { method: "POST" });
+      const res = await api(buildAdminUserActionPath(s.openedUser.user_id, "reset-trial"), {
+        method: "POST",
+      });
       if (res?.ok) {
         onToast(at("trial_reset", {}, "Триал сброшен"));
         await refreshOpenedUserDetail({
@@ -829,7 +839,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
         onToast(at("premium_override_invalid_bonus", {}, "Некорректное значение GB"));
         return;
       }
-      const res = await api(`/admin/users/${s.openedUser.user_id}/premium-override`, {
+      const res = await api(buildAdminUserActionPath(s.openedUser.user_id, "premium-override"), {
         method: "POST",
         body: JSON.stringify({
           unlimited: Boolean(s.premiumUnlimitedDraft),
@@ -871,7 +881,9 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
         );
         return;
       }
-      const res = await api(`/admin/users/${s.openedUser.user_id}/regular-traffic-override`, {
+      const res = await api(
+        buildAdminUserActionPath(s.openedUser.user_id, "regular-traffic-override"),
+        {
         method: "POST",
         body: JSON.stringify({
           unlimited: Boolean(s.regularUnlimitedDraft),
@@ -921,7 +933,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
           return;
         }
       }
-      const res = await api(`/admin/users/${s.openedUser.user_id}/hwid-device-limit`, {
+      const res = await api(buildAdminUserActionPath(s.openedUser.user_id, "hwid-device-limit"), {
         method: "POST",
         body: JSON.stringify({
           unlimited,
@@ -965,7 +977,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     const toastParams = { gb, user_id: userId, user };
     applyState((st) => ({ ...st, userActionBusy: true }));
     try {
-      const res = await api(`/admin/users/${s.openedUser.user_id}/traffic-grant`, {
+      const res = await api(buildAdminUserActionPath(s.openedUser.user_id, "traffic-grant"), {
         method: "POST",
         body: JSON.stringify({ kind, gb }),
       });
@@ -1008,7 +1020,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     if (!openedUser) return;
     applyState((st) => ({ ...st, userActionBusy: true }));
     try {
-      const res = await api(`/admin/users/${openedUser.user_id}`, { method: "DELETE" });
+      const res = await api(buildAdminUserPath(openedUser.user_id), { method: "DELETE" });
       if (res?.ok) {
         onToast(at("user_deleted", {}, "Удален"));
         applyState((st) => ({
