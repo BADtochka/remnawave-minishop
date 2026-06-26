@@ -1,25 +1,23 @@
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+from aiohttp import web
+from sqlalchemy.orm import sessionmaker
+
 from bot.app.web.context import (
     get_email_auth_service,
     get_session_factory,
     get_settings,
 )
+from bot.app.web.webapp_auth import create_webapp_session_token
+from bot.services.email_auth_service import EmailAuthService
+from config.settings import Settings
+from db.dal import security_dal, user_dal
+from db.models import User
 
 from ._runtime import (
-    Any,
-    Dict,
-    EmailAuthService,
-    Optional,
-    Settings,
-    User,
-    create_webapp_session_token,
-    datetime,
     json_response,
     logger,
-    security_dal,
-    sessionmaker,
-    timezone,
-    user_dal,
-    web,
 )
 from .auth_common import (
     _build_webapp_auth_response,

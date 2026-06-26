@@ -1,31 +1,32 @@
+import base64
+import hashlib
+import hmac
+import ipaddress
+import re
+import secrets
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit
+
+from aiohttp import web
+
 from bot.app.web.context import (
     get_settings,
 )
+from bot.app.web.webapp_auth import (
+    create_signed_telegram_oauth_state,
+    verify_signed_telegram_oauth_state,
+)
+from bot.services.email_auth_service import is_disposable_email
+from bot.utils.request_security import parse_ip_entries
+from bot.utils.text_sanitizer import panel_description_from_profile
+from config.settings import Settings
+from db.models import User
 
 from ._runtime import (
     WEBAPP_CSRF_COOKIE_NAME,
     WEBAPP_SESSION_COOKIE_NAME,
     WEBAPP_TELEGRAM_OAUTH_STATE_COOKIE_NAME,
-    Any,
-    Dict,
-    List,
-    Optional,
-    Settings,
-    User,
-    base64,
-    create_signed_telegram_oauth_state,
-    hashlib,
-    hmac,
-    ipaddress,
-    is_disposable_email,
     json_response,
-    panel_description_from_profile,
-    parse_ip_entries,
-    re,
-    secrets,
-    urlsplit,
-    verify_signed_telegram_oauth_state,
-    web,
 )
 
 

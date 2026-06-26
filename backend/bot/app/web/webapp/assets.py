@@ -1,3 +1,16 @@
+import asyncio
+import hmac
+import html
+import json
+import re
+import secrets
+import subprocess
+import time
+from collections import deque
+from typing import Any, Dict, Optional
+from urllib.parse import quote
+
+from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from bot.app.web.context import (
@@ -5,12 +18,17 @@ from bot.app.web.context import (
     get_i18n,
     get_settings,
 )
+from bot.app.web.webapp_auth import verify_webapp_session_token
+from bot.infra.redis import get_redis, redis_key
 from bot.middlewares.i18n import locale_language_options
+from bot.utils.request_security import request_client_ip
+from config.settings import Settings
 from config.webapp_themes_config import (
     public_theme_payload,
     public_themes_catalog_payload,
     resolve_webapp_theme_selection,
 )
+from db.dal import subscription_dal
 
 from ._runtime import (
     _APP_VERSION_CACHE,
@@ -30,28 +48,8 @@ from ._runtime import (
     WEBAPP_RATE_LIMIT_WINDOW_SECONDS,
     WEBAPP_SESSION_COOKIE_NAME,
     WEBAPP_STATE_CHANGING_METHODS,
-    Any,
-    Dict,
-    Optional,
-    Settings,
-    asyncio,
-    deque,
-    get_redis,
-    hmac,
-    html,
-    json,
     json_response,
     logger,
-    quote,
-    re,
-    redis_key,
-    request_client_ip,
-    secrets,
-    subprocess,
-    subscription_dal,
-    time,
-    verify_webapp_session_token,
-    web,
 )
 from .assets_branding import (
     _close_shared_http_session,

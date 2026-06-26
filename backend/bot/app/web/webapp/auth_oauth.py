@@ -1,31 +1,32 @@
+import base64
+import secrets
+from datetime import datetime
+from typing import Any, Dict, Optional
+from urllib.parse import urlencode
+
+from aiohttp import ClientTimeout, web
+from sqlalchemy.orm import sessionmaker
+
 from bot.app.web.context import (
     get_session_factory,
     get_settings,
 )
-
-from ._runtime import (
-    Any,
-    ClientTimeout,
-    Dict,
-    Optional,
-    Settings,
-    User,
-    UserMergeConflictError,
-    base64,
+from bot.app.web.webapp_auth import (
     create_telegram_oauth_nonce,
     create_webapp_session_token,
-    datetime,
-    json_response,
-    logger,
-    secrets,
-    sessionmaker,
-    urlencode,
-    user_dal,
     validate_telegram_login_widget_data,
     validate_telegram_oauth_id_token,
     validate_telegram_webapp_init_data,
     verify_telegram_oauth_nonce,
-    web,
+)
+from config.settings import Settings
+from db.dal import user_dal
+from db.dal.user_dal import UserMergeConflictError
+from db.models import User
+
+from ._runtime import (
+    json_response,
+    logger,
 )
 from .assets import (
     _enforce_webapp_rate_limit,

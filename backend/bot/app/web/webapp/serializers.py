@@ -1,3 +1,12 @@
+import json
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
+
+from aiohttp import web
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import sessionmaker
+
 from bot.app.web.context import (
     get_bot_username,
     get_optional_subscription_service,
@@ -11,40 +20,22 @@ from bot.app.web.webapp.auth import (
     _trial_telegram_required_reason,
     _user_has_linked_telegram,
 )
+from bot.services.referral_service import ReferralService
+from bot.services.subscription_service_impl.core import SubscriptionService
 from bot.services.telegram_notifications import (
     TELEGRAM_NOTIFICATIONS_ENABLED,
     normalize_telegram_notification_status,
     telegram_notifications_need_prompt,
     telegram_notifications_start_link,
 )
+from config.settings import Settings
 from config.subscription_guides_config import subscription_guides_available
+from config.tariffs_config import default_currency_key_for_settings, payment_currency_code
 from config.webapp_themes_config import public_themes_catalog_payload
+from db.dal import subscription_dal, support_dal, user_dal
 
 from ._runtime import (
-    Any,
-    AsyncSession,
-    Dict,
-    List,
-    Optional,
-    ReferralService,
-    Settings,
-    SubscriptionService,
-    datetime,
-    default_currency_key_for_settings,
-    json,
     logger,
-    parse_qsl,
-    payment_currency_code,
-    quote,
-    sessionmaker,
-    subscription_dal,
-    support_dal,
-    timezone,
-    urlencode,
-    urlsplit,
-    urlunsplit,
-    user_dal,
-    web,
 )
 from .assets import (
     _get_cached_webapp_settings,

@@ -1,4 +1,5 @@
-from ._runtime import security_dal, subscription_dal, user_dal
+from db.dal import security_dal, subscription_dal, user_dal
+
 from .auth_common import (
     _build_webapp_auth_response,
     _clear_telegram_oauth_state_cookie,

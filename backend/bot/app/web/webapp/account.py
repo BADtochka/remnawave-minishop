@@ -1,3 +1,10 @@
+import hashlib
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+from aiohttp import web
+from sqlalchemy.orm import sessionmaker
+
 from bot.app.web.context import (
     get_email_auth_service,
     get_i18n,
@@ -5,26 +12,18 @@ from bot.app.web.context import (
     get_settings,
 )
 from bot.app.web.webapp.cache_helpers import webapp_cached_user_payload
+from bot.app.web.webapp_auth import create_webapp_session_token
 from bot.infra import events
 from bot.infra.event_payloads import AccountEmailLinkedPayload, AccountTelegramLinkedPayload
+from bot.services.email_auth_service import EmailAuthService
+from config.settings import Settings
+from db.dal import user_dal
+from db.dal.user_dal import UserMergeConflictError
+from db.models import UserTelegramAvatar
 
 from ._runtime import (
-    Any,
-    Dict,
-    EmailAuthService,
-    Optional,
-    Settings,
-    UserMergeConflictError,
-    UserTelegramAvatar,
-    create_webapp_session_token,
-    datetime,
-    hashlib,
     json_response,
     logger,
-    sessionmaker,
-    timezone,
-    user_dal,
-    web,
 )
 from .assets import (
     _enforce_webapp_rate_limit,

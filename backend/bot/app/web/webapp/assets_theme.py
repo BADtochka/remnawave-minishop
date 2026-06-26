@@ -1,6 +1,16 @@
+import hashlib
+import html
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from urllib.parse import quote
+
+from aiohttp import web
+
 from bot.app.web.context import (
     get_settings,
 )
+from config.settings import Settings
 from config.webapp_themes_config import (
     default_webapp_theme_asset_file,
     default_webapp_theme_css_files,
@@ -16,17 +26,6 @@ from ._runtime import (
     WEBAPP_THEME_ASSET_CONTENT_TYPES,
     WEBAPP_THEME_ASSET_MAX_BYTES,
     WEBAPP_THEME_CSS_MAX_BYTES,
-    Any,
-    Dict,
-    List,
-    Optional,
-    Path,
-    Settings,
-    hashlib,
-    html,
-    quote,
-    re,
-    web,
 )
 from .assets_static import _gzip_body_cached, _request_accepts_encoding
 

@@ -1,22 +1,21 @@
 import gzip
+import hashlib
+import re
+import time
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+from aiohttp import web
 
 from bot.app.web.context import (
     get_settings,
 )
+from config.settings import Settings
 
 from ._runtime import (
     ASSET_DIR,
     ROBOTS_TX,
-    Any,
-    Dict,
-    Optional,
-    Path,
-    Settings,
-    hashlib,
     json_response,
-    re,
-    time,
-    web,
 )
 
 _TEXT_FILE_CACHE: Dict[tuple[str, bool], tuple[int, int, str]] = {}

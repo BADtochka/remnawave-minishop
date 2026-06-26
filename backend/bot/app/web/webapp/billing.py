@@ -1,6 +1,7 @@
-from db.dal import message_log_dal
+from aiohttp import web
 
-from ._runtime import payment_dal, subscription_dal, user_dal, web
+from db.dal import message_log_dal, payment_dal, subscription_dal, user_dal
+
 from .billing_common import (
     _HTML_TAG_RE,
     _TRIAL_ACTIVATION_FAILURE_STATUSES,

@@ -1,4 +1,14 @@
-from typing import TypeVar, cast
+import asyncio
+import hashlib
+import io
+import json
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple, TypeVar, cast
+
+from aiogram import Bot
+from aiohttp import web
+from pydantic import BaseModel, ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.app.web.context import (
     get_bot,
@@ -11,33 +21,16 @@ from bot.middlewares.i18n import (
     is_valid_locale_language_code,
     normalize_locale_language_code,
 )
+from config.settings import Settings
+from db.dal import user_dal
+from db.models import User, UserTelegramAvatar
 
 from ._runtime import (
     WEBAPP_TELEGRAM_AVATAR_FETCH_TIMEOUT_SECONDS,
     WEBAPP_TELEGRAM_AVATAR_MAX_BYTES,
     WEBAPP_TELEGRAM_AVATAR_REFRESH_SECONDS,
-    Any,
-    AsyncSession,
-    BaseModel,
-    Bot,
-    Dict,
-    List,
-    Optional,
-    Settings,
-    Tuple,
-    User,
-    UserTelegramAvatar,
-    ValidationError,
-    asyncio,
-    datetime,
-    hashlib,
-    io,
-    json,
     json_response,
     logger,
-    timezone,
-    user_dal,
-    web,
 )
 
 BodyModelT = TypeVar("BodyModelT", bound=BaseModel)

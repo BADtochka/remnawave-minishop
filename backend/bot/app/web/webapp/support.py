@@ -1,3 +1,8 @@
+from typing import Any, Dict
+
+from aiohttp import web
+from sqlalchemy.orm import sessionmaker
+
 from bot.app.web.context import (
     get_session_factory,
     get_support_service,
@@ -8,11 +13,7 @@ from db.dal import support_dal, user_dal
 from db.models import SupportTicket, SupportTicketMessage
 
 from ._runtime import (
-    Any,
-    Dict,
     json_response,
-    sessionmaker,
-    web,
 )
 from .common import (
     _json_error,

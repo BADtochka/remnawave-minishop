@@ -1,3 +1,9 @@
+import asyncio
+
+from aiogram import Bot, Dispatcher
+from aiohttp import web
+from sqlalchemy.orm import sessionmaker
+
 from bot.app.web.admin_api_impl.auth import (
     admin_auth_middleware,
 )
@@ -8,16 +14,9 @@ from bot.app.web.context import (
     set_service_context,
     workflow_data_for,
 )
+from bot.services.email_auth_service import EmailAuthService
+from config.settings import Settings
 
-from ._runtime import (
-    Bot,
-    Dispatcher,
-    EmailAuthService,
-    Settings,
-    asyncio,
-    sessionmaker,
-    web,
-)
 from .assets import (
     _close_shared_http_session,
     _csrf_protection_middleware,

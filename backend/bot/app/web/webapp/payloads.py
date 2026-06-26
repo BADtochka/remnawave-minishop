@@ -1,16 +1,8 @@
-from typing import Annotated, Literal, cast
+from typing import Annotated, Any, Literal, Optional, cast
 
-from pydantic import StringConstraints
+from pydantic import BaseModel, ConfigDict, EmailStr, StringConstraints, field_validator
 
-from ._runtime import (
-    Any,
-    BaseModel,
-    ConfigDict,
-    EmailStr,
-    Optional,
-    field_validator,
-    normalize_email,
-)
+from bot.services.email_auth_service import normalize_email
 
 PasswordAuthString = Annotated[str, StringConstraints(min_length=1, max_length=128)]
 PasswordSetupString = Annotated[str, StringConstraints(min_length=8, max_length=128)]

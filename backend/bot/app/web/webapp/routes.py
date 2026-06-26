@@ -1,5 +1,7 @@
 from typing import Any
 
+from aiohttp import web
+
 from bot.app.web.admin_api_impl.routes import (
     setup_admin_routes,
 )
@@ -21,7 +23,6 @@ from ._runtime import (
     WEBAPP_FAVICON_PATH,
     WEBAPP_LOGO_PROXY_PATH,
     WEBAPP_UPLOADED_LOGO_PATH,
-    web,
 )
 from .account import (
     account_avatar_route,

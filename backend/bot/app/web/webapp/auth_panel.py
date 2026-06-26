@@ -1,24 +1,21 @@
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+from aiohttp import web
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bot.app.web.context import (
     get_optional_subscription_service,
 )
+from bot.services.subscription_service_impl.core import SubscriptionService
+from bot.utils.text_sanitizer import sanitize_display_name, sanitize_username
+from config.settings import Settings
+from db.dal import subscription_dal, user_dal
+from db.dal.user_dal import UserMergeConflictError
+from db.models import User
 
 from ._runtime import (
-    Any,
-    AsyncSession,
-    Dict,
-    Optional,
-    Settings,
-    SubscriptionService,
-    User,
-    UserMergeConflictError,
-    datetime,
     logger,
-    sanitize_display_name,
-    sanitize_username,
-    subscription_dal,
-    timezone,
-    user_dal,
-    web,
 )
 from .auth_common import (
     _telegram_photo_url_value,

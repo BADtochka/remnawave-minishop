@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from ._runtime import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Settings,
+from typing import Any, Dict, List, Optional
+
+from aiohttp import web
+
+from config.settings import Settings
+from config.tariffs_config import (
     default_currency_key_for_settings,
     default_payment_currency_code_for_settings,
     payment_currency_code,
-    web,
 )
+
 from .common import (
     _format_months_title,
     _format_number_for_payload,

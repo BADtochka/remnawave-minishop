@@ -1,3 +1,8 @@
+from typing import Any, Dict
+
+from aiohttp import web
+from sqlalchemy.orm import sessionmaker
+
 from bot.app.web.context import (
     get_bot,
     get_bot_username,
@@ -10,16 +15,12 @@ from bot.services.telegram_notifications import (
     probe_telegram_notifications,
     telegram_notifications_start_link,
 )
+from config.settings import Settings
+from db.dal import user_dal
 
 from ._runtime import (
-    Any,
-    Dict,
-    Settings,
     json_response,
     logger,
-    sessionmaker,
-    user_dal,
-    web,
 )
 from .common import (
     _invalidate_webapp_user_caches,

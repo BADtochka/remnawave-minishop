@@ -1,3 +1,10 @@
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+from aiohttp import web
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import sessionmaker
+
 from bot.app.web.context import (
     get_session_factory,
     get_settings,
@@ -5,24 +12,15 @@ from bot.app.web.context import (
 )
 from bot.infra import events
 from bot.infra.event_payloads import ReferralBonusGrantedPayload
+from bot.services.subscription_service_impl.core import SubscriptionService
+from bot.utils.text_sanitizer import sanitize_display_name, sanitize_username
+from config.settings import Settings
+from db.dal import user_dal
+from db.models import User
 
 from ._runtime import (
-    Any,
-    AsyncSession,
-    Dict,
-    Optional,
-    Settings,
-    SubscriptionService,
-    User,
-    datetime,
     json_response,
     logger,
-    sanitize_display_name,
-    sanitize_username,
-    sessionmaker,
-    timezone,
-    user_dal,
-    web,
 )
 from .assets import (
     _enforce_webapp_rate_limit,

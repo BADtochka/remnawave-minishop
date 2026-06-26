@@ -1,3 +1,9 @@
+from typing import Any, Dict
+
+from aiohttp import web
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import sessionmaker
+
 from bot.app.web.context import (
     get_bot,
     get_i18n,
@@ -15,17 +21,12 @@ from bot.app.web.webapp.common import (
 )
 from bot.infra import events
 from bot.infra.event_payloads import PaymentCanceledPayload
+from db.dal import payment_dal
+from db.models import Payment
 
 from ._runtime import (
-    Any,
-    AsyncSession,
-    Dict,
-    Payment,
     json_response,
     logger,
-    payment_dal,
-    sessionmaker,
-    web,
 )
 
 

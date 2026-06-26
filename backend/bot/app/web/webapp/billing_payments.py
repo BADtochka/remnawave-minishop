@@ -1,3 +1,9 @@
+from typing import Any, Dict, Optional
+
+from aiohttp import web
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import sessionmaker
+
 from bot.app.web.context import (
     get_session_factory,
     get_settings,
@@ -12,22 +18,17 @@ from bot.app.web.webapp.common import (
 from bot.app.web.webapp.payloads import (
     WebAppPaymentCreatePayload,
 )
-
-from ._runtime import (
-    Any,
-    AsyncSession,
-    Dict,
-    Optional,
-    Settings,
-    SubscriptionService,
+from bot.services.subscription_service_impl.core import SubscriptionService
+from config.settings import Settings
+from config.tariffs_config import (
     default_currency_key_for_settings,
     default_payment_currency_code_for_settings,
-    logger,
     payment_currency_code,
-    sessionmaker,
-    subscription_dal,
-    user_dal,
-    web,
+)
+from db.dal import subscription_dal, user_dal
+
+from ._runtime import (
+    logger,
 )
 from .billing_common import _parse_positive_int_units
 from .common import (
