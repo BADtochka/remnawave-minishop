@@ -2,9 +2,37 @@ import { readCookie } from "./session.js";
 import type { paths } from "../api/openapi.generated";
 
 type HttpMethod = "get" | "put" | "post" | "delete" | "patch";
-export type ApiPath = keyof paths;
+type RawApiPath = Extract<keyof paths, string>;
+export type ApiPath = RawApiPath;
+
+type ExpandPathPath<Path extends string> = Path extends `${infer Prefix}/{${string}}${infer Suffix}`
+  ? `${Prefix}/${string}${ExpandPathPath<Suffix>}`
+  : Path;
+
+type ApiPathExpanded = {
+  [P in RawApiPath]: ExpandPathPath<P>;
+}[RawApiPath];
+
 type ApiPathFor<Path extends string> = Path extends `/api${string}` ? Path : `/api${Path}`;
-type KnownApiPath<Path extends string> = ApiPathFor<Path> & ApiPath;
+
+type StripQuery<Path extends string> = Path extends `${infer PathWithoutQuery}?${string}`
+  ? PathWithoutQuery
+  : Path;
+
+type MatchApiTemplatePath<Path extends string> = {
+  [P in RawApiPath]: Path extends ExpandPathPath<P> ? P : never;
+}[RawApiPath];
+
+type ResolvedApiPath<Path extends string> = Path extends string
+  ? MatchApiTemplatePath<StripQuery<ApiPathFor<Path>>>
+  : never;
+
+type KnownApiPath<Path extends string> = Path extends ApiPathInput ? ResolvedApiPath<Path> : never;
+
+type ApiPathInputWithApiPrefix = ApiPath | ApiPathExpanded;
+type ApiPathInputWithoutPrefix = ApiPathInputWithApiPrefix extends `/api${infer Rest}` ? Rest : never;
+type ApiPathInput = ApiPathInputWithApiPrefix | `${ApiPathInputWithApiPrefix}?${string}` | ApiPathInputWithoutPrefix | `${ApiPathInputWithoutPrefix}?${string}`;
+
 type OperationFor<Path extends string, Method extends HttpMethod> =
   KnownApiPath<Path> extends never ? never : NonNullable<paths[KnownApiPath<Path>][Method]>;
 type JsonRequestBody<Operation> = Operation extends {
@@ -81,13 +109,54 @@ type ApiClientOptions = {
 };
 
 export type ApiClient = {
-  api<Path extends string>(path: Path, options?: RequestInit): Promise<ApiResponse<Path>>;
-  publicApi<Path extends string>(
+  api<Path extends ApiPathInput>(path: Path, options?: RequestInit): Promise<ApiResponse<Path>>;
+  apiUnchecked(path: string, options?: RequestInit): Promise<Record<string, unknown>>;
+  publicApi<Path extends ApiPathInput>(
     path: Path,
     payload?: PostPayload<Path>,
     options?: Pick<RequestInit, "signal">
   ): Promise<PostResponse<Path>>;
+  publicApiUnchecked(
+    path: string,
+    payload?: Record<string, unknown>,
+    options?: Pick<RequestInit, "signal">
+  ): Promise<Record<string, unknown>>;
 };
+
+export type MePath = "/me" | "/me?fresh=1";
+export function buildMePath(fresh: boolean = false): MePath {
+  return fresh ? "/me?fresh=1" : "/me";
+}
+
+export type AdminHealthPath = "/admin/health" | "/admin/health?refresh=1";
+export function buildAdminHealthPath(refresh: boolean = false): AdminHealthPath {
+  return refresh ? "/admin/health?refresh=1" : "/admin/health";
+}
+
+export type TariffTopupOptionsPath = `/tariffs/topup-options?kind=${string}`;
+export function buildTariffTopupOptionsPath(kind: string): TariffTopupOptionsPath {
+  return `/tariffs/topup-options?kind=${encodeURIComponent(String(kind))}`;
+}
+
+export type PaymentStatusPath = `/payments/${string}`;
+export function buildPaymentStatusPath(paymentId: string | number): PaymentStatusPath {
+  return `/payments/${encodeURIComponent(String(paymentId))}` as PaymentStatusPath;
+}
+
+export type SupportTicketPath = "/support/tickets/{id}";
+export function buildSupportTicketPath(ticketId: string | number): SupportTicketPath {
+  return `/support/tickets/${encodeURIComponent(String(ticketId))}` as SupportTicketPath;
+}
+
+export type SupportTicketMessagesPath = "/support/tickets/{id}/messages";
+export function buildSupportTicketMessagesPath(ticketId: string | number): SupportTicketMessagesPath {
+  return `/support/tickets/${encodeURIComponent(String(ticketId))}/messages` as SupportTicketMessagesPath;
+}
+
+export type SupportTicketReadPath = "/support/tickets/{id}/read";
+export function buildSupportTicketReadPath(ticketId: string | number): SupportTicketReadPath {
+  return `/support/tickets/${encodeURIComponent(String(ticketId))}/read` as SupportTicketReadPath;
+}
 
 export function unwrap<T extends { ok: boolean }>(response: T): Extract<T, { ok: true }> {
   if (!response.ok) throw response;
@@ -105,11 +174,8 @@ export function createApiClient({
   const isFormDataBody = (body: BodyInit | null | undefined) =>
     typeof FormData !== "undefined" && body instanceof FormData;
 
-  async function api<Path extends string>(
-    path: Path,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<Path>> {
-    if (mockApi) return (await mockApi(path, options, getMockContext())) as ApiResponse<Path>;
+  async function requestJson(path: string, options: RequestInit = {}): Promise<Record<string, unknown>> {
+    if (mockApi) return (await mockApi(path, options, getMockContext())) as Record<string, unknown>;
 
     const method = String(options.method || "GET").toUpperCase();
     const headers = new Headers(options.headers);
@@ -129,20 +195,31 @@ export function createApiClient({
     });
     const payload = await response.json().catch(() => ({}));
     if (response.status === 401) onUnauthorized();
-    return payload as ApiResponse<Path>;
+    return payload as Record<string, unknown>;
   }
 
-  async function publicApi<Path extends string>(
+  async function api<Path extends ApiPathInput>(
     path: Path,
-    payload: PostPayload<Path> = {} as PostPayload<Path>,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<Path>> {
+    return (await requestJson(path, options)) as ApiResponse<Path>;
+  }
+
+  async function apiUnchecked(path: string, options: RequestInit = {}): Promise<Record<string, unknown>> {
+    return requestJson(path, options);
+  }
+
+  async function publicApiUnchecked(
+    path: string,
+    payload: Record<string, unknown> = {},
     options: Pick<RequestInit, "signal"> = {}
-  ): Promise<PostResponse<Path>> {
+  ): Promise<Record<string, unknown>> {
     if (mockApi) {
       return (await mockApi(
         path,
         { method: "POST", body: JSON.stringify(payload) },
         getMockContext()
-      )) as PostResponse<Path>;
+      )) as Record<string, unknown>;
     }
     const response = await fetch(`${apiBase}${path}`, {
       method: "POST",
@@ -151,8 +228,16 @@ export function createApiClient({
       signal: options.signal,
       credentials: "same-origin",
     });
-    return (await response.json()) as PostResponse<Path>;
+    return (await response.json()) as Record<string, unknown>;
   }
 
-  return { api, publicApi };
+  async function publicApi<Path extends ApiPathInput>(
+    path: Path,
+    payload: PostPayload<Path> = {} as PostPayload<Path>,
+    options: Pick<RequestInit, "signal"> = {}
+  ): Promise<PostResponse<Path>> {
+    return (await publicApiUnchecked(path, payload, options)) as PostResponse<Path>;
+  }
+
+  return { api, apiUnchecked, publicApi, publicApiUnchecked };
 }
