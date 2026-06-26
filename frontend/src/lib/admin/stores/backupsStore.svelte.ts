@@ -116,7 +116,9 @@ export function createBackupsStore({ api, onToast, at }: BackupsStoreOptions): B
   });
 
   function updateState(updater: (snapshot: BackupsStore) => BackupsStore): void {
-    Object.assign(state, updater(state));
+    const next = updater(state);
+    if (next === state) return;
+    Object.assign(state, next);
   }
 
   async function loadArchives(): Promise<void> {

@@ -122,7 +122,9 @@ export function createSettingsStore({ api, onToast, at }: SettingsStoreOptions):
   });
 
   function updateState(updater: (snapshot: SettingsStore) => SettingsStore): void {
-    Object.assign(state, updater(state));
+    const next = updater(state);
+    if (next === state) return;
+    Object.assign(state, next);
   }
 
   async function loadSettings(): Promise<void> {

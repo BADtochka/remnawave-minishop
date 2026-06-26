@@ -65,7 +65,9 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
   });
 
   function updateState(updater: (snapshot: BroadcastStore) => BroadcastStore): void {
-    Object.assign(state, updater(state));
+    const next = updater(state);
+    if (next === state) return;
+    Object.assign(state, next);
   }
 
   const BROADCAST_TARGET_OPTIONS: BroadcastTargetOption[] = [

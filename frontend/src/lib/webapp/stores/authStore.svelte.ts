@@ -129,7 +129,9 @@ export function createAuthStore({
   });
 
   function updateState(updater: (snapshot: AuthState) => AuthState): void {
-    Object.assign(state, updater(state));
+    const next = updater(state);
+    if (next === state) return;
+    Object.assign(state, next);
   }
 
   let authResendTimer: number | null = null;

@@ -158,7 +158,9 @@ export function createAccountStore({
   });
 
   function updateState(updater: (snapshot: AccountStore) => AccountStore): void {
-    Object.assign(state, updater(state));
+    const next = updater(state);
+    if (next === state) return;
+    Object.assign(state, next);
   }
 
   let linkEmailResendTimer: number | null = null;

@@ -175,7 +175,9 @@ export function createTariffsStore({
     tariffFromDraftFn(draft, defaultCurrency) as Tariff;
 
   function updateStore(updater: (snapshot: TariffsState) => TariffsState): void {
-    Object.assign(state, updater(state));
+    const next = updater(state);
+    if (next === state) return;
+    Object.assign(state, next);
   }
 
   function readState(): TariffsState {
@@ -206,12 +208,7 @@ export function createTariffsStore({
   }
 
   async function loadPanelSquads(): Promise<void> {
-    let loading = false;
-    updateStore((s) => {
-      loading = s.panelSquadsLoading;
-      return s;
-    });
-    if (loading) return;
+    if (state.panelSquadsLoading) return;
 
     updateStore((s) => ({ ...s, panelSquadsLoading: true }));
     try {
@@ -231,12 +228,7 @@ export function createTariffsStore({
   }
 
   function squadLabel(uuid: string): string {
-    let squads: PanelSquad[] = [];
-    updateStore((s) => {
-      squads = s.panelSquads;
-      return s;
-    });
-    const squad = squads.find((item) => item.uuid === uuid);
+    const squad = state.panelSquads.find((item) => item.uuid === uuid);
     return squad ? `${squad.name} · ${uuid.slice(0, 8)}…` : uuid;
   }
 
@@ -265,11 +257,7 @@ export function createTariffsStore({
 
   async function persistTariffs(nextCatalog: TariffsCatalog, successText?: string): Promise<void> {
     updateStore((s) => ({ ...s, tariffsSaving: true }));
-    let currentPath = "";
-    updateStore((s) => {
-      currentPath = s.tariffsPath;
-      return s;
-    });
+    const currentPath = state.tariffsPath;
 
     try {
       const payload: TariffsSavePayload = { catalog: nextCatalog };
@@ -465,6 +453,7 @@ export function createTariffsStore({
   }
 
   function updateState(updates: Partial<TariffsState>): void {
+    if (!Object.keys(updates).length) return;
     updateStore((s) => ({ ...s, ...updates }));
   }
 

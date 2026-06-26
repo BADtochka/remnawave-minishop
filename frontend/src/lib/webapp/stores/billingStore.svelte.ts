@@ -169,7 +169,9 @@ export function createBillingStore({
   });
 
   function updateState(updater: (snapshot: BillingState) => BillingState): void {
-    Object.assign(state, updater(state));
+    const next = updater(state);
+    if (next === state) return;
+    Object.assign(state, next);
   }
 
   let topupOptionsRequestId = 0;

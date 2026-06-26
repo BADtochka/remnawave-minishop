@@ -171,7 +171,9 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
   let _openUserRequestId = 0;
 
   function applyState(updater: (snapshot: AdminStoreState) => AdminStoreState): void {
-    Object.assign(state, updater(state));
+    const next = updater(state);
+    if (next === state) return;
+    Object.assign(state, next);
   }
 
   function _closedUserModalState(): Partial<AdminStoreState> {
@@ -1021,6 +1023,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
   }
 
   function updateState(updates: Partial<AdminStoreState>) {
+    if (!Object.keys(updates).length) return;
     Object.assign(state, updates);
   }
 

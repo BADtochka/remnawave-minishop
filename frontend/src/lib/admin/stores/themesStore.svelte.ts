@@ -281,7 +281,9 @@ export function createThemesStore({
   });
 
   function updateState(updater: (snapshot: ThemesStore) => ThemesStore): void {
-    Object.assign(state, updater(state));
+    const next = updater(state);
+    if (next === state) return;
+    Object.assign(state, next);
   }
 
   async function loadThemes(): Promise<void> {

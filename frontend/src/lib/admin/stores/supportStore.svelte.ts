@@ -202,7 +202,9 @@ export function createAdminSupportStore({
   }
 
   function updateState(updater: (snapshot: AdminSupportState) => AdminSupportState): void {
-    Object.assign(state, updater(state));
+    const next = updater(state);
+    if (next === state) return;
+    Object.assign(state, next);
   }
 
   function currentOpenedTicketId() {

@@ -148,7 +148,9 @@ export function createTranslationsStore({
   });
 
   function updateState(updater: (snapshot: TranslationsStore) => TranslationsStore): void {
-    Object.assign(state, updater(state));
+    const next = updater(state);
+    if (next === state) return;
+    Object.assign(state, next);
   }
 
   async function loadTranslations(): Promise<void> {
