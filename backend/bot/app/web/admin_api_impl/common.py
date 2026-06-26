@@ -42,6 +42,21 @@ def _error(status: int, code: str, message: str = "") -> web.Response:
     )
 
 
+def _error_payload(
+    status: int,
+    code: str,
+    *,
+    errors: Dict[str, Any] | None = None,
+    message: str = "",
+) -> web.Response:
+    body: Dict[str, Any] = {"ok": False, "error": code}
+    if message:
+        body["message"] = message
+    if errors:
+        body["errors"] = errors
+    return web.json_response(body, status=status)
+
+
 _PANEL_LAST_CONNECTED_KEYS = (
     "onlineAt",
     "online_at",

@@ -32,6 +32,7 @@ from .auth import (
 )
 from .common import (
     _error,
+    _error_payload,
     _ok,
 )
 from .webapp_runtime import refresh_webapp_runtime_after_settings_change
@@ -143,9 +144,11 @@ async def admin_settings_patch_route(request: web.Request) -> web.Response:
         actor_id=actor_id,
     )
     if not result.get("ok"):
-        return web.json_response(
-            {"ok": False, "error": "validation_failed", "errors": result.get("errors", {})},
-            status=400,
+        return _error_payload(
+            400,
+            "validation_failed",
+            errors=result.get("errors", {}),
+            message=result.get("message", "Validation failed"),
         )
 
     await refresh_webapp_runtime_after_settings_change(request, updates=updates, deletes=deletes)

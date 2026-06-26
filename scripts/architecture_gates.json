@@ -1,0 +1,47 @@
+{
+  "module_size": {
+    "max_lines": 1000,
+    "scopes": [
+      "backend/bot",
+      "backend/config",
+      "backend/db",
+      "frontend/src"
+    ],
+    "extensions": [
+      ".py",
+      ".ts",
+      ".svelte",
+      ".js"
+    ],
+    "allowlist": [
+      "backend/bot/app/web/templates/*.js",
+      "backend/db/migrator.py",
+      "frontend/src/lib/api/openapi.generated.ts",
+      "frontend/src/lib/webapp/demoDataset.js",
+      "frontend/src/lib/webapp/mockApi.js",
+      "frontend/src/lib/webapp/previewMock.js",
+      "frontend/src/lib/admin/stores/usersStore.svelte.ts",
+      "frontend/src/webapp/screens/InstallGuideScreen.svelte"
+    ]
+  },
+  "type_ignore": {
+    "scopes": [
+      "backend/bot",
+      "backend/config"
+    ],
+    "allowlist": {
+      "backend/config/settings.py": 1,
+      "backend/config/webapp_themes_config.py": 1,
+      "backend/bot/app/controllers/dispatcher_controller.py": 1,
+      "backend/bot/services/panel_api_service.py": 1
+    }
+  },
+  "raw_json_response": {
+    "scopes": [
+      "backend/bot/app/web/admin_api_impl"
+    ],
+    "allowlist": [
+      "backend/bot/app/web/admin_api_impl/common.py"
+    ]
+  }
+}

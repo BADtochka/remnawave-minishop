@@ -35,6 +35,7 @@ from .auth import (
 )
 from .common import (
     _error,
+    _ok,
 )
 
 TicketBodyString = Annotated[str, StringConstraints(min_length=1, max_length=4000)]
@@ -202,9 +203,8 @@ async def admin_support_tickets_route(request: web.Request) -> web.Response:
             limit=limit,
             offset=offset,
         )
-    return web.json_response(
+    return _ok(
         {
-            "ok": True,
             "tickets": [
                 {
                     **_support_ticket_payload(ticket),
@@ -233,9 +233,8 @@ async def admin_support_ticket_detail_route(request: web.Request) -> web.Respons
             author = await user_dal.get_user_by_id(session, author_id)
             if author:
                 authors[author_id] = author
-    return web.json_response(
+    return _ok(
         {
-            "ok": True,
             "ticket": {
                 **_support_ticket_payload(ticket),
                 "user": _admin_support_user_payload(user),
@@ -266,9 +265,8 @@ async def admin_support_ticket_reply_route(request: web.Request) -> web.Response
     async_session_factory: sessionmaker = get_session_factory(request)
     async with async_session_factory() as session:
         admin = await user_dal.get_user_by_id(session, admin_id)
-    return web.json_response(
+    return _ok(
         {
-            "ok": True,
             "ticket": _support_ticket_payload(ticket),
             "message": _support_message_payload(
                 message, authors={admin_id: admin} if admin else {}
@@ -304,14 +302,14 @@ async def admin_support_ticket_patch_route(request: web.Request) -> web.Response
             )
     except TicketNotFound:
         return _error(404, "not_found", "Ticket not found")
-    return web.json_response({"ok": True, "ticket": _support_ticket_payload(ticket)})
+    return _ok({"ticket": _support_ticket_payload(ticket)})
 
 
 async def admin_support_ticket_read_route(request: web.Request) -> web.Response:
     _require_admin_user_id(request)
     ticket_id = int(request.match_info["id"])
     await get_support_service(request).mark_read_as_admin(ticket_id)
-    return web.json_response({"ok": True})
+    return _ok({})
 
 
 async def admin_support_stats_route(request: web.Request) -> web.Response:
@@ -319,4 +317,4 @@ async def admin_support_stats_route(request: web.Request) -> web.Response:
     async_session_factory: sessionmaker = get_session_factory(request)
     async with async_session_factory() as session:
         stats = await support_dal.admin_stats(session)
-    return web.json_response({"ok": True, "stats": stats})
+    return _ok({"stats": stats})
