@@ -1,14 +1,17 @@
 import asyncio
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from yookassa import Configuration
 from yookassa import Payment as YooKassaPayment
 from yookassa.domain.common.confirmation_type import ConfirmationType
 from yookassa.domain.request.payment_request_builder import PaymentRequestBuilder
 
-from bot.services.subscription_service_impl.core import SubscriptionService
+if TYPE_CHECKING:
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    SubscriptionService = object
 from config.settings import Settings
 
 from ..base import (

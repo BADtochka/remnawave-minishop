@@ -5,15 +5,20 @@ import hmac
 import json
 import logging
 import time
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from aiohttp import ClientError, web
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from bot.middlewares.i18n import JsonI18n
-from bot.services.referral_service import ReferralService
-from bot.services.subscription_service_impl.core import SubscriptionService
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
 from config.settings import Settings
 from db.dal import payment_dal, user_billing_dal
 

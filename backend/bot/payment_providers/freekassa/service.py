@@ -5,7 +5,7 @@ import json
 import logging
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 from urllib.parse import parse_qsl
 
 from aiogram import Bot, F, Router, types
@@ -16,8 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from bot.middlewares.i18n import JsonI18n
-from bot.services.referral_service import ReferralService
-from bot.services.subscription_service_impl.core import SubscriptionService
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
 from bot.utils.request_security import ip_in_allowlist, request_client_ip
 from config.settings import Settings
 from config.tariffs_config import (

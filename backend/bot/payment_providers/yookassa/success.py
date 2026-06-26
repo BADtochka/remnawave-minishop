@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from aiogram import Bot
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,8 +18,13 @@ from bot.infra.payment_events import build_payment_succeeded_payload
 from bot.middlewares.i18n import JsonI18n
 from bot.services.lknpd_service import LknpdService
 from bot.services.panel_api_service import PanelApiService
-from bot.services.referral_service import ReferralService
-from bot.services.subscription_service_impl.core import SubscriptionService
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
 from bot.utils.config_link import prepare_config_links
 from bot.utils.install_links import ensure_user_install_guide_links
 from config.settings import Settings

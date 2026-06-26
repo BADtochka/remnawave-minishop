@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 
 from aiogram import Bot
 from aiohttp import web
@@ -15,8 +15,13 @@ from bot.infra.webhook_queue import enqueue_webhook_event
 from bot.middlewares.i18n import JsonI18n
 from bot.services.lknpd_service import LknpdService
 from bot.services.panel_api_service import PanelApiService
-from bot.services.referral_service import ReferralService
-from bot.services.subscription_service_impl.core import SubscriptionService
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
 from bot.services.user_email_notifications import send_user_notification_email
 from bot.utils.request_security import ip_in_allowlist, request_client_ip
 from config.settings import Settings

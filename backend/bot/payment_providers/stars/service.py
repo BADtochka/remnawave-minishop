@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from aiogram import Bot, F, Router, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
@@ -9,8 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.inline.user_keyboards import payment_methods_back_callback
 from bot.middlewares.i18n import JsonI18n
-from bot.services.referral_service import ReferralService
-from bot.services.subscription_service_impl.core import SubscriptionService
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
 from bot.utils.callback_answer import callback_message_or_none
 from config.settings import Settings
 from db.dal import payment_dal

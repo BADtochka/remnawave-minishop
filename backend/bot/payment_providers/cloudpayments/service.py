@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import base64
 import hashlib
 import hmac
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qsl, unquote_plus
 
 from aiogram import Bot, F, Router, types
@@ -13,8 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from bot.middlewares.i18n import JsonI18n
-from bot.services.referral_service import ReferralService
-from bot.services.subscription_service_impl.core import SubscriptionService
 from bot.utils.request_security import ip_in_allowlist, request_client_ip
 from config.settings import Settings
 from config.tariffs_config import (
@@ -65,6 +65,10 @@ from ..shared import (
 )
 from ..shared.app_context import app_optional, app_required
 from .manifest import _CONFIG_MANIFEST, _PRESENTATION_MANIFEST
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
 
 _LOG = "cloudpayments"
 

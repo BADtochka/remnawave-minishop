@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Protocol
 
 from aiogram import Bot
 from sqlalchemy import text
@@ -11,14 +11,32 @@ from bot.middlewares.i18n import JsonI18n
 from config.settings import Settings
 from db.dal import payment_dal, subscription_dal, user_dal
 
-from .subscription_service import SubscriptionService
+
+class _SubscriptionServiceLike(Protocol):
+    async def has_active_subscription(self, session: Any, user_id: int) -> bool: ...
+
+    async def _get_or_create_panel_user_link_details(
+        self,
+        session: Any,
+        user_id: int,
+        user_model: Any,
+    ) -> tuple[Optional[str], Optional[int], Optional[int], Optional[int]]: ...
+
+    async def extend_active_subscription_days(
+        self,
+        session: Any,
+        user_id: int,
+        bonus_days: int,
+        reason: str,
+    ) -> Optional[datetime]:
+        ...
 
 
 class ReferralService:
     def __init__(
         self,
         settings: Settings,
-        subscription_service: SubscriptionService,
+        subscription_service: _SubscriptionServiceLike,
         bot: Bot,
         i18n: JsonI18n,
     ):
