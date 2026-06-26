@@ -5615,9 +5615,11 @@ export interface operations {
         };
         content: {
           "application/json": {
+            /** @description Runtime Mini App config assembled from settings and theme catalog. */
             config: {
               [key: string]: unknown;
             };
+            /** @description Locale dictionary keyed by language and translation key. */
             i18n: {
               [key: string]: unknown;
             };
@@ -5700,13 +5702,84 @@ export interface operations {
         };
         content: {
           "application/json": {
+            current_limit?: number | null;
+            extra_hwid_devices?: number;
+            extra_hwid_devices_valid_until?: string | null;
+            extra_hwid_devices_valid_until_text?: string | null;
             /** @constant */
             ok: true;
             plans?: {
-              [key: string]: unknown;
+              billing_model?: string;
+              currency?: string;
+              description?: string;
+              device_count?: number;
+              hwid_device_limit?: number | null;
+              hwid_device_packages?: {
+                billing_model?: string;
+                currency?: string;
+                device_count?: number;
+                id?: string;
+                months?: number;
+                price?: number;
+                sale_mode?: string;
+                stars_price?: number;
+                subtitle?: string;
+                tariff_key?: string;
+                tariff_name?: string;
+                title?: string;
+              }[];
+              hwid_renewal?: {
+                active_until?: string | null;
+                active_until_text?: string | null;
+                available?: boolean;
+                currency?: string;
+                device_count?: number;
+                price?: number;
+                pricing_period_months?: number;
+                stars_price?: number;
+                valid_from?: string | null;
+                valid_from_text?: string | null;
+                valid_until?: string | null;
+                valid_until_text?: string | null;
+              };
+              id?: string;
+              is_default_tariff?: boolean;
+              monthly_gb?: number | null;
+              months?: number;
+              price?: number;
+              proration_ratio?: number;
+              sale_mode?: string;
+              squad_uuids?: string[];
+              stars_price?: number;
+              subtitle?: string;
+              tariff_key?: string;
+              tariff_name?: string;
+              title?: string;
+              traffic_gb?: number;
+              valid_from?: string | null;
+              valid_from_text?: string | null;
+              valid_until?: string | null;
+              valid_until_text?: string | null;
             }[];
+            premium_baseline_bytes?: number;
+            premium_bonus_bytes?: number;
+            premium_is_limited?: boolean;
+            premium_limit_bytes?: number;
+            premium_node_labels?: string[];
+            premium_squad_labels?: string[];
+            premium_title?: string;
+            premium_topup_balance_bytes?: number;
+            premium_topup_used_bytes?: number;
+            premium_traffic_percent?: number;
+            premium_unlimited_override?: boolean;
+            premium_used_bytes?: number;
+            renewal_available?: boolean;
+            renewal_recommended_count?: number;
             tariff_key?: string;
             tariff_name?: string;
+            topup_kind?: string;
+            traffic_percent?: number;
+            warning_levels?: number[];
           };
         };
       };
@@ -5728,6 +5801,7 @@ export interface operations {
         };
         content: {
           "application/json": {
+            /** @description Locale dictionary keyed by language and translation key. */
             i18n: {
               [key: string]: unknown;
             };
@@ -5757,6 +5831,206 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
+            payment_methods: {
+              currency?: string;
+              icon?: string;
+              id?: string;
+              min_amount?: number;
+              minimum_amount?: number;
+              minimum_amount_text?: string;
+              name?: string;
+            }[];
+            plans: {
+              billing_model?: string;
+              currency?: string;
+              description?: string;
+              device_count?: number;
+              hwid_device_limit?: number | null;
+              hwid_device_packages?: {
+                billing_model?: string;
+                currency?: string;
+                device_count?: number;
+                id?: string;
+                months?: number;
+                price?: number;
+                sale_mode?: string;
+                stars_price?: number;
+                subtitle?: string;
+                tariff_key?: string;
+                tariff_name?: string;
+                title?: string;
+              }[];
+              hwid_renewal?: {
+                active_until?: string | null;
+                active_until_text?: string | null;
+                available?: boolean;
+                currency?: string;
+                device_count?: number;
+                price?: number;
+                pricing_period_months?: number;
+                stars_price?: number;
+                valid_from?: string | null;
+                valid_from_text?: string | null;
+                valid_until?: string | null;
+                valid_until_text?: string | null;
+              };
+              id?: string;
+              is_default_tariff?: boolean;
+              monthly_gb?: number | null;
+              months?: number;
+              price?: number;
+              proration_ratio?: number;
+              sale_mode?: string;
+              squad_uuids?: string[];
+              stars_price?: number;
+              subtitle?: string;
+              tariff_key?: string;
+              tariff_name?: string;
+              title?: string;
+              traffic_gb?: number;
+              valid_from?: string | null;
+              valid_from_text?: string | null;
+              valid_until?: string | null;
+              valid_until_text?: string | null;
+            }[];
+            referral: {
+              bonus_details?: {
+                details?: {
+                  [key: string]: unknown;
+                }[];
+                friend_days?: number;
+                friend_max_days?: number;
+                friend_min_days?: number;
+                id?: string;
+                inviter_days?: number;
+                inviter_max_days?: number;
+                inviter_min_days?: number;
+                months?: number;
+                tariff_key?: string;
+                tariff_name?: string;
+                title?: string;
+                type?: string;
+              }[];
+              bot_link?: string | null;
+              code?: string | null;
+              invited_count?: number;
+              one_bonus_per_referee?: boolean;
+              purchased_count?: number;
+              webapp_link?: string | null;
+              welcome_bonus_block_reason?: string | null;
+              welcome_bonus_days?: number;
+              welcome_bonus_requires_telegram?: boolean;
+              welcome_bonus_without_telegram_enabled?: boolean;
+            };
+            settings: {
+              email_auth_enabled?: boolean;
+              my_devices_enabled?: boolean;
+              server_status_url?: string | null;
+              subscription_guides_enabled?: boolean;
+              subscription_purchase_description?: string;
+              support_ticket_max_body_length?: number;
+              support_ticket_max_subject_length?: number;
+              support_tickets_enabled?: boolean;
+              support_url?: string | null;
+              traffic_mode?: boolean;
+              trial_available?: boolean;
+              trial_block_reason?: string | null;
+              trial_duration_days?: number;
+              trial_enabled?: boolean;
+              trial_requires_telegram?: boolean;
+              trial_traffic_limit_gb?: number;
+              trial_traffic_strategy?: string;
+              trial_without_telegram_enabled?: boolean;
+              user_hwid_device_limit?: number | null;
+            };
+            subscription: {
+              active?: boolean;
+              auto_renew_available?: boolean;
+              auto_renew_can_enable?: boolean;
+              auto_renew_enabled?: boolean;
+              auto_renew_provider_label?: string | null;
+              base_hwid_device_limit?: number | null;
+              billing_model?: string | null;
+              can_topup_devices?: boolean;
+              can_topup_premium_traffic?: boolean;
+              can_topup_regular_traffic?: boolean;
+              can_topup_traffic?: boolean;
+              config_link?: string | null;
+              connect_url?: string | null;
+              days_left?: number;
+              device_topup_renewal_available?: boolean;
+              end_date?: string | null;
+              end_date_text?: string | null;
+              extra_hwid_devices?: number;
+              extra_hwid_devices_next_valid_from?: string | null;
+              extra_hwid_devices_valid_until?: string | null;
+              extra_hwid_devices_valid_until_text?: string | null;
+              install_share_token?: string | null;
+              install_share_url?: string | null;
+              is_throttled?: boolean;
+              max_devices?: number | null;
+              panel_short_uuid?: string | null;
+              period_start_at?: string | null;
+              premium_baseline_bytes?: number | null;
+              premium_bonus_bytes?: number;
+              premium_is_limited?: boolean;
+              premium_limit?: string;
+              premium_limit_bytes?: number | null;
+              premium_node_labels?: string[];
+              premium_squad_labels?: string[];
+              premium_title?: string | null;
+              premium_topup_balance_bytes?: number | null;
+              premium_topup_used_bytes?: number | null;
+              premium_unlimited_override?: boolean;
+              premium_used?: string;
+              premium_used_bytes?: number | null;
+              provider?: string | null;
+              regular_bonus_bytes?: number;
+              regular_unlimited_override?: boolean;
+              remaining_text?: string;
+              status?: string;
+              tariff_description?: string | null;
+              tariff_key?: string | null;
+              tariff_name?: string | null;
+              tier_baseline_bytes?: number | null;
+              topup_balance_bytes?: number | null;
+              traffic_limit?: string;
+              traffic_limit_bytes?: number | null;
+              traffic_limit_strategy?: string;
+              traffic_used?: string;
+              traffic_used_bytes?: number | null;
+            };
+            support_unread_count: number;
+            themes_catalog: {
+              default_theme?: string;
+              themes?: ({
+                default?: boolean;
+                enabled?: boolean;
+                key?: string;
+                label?: string;
+              } & {
+                [key: string]: unknown;
+              })[];
+            } & {
+              [key: string]: unknown;
+            };
+            user: {
+              email?: string | null;
+              email_verified?: boolean;
+              first_name?: string | null;
+              id?: number;
+              is_admin?: boolean;
+              language_code?: string;
+              password_auth_enabled?: boolean;
+              telegram_id?: number | null;
+              telegram_linked?: boolean;
+              telegram_notifications_enabled?: boolean;
+              telegram_notifications_need_prompt?: boolean;
+              telegram_notifications_start_link?: string | null;
+              telegram_notifications_status?: string;
+              telegram_photo_url?: string;
+              username?: string | null;
+            };
           };
         };
       };
@@ -5786,6 +6060,7 @@ export interface operations {
             /** @constant */
             ok: true;
             paid?: boolean;
+            /** @description Provider-specific payment payload returned by the selected integration. */
             payment?: {
               [key: string]: unknown;
             };
@@ -5819,6 +6094,7 @@ export interface operations {
             /** @constant */
             ok: true;
             paid?: boolean;
+            /** @description Provider-specific payment payload returned by the selected integration. */
             payment?: {
               [key: string]: unknown;
             };
@@ -5901,6 +6177,7 @@ export interface operations {
         };
         content: {
           "application/json": {
+            /** @description Resolved subscription guide config from admin override or panel. */
             config?: {
               [key: string]: unknown;
             };
@@ -5931,6 +6208,7 @@ export interface operations {
         };
         content: {
           "application/json": {
+            /** @description Resolved subscription guide config from admin override or panel. */
             config?: {
               [key: string]: unknown;
             };
@@ -5938,6 +6216,7 @@ export interface operations {
             /** @constant */
             ok: true;
             source?: string | null;
+            /** @description Public install subscription context resolved by share token. */
             subscription?: {
               [key: string]: unknown;
             };
@@ -6158,9 +6437,8 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-            subscription?: {
-              [key: string]: unknown;
-            };
+            subscription_id: number;
+            tariff_key: string;
           };
         };
       };
@@ -6183,12 +6461,38 @@ export interface operations {
         content: {
           "application/json": {
             current: {
-              [key: string]: unknown;
+              billing_model: string;
+              description: string;
+              tariff_key: string;
+              title: string;
             };
             /** @constant */
             ok: true;
             targets: {
-              [key: string]: unknown;
+              actions: {
+                converted_gb?: number;
+                converted_hwid_days?: number;
+                converted_hwid_gb?: number;
+                converted_hwid_value_rub?: number;
+                currency?: string;
+                days_after?: number;
+                kind?: string;
+                mode?: string;
+                months?: number;
+                price?: number;
+                remaining_days?: number;
+                title?: string;
+                traffic_gb?: number;
+              }[];
+              billing_model: string;
+              description: string;
+              monthly_gb?: number | null;
+              /** @description Raw switch calculation details from the subscription service. */
+              options?: {
+                [key: string]: unknown;
+              };
+              tariff_key: string;
+              title: string;
             }[];
           };
         };
@@ -6219,6 +6523,7 @@ export interface operations {
             /** @constant */
             ok: true;
             paid?: boolean;
+            /** @description Provider-specific payment payload returned by the selected integration. */
             payment?: {
               [key: string]: unknown;
             };
@@ -6246,13 +6551,84 @@ export interface operations {
         };
         content: {
           "application/json": {
+            current_limit?: number | null;
+            extra_hwid_devices?: number;
+            extra_hwid_devices_valid_until?: string | null;
+            extra_hwid_devices_valid_until_text?: string | null;
             /** @constant */
             ok: true;
             plans?: {
-              [key: string]: unknown;
+              billing_model?: string;
+              currency?: string;
+              description?: string;
+              device_count?: number;
+              hwid_device_limit?: number | null;
+              hwid_device_packages?: {
+                billing_model?: string;
+                currency?: string;
+                device_count?: number;
+                id?: string;
+                months?: number;
+                price?: number;
+                sale_mode?: string;
+                stars_price?: number;
+                subtitle?: string;
+                tariff_key?: string;
+                tariff_name?: string;
+                title?: string;
+              }[];
+              hwid_renewal?: {
+                active_until?: string | null;
+                active_until_text?: string | null;
+                available?: boolean;
+                currency?: string;
+                device_count?: number;
+                price?: number;
+                pricing_period_months?: number;
+                stars_price?: number;
+                valid_from?: string | null;
+                valid_from_text?: string | null;
+                valid_until?: string | null;
+                valid_until_text?: string | null;
+              };
+              id?: string;
+              is_default_tariff?: boolean;
+              monthly_gb?: number | null;
+              months?: number;
+              price?: number;
+              proration_ratio?: number;
+              sale_mode?: string;
+              squad_uuids?: string[];
+              stars_price?: number;
+              subtitle?: string;
+              tariff_key?: string;
+              tariff_name?: string;
+              title?: string;
+              traffic_gb?: number;
+              valid_from?: string | null;
+              valid_from_text?: string | null;
+              valid_until?: string | null;
+              valid_until_text?: string | null;
             }[];
+            premium_baseline_bytes?: number;
+            premium_bonus_bytes?: number;
+            premium_is_limited?: boolean;
+            premium_limit_bytes?: number;
+            premium_node_labels?: string[];
+            premium_squad_labels?: string[];
+            premium_title?: string;
+            premium_topup_balance_bytes?: number;
+            premium_topup_used_bytes?: number;
+            premium_traffic_percent?: number;
+            premium_unlimited_override?: boolean;
+            premium_used_bytes?: number;
+            renewal_available?: boolean;
+            renewal_recommended_count?: number;
             tariff_key?: string;
             tariff_name?: string;
+            topup_kind?: string;
+            traffic_percent?: number;
+            warning_levels?: number[];
           };
         };
       };

@@ -203,3 +203,89 @@ def setup_routes(app):
     assert result == 1
     assert "[route-contracts]" in output
     assert "/api/profile" in output
+
+
+def test_route_contract_guard_accepts_decentralized_contracts(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    config = _base_config()
+    config["route_contracts"] = {
+        "route_setup_scopes": ["backend/bot/app/web/webapp/routes.py"],
+        "contract_scopes": ["backend/bot/app/web/webapp"],
+        "path_allowlist": [],
+    }
+    _write(
+        tmp_path,
+        "backend/bot/app/web/webapp/routes.py",
+        """
+async def profile_route(request):
+    return None
+
+
+def setup_routes(app):
+    app.router.add_get("/api/profile", profile_route)
+""",
+    )
+    _write(
+        tmp_path,
+        "backend/bot/app/web/webapp/profile_contracts.py",
+        'PROFILE_ROUTE_CONTRACTS = {"profile_route": object()}\n',
+    )
+
+    result, output = _run_check(tmp_path, monkeypatch, capsys, config)
+
+    assert result == 0
+    assert "Architecture checks passed." in output
+
+
+def test_loose_schema_guard_rejects_unexplained_loose_contracts(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    config = _base_config()
+    config["loose_schemas"] = {
+        "scopes": ["backend/bot/app/web/webapp"],
+        "allowlist": {},
+    }
+    _write(
+        tmp_path,
+        "backend/bot/app/web/webapp/profile_contracts.py",
+        "from bot.app.web.route_contracts import loose_object_schema\n"
+        "PROFILE_ROUTE_CONTRACTS = {'profile_route': loose_object_schema()}\n",
+    )
+
+    result, output = _run_check(tmp_path, monkeypatch, capsys, config)
+
+    assert result == 1
+    assert "[loose-schema]" in output
+    assert "profile_contracts.py" in output
+
+
+def test_loose_schema_guard_requires_non_empty_reasons(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    config = _base_config()
+    config["loose_schemas"] = {
+        "scopes": ["backend/bot/app/web/webapp"],
+        "allowlist": {
+            "backend/bot/app/web/webapp/profile_contracts.py": {
+                "loose_object_schema": [""],
+            }
+        },
+    }
+    _write(
+        tmp_path,
+        "backend/bot/app/web/webapp/profile_contracts.py",
+        "from bot.app.web.route_contracts import loose_object_schema\n"
+        "PROFILE_ROUTE_CONTRACTS = {'profile_route': loose_object_schema()}\n",
+    )
+
+    result, output = _run_check(tmp_path, monkeypatch, capsys, config)
+
+    assert result == 1
+    assert "reason #1 is empty" in output

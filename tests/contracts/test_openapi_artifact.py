@@ -108,3 +108,33 @@ def test_live_api_routes_are_registered_in_contracts():
 
     undocumented_contracts = sorted(handler for handler in contracts if handler not in api_handlers)
     assert undocumented_contracts == []
+
+
+def _schema_has_ok_envelope(schema: dict) -> bool:
+    properties = schema.get("properties")
+    if isinstance(properties, dict) and "ok" in properties:
+        return True
+
+    all_of = schema.get("allOf")
+    if isinstance(all_of, list):
+        return any(isinstance(item, dict) and _schema_has_ok_envelope(item) for item in all_of)
+
+    return False
+
+
+def test_openapi_json_responses_use_ok_envelope():
+    document = json.loads(DEFAULT_OUTPUT_PATH.read_text(encoding="utf-8"))
+    missing = []
+
+    for path, methods in document["paths"].items():
+        for method, operation in methods.items():
+            response = operation["responses"]["200"]
+            content = response.get("content", {})
+            json_response = content.get("application/json")
+            if not json_response:
+                continue
+            schema = json_response.get("schema", {})
+            if not isinstance(schema, dict) or not _schema_has_ok_envelope(schema):
+                missing.append(f"{method.upper()} {path}")
+
+    assert missing == []

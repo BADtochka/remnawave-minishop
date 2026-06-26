@@ -291,6 +291,64 @@ def _check_raw_json_response(cfg: dict, issues: list[str]) -> None:
                 issues.append(f"[raw-json-response] {rel}: uses web.json_response directly")
 
 
+def _check_loose_schemas(cfg: dict, issues: list[str]) -> None:
+    checks = cfg.get("loose_schemas")
+    if not checks:
+        return
+
+    pattern = re.compile(r"\b(?P<helper>loose_(?:object|array)_schema)\s*\(")
+    allowlist = checks.get("allowlist", {})
+    allowed_counts: dict[str, dict[str, int]] = {}
+
+    for rel, helper_entries in allowlist.items():
+        if not isinstance(helper_entries, dict):
+            issues.append(f"[loose-schema] {rel}: allowlist entry must map helper names to reasons")
+            continue
+
+        allowed_counts[rel] = {}
+        for helper_name, reasons in helper_entries.items():
+            if helper_name not in {"loose_object_schema", "loose_array_schema"}:
+                issues.append(f"[loose-schema] {rel}: unknown helper {helper_name}")
+                continue
+            if not isinstance(reasons, list) or not reasons:
+                issues.append(f"[loose-schema] {rel}: {helper_name} allowlist must include reasons")
+                continue
+            for idx, reason in enumerate(reasons, 1):
+                if not isinstance(reason, str) or not reason.strip():
+                    issues.append(f"[loose-schema] {rel}: {helper_name} reason #{idx} is empty")
+            allowed_counts[rel][helper_name] = len(reasons)
+
+    actual_counts: dict[str, dict[str, int]] = {}
+    for scope in checks.get("scopes", []):
+        for file in _iter_text_files(scope, {".py"}):
+            rel = _to_posix(file)
+            content = file.read_text(encoding="utf-8", errors="ignore")
+            for match in pattern.finditer(content):
+                helper_name = match.group("helper")
+                actual_counts.setdefault(rel, {}).setdefault(helper_name, 0)
+                actual_counts[rel][helper_name] += 1
+
+    for rel, helper_counts in sorted(actual_counts.items()):
+        for helper_name, actual in sorted(helper_counts.items()):
+            allowed = allowed_counts.get(rel, {}).get(helper_name, 0)
+            if actual > allowed:
+                issues.append(
+                    f"[loose-schema] {rel}: found {actual} {helper_name} calls, "
+                    f"allowed {allowed}; add typed schema or an allowlist reason"
+                )
+            elif actual < allowed:
+                issues.append(
+                    f"[loose-schema] {rel}: allowlist permits {allowed} {helper_name} calls, "
+                    f"but only {actual} remain"
+                )
+
+    for rel, helper_counts in sorted(allowed_counts.items()):
+        actual_helpers = actual_counts.get(rel, {})
+        for helper_name, allowed in sorted(helper_counts.items()):
+            if actual_helpers.get(helper_name, 0) == 0 and allowed:
+                issues.append(f"[loose-schema] {rel}: allowlist entry for {helper_name} is stale")
+
+
 def _check_frontend_weak_typing(cfg: dict, issues: list[str]) -> None:
     checks = cfg.get("frontend_weak_typing")
     if not checks:
@@ -535,6 +593,7 @@ def main() -> int:
     _check_module_size(config, issues)
     _check_type_ignores(config, issues)
     _check_raw_json_response(config, issues)
+    _check_loose_schemas(config, issues)
     _check_frontend_weak_typing(config, issues)
     _check_frontend_api_calls(config, issues)
     _check_runtime_all_exports(config, issues)
