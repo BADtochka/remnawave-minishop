@@ -10363,6 +10363,6 @@
   },
   "x-generated-from": {
     "plugins": "core+builtin only",
-    "router": "bot.app.web.subscription_webapp.setup_subscription_webapp_routes"
+    "router": "bot.app.web.webapp.routes.setup_subscription_webapp_routes"
   }
 }
