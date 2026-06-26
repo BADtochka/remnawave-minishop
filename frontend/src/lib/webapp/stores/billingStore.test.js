@@ -1,4 +1,3 @@
-import { get } from "svelte/store";
 import { describe, expect, it, vi } from "vitest";
 
 import { createBillingStore } from "./billingStore.ts";
@@ -43,7 +42,7 @@ describe("billingStore", () => {
       { selectDefaultTariff: true, preferCheckout: true }
     );
 
-    expect(get(store)).toMatchObject({
+    expect(store).toMatchObject({
       paymentModalOpen: true,
       paymentStep: "checkout",
       selectedTariffKey: "pro",
@@ -69,7 +68,7 @@ describe("billingStore", () => {
 
     await vi.waitFor(() => expect(billing.fetchTopupOptions).toHaveBeenCalledWith("premium"));
     await vi.waitFor(() =>
-      expect(get(store)).toMatchObject({
+      expect(store).toMatchObject({
         topupModalOpen: true,
         topupKind: "premium",
         selectedMethod: "card",
@@ -101,7 +100,7 @@ describe("billingStore", () => {
     });
     expect(deps.showToast).toHaveBeenCalledWith("wa_tariff_change_applied");
     expect(deps.loadData).toHaveBeenCalled();
-    expect(get(store)).toMatchObject({
+    expect(store).toMatchObject({
       changeConfirmOpen: false,
       changeModalOpen: false,
       changeOptions: null,

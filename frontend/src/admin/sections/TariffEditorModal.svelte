@@ -21,70 +21,61 @@
   type ComponentCallback = (...args: never[]) => void;
   type DraftRow = Record<string, string | number | undefined>;
 
-  export let at: TranslateFn;
+  let { at }: { at: TranslateFn } = $props();
   const tariffsStore = getContext<TariffsStore>("tariffsStore");
 
-  let tariffEditorOpen = false;
-  let tariffEditingKey = "";
-  let tariffDraft: TariffDraft;
-  let tariffsSaving = false;
-  let tariffDeleteOpen = false;
-  let tariffDeleteTarget: Tariff | null = null;
-  let panelSquadsLoading = false;
-  let panelSquads: PanelSquad[] = [];
-  let tariffsCatalog: TariffsCatalog;
-  let billingModelOptions: SelectOption[] = [];
-  let panelSquadOptions: SelectOption[] = [];
-  let defaultCurrencyKey = "rub";
-  let defaultCurrencyCode = "RUB";
-  let currencyPriceColumnLabel = "";
-  let currencyPriceAriaLabel = "";
-  let conversionCurrencyLabel = "";
+  const tariffsState = $derived(tariffsStore);
+  const tariffEditorOpen = $derived(Boolean(tariffsState.tariffEditorOpen));
+  const tariffEditingKey = $derived(String(tariffsState.tariffEditingKey || ""));
+  const tariffDraft: TariffDraft = $derived(tariffsState.tariffDraft);
+  const tariffsSaving = $derived(Boolean(tariffsState.tariffsSaving));
+  const tariffDeleteOpen = $derived(Boolean(tariffsState.tariffDeleteOpen));
+  const tariffDeleteTarget: Tariff | null = $derived(tariffsState.tariffDeleteTarget);
+  const panelSquadsLoading = $derived(Boolean(tariffsState.panelSquadsLoading));
+  const panelSquads: PanelSquad[] = $derived(tariffsState.panelSquads || []);
+  const tariffsCatalog: TariffsCatalog = $derived(tariffsState.tariffsCatalog);
 
-  $: ({
-    tariffEditorOpen,
-    tariffEditingKey,
-    tariffDraft,
-    tariffsSaving,
-    tariffDeleteOpen,
-    tariffDeleteTarget,
-    panelSquadsLoading,
-    panelSquads,
-    tariffsCatalog,
-  } = $tariffsStore);
-
-  $: billingModelOptions = [
+  const billingModelOptions: SelectOption[] = $derived([
     { value: "period", label: at("tariff_model_period_label", {}, "Период") },
     { value: "traffic", label: at("tariff_model_traffic_label", {}, "Трафик") },
-  ];
-  $: panelSquadOptions = (panelSquads || []).map((squad) => ({
-    value: squad.uuid,
-    label: squad.name,
-  }));
-  $: defaultCurrencyKey = normalizeCurrencyKey(tariffsCatalog?.default_currency || "rub") as string;
-  $: defaultCurrencyCode = defaultCurrencyKey.toUpperCase();
-  $: currencyPriceColumnLabel = at(
-    "tariff_col_price_currency",
-    { currency: defaultCurrencyCode },
-    `Цена, ${defaultCurrencyCode}`
+  ]);
+  const panelSquadOptions: SelectOption[] = $derived(
+    (panelSquads || []).map((squad) => ({
+      value: squad.uuid,
+      label: squad.name,
+    }))
   );
-  $: currencyPriceAriaLabel = at(
-    "tariff_label_price_currency",
-    { currency: defaultCurrencyCode },
-    `Цена в ${defaultCurrencyCode}`
+  const defaultCurrencyKey = $derived(
+    normalizeCurrencyKey(tariffsCatalog?.default_currency || "rub") as string
   );
-  $: conversionCurrencyLabel = at(
-    "tariff_label_conversion_currency",
-    { currency: defaultCurrencyCode },
-    `Курс конвертации, ${defaultCurrencyCode} за 1 GB`
+  const defaultCurrencyCode = $derived(defaultCurrencyKey.toUpperCase());
+  const currencyPriceColumnLabel = $derived(
+    at(
+      "tariff_col_price_currency",
+      { currency: defaultCurrencyCode },
+      `Цена, ${defaultCurrencyCode}`
+    )
+  );
+  const currencyPriceAriaLabel = $derived(
+    at(
+      "tariff_label_price_currency",
+      { currency: defaultCurrencyCode },
+      `Цена в ${defaultCurrencyCode}`
+    )
+  );
+  const conversionCurrencyLabel = $derived(
+    at(
+      "tariff_label_conversion_currency",
+      { currency: defaultCurrencyCode },
+      `Курс конвертации, ${defaultCurrencyCode} за 1 GB`
+    )
   );
   function addDraftSquad(field: DraftSquadField, value: string): void {
     tariffsStore.addSquadToDraft(field, value);
-    tariffsStore.update((state) => ({
-      ...state,
-      selectedBaseSquad: field === "squadUuids" ? "" : state.selectedBaseSquad,
-      selectedPremiumSquad: field === "premiumSquadUuids" ? "" : state.selectedPremiumSquad,
-    }));
+    tariffsStore.updateState({
+      selectedBaseSquad: field === "squadUuids" ? "" : tariffsStore.selectedBaseSquad,
+      selectedPremiumSquad: field === "premiumSquadUuids" ? "" : tariffsStore.selectedPremiumSquad,
+    });
   }
 
   const addBaseSquad = ((value: string) => addDraftSquad("squadUuids", value)) as ComponentCallback;
@@ -122,7 +113,7 @@
   onclose={() => tariffsStore.updateState({ tariffEditorOpen: false })}
   class="admin-dialog admin-tariff-dialog"
 >
-  <Tabs.Root bind:value={$tariffsStore.tariffEditorTab} class="admin-tabs-root">
+  <Tabs.Root bind:value={tariffsStore.tariffEditorTab} class="admin-tabs-root">
     <Tabs.List class="admin-tabs-list">
       <Tabs.Trigger value="general" class="admin-tabs-trigger"
         >{at("tariff_tab_general", {}, "Основное")}</Tabs.Trigger
@@ -156,7 +147,7 @@
             class="input"
             type="text"
             placeholder="standard"
-            bind:value={$tariffsStore.tariffDraft.key}
+            bind:value={tariffsStore.tariffDraft.key}
           />
         </Label.Root>
 
@@ -174,7 +165,7 @@
             )}</small
           >
           <AdminSelect
-            bind:value={$tariffsStore.tariffDraft.billing_model}
+            bind:value={tariffsStore.tariffDraft.billing_model}
             items={billingModelOptions}
             ariaLabel={at("tariff_label_model", {}, "Модель")}
           />
@@ -212,7 +203,7 @@
             class="input"
             type="text"
             placeholder={at("tariff_placeholder_name_ru", {}, "Стандарт")}
-            bind:value={$tariffsStore.tariffDraft.nameRu}
+            bind:value={tariffsStore.tariffDraft.nameRu}
           />
         </Label.Root>
         <Label.Root class="admin-field-label">
@@ -221,7 +212,7 @@
             class="input"
             type="text"
             placeholder={at("tariff_placeholder_name_en", {}, "Standard")}
-            bind:value={$tariffsStore.tariffDraft.nameEn}
+            bind:value={tariffsStore.tariffDraft.nameEn}
           />
         </Label.Root>
       </div>
@@ -233,7 +224,7 @@
             class="input"
             type="text"
             placeholder={at("tariff_placeholder_desc_ru", {}, "Базовый набор серверов")}
-            bind:value={$tariffsStore.tariffDraft.descriptionRu}
+            bind:value={tariffsStore.tariffDraft.descriptionRu}
           />
         </Label.Root>
         <Label.Root class="admin-field-label">
@@ -242,7 +233,7 @@
             class="input"
             type="text"
             placeholder={at("tariff_placeholder_desc_en", {}, "Base server pool")}
-            bind:value={$tariffsStore.tariffDraft.descriptionEn}
+            bind:value={tariffsStore.tariffDraft.descriptionEn}
           />
         </Label.Root>
       </div>
@@ -259,7 +250,7 @@
               )}</small
         >
         <AdminSelect
-          bind:value={$tariffsStore.selectedBaseSquad}
+          bind:value={tariffsStore.selectedBaseSquad}
           items={panelSquadOptions}
           placeholder={at("btn_add_squad", {}, "Добавить сквад")}
           ariaLabel={at("btn_add_squad", {}, "Добавить основной сквад")}
@@ -270,7 +261,7 @@
             <button
               type="button"
               class="admin-chip"
-              on:click={() => tariffsStore.removeSquadFromDraft("squadUuids", uuid)}
+              onclick={() => tariffsStore.removeSquadFromDraft("squadUuids", uuid)}
             >
               {tariffsStore.squadLabel(uuid)}
               <X size={12} />
@@ -294,7 +285,7 @@
             type="number"
             min="0"
             placeholder="5"
-            bind:value={$tariffsStore.tariffDraft.hwid_device_limit}
+            bind:value={tariffsStore.tariffDraft.hwid_device_limit}
           />
         </Label.Root>
         {#if tariffDraft.billing_model === "period"}
@@ -313,7 +304,7 @@
               min="0"
               step="0.1"
               placeholder="100"
-              bind:value={$tariffsStore.tariffDraft.monthly_gb}
+              bind:value={tariffsStore.tariffDraft.monthly_gb}
             />
           </Label.Root>
         {:else}
@@ -332,7 +323,7 @@
               min="0"
               step="0.01"
               placeholder="20"
-              bind:value={$tariffsStore.tariffDraft.conversion_rate_rub_per_gb}
+              bind:value={tariffsStore.tariffDraft.conversion_rate_rub_per_gb}
             />
           </Label.Root>
         {/if}
@@ -369,7 +360,7 @@
               class="input"
               type="text"
               placeholder={at("tariff_placeholder_premium_name_ru", {}, "Premium-серверы")}
-              bind:value={$tariffsStore.tariffDraft.premiumNameRu}
+              bind:value={tariffsStore.tariffDraft.premiumNameRu}
             />
           </Label.Root>
           <Label.Root class="admin-field-label">
@@ -385,7 +376,7 @@
               class="input"
               type="text"
               placeholder={at("tariff_placeholder_premium_name_en", {}, "Premium servers")}
-              bind:value={$tariffsStore.tariffDraft.premiumNameEn}
+              bind:value={tariffsStore.tariffDraft.premiumNameEn}
             />
           </Label.Root>
         </div>
@@ -400,7 +391,7 @@
               )}</small
             >
             <AdminSelect
-              bind:value={$tariffsStore.selectedPremiumSquad}
+              bind:value={tariffsStore.selectedPremiumSquad}
               items={panelSquadOptions}
               placeholder={at("btn_add_premium_squad", {}, "Добавить premium-сквад")}
               ariaLabel={at("btn_add_premium_squad", {}, "Добавить premium-сквад")}
@@ -411,7 +402,7 @@
                 <button
                   type="button"
                   class="admin-chip"
-                  on:click={() => tariffsStore.removeSquadFromDraft("premiumSquadUuids", uuid)}
+                  onclick={() => tariffsStore.removeSquadFromDraft("premiumSquadUuids", uuid)}
                 >
                   {tariffsStore.squadLabel(uuid)}
                   <X size={12} />
@@ -440,7 +431,7 @@
               min="0"
               step="0.1"
               placeholder="50"
-              bind:value={$tariffsStore.tariffDraft.premium_monthly_gb}
+              bind:value={tariffsStore.tariffDraft.premium_monthly_gb}
             />
           </Label.Root>
         </div>
@@ -480,46 +471,46 @@
               class="admin-row-editor-line admin-row-editor-drag"
               handleLabel={at("tariff_package_reorder", {}, "Перетащите, чтобы изменить порядок")}
               onReorder={movePremiumTopupRow}
-              let:item={row}
-              let:index
             >
-              <Input
-                class="input"
-                type="number"
-                min="0.1"
-                step="0.1"
-                placeholder="10"
-                bind:value={row.gb}
-                aria-label={at("tariff_col_volume_gb", {}, "Объём premium-пакета в GB")}
-              />
-              <Input
-                class="input"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="199"
-                bind:value={row.price}
-                aria-label={currencyPriceAriaLabel}
-              />
-              <Input
-                class="input"
-                type="number"
-                min="0"
-                step="1"
-                placeholder="100"
-                bind:value={row.stars}
-                aria-label={at(
-                  "tariff_label_price_stars",
-                  {},
-                  "Цена premium-пакета в Telegram Stars"
-                )}
-              />
-              <AdminButton
-                size="sm"
-                variant="danger"
-                onclick={() => tariffsStore.removeDraftRow("premiumTopupRows", index)}
-                aria-label={at("btn_delete", {}, "Удалить")}><Trash2 size={13} /></AdminButton
-              >
+              {#snippet children(row: DraftRow, index: number)}
+                <Input
+                  class="input"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  placeholder="10"
+                  bind:value={row.gb}
+                  aria-label={at("tariff_col_volume_gb", {}, "Объём premium-пакета в GB")}
+                />
+                <Input
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="199"
+                  bind:value={row.price}
+                  aria-label={currencyPriceAriaLabel}
+                />
+                <Input
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="100"
+                  bind:value={row.stars}
+                  aria-label={at(
+                    "tariff_label_price_stars",
+                    {},
+                    "Цена premium-пакета в Telegram Stars"
+                  )}
+                />
+                <AdminButton
+                  size="sm"
+                  variant="danger"
+                  onclick={() => tariffsStore.removeDraftRow("premiumTopupRows", index)}
+                  aria-label={at("btn_delete", {}, "Удалить")}><Trash2 size={13} /></AdminButton
+                >
+              {/snippet}
             </Sortable>
           </div>
         {/if}
@@ -579,61 +570,61 @@
                 class="admin-row-editor-line admin-row-editor-period"
                 handleLabel={at("tariff_period_reorder", {}, "Перетащите, чтобы изменить порядок")}
                 onReorder={movePeriodRow}
-                let:item={row}
-                let:index
               >
-                <Input
-                  class="input"
-                  type="number"
-                  min="1"
-                  placeholder="1"
-                  bind:value={row.months}
-                  aria-label={at("tariff_col_period_months", {}, "Срок (месяцы)")}
-                />
-                <Input
-                  class="input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="299"
-                  bind:value={row.rub}
-                  aria-label={currencyPriceAriaLabel}
-                />
-                <Input
-                  class="input"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="150"
-                  bind:value={row.stars}
-                  aria-label={at("tariff_label_price_stars", {}, "Цена в Telegram Stars")}
-                />
-                <Input
-                  class="input"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="3"
-                  bind:value={row.referral_inviter}
-                  aria-label={at("tariff_label_ref_inviter", {}, "Бонус приглашающему")}
-                />
-                <Input
-                  class="input"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="1"
-                  bind:value={row.referral_referee}
-                  aria-label={at("tariff_label_ref_referee", {}, "Бонус приглашённому")}
-                />
-                <AdminButton
-                  size="sm"
-                  variant="danger"
-                  onclick={() => tariffsStore.removeDraftRow("periodRows", index)}
-                  aria-label={at("btn_delete", {}, "Удалить")}
-                >
-                  <Trash2 size={13} />
-                </AdminButton>
+                {#snippet children(row: DraftRow, index: number)}
+                  <Input
+                    class="input"
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    bind:value={row.months}
+                    aria-label={at("tariff_col_period_months", {}, "Срок (месяцы)")}
+                  />
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="299"
+                    bind:value={row.rub}
+                    aria-label={currencyPriceAriaLabel}
+                  />
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="150"
+                    bind:value={row.stars}
+                    aria-label={at("tariff_label_price_stars", {}, "Цена в Telegram Stars")}
+                  />
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="3"
+                    bind:value={row.referral_inviter}
+                    aria-label={at("tariff_label_ref_inviter", {}, "Бонус приглашающему")}
+                  />
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="1"
+                    bind:value={row.referral_referee}
+                    aria-label={at("tariff_label_ref_referee", {}, "Бонус приглашённому")}
+                  />
+                  <AdminButton
+                    size="sm"
+                    variant="danger"
+                    onclick={() => tariffsStore.removeDraftRow("periodRows", index)}
+                    aria-label={at("btn_delete", {}, "Удалить")}
+                  >
+                    <Trash2 size={13} />
+                  </AdminButton>
+                {/snippet}
               </Sortable>
             </div>
           {/if}
@@ -673,42 +664,42 @@
                 class="admin-row-editor-line admin-row-editor-drag"
                 handleLabel={at("tariff_package_reorder", {}, "Перетащите, чтобы изменить порядок")}
                 onReorder={moveTrafficRow}
-                let:item={row}
-                let:index
               >
-                <Input
-                  class="input"
-                  type="number"
-                  min="0.1"
-                  step="0.1"
-                  placeholder="50"
-                  bind:value={row.gb}
-                  aria-label={at("tariff_col_volume_gb", {}, "Объём пакета в GB")}
-                />
-                <Input
-                  class="input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="299"
-                  bind:value={row.price}
-                  aria-label={currencyPriceAriaLabel}
-                />
-                <Input
-                  class="input"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="150"
-                  bind:value={row.stars}
-                  aria-label={at("tariff_label_price_stars", {}, "Цена пакета в Telegram Stars")}
-                />
-                <AdminButton
-                  size="sm"
-                  variant="danger"
-                  onclick={() => tariffsStore.removeDraftRow("trafficRows", index)}
-                  aria-label={at("btn_delete", {}, "Удалить")}><Trash2 size={13} /></AdminButton
-                >
+                {#snippet children(row: DraftRow, index: number)}
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    placeholder="50"
+                    bind:value={row.gb}
+                    aria-label={at("tariff_col_volume_gb", {}, "Объём пакета в GB")}
+                  />
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="299"
+                    bind:value={row.price}
+                    aria-label={currencyPriceAriaLabel}
+                  />
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="150"
+                    bind:value={row.stars}
+                    aria-label={at("tariff_label_price_stars", {}, "Цена пакета в Telegram Stars")}
+                  />
+                  <AdminButton
+                    size="sm"
+                    variant="danger"
+                    onclick={() => tariffsStore.removeDraftRow("trafficRows", index)}
+                    aria-label={at("btn_delete", {}, "Удалить")}><Trash2 size={13} /></AdminButton
+                  >
+                {/snippet}
               </Sortable>
             </div>
           {/if}
@@ -754,42 +745,42 @@
                 class="admin-row-editor-line admin-row-editor-drag"
                 handleLabel={at("tariff_package_reorder", {}, "Перетащите, чтобы изменить порядок")}
                 onReorder={moveTopupRow}
-                let:item={row}
-                let:index
               >
-                <Input
-                  class="input"
-                  type="number"
-                  min="0.1"
-                  step="0.1"
-                  placeholder="20"
-                  bind:value={row.gb}
-                  aria-label={at("tariff_col_volume_gb", {}, "Объём пакета в GB")}
-                />
-                <Input
-                  class="input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="149"
-                  bind:value={row.price}
-                  aria-label={currencyPriceAriaLabel}
-                />
-                <Input
-                  class="input"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="75"
-                  bind:value={row.stars}
-                  aria-label={at("tariff_label_price_stars", {}, "Цена пакета в Telegram Stars")}
-                />
-                <AdminButton
-                  size="sm"
-                  variant="danger"
-                  onclick={() => tariffsStore.removeDraftRow("topupRows", index)}
-                  aria-label={at("btn_delete", {}, "Удалить")}><Trash2 size={13} /></AdminButton
-                >
+                {#snippet children(row: DraftRow, index: number)}
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    placeholder="20"
+                    bind:value={row.gb}
+                    aria-label={at("tariff_col_volume_gb", {}, "Объём пакета в GB")}
+                  />
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="149"
+                    bind:value={row.price}
+                    aria-label={currencyPriceAriaLabel}
+                  />
+                  <Input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="75"
+                    bind:value={row.stars}
+                    aria-label={at("tariff_label_price_stars", {}, "Цена пакета в Telegram Stars")}
+                  />
+                  <AdminButton
+                    size="sm"
+                    variant="danger"
+                    onclick={() => tariffsStore.removeDraftRow("topupRows", index)}
+                    aria-label={at("btn_delete", {}, "Удалить")}><Trash2 size={13} /></AdminButton
+                  >
+                {/snippet}
               </Sortable>
             </div>
           {/if}
@@ -846,46 +837,46 @@
               class="admin-row-editor-line admin-row-editor-drag"
               handleLabel={at("tariff_package_reorder", {}, "Перетащите, чтобы изменить порядок")}
               onReorder={moveHwidRow}
-              let:item={row}
-              let:index
             >
-              <Input
-                class="input"
-                type="number"
-                min="1"
-                step="1"
-                placeholder="1"
-                bind:value={row.count}
-                aria-label={at(
-                  "tariff_label_hwid_count_full",
-                  {},
-                  "Сколько устройств добавляет пакет"
-                )}
-              />
-              <Input
-                class="input"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="99"
-                bind:value={row.price}
-                aria-label={currencyPriceAriaLabel}
-              />
-              <Input
-                class="input"
-                type="number"
-                min="0"
-                step="1"
-                placeholder="50"
-                bind:value={row.stars}
-                aria-label={at("tariff_label_price_stars", {}, "Цена пакета в Telegram Stars")}
-              />
-              <AdminButton
-                size="sm"
-                variant="danger"
-                onclick={() => tariffsStore.removeDraftRow("hwidRows", index)}
-                aria-label={at("btn_delete", {}, "Удалить")}><Trash2 size={13} /></AdminButton
-              >
+              {#snippet children(row: DraftRow, index: number)}
+                <Input
+                  class="input"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="1"
+                  bind:value={row.count}
+                  aria-label={at(
+                    "tariff_label_hwid_count_full",
+                    {},
+                    "Сколько устройств добавляет пакет"
+                  )}
+                />
+                <Input
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="99"
+                  bind:value={row.price}
+                  aria-label={currencyPriceAriaLabel}
+                />
+                <Input
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="50"
+                  bind:value={row.stars}
+                  aria-label={at("tariff_label_price_stars", {}, "Цена пакета в Telegram Stars")}
+                />
+                <AdminButton
+                  size="sm"
+                  variant="danger"
+                  onclick={() => tariffsStore.removeDraftRow("hwidRows", index)}
+                  aria-label={at("btn_delete", {}, "Удалить")}><Trash2 size={13} /></AdminButton
+                >
+              {/snippet}
             </Sortable>
           </div>
         {/if}

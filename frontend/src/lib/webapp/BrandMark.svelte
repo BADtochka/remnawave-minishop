@@ -1,17 +1,10 @@
 <script>
-  import { onDestroy } from "svelte";
-
   import { cn } from "../utils.js";
   import { normalizeBrand } from "./browser.js";
 
   const LOGO_LOAD_TIMEOUT_MS = 10000;
 
-  export let brand = {};
-  export let logoUrl = "";
-  export let size = "sm";
-  export let animate = false;
-  let className = "";
-  export { className as class };
+  let { brand = {}, logoUrl = "", size = "sm", animate = false, class: className = "" } = $props();
 
   const SIZE_CLASSES = {
     sm: "",
@@ -20,29 +13,32 @@
     xl: "brand-mark-xl",
   };
 
-  let loaded = false;
-  let failed = false;
-  let lastLogoUrl = "";
+  let loaded = $state(false);
+  let failed = $state(false);
+  let lastLogoUrl = $state("");
   let logoLoadTimer = null;
   let logoLoadTimerUrl = "";
 
-  $: normalizedBrand = normalizeBrand({
-    ...brand,
-    logoUrl: logoUrl || brand?.logoUrl,
-  });
-  $: normalizedLogoUrl = normalizedBrand.logoUrl;
-  $: sizeClass = SIZE_CLASSES[size] || "";
+  const normalizedBrand = $derived(
+    normalizeBrand({
+      ...brand,
+      logoUrl: logoUrl || brand?.logoUrl,
+    })
+  );
+  const normalizedLogoUrl = $derived(normalizedBrand.logoUrl);
+  const sizeClass = $derived(SIZE_CLASSES[size] || "");
 
-  $: if (normalizedLogoUrl !== lastLogoUrl) {
-    lastLogoUrl = normalizedLogoUrl;
-    loaded = false;
-    failed = false;
-  }
-  $: if (normalizedLogoUrl && !loaded && !failed) armLogoLoadTimeout();
-  $: if (!normalizedLogoUrl || loaded || failed) clearLogoLoadTimeout();
+  $effect(() => {
+    if (normalizedLogoUrl !== lastLogoUrl) {
+      lastLogoUrl = normalizedLogoUrl;
+      loaded = false;
+      failed = false;
+    }
 
-  onDestroy(() => {
-    clearLogoLoadTimeout();
+    if (normalizedLogoUrl && !loaded && !failed) armLogoLoadTimeout();
+    if (!normalizedLogoUrl || loaded || failed) clearLogoLoadTimeout();
+
+    return clearLogoLoadTimeout;
   });
 
   function clearLogoLoadTimeout() {
@@ -86,11 +82,11 @@
       loading="eager"
       decoding="async"
       fetchpriority="high"
-      on:load={() => {
+      onload={() => {
         loaded = true;
         clearLogoLoadTimeout();
       }}
-      on:error={() => {
+      onerror={() => {
         failed = true;
         clearLogoLoadTimeout();
       }}

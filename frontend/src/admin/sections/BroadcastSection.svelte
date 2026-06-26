@@ -8,37 +8,32 @@
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 
-  export let at: TranslateFn;
+  let { at }: { at: TranslateFn } = $props();
   const broadcastStore = getContext<BroadcastStore>("broadcastStore");
 
-  let broadcastTarget = "all";
-  let broadcastText = "";
-  let broadcastBusy = false;
-  let broadcastResult: { queued: number; failed: number } | null = null;
-  let broadcastCounts: Record<string, number> | null = null;
-  let broadcastCountsLoading = false;
-  const handleTargetChange = ((value: string) => {
+  const broadcastTarget = $derived(broadcastStore.broadcastTarget);
+  const broadcastText = $derived(broadcastStore.broadcastText);
+  const broadcastBusy = $derived(broadcastStore.broadcastBusy);
+  const broadcastResult = $derived(
+    broadcastStore.broadcastResult as { queued: number; failed: number } | null
+  );
+  const broadcastCounts = $derived(broadcastStore.broadcastCounts as Record<string, number> | null);
+  const broadcastCountsLoading = $derived(Boolean(broadcastStore.broadcastCountsLoading));
+  const handleTargetChange = (value: string) => {
     broadcastStore.updateField({ broadcastTarget: value });
-  }) as () => void;
-
-  $: ({
-    broadcastTarget,
-    broadcastText,
-    broadcastBusy,
-    broadcastResult,
-    broadcastCounts,
-    broadcastCountsLoading,
-  } = $broadcastStore);
+  };
 
   const BROADCAST_TARGET_OPTIONS = broadcastStore.BROADCAST_TARGET_OPTIONS;
 
   // Append the resolved audience size to each option once counts are loaded.
-  $: targetOptions = BROADCAST_TARGET_OPTIONS.map((option) => {
-    const count = broadcastCounts?.[option.value];
-    if (count != null) return { ...option, label: `${option.label} (${count})` };
-    if (broadcastCountsLoading) return { ...option, label: `${option.label} (...)` };
-    return option;
-  });
+  const targetOptions = $derived(
+    BROADCAST_TARGET_OPTIONS.map((option) => {
+      const count = broadcastCounts?.[option.value];
+      if (count != null) return { ...option, label: `${option.label} (${count})` };
+      if (broadcastCountsLoading) return { ...option, label: `${option.label} (...)` };
+      return option;
+    })
+  );
 
   onMount(() => {
     broadcastStore.loadCounts();
@@ -68,7 +63,7 @@
           class="admin-textarea"
           rows={6}
           value={broadcastText}
-          on:input={(e) =>
+          oninput={(e) =>
             broadcastStore.updateField({
               broadcastText: (e.currentTarget as HTMLTextAreaElement).value,
             })}

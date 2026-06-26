@@ -1,5 +1,6 @@
 import { createTelegramLaunch } from "./telegramLaunch.js";
 import { createTelegramSdk } from "./telegramSdk.js";
+import { shellState } from "./shellState.svelte";
 
 export type TelegramWebApp = Record<string, unknown> & {
   initData?: string;
@@ -44,19 +45,25 @@ export function createTelegramRuntime<Tg = TelegramWebApp | null>({
   createSdk = createTelegramSdk as unknown as CreateTelegramSdk<Tg>,
   miniAppAuthTimeoutMs,
   scriptUrl,
-  setInitData,
-  setStatus,
-  setTelegram,
 }: {
   actionTimeoutMs: number;
   bootTimeoutMs: number;
   createSdk?: CreateTelegramSdk<Tg>;
   miniAppAuthTimeoutMs: number;
   scriptUrl: string;
-  setInitData: (initData: string) => void;
-  setStatus: (status: string) => void;
-  setTelegram: (telegram: Tg) => void;
 }): TelegramRuntime<Tg> {
+  function setInitData(initData: string) {
+    shellState.telegramMiniAppInitData = initData || "";
+  }
+
+  function setStatus(status: string) {
+    shellState.telegramSdkStatus = status;
+  }
+
+  function setTelegram(telegram: Tg) {
+    shellState.tg = telegram as TelegramWebApp | null;
+  }
+
   const telegramSdk = createSdk({
     scriptUrl,
     bootTimeoutMs,

@@ -419,6 +419,25 @@ class Settings(SettingsComputedMixin, SettingsValidationMixin, BaseSettings):
         default="production",
         description="Runtime profile: production, development, staging or test.",
     )
+    QA_AUTH_ENABLED: bool = Field(
+        default=False,
+        description=(
+            "Expose email verification codes through the public auth API in "
+            "development/test runtimes for full-stack QA."
+        ),
+    )
+    QA_PAYMENT_ENABLED: bool = Field(
+        default=False,
+        description="Enable the signed local QA payment provider in development/test runtimes.",
+    )
+    QA_PAYMENT_ADMIN_ONLY_ENABLED: bool = Field(
+        default=False,
+        description="Expose the local QA payment provider to admin users only.",
+    )
+    QA_PAYMENT_SECRET: str = Field(
+        default="",
+        description="HMAC secret used by the local QA payment webhook.",
+    )
     PANEL_WRITE_MODE: str = Field(
         default="auto",
         description=(

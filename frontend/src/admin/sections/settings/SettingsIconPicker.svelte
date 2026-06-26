@@ -9,18 +9,33 @@
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type DynamicComponent = ComponentType<SvelteComponent<Record<string, unknown>>>;
 
-  export let at: TranslateFn;
-  export let iconPickerField: AdminSettingField | null = null;
-  export let iconPickerSearch = "";
-  export let filteredIconOptions: readonly string[] = [];
-  export let fieldLabelText: (field: AdminSettingField) => string;
-  export let iconComponent: (name: unknown) => DynamicComponent | null;
-  export let iconValue: (field: AdminSettingField | null) => string;
-  export let iconLabel: (field: AdminSettingField | null) => string;
-  export let iconIsDefault: (field: AdminSettingField) => boolean;
-  export let closeIconPicker: () => void;
-  export let clearIconPickerField: () => void;
-  export let selectIcon: (name: string) => void;
+  let {
+    at,
+    iconPickerField = null,
+    iconPickerSearch = $bindable(""),
+    filteredIconOptions = [],
+    fieldLabelText,
+    iconComponent,
+    iconValue,
+    iconLabel,
+    iconIsDefault,
+    closeIconPicker,
+    clearIconPickerField,
+    selectIcon,
+  }: {
+    at: TranslateFn;
+    iconPickerField?: AdminSettingField | null;
+    iconPickerSearch?: string;
+    filteredIconOptions?: readonly string[];
+    fieldLabelText: (field: AdminSettingField) => string;
+    iconComponent: (name: unknown) => DynamicComponent | null;
+    iconValue: (field: AdminSettingField | null) => string;
+    iconLabel: (field: AdminSettingField | null) => string;
+    iconIsDefault: (field: AdminSettingField) => boolean;
+    closeIconPicker: () => void;
+    clearIconPickerField: () => void;
+    selectIcon: (name: string) => void;
+  } = $props();
 </script>
 
 <Dialog
@@ -38,7 +53,7 @@
       <div class="admin-icon-picker-current">
         <span class="admin-icon-picker-current-preview" aria-hidden="true">
           {#if CurrentIcon}
-            <svelte:component this={CurrentIcon} size={24} />
+            <CurrentIcon size={24} />
           {/if}
         </span>
         <span class="admin-icon-picker-current-meta">
@@ -75,7 +90,7 @@
             onclick={() => selectIcon(iconName)}
           >
             {#if Icon}
-              <svelte:component this={Icon} size={18} />
+              <Icon size={18} />
             {/if}
             <span>{iconName}</span>
           </button>

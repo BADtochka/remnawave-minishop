@@ -24,41 +24,73 @@
   type UserDetail = Record<string, unknown> & {
     active_subscription?: SubscriptionDetail | null;
   };
+  type Props = {
+    at: TranslateFn;
+    openedUser?: AdminUser | null;
+    openedUserDetail?: UserDetail | null;
+    userActionBusy?: boolean;
+    userMessageDraft?: string;
+    extendTariffItems?: SelectOption[];
+    extendTariffsLoading?: boolean;
+    userExtendDaysValid?: boolean;
+    userExtendTariffValid?: boolean;
+    extendTariffRequired?: boolean;
+    selectExtendTariff: ComponentCallback;
+    periodTariffItems?: SelectOption[];
+    tariffActionDirty?: boolean;
+    currentSubscriptionTariffLabel?: string;
+    userTariffActionKey?: string;
+    selectTariffAction: ComponentCallback;
+    premiumOverrideDirty?: boolean;
+    premiumOverrideDraftValid?: boolean;
+    premiumUnlimitedDraft?: boolean;
+    regularOverrideDirty?: boolean;
+    regularOverrideDraftValid?: boolean;
+    regularUnlimitedDraft?: boolean;
+    hwidLimitDirty?: boolean;
+    hwidLimitDraftValid?: boolean;
+    hwidUnlimitedDraft?: boolean;
+    hwidLimitLabel: (sub: Record<string, unknown> | null | undefined) => string;
+    selectGrantTrafficKind: ComponentCallback;
+    grantTrafficGbValid?: boolean;
+  };
 
-  export let at: TranslateFn;
-  export let openedUser: AdminUser | null = null;
-  export let openedUserDetail: UserDetail | null = null;
-  export let userActionBusy = false;
-  export let userMessageDraft = "";
-  export let extendTariffItems: SelectOption[] = [];
-  export let extendTariffsLoading = false;
-  export let userExtendDaysValid = false;
-  export let userExtendTariffValid = false;
-  export let extendTariffRequired = false;
-  export let selectExtendTariff: ComponentCallback;
-  export let periodTariffItems: SelectOption[] = [];
-  export let tariffActionDirty = false;
-  export let currentSubscriptionTariffLabel = "";
-  export let userTariffActionKey = "";
-  export let selectTariffAction: ComponentCallback;
-  export let premiumOverrideDirty = false;
-  export let premiumOverrideDraftValid = false;
-  export let premiumUnlimitedDraft = false;
-  export let regularOverrideDirty = false;
-  export let regularOverrideDraftValid = false;
-  export let regularUnlimitedDraft = false;
-  export let hwidLimitDirty = false;
-  export let hwidLimitDraftValid = false;
-  export let hwidUnlimitedDraft = false;
-  export let hwidLimitLabel: (sub: Record<string, unknown> | null | undefined) => string;
-  export let selectGrantTrafficKind: ComponentCallback;
-  export let grantTrafficGbValid = false;
+  let {
+    at,
+    openedUser = null,
+    openedUserDetail = null,
+    userActionBusy = false,
+    userMessageDraft = "",
+    extendTariffItems = [],
+    extendTariffsLoading = false,
+    userExtendDaysValid = false,
+    userExtendTariffValid = false,
+    extendTariffRequired = false,
+    selectExtendTariff,
+    periodTariffItems = [],
+    tariffActionDirty = false,
+    currentSubscriptionTariffLabel = "",
+    userTariffActionKey = "",
+    selectTariffAction,
+    premiumOverrideDirty = false,
+    premiumOverrideDraftValid = false,
+    premiumUnlimitedDraft = false,
+    regularOverrideDirty = false,
+    regularOverrideDraftValid = false,
+    regularUnlimitedDraft = false,
+    hwidLimitDirty = false,
+    hwidLimitDraftValid = false,
+    hwidUnlimitedDraft = false,
+    hwidLimitLabel,
+    selectGrantTrafficKind,
+    grantTrafficGbValid = false,
+  }: Props = $props();
 
   const usersStore = getContext<UsersStore>("usersStore");
 
-  $: activeSubscription = openedUserDetail?.active_subscription ?? null;
-  $: extraHwidDevices = Number(activeSubscription?.extra_hwid_devices || 0);
-  $: openedUserIsBanned = Boolean(openedUser?.is_banned);
+  const activeSubscription = $derived(openedUserDetail?.active_subscription ?? null);
+  const extraHwidDevices = $derived(Number(activeSubscription?.extra_hwid_devices || 0));
+  const openedUserIsBanned = $derived(Boolean(openedUser?.is_banned));
 </script>
 
 <Tabs.Content value="actions" class="admin-tabs-content admin-actions-tab">
@@ -75,7 +107,7 @@
               min="1"
               max="3650"
               step="1"
-              bind:value={$usersStore.userExtendDays}
+              bind:value={usersStore.userExtendDays}
               aria-label={at("user_label_extend_days", {}, "Дней")}
             />
           </Label.Root>
@@ -84,7 +116,7 @@
               <span>{at("user_tariff_select_label", {}, "Tariff")}</span>
               <AdminSelect
                 class="admin-user-tariff-select admin-user-extend-tariff-select"
-                value={$usersStore.userExtendTariffKey}
+                value={usersStore.userExtendTariffKey}
                 items={extendTariffItems}
                 placeholder={at("user_tariff_select_placeholder", {}, "Select tariff")}
                 ariaLabel={at("user_tariff_select_label", {}, "Tariff")}
@@ -101,7 +133,7 @@
               extendTariffsLoading ||
               !userExtendDaysValid ||
               !userExtendTariffValid ||
-              (extendTariffRequired && !$usersStore.userExtendTariffKey)}
+              (extendTariffRequired && !usersStore.userExtendTariffKey)}
           >
             <Plus size={14} />
             {at("user_btn_extend", {}, "Продлить")}
@@ -111,7 +143,7 @@
           <small class="admin-muted"
             >{at("user_extend_tariff_required", {}, "Select a tariff before adding days")}</small
           >
-        {:else if extendTariffRequired && !$usersStore.userExtendTariffKey}
+        {:else if extendTariffRequired && !usersStore.userExtendTariffKey}
           <small class="admin-muted"
             >{at("user_extend_tariff_required", {}, "Select a tariff before adding days")}</small
           >
@@ -119,7 +151,7 @@
         {#if extraHwidDevices > 0}
           <label class="admin-extend-hwid-option">
             <Checkbox
-              bind:checked={$usersStore.userExtendHwidDevices}
+              bind:checked={usersStore.userExtendHwidDevices}
               disabled={userActionBusy}
               ariaLabel={at(
                 "user_extend_hwid_devices_aria",
@@ -178,7 +210,7 @@
             <span>{at("user_tariff_select_label", {}, "Tariff")}</span>
             <AdminSelect
               class="admin-user-tariff-select"
-              value={$usersStore.userTariffActionKey}
+              value={usersStore.userTariffActionKey}
               items={periodTariffItems}
               placeholder={at("user_tariff_select_placeholder", {}, "Select tariff")}
               ariaLabel={at("user_tariff_select_label", {}, "Tariff")}
@@ -246,7 +278,7 @@
             placeholder="0"
             disabled={premiumUnlimitedDraft}
             aria-label={at("user_premium_override_bonus", {}, "Доп. премиум-трафик, GB")}
-            bind:value={$usersStore.premiumBonusGbDraft}
+            bind:value={usersStore.premiumBonusGbDraft}
           />
         </Label.Root>
       </div>
@@ -254,7 +286,7 @@
         <div class="admin-override-card-toolbar">
           <label class="admin-override-unlimited-label">
             <Checkbox
-              bind:checked={$usersStore.premiumUnlimitedDraft}
+              bind:checked={usersStore.premiumUnlimitedDraft}
               aria-label={at("user_override_unlimited_short", {}, "Безлимит")}
             />
             <span>{at("user_override_unlimited_short", {}, "Безлимит")}</span>
@@ -334,7 +366,7 @@
             placeholder="0"
             disabled={regularUnlimitedDraft}
             aria-label={at("user_regular_override_bonus", {}, "Доп. основной трафик, GB")}
-            bind:value={$usersStore.regularBonusGbDraft}
+            bind:value={usersStore.regularBonusGbDraft}
           />
         </Label.Root>
       </div>
@@ -342,7 +374,7 @@
         <div class="admin-override-card-toolbar">
           <label class="admin-override-unlimited-label">
             <Checkbox
-              bind:checked={$usersStore.regularUnlimitedDraft}
+              bind:checked={usersStore.regularUnlimitedDraft}
               aria-label={at("user_override_unlimited_short", {}, "Безлимит")}
             />
             <span>{at("user_override_unlimited_short", {}, "Безлимит")}</span>
@@ -436,7 +468,7 @@
             placeholder={at("user_hwid_limit_default_placeholder", {}, "Тариф")}
             disabled={hwidUnlimitedDraft}
             aria-label={at("user_hwid_limit_input", {}, "Лимит устройств")}
-            bind:value={$usersStore.hwidDeviceLimitDraft}
+            bind:value={usersStore.hwidDeviceLimitDraft}
           />
         </Label.Root>
       </div>
@@ -444,7 +476,7 @@
         <div class="admin-override-card-toolbar">
           <label class="admin-override-unlimited-label">
             <Checkbox
-              bind:checked={$usersStore.hwidUnlimitedDraft}
+              bind:checked={usersStore.hwidUnlimitedDraft}
               aria-label={at("user_override_unlimited_short", {}, "Безлимит")}
             />
             <span>{at("user_override_unlimited_short", {}, "Безлимит")}</span>
@@ -503,7 +535,7 @@
           <span>{at("user_traffic_grant_kind", {}, "Тип трафика")}</span>
           <AdminSelect
             class="admin-grant-kind-select"
-            value={$usersStore.grantTrafficKindDraft}
+            value={usersStore.grantTrafficKindDraft}
             items={[
               {
                 value: "regular",
@@ -528,7 +560,7 @@
               step="1"
               placeholder="0"
               aria-label={at("user_traffic_grant_gb", {}, "ГБ к выдаче")}
-              bind:value={$usersStore.grantTrafficGbDraft}
+              bind:value={usersStore.grantTrafficGbDraft}
             />
             <AdminButton
               variant="primary"
@@ -551,7 +583,7 @@
       class="admin-textarea"
       rows={3}
       placeholder={at("user_placeholder_msg", {}, "Текст сообщения")}
-      bind:value={$usersStore.userMessageDraft}
+      bind:value={usersStore.userMessageDraft}
     />
   </Label.Root>
   <div class="admin-message-actions">

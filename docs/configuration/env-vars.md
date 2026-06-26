@@ -45,6 +45,19 @@
 | `TRUSTED_PROXIES` | `.env` | IP/CIDR обратных прокси, которым доверяется `X-Forwarded-For`. По умолчанию включает loopback и private ranges для Docker/LAN/Kubernetes proxy. |
 | `HTTP_BIND` / `HTTPS_BIND` | Caddy Compose | Адреса публикации Caddy-варианта. |
 | `NEWT_ID` / `NEWT_SECRET` | Dev Compose | Доступы Newt в dev-compose. |
+| `DEV_POSTGRES_PORT` | Dev Compose | Хостовый порт PostgreSQL единого dev stand для full-stack QA. По умолчанию `6768`. |
+
+## Dev / QA only
+
+Эти переменные предназначены для локального dev stand и CI full-stack QA. Не
+включайте их в production `.env`.
+
+| Переменная | Назначение |
+| --- | --- |
+| `QA_AUTH_ENABLED` | В `APP_RUNTIME_MODE=development|test` возвращает одноразовый email-код в ответе `/api/auth/email/request`, чтобы QA могла пройти обычную верификацию без SMTP. |
+| `QA_PAYMENT_ENABLED` | Включает локальный provider `qa` для Mini App платежей в dev/test runtime. |
+| `QA_PAYMENT_ADMIN_ONLY_ENABLED` | Делает provider `qa` доступным только администраторам. Обычно `False` в dev stand. |
+| `QA_PAYMENT_SECRET` | HMAC-секрет для `/webhook/qa-payment`; тесты подписывают payload через `X-QA-Payment-Signature`. |
 
 `TRUSTED_PROXIES` нужен не только для логов: платежные webhook-обработчики с IP-фильтром
 сравнивают allowlist провайдера с client IP после обработки `X-Forwarded-For`. Если внешний

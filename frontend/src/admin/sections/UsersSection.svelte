@@ -22,11 +22,7 @@
   } from "$components/patterns/admin/index.js";
   import { getContext, onMount } from "svelte";
   import { trafficOfLabel } from "../../lib/admin/format.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { TableHandler } from "@vincjo/datatables";
   import type { AdminUser, UsersStore } from "../../lib/admin/stores/usersStore";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
@@ -45,6 +41,16 @@
   type FilterKey = "usersFilter" | "usersPanelStatus" | "usersPremiumTraffic";
   type FilterPatch = Partial<Record<FilterKey, string>> & { usersPage?: number };
   type FilterChip = { key: FilterKey; label: string; value: string };
+  type UsersSectionProps = {
+    at?: TranslateFn;
+    fmtDateShort?: (value: string | null | undefined) => string;
+    fmtMoney?: (value: number, currency?: string | null) => string;
+    panelStatusBadge?: (user: AdminUser) => Record<string, string>;
+    resolvedAvatarUrl?: (user: AdminUser) => string;
+    userDisplayName?: (user: AdminUser) => string;
+    userInitials?: (user: AdminUser) => string;
+    userSecondaryName?: (user: AdminUser) => string;
+  };
   type TrafficBadge =
     | {
         state?: string;
@@ -54,48 +60,41 @@
     | null
     | undefined;
 
-  export let at: TranslateFn = (key) => key;
-  export let fmtDateShort: (value: string | null | undefined) => string = (value) =>
-    String(value || "");
-  export let fmtMoney: (value: number, currency?: string | null) => string = (value) =>
-    String(value);
-  export let panelStatusBadge: (user: AdminUser) => Record<string, string> = () => ({});
-  export let resolvedAvatarUrl: (user: AdminUser) => string = () => "";
-  export let userDisplayName: (user: AdminUser) => string = () => "";
-  export let userInitials: (user: AdminUser) => string = () => "";
-  export let userSecondaryName: (user: AdminUser) => string = () => "";
+  let {
+    at = (key) => key,
+    fmtDateShort = (value) => String(value || ""),
+    fmtMoney = (value) => String(value),
+    panelStatusBadge = () => ({}),
+    resolvedAvatarUrl = () => "",
+    userDisplayName = () => "",
+    userInitials = () => "",
+    userSecondaryName = () => "",
+  }: UsersSectionProps = $props();
 
   const usersStore = getContext<UsersStore>("usersStore");
-  const usersTable = createAdminDatatable();
-  const usersTableSignal = watchAdminDatatable(usersTable);
-  let users: AdminUser[] = [];
-  let usersTotal = 0;
-  let usersPage = 0;
-  let usersQuery = "";
-  let usersFilter = "all";
-  let usersPanelStatus = "all";
-  let usersPremiumTraffic = "all";
-  let usersSort = "";
-  let usersLoading = false;
+  const usersTable = new TableHandler<AdminUser>();
+  const usersState = $derived(usersStore);
+  const users = $derived(usersState.users);
+  const usersTotal = $derived(usersState.usersTotal);
+  const usersPage = $derived(usersState.usersPage);
+  const usersQuery = $derived(usersState.usersQuery);
+  const usersFilter = $derived(usersState.usersFilter);
+  const usersPanelStatus = $derived(usersState.usersPanelStatus);
+  const usersPremiumTraffic = $derived(usersState.usersPremiumTraffic);
+  const usersSort = $derived(usersState.usersSort);
+  const usersLoading = $derived(usersState.usersLoading);
 
-  $: ({
-    users,
-    usersTotal,
-    usersPage,
-    usersQuery,
-    usersFilter,
-    usersPanelStatus,
-    usersPremiumTraffic,
-    usersSort,
-    usersLoading,
-  } = $usersStore);
-  $: syncAdminDatatable(usersTable, users);
+  $effect(() => {
+    usersTable.setRows(users);
+  });
 
   const USERS_PAGE_SIZE = 25;
-  let usersFilterSheetOpen = false;
-  $: usersPageCount = Math.max(1, Math.ceil(Number(usersTotal || 0) / USERS_PAGE_SIZE));
+  let usersFilterSheetOpen = $state(false);
+  const usersPageCount = $derived(
+    Math.max(1, Math.ceil(Number(usersTotal || 0) / USERS_PAGE_SIZE))
+  );
 
-  const USERS_FILTER_OPTIONS = [
+  const USERS_FILTER_OPTIONS = $derived([
     { value: "all", label: at("filter_all", {}, "Все") },
     { value: "active", label: at("filter_not_banned", {}, "Не забанены") },
     { value: "banned", label: at("filter_banned", {}, "Забанены") },
@@ -104,7 +103,7 @@
     { value: "email_linked", label: at("filter_email_linked", {}, "С email") },
     { value: "no_email", label: at("filter_no_email", {}, "Без email") },
     { value: "panel_linked", label: at("filter_panel_linked", {}, "С панелью") },
-  ];
+  ] satisfies SelectOption[]);
 
   const SORT_COLUMNS = {
     user: { asc: "name_asc", desc: "name_desc", defaultDirection: "asc" },
@@ -132,14 +131,14 @@
     registration: { asc: "registered_asc", desc: "registered_desc", defaultDirection: "desc" },
   } satisfies Record<string, SortColumn>;
 
-  const USERS_PANEL_STATUS_OPTIONS = [
+  const USERS_PANEL_STATUS_OPTIONS = $derived([
     { value: "all", label: at("panel_status_all", {}, "Все статусы") },
     { value: "active", label: at("status_active", {}, "active") },
     { value: "expired", label: at("status_expired", {}, "expired") },
     { value: "limited", label: at("status_limited", {}, "limited") },
-  ];
+  ] satisfies SelectOption[]);
 
-  const USERS_PREMIUM_TRAFFIC_OPTIONS = [
+  const USERS_PREMIUM_TRAFFIC_OPTIONS = $derived([
     { value: "all", label: at("premium_traffic_filter_all", {}, "Все (премиум)") },
     { value: "none", label: at("premium_traffic_filter_none", {}, "Без лимита в тарифе") },
     {
@@ -149,7 +148,7 @@
     { value: "good", label: at("premium_traffic_filter_good", {}, "Премиум: норма") },
     { value: "warn", label: at("premium_traffic_filter_warn", {}, "Премиум: мало") },
     { value: "critical", label: at("premium_traffic_filter_critical", {}, "Премиум: исчерпан") },
-  ];
+  ] satisfies SelectOption[]);
 
   function optionLabel(options: SelectOption[], value: string): string {
     return options.find((item) => item.value === value)?.label || value;
@@ -295,27 +294,29 @@
     void usersStore.loadUsers();
   }
 
-  $: activeUserFilterChips = (
-    [
-      usersFilter !== "all" && {
-        key: "usersFilter",
-        label: at("filter", {}, "Фильтр"),
-        value: optionLabel(USERS_FILTER_OPTIONS, usersFilter),
-      },
-      usersPanelStatus !== "all" && {
-        key: "usersPanelStatus",
-        label: at("panel_status", {}, "Статус панели"),
-        value: optionLabel(USERS_PANEL_STATUS_OPTIONS, usersPanelStatus),
-      },
-      usersPremiumTraffic !== "all" && {
-        key: "usersPremiumTraffic",
-        label: at("premium_traffic_filter_label", {}, "Премиум трафик"),
-        value: optionLabel(USERS_PREMIUM_TRAFFIC_OPTIONS, usersPremiumTraffic),
-      },
-    ] satisfies (FilterChip | false)[]
-  ).filter(isFilterChip);
-  $: activeUsersFilterCount = activeUserFilterChips.length;
-  $: userTableHeaders = userTableColumns().map((column) => column.label);
+  const activeUserFilterChips = $derived(
+    (
+      [
+        usersFilter !== "all" && {
+          key: "usersFilter",
+          label: at("filter", {}, "Фильтр"),
+          value: optionLabel(USERS_FILTER_OPTIONS, usersFilter),
+        },
+        usersPanelStatus !== "all" && {
+          key: "usersPanelStatus",
+          label: at("panel_status", {}, "Статус панели"),
+          value: optionLabel(USERS_PANEL_STATUS_OPTIONS, usersPanelStatus),
+        },
+        usersPremiumTraffic !== "all" && {
+          key: "usersPremiumTraffic",
+          label: at("premium_traffic_filter_label", {}, "Премиум трафик"),
+          value: optionLabel(USERS_PREMIUM_TRAFFIC_OPTIONS, usersPremiumTraffic),
+        },
+      ] satisfies (FilterChip | false)[]
+    ).filter(isFilterChip)
+  );
+  const activeUsersFilterCount = $derived(activeUserFilterChips.length);
+  const userTableHeaders = $derived(userTableColumns().map((column) => column.label));
 
   onMount(() => {
     usersStore.loadUsers();
@@ -371,7 +372,7 @@
           <button
             type="button"
             aria-label={at("clear_filter", { label: chip.label }, "Сбросить фильтр")}
-            on:click={() => clearUsersFilter(chip.key)}
+            onclick={() => clearUsersFilter(chip.key)}
           >
             <X size={12} />
           </button>
@@ -388,8 +389,8 @@
       class="input"
       placeholder={at("users_search_placeholder", {}, "ID, @username или email")}
       value={usersQuery}
-      on:input={handleUsersSearchInput}
-      on:keydown={handleUsersSearchKeydown}
+      oninput={handleUsersSearchInput}
+      onkeydown={handleUsersSearchKeydown}
     />
     <AdminButton
       variant="primary"
@@ -504,7 +505,7 @@
       rows={USERS_PAGE_SIZE}
       widths={["220px", "128px", "112px", "78px", "88px", "96px", "112px", "112px"]}
     />
-  {:else if !$usersTableSignal.rows.length}
+  {:else if !usersTable.rows.length}
     <AdminEmptyState tone="card"
       ><span class="admin-muted">{at("users_empty", {}, "Никого не найдено")}</span
       ></AdminEmptyState
@@ -520,7 +521,7 @@
                   type="button"
                   class="admin-sort-header"
                   title={sortTitle(column.sort)}
-                  on:click={() => toggleUsersSortForColumn(column)}
+                  onclick={() => toggleUsersSortForColumn(column)}
                 >
                   <span>{column.label}</span>
                   <span
@@ -545,7 +546,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each $usersTableSignal.rows as user (user.user_id)}
+        {#each usersTable.rows as user (user.user_id)}
           {@const avatar = resolvedAvatarUrl(user)}
           {@const badge = panelStatusBadge(user)}
           <tr
@@ -553,8 +554,8 @@
             role="button"
             tabindex="0"
             data-user-id={user.user_id}
-            on:click={() => usersStore.openUser(user)}
-            on:keydown={(e) => {
+            onclick={() => usersStore.openUser(user)}
+            onkeydown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 usersStore.openUser(user);

@@ -1,5 +1,5 @@
 // Pure theme-derivation slice extracted from App.svelte (T2 decompose-then-type).
-// Mirrors the former $: theme reactive blocks 1:1 so behaviour is identical; the
+// Mirrors the former theme reactive blocks 1:1 so behaviour is identical; the
 // shell binds the returned view and re-runs computeThemeView when its inputs change.
 import {
   findThemeEntry,

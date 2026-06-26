@@ -11,11 +11,7 @@
     AdminTable,
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { TableHandler } from "@vincjo/datatables";
   import type { PromosStore } from "../../lib/admin/stores/promosStore";
   import type { components } from "../../lib/api/openapi.generated";
 
@@ -23,34 +19,43 @@
   type Promo = components["schemas"]["PromoOut"];
   type PromoDraft = components["schemas"]["PromoCreateBody"];
 
-  export let at: TranslateFn;
-  export let fmtDateShort: (value: string) => string;
+  let {
+    at,
+    fmtDateShort,
+  }: {
+    at: TranslateFn;
+    fmtDateShort: (value: string) => string;
+  } = $props();
 
   const promosStore = getContext<PromosStore>("promosStore");
-  const promosTable = createAdminDatatable();
-  const promosTableSignal = watchAdminDatatable(promosTable);
+  const promosTable = new TableHandler<Promo>();
 
-  let promos: Promo[] = [];
-  let promosTotal = 0;
-  let promosPage = 0;
-  let promosLoading = false;
-  let promoCreateOpen = false;
-  let promoDraft: PromoDraft = { code: "", bonus_days: 7, max_activations: 1, valid_days: 30 };
+  const promos = $derived(promosStore.promos as Promo[]);
+  const promosTotal = $derived(Number(promosStore.promosTotal || 0));
+  const promosPage = $derived(Number(promosStore.promosPage || 0));
+  const promosLoading = $derived(Boolean(promosStore.promosLoading));
+  const promoCreateOpen = $derived(Boolean(promosStore.promoCreateOpen));
+  const promoDraft = $derived(
+    (promosStore.promoDraft || {
+      code: "",
+      bonus_days: 7,
+      max_activations: 1,
+      valid_days: 30,
+    }) as PromoDraft
+  );
+  const promoRows = $derived(promosTable.rows as Promo[]);
 
-  $: ({ promos, promosTotal, promosPage, promosLoading, promoCreateOpen, promoDraft } =
-    $promosStore);
-  $: syncAdminDatatable(promosTable, promos);
-  $: promoRows = $promosTableSignal.rows as Promo[];
+  $effect(() => promosTable.setRows(promos));
 
-  $: promosHasMore = promos.length < promosTotal;
-  $: promoHeaders = [
+  const promosHasMore = $derived(promos.length < promosTotal);
+  const promoHeaders = $derived([
     at("promo_col_code", {}, "Код"),
     at("promo_col_bonus", {}, "Бонус"),
     at("promo_col_activations", {}, "Активаций"),
     at("promo_col_valid_until", {}, "Действует до"),
     at("promo_col_status", {}, "Статус"),
     at("actions", {}, "Действия"),
-  ];
+  ]);
 
   onMount(() => {
     promosStore.loadPromos();
@@ -137,7 +142,7 @@
           type="text"
           class="input"
           value={promoDraft.code}
-          on:input={(e) =>
+          oninput={(e) =>
             promosStore.updateDraft({ code: (e.currentTarget as HTMLInputElement).value })}
           placeholder="FREE-7-DAYS"
         />
@@ -151,7 +156,7 @@
             class="input"
             min="1"
             value={String(promoDraft.bonus_days)}
-            on:input={(e) =>
+            oninput={(e) =>
               promosStore.updateDraft({
                 bonus_days: Number((e.currentTarget as HTMLInputElement).value),
               })}
@@ -163,7 +168,7 @@
             class="input"
             min="1"
             value={String(promoDraft.max_activations)}
-            on:input={(e) =>
+            oninput={(e) =>
               promosStore.updateDraft({
                 max_activations: Number((e.currentTarget as HTMLInputElement).value),
               })}
@@ -176,7 +181,7 @@
           class="input"
           min="1"
           value={String(promoDraft.valid_days)}
-          on:input={(e) =>
+          oninput={(e) =>
             promosStore.updateDraft({
               valid_days: Number((e.currentTarget as HTMLInputElement).value),
             })}

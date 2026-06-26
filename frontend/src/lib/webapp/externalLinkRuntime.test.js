@@ -1,29 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createExternalLinkRuntime } from "./externalLinkRuntime.js";
+import { resetShellState, shellState } from "./shellState.svelte.ts";
 
 function makeRuntime(overrides = {}) {
   const state = {
     currentLang: "ru",
     telegram: null,
-    target: "",
     ...overrides,
   };
+  resetShellState({ tg: state.telegram });
   const deps = {
     assignLocation: vi.fn(),
     getCurrentLang: () => state.currentLang,
-    getTelegram: () => state.telegram,
     hasTelegramLaunchParams: vi.fn(() => false),
     openHiddenAnchor: vi.fn(),
     openLaunchTarget: vi.fn(),
     refreshTelegram: vi.fn(() => state.telegram),
     readLaunchTarget: vi.fn(() => ""),
-    setAppLaunchTarget: vi.fn((target) => {
-      state.target = target;
-    }),
-    setTelegram: vi.fn((value) => {
-      state.telegram = value;
-    }),
   };
   return { deps, runtime: createExternalLinkRuntime(deps), state };
 }
@@ -58,12 +52,11 @@ describe("createExternalLinkRuntime", () => {
   });
 
   it("keeps app launch target actions wired to shell state", () => {
-    const { deps, runtime, state } = makeRuntime();
+    const { deps, runtime } = makeRuntime();
 
     expect(runtime.openAppLaunchTarget("tg://resolve?domain=bot")).toBe(true);
 
-    expect(state.target).toBe("tg://resolve?domain=bot");
-    expect(deps.setAppLaunchTarget).toHaveBeenCalledWith("tg://resolve?domain=bot");
+    expect(shellState.appLaunchTarget).toBe("tg://resolve?domain=bot");
     expect(deps.openLaunchTarget).toHaveBeenCalledWith("tg://resolve?domain=bot");
   });
 });

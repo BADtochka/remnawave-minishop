@@ -5,6 +5,7 @@ import {
   markManualLogout as markManualLogoutInStorage,
   readCookie,
 } from "./session.js";
+import { shellState } from "./shellState.svelte";
 
 type SessionStorageActions = {
   clearManualLogoutFlag: (flagKey: string) => void;
@@ -18,8 +19,6 @@ type WebappSessionActionDeps = {
   csrfCookieName: string;
   isMock: () => boolean;
   manualLogoutFlagKey: string;
-  setCsrfToken: (token: string) => void;
-  setToken: (token: string) => void;
   storage?: SessionStorageActions;
 };
 
@@ -35,8 +34,6 @@ export function createWebappSessionActions({
   csrfCookieName,
   isMock,
   manualLogoutFlagKey,
-  setCsrfToken,
-  setToken,
   storage = defaultStorage,
 }: WebappSessionActionDeps) {
   function clearManualLogoutFlag() {
@@ -45,14 +42,14 @@ export function createWebappSessionActions({
 
   function updateToken(nextToken: string, nextCsrf = "") {
     clearManualLogoutFlag();
-    setToken(nextToken || "");
-    setCsrfToken(nextCsrf || storage.readCookie(csrfCookieName) || "");
+    shellState.token = nextToken || "";
+    shellState.csrfToken = nextCsrf || storage.readCookie(csrfCookieName) || "";
     if (!isMock()) storage.clearStoredToken();
   }
 
   function clearToken() {
-    setToken("");
-    setCsrfToken("");
+    shellState.token = "";
+    shellState.csrfToken = "";
     storage.clearStoredToken();
   }
 

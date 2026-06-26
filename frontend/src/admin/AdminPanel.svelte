@@ -84,109 +84,172 @@
   type PanelStatusBadge = { label: string; variant: "success" | "danger" | "warning" | "muted" };
   type DynamicComponent = ComponentType<SvelteComponent<Record<string, unknown>>>;
 
-  export let api: AdminApi;
-  export let onClose: () => void = () => {};
-  export let onToast: (message: string) => void = () => {};
-  export let initialSection = "stats";
-  export let initialSettingsPath: SettingsPath = [];
-  export let initialPaymentId: number | null = null;
-  export let initialPaymentUserId: number | null = null;
-  export let initialUserId: number | null = null;
-  export let onSectionChange: (section: string, userId?: number) => void = () => {};
-  export let onSettingsSaved: (payload: SettingsSavedPayload) => void | Promise<void> = () => {};
-  export let onTariffsSaved: (catalog: TariffsCatalog) => void | Promise<void> = () => {};
-  export let onThemesSaved: () => void | Promise<void> = () => {};
-  export let onTranslationsSaved: (
-    payload: TranslationsSavedPayload
-  ) => void | Promise<void> = () => {};
-  export let routePrefix = "";
-  export let brand: Record<string, unknown> = {};
-  export let brandTitle = "Subscription";
-  export let appFaviconUrl = "";
-  export let appFaviconUseCustom = false;
-  export let appVersion = "dev+local";
-  export let appRepositoryUrl = "https://minishop.minidoc.cc/";
-  export let currentLang = "ru";
-  export let languageOptions: LanguageOption[] = [];
-  export let languageBusy = false;
-  export let onLanguageChange: (value: string, meta: LanguageChangeMeta) => void = () => {};
-  export let t: TranslateFn = (key, _params = {}, fallback = "") => fallback || key;
+  let {
+    api,
+    onClose = () => {},
+    onToast = () => {},
+    initialSection = "stats",
+    initialSettingsPath = [],
+    initialPaymentId = null,
+    initialPaymentUserId = null,
+    initialUserId = null,
+    onSectionChange = () => {},
+    onSettingsSaved = () => {},
+    onTariffsSaved = () => {},
+    onThemesSaved = () => {},
+    onTranslationsSaved = () => {},
+    routePrefix = "",
+    brand = {},
+    brandTitle = "Subscription",
+    appFaviconUrl = "",
+    appFaviconUseCustom = false,
+    appVersion = "dev+local",
+    appRepositoryUrl = "https://minishop.minidoc.cc/",
+    currentLang = "ru",
+    languageOptions = [],
+    languageBusy = false,
+    onLanguageChange = () => {},
+    t = (key, _params = {}, fallback = "") => fallback || key,
+  }: {
+    api: AdminApi;
+    onClose?: () => void;
+    onToast?: (message: string) => void;
+    initialSection?: string;
+    initialSettingsPath?: SettingsPath;
+    initialPaymentId?: number | null;
+    initialPaymentUserId?: number | null;
+    initialUserId?: number | null;
+    onSectionChange?: (section: string, userId?: number) => void;
+    onSettingsSaved?: (payload: SettingsSavedPayload) => void | Promise<void>;
+    onTariffsSaved?: (catalog: TariffsCatalog) => void | Promise<void>;
+    onThemesSaved?: () => void | Promise<void>;
+    onTranslationsSaved?: (payload: TranslationsSavedPayload) => void | Promise<void>;
+    routePrefix?: string;
+    brand?: Record<string, unknown>;
+    brandTitle?: string;
+    appFaviconUrl?: string;
+    appFaviconUseCustom?: boolean;
+    appVersion?: string;
+    appRepositoryUrl?: string;
+    currentLang?: string;
+    languageOptions?: LanguageOption[];
+    languageBusy?: boolean;
+    onLanguageChange?: (value: string, meta: LanguageChangeMeta) => void;
+    t?: TranslateFn;
+  } = $props();
 
   const at: TranslateFn = (key, params = {}, fallback = "") =>
     t(`admin_${key}`, params, fallback || key);
 
-  let featureSet = new Set<string>();
-  let visibleSections: AdminSectionDescriptor[] = [];
-  let NAV_GROUPS: NavGroup[] = [];
-  let SECTION_META: Record<string, SectionMeta> = {};
-  let SECTION_BY_ID = new Map<string, AdminSectionDescriptor>();
-  let VALID_SECTIONS: string[] = [];
+  function initialApi(): AdminApi {
+    return api;
+  }
 
-  $: featureSet = new Set<string>(($settingsStore?.features || []) as string[]);
-  $: visibleSections = ADMIN_SECTIONS.filter(
-    (section) => !section.feature || featureSet.has(section.feature)
-  );
-  $: NAV_GROUPS = ADMIN_SECTION_GROUPS.map((group) => ({
-    id: group.id,
-    order: group.order,
-    label: at(group.i18nKey, {}, group.fallbackLabel),
-    items: visibleSections
-      .filter((section) => section.group === group.id)
-      .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
-      .map((section) => ({
-        ...section,
-        label: at(section.i18nKey, {}, section.fallbackLabel),
-      })),
-  })).filter((group) => group.items.length);
-  $: SECTION_META = Object.fromEntries(
-    visibleSections.map((section) => [
-      section.id,
-      {
-        title: at(section.titleI18nKey, {}, section.fallbackTitle),
-        subtitle: at(section.subtitleI18nKey, {}, section.fallbackSubtitle),
-      },
-    ])
-  );
-  $: SECTION_BY_ID = new Map(visibleSections.map((section) => [section.id, section]));
+  function initialRoutePrefix(): string {
+    return routePrefix;
+  }
 
-  $: VALID_SECTIONS = (NAV_GROUPS || []).flatMap((group) =>
-    (group.items || []).map((item) => item.id)
+  function initialTariffsSaved(): (catalog: TariffsCatalog) => void | Promise<void> {
+    return onTariffsSaved;
+  }
+
+  function initialThemesSaved(): () => void | Promise<void> {
+    return onThemesSaved;
+  }
+
+  const stableApi = initialApi();
+  const stableRoutePrefix = initialRoutePrefix();
+  const stableOnTariffsSaved = initialTariffsSaved();
+  const stableOnThemesSaved = initialThemesSaved();
+  const settingsStore = createSettingsStore({ api: stableApi, onToast: flash, at });
+
+  const featureSet = $derived(new Set<string>((settingsStore.features || []) as string[]));
+  const visibleSections: AdminSectionDescriptor[] = $derived(
+    ADMIN_SECTIONS.filter((section) => !section.feature || featureSet.has(section.feature))
+  );
+  const NAV_GROUPS: NavGroup[] = $derived(
+    ADMIN_SECTION_GROUPS.map((group) => ({
+      id: group.id,
+      order: group.order,
+      label: at(group.i18nKey, {}, group.fallbackLabel),
+      items: visibleSections
+        .filter((section) => section.group === group.id)
+        .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+        .map((section) => ({
+          ...section,
+          label: at(section.i18nKey, {}, section.fallbackLabel),
+        })),
+    })).filter((group) => group.items.length)
+  );
+  const SECTION_META: Record<string, SectionMeta> = $derived(
+    Object.fromEntries(
+      visibleSections.map((section) => [
+        section.id,
+        {
+          title: at(section.titleI18nKey, {}, section.fallbackTitle),
+          subtitle: at(section.subtitleI18nKey, {}, section.fallbackSubtitle),
+        },
+      ])
+    )
+  );
+  const SECTION_BY_ID = $derived(new Map(visibleSections.map((section) => [section.id, section])));
+
+  const VALID_SECTIONS: string[] = $derived(
+    (NAV_GROUPS || []).flatMap((group) => (group.items || []).map((item) => item.id))
   );
   const normalizeSection = (value: unknown): AdminSectionId =>
     (VALID_SECTIONS || []).includes(String(value)) ? String(value) : "stats";
   const settingsPathKey = (path: unknown): string => (Array.isArray(path) ? path : []).join("/");
 
-  let active = normalizeSection(initialSection);
-  let lastInitialSection = active;
-  $: if (VALID_SECTIONS.length && !VALID_SECTIONS.includes(active)) {
-    active = normalizeSection(active);
+  function initialActiveSection(): AdminSectionId {
+    return normalizeSection(initialSection);
   }
-  let settingsPath: SettingsPath = Array.isArray(initialSettingsPath) ? initialSettingsPath : [];
-  let lastInitialSettingsPathKey = settingsPathKey(settingsPath);
-  $: {
+
+  function initialSettingsPathValue(): SettingsPath {
+    return Array.isArray(initialSettingsPath) ? initialSettingsPath : [];
+  }
+
+  const initialActive = initialActiveSection();
+  const initialSettingsPathSnapshot = initialSettingsPathValue();
+  let active = $state(initialActive);
+  let lastInitialSection = $state(initialActive);
+  let settingsPath = $state<SettingsPath>(initialSettingsPathSnapshot);
+  let lastInitialSettingsPathKey = $state(settingsPathKey(initialSettingsPathSnapshot));
+
+  $effect(() => {
+    if (VALID_SECTIONS.length && !VALID_SECTIONS.includes(active)) {
+      active = normalizeSection(active);
+    }
+  });
+
+  $effect(() => {
     const nextInitialSection = normalizeSection(initialSection);
     if (nextInitialSection !== lastInitialSection) {
       active = nextInitialSection;
       lastInitialSection = nextInitialSection;
     }
-  }
-  $: {
+  });
+
+  $effect(() => {
     const nextInitialSettingsPathKey = settingsPathKey(initialSettingsPath);
     if (nextInitialSettingsPathKey !== lastInitialSettingsPathKey) {
       settingsPath = Array.isArray(initialSettingsPath) ? initialSettingsPath : [];
       lastInitialSettingsPathKey = nextInitialSettingsPathKey;
     }
-  }
-  let sidebarOpen = false;
-  let isCompact = false;
-  let dismissedUserRouteKey = "";
-  let lastUserRouteKey = "";
-  let adminLanguageMenuOpen = false;
-  let adminLanguageClickGuard = false;
-  let adminLanguageClickGuardArmed = false;
+  });
+
+  let sidebarOpen = $state(false);
+  let isCompact = $state(false);
+  let dismissedUserRouteKey = $state("");
+  let lastUserRouteKey = $state("");
+  let adminLanguageMenuOpen = $state(false);
+  let adminLanguageClickGuard = $state(false);
+  let adminLanguageClickGuardArmed = $state(false);
   let adminLanguageClickGuardTimer: ReturnType<typeof window.setTimeout> | null = null;
   let adminLanguageClickGuardArmTimer: ReturnType<typeof window.setTimeout> | null = null;
-  $: adminLanguageGuardActive = isCompact && (adminLanguageMenuOpen || adminLanguageClickGuard);
+  const adminLanguageGuardActive = $derived(
+    isCompact && (adminLanguageMenuOpen || adminLanguageClickGuard)
+  );
 
   function readReduceMotion() {
     return (
@@ -194,7 +257,7 @@
     );
   }
 
-  let reduceMotion = readReduceMotion();
+  let reduceMotion = $state(readReduceMotion());
 
   function flash(text: string): void {
     onToast(text);
@@ -214,20 +277,49 @@
     },
   });
 
-  const adsStore = createAdsStore({ api, onToast: flash, at });
-  const backupsStore = createBackupsStore({ api, onToast: flash, at });
-  const broadcastStore = createBroadcastStore({ api, onToast: flash, at });
-  const healthStore = createHealthStore({ api, at, queryClient: adminQueryClient });
-  const logsStore = createLogsStore({ api, onToast: flash, at, queryClient: adminQueryClient });
-  const paymentsStore = createPaymentsStore({ api, onToast: flash, at, routePrefix });
-  const promosStore = createPromosStore({ api, onToast: flash, at });
-  const settingsStore = createSettingsStore({ api, onToast: flash, at });
-  const statsStore = createStatsStore({ api, onToast: flash, at });
-  const supportStore = createAdminSupportStore({ api, onToast: flash, at, routePrefix });
-  const tariffsStore = createTariffsStore({ api, onTariffsSaved, flash, at });
-  const themesStore = createThemesStore({ api, onThemesSaved, flash, at });
-  const translationsStore = createTranslationsStore({ api, onToast: flash, at });
-  const usersStore = createUsersStore({ api, onToast: flash, at, routePrefix });
+  const adsStore = createAdsStore({ api: stableApi, onToast: flash, at });
+  const backupsStore = createBackupsStore({ api: stableApi, onToast: flash, at });
+  const broadcastStore = createBroadcastStore({ api: stableApi, onToast: flash, at });
+  const healthStore = createHealthStore({ api: stableApi, at, queryClient: adminQueryClient });
+  const logsStore = createLogsStore({
+    api: stableApi,
+    onToast: flash,
+    at,
+    queryClient: adminQueryClient,
+  });
+  const paymentsStore = createPaymentsStore({
+    api: stableApi,
+    onToast: flash,
+    at,
+    routePrefix: stableRoutePrefix,
+  });
+  const promosStore = createPromosStore({ api: stableApi, onToast: flash, at });
+  const statsStore = createStatsStore({ api: stableApi, onToast: flash, at });
+  const supportStore = createAdminSupportStore({
+    api: stableApi,
+    onToast: flash,
+    at,
+    routePrefix: stableRoutePrefix,
+  });
+  const tariffsStore = createTariffsStore({
+    api: stableApi,
+    onTariffsSaved: stableOnTariffsSaved,
+    flash,
+    at,
+  });
+  const themesStore = createThemesStore({
+    api: stableApi,
+    onThemesSaved: stableOnThemesSaved,
+    flash,
+    at,
+  });
+  const translationsStore = createTranslationsStore({ api: stableApi, onToast: flash, at });
+  const usersStore = createUsersStore({
+    api: stableApi,
+    onToast: flash,
+    at,
+    routePrefix: stableRoutePrefix,
+  });
 
   setContext("promosStore", promosStore);
   setContext("adsStore", adsStore);
@@ -244,24 +336,31 @@
   setContext("themesStore", themesStore);
   setContext("translationsStore", translationsStore);
 
-  $: usersStore.setActive(active);
-  $: paymentsStore.setActive(active);
-  $: supportStore.setActive(active);
-  $: dirtyCount = Object.keys($settingsStore.settingsDirty || {}).length;
-  $: translationsDirtyCount = Object.keys($translationsStore.translationsDirty || {}).length;
-  $: syncBusy = $statsStore.syncBusy;
-  $: settingsSaving = $settingsStore.settingsSaving;
-  $: translationsSaving = $translationsStore.translationsSaving;
-  $: meta = SECTION_META[active] || { title: active, subtitle: "" };
-  $: activeSection = SECTION_BY_ID.get(active);
-  $: openSectionUserCard =
+  $effect(() => {
+    usersStore.setActive(active);
+    paymentsStore.setActive(active);
+    supportStore.setActive(active);
+  });
+
+  const dirtyCount = $derived(Object.keys(settingsStore.settingsDirty || {}).length);
+  const translationsDirtyCount = $derived(
+    Object.keys(translationsStore.translationsDirty || {}).length
+  );
+  const syncBusy = $derived(statsStore.syncBusy);
+  const settingsSaving = $derived(settingsStore.settingsSaving);
+  const translationsSaving = $derived(translationsStore.translationsSaving);
+  const meta = $derived(SECTION_META[active] || { title: active, subtitle: "" });
+  const activeSection = $derived(SECTION_BY_ID.get(active));
+  const openSectionUserCard = $derived(
     active === "payments"
       ? openPaymentUserCard
       : active === "logs"
         ? openLogsUserCard
-        : openUserCard;
-  $: currentLanguageOption =
-    languageOptions.find((option) => option.value === currentLang) || languageOptions[0];
+        : openUserCard
+  );
+  const currentLanguageOption = $derived(
+    languageOptions.find((option) => option.value === currentLang) || languageOptions[0]
+  );
 
   const gravatarCache = createGravatarCache(() => usersStore.updateState({}));
 
@@ -356,29 +455,29 @@
     const paymentUserId = active === "payments" ? readPaymentUserIdFromPath() : null;
     const contextualUserId = paymentUserId || userId;
     if (contextualUserId) {
-      if (!$usersStore.openedUser || $usersStore.openedUser.user_id !== contextualUserId) {
+      if (!usersStore.openedUser || usersStore.openedUser.user_id !== contextualUserId) {
         void usersStore.openUser(contextualUserId, {
           skipPush: true,
           pathContext: paymentUserId ? "payments" : "users",
         });
       }
-    } else if ($usersStore.openedUser) {
+    } else if (usersStore.openedUser) {
       usersStore.closeUser({ skipPush: true });
     }
     const paymentId = readPaymentIdFromPath();
     if (active === "payments" && paymentId) {
-      if (!$paymentsStore.openedPaymentId || $paymentsStore.openedPaymentId !== paymentId) {
+      if (!paymentsStore.openedPaymentId || paymentsStore.openedPaymentId !== paymentId) {
         void paymentsStore.openPayment(paymentId, { skipPush: true });
       }
-    } else if ($paymentsStore.openedPaymentId) {
+    } else if (paymentsStore.openedPaymentId) {
       paymentsStore.closePayment({ skipPush: true });
     }
     const ticketId = readSupportTicketIdFromPath();
     if (active === "support" && ticketId) {
-      if (!$supportStore.openedTicketId || $supportStore.openedTicketId !== ticketId) {
+      if (!supportStore.openedTicketId || supportStore.openedTicketId !== ticketId) {
         void supportStore.openTicket(ticketId, { skipPush: true });
       }
-    } else if (active === "support" && $supportStore.openedTicketId) {
+    } else if (active === "support" && supportStore.openedTicketId) {
       supportStore.closeTicketView({ skipPush: true });
     }
   }
@@ -568,42 +667,48 @@
     };
   });
 
-  $: sectionFade = reduceMotion ? { duration: 0 } : { duration: 200 };
-  $: sidebarBackdropFade = reduceMotion ? { duration: 0 } : { duration: 180 };
+  const sectionFade = $derived(reduceMotion ? { duration: 0 } : { duration: 200 });
+  const sidebarBackdropFade = $derived(reduceMotion ? { duration: 0 } : { duration: 180 });
 
-  $: {
+  $effect(() => {
     const currentUserRouteKey = userRouteKey();
     if (currentUserRouteKey !== lastUserRouteKey) {
       if (currentUserRouteKey !== dismissedUserRouteKey) dismissedUserRouteKey = "";
       lastUserRouteKey = currentUserRouteKey;
     }
-  }
+  });
 
-  $: if (
-    active === "users" &&
-    initialUserId &&
-    dismissedUserRouteKey !== `users:${initialUserId}` &&
-    (!$usersStore.openedUser || $usersStore.openedUser.user_id !== initialUserId)
-  ) {
-    void usersStore.openUser(initialUserId, { skipPush: true });
-  }
+  $effect(() => {
+    if (
+      active === "users" &&
+      initialUserId &&
+      dismissedUserRouteKey !== `users:${initialUserId}` &&
+      (!usersStore.openedUser || usersStore.openedUser.user_id !== initialUserId)
+    ) {
+      void usersStore.openUser(initialUserId, { skipPush: true });
+    }
+  });
 
-  $: if (
-    active === "payments" &&
-    initialPaymentId &&
-    (!$paymentsStore.openedPaymentId || $paymentsStore.openedPaymentId !== initialPaymentId)
-  ) {
-    void paymentsStore.openPayment(initialPaymentId, { skipPush: true });
-  }
+  $effect(() => {
+    if (
+      active === "payments" &&
+      initialPaymentId &&
+      (!paymentsStore.openedPaymentId || paymentsStore.openedPaymentId !== initialPaymentId)
+    ) {
+      void paymentsStore.openPayment(initialPaymentId, { skipPush: true });
+    }
+  });
 
-  $: if (
-    active === "payments" &&
-    initialPaymentUserId &&
-    dismissedUserRouteKey !== `payments:${initialPaymentUserId}` &&
-    (!$usersStore.openedUser || $usersStore.openedUser.user_id !== initialPaymentUserId)
-  ) {
-    void usersStore.openUser(initialPaymentUserId, { skipPush: true, pathContext: "payments" });
-  }
+  $effect(() => {
+    if (
+      active === "payments" &&
+      initialPaymentUserId &&
+      dismissedUserRouteKey !== `payments:${initialPaymentUserId}` &&
+      (!usersStore.openedUser || usersStore.openedUser.user_id !== initialPaymentUserId)
+    ) {
+      void usersStore.openUser(initialPaymentUserId, { skipPush: true, pathContext: "payments" });
+    }
+  });
 </script>
 
 <div
@@ -618,7 +723,7 @@
       aria-label={at("close_menu", {}, "Закрыть меню")}
       in:fade={sidebarBackdropFade}
       out:fade={sidebarBackdropFade}
-      on:click={() => (sidebarOpen = false)}
+      onclick={() => (sidebarOpen = false)}
     ></button>
   {/if}
   {#if adminLanguageGuardActive}
@@ -627,8 +732,8 @@
       class:language-select-guard--armed={adminLanguageClickGuardArmed}
       type="button"
       aria-label={t("wa_close", {}, at("close", {}, "Закрыть"))}
-      on:pointerdown={closeAdminLanguageFromGuard}
-      on:click={closeAdminLanguageFromGuard}
+      onpointerdown={closeAdminLanguageFromGuard}
+      onclick={closeAdminLanguageFromGuard}
     ></button>
   {/if}
   <aside class="admin-sidebar" aria-label={at("sidebar_navigation", {}, "Навигация админки")}>
@@ -652,18 +757,19 @@
       <div class="admin-sidebar-section-label">{group.label}</div>
       <nav class="admin-nav" aria-label={group.label}>
         {#each group.items as item}
+          {@const NavIcon = dynamicComponent(item.icon)}
           <button
             type="button"
             class="admin-nav-item"
             class:active={active === item.id}
-            on:click={() => setActive(item.id)}
+            onclick={() => setActive(item.id)}
           >
-            <svelte:component this={dynamicComponent(item.icon)} size={16} />
+            <NavIcon size={16} />
             <span>{item.label}</span>
             <span>
-              {#if item.id === "support" && $supportStore.stats?.total_unread_admin}
+              {#if item.id === "support" && supportStore.stats?.total_unread_admin}
                 <AdminBadge variant="danger">
-                  <span class="numeric-badge-value">{$supportStore.stats.total_unread_admin}</span>
+                  <span class="numeric-badge-value">{supportStore.stats.total_unread_admin}</span>
                 </AdminBadge>
               {/if}
             </span>
@@ -739,7 +845,7 @@
         <button
           type="button"
           class="admin-mobile-toggle"
-          on:click={() => (sidebarOpen = !sidebarOpen)}
+          onclick={() => (sidebarOpen = !sidebarOpen)}
           aria-label={at("menu", {}, "Меню")}
         >
           <Menu size={18} />
@@ -831,8 +937,8 @@
       {#key active}
         <div class="admin-section-stage" in:fade={sectionFade} out:fade={sectionFade}>
           {#if activeSection}
-            <svelte:component
-              this={dynamicComponent(activeSection.component)}
+            {@const ActiveSectionComponent = dynamicComponent(activeSection.component)}
+            <ActiveSectionComponent
               {at}
               {brand}
               {currentLang}

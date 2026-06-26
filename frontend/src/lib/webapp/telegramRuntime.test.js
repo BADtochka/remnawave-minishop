@@ -1,22 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createTelegramRuntime } from "./telegramRuntime.js";
+import { resetShellState, shellState } from "./shellState.svelte.ts";
 
 function makeRuntime({ initData = "initial-init", telegram = { platform: "ios" } } = {}) {
+  resetShellState();
   const state = {
     initData,
     telegram,
-  };
-  const setters = {
-    setInitData: vi.fn((value) => {
-      state.appliedInitData = value;
-    }),
-    setStatus: vi.fn((value) => {
-      state.appliedStatus = value;
-    }),
-    setTelegram: vi.fn((value) => {
-      state.appliedTelegram = value;
-    }),
   };
   const sdk = {
     get initData() {
@@ -30,8 +21,6 @@ function makeRuntime({ initData = "initial-init", telegram = { platform: "ios" }
     }),
     readInitDataFromLocation: vi.fn(() => "location-init"),
     refresh: vi.fn(() => {
-      setters.setInitData(state.initData);
-      if (state.telegram) setters.setStatus("ready");
       return state.telegram;
     }),
   };
@@ -42,45 +31,44 @@ function makeRuntime({ initData = "initial-init", telegram = { platform: "ios" }
     createSdk,
     miniAppAuthTimeoutMs: 30,
     scriptUrl: "https://telegram.example/sdk.js",
-    ...setters,
   });
-  return { createSdk, runtime, sdk, setters, state };
+  return { createSdk, runtime, sdk, state };
 }
 
 describe("createTelegramRuntime", () => {
   it("creates the sdk and applies the initial refresh state", () => {
-    const { createSdk, sdk, setters, state } = makeRuntime();
+    const { createSdk, sdk, state } = makeRuntime();
 
     expect(createSdk).toHaveBeenCalledWith({
       actionTimeoutMs: 20,
       bootTimeoutMs: 10,
       miniAppAuthTimeoutMs: 30,
       onInitDataChange: expect.any(Function),
-      onStatusChange: setters.setStatus,
+      onStatusChange: expect.any(Function),
       scriptUrl: "https://telegram.example/sdk.js",
     });
     expect(sdk.refresh).toHaveBeenCalledOnce();
-    expect(setters.setTelegram).toHaveBeenCalledWith(state.telegram);
-    expect(setters.setStatus).toHaveBeenLastCalledWith("ready");
-    expect(setters.setInitData).toHaveBeenLastCalledWith("initial-init");
+    expect(shellState.tg).toBe(state.telegram);
+    expect(shellState.telegramSdkStatus).toBe("ready");
+    expect(shellState.telegramMiniAppInitData).toBe("initial-init");
   });
 
   it("keeps status idle when the initial refresh has no web app", () => {
-    const { setters } = makeRuntime({ initData: "", telegram: null });
+    makeRuntime({ initData: "", telegram: null });
 
-    expect(setters.setTelegram).toHaveBeenCalledWith(null);
-    expect(setters.setStatus).toHaveBeenLastCalledWith("idle");
-    expect(setters.setInitData).toHaveBeenLastCalledWith("");
+    expect(shellState.tg).toBeNull();
+    expect(shellState.telegramSdkStatus).toBe("idle");
+    expect(shellState.telegramMiniAppInitData).toBe("");
   });
 
   it("updates telegram and init data after launch loading", async () => {
-    const { runtime, setters, state } = makeRuntime();
+    const { runtime, state } = makeRuntime();
 
     const loadedTelegram = await runtime.load();
 
     expect(loadedTelegram).toBe(state.telegram);
-    expect(setters.setTelegram).toHaveBeenLastCalledWith({ platform: "android" });
-    expect(setters.setInitData).toHaveBeenLastCalledWith("loaded-init");
+    expect(shellState.tg).toEqual({ platform: "android" });
+    expect(shellState.telegramMiniAppInitData).toBe("loaded-init");
   });
 
   it("proxies launch parameter and location init-data helpers", () => {
@@ -93,25 +81,25 @@ describe("createTelegramRuntime", () => {
   });
 
   it("refreshes the shell-owned telegram binding", () => {
-    const { runtime, setters, state } = makeRuntime();
+    const { runtime, state } = makeRuntime();
     state.telegram = { platform: "desktop" };
     state.initData = "refreshed-init";
 
     expect(runtime.refreshTelegram()).toEqual({ platform: "desktop" });
 
-    expect(setters.setTelegram).toHaveBeenLastCalledWith({ platform: "desktop" });
-    expect(setters.setStatus).toHaveBeenLastCalledWith("ready");
-    expect(setters.setInitData).toHaveBeenLastCalledWith("refreshed-init");
+    expect(shellState.tg).toEqual({ platform: "desktop" });
+    expect(shellState.telegramSdkStatus).toBe("ready");
+    expect(shellState.telegramMiniAppInitData).toBe("refreshed-init");
   });
 
   it("does not overwrite status on later empty refreshes", () => {
-    const { runtime, setters, state } = makeRuntime();
+    const { runtime, state } = makeRuntime();
     state.telegram = null;
-    setters.setStatus.mockClear();
+    shellState.telegramSdkStatus = "ready";
 
     expect(runtime.refreshTelegram()).toBeNull();
 
-    expect(setters.setTelegram).toHaveBeenLastCalledWith(null);
-    expect(setters.setStatus).not.toHaveBeenCalled();
+    expect(shellState.tg).toBeNull();
+    expect(shellState.telegramSdkStatus).toBe("ready");
   });
 });

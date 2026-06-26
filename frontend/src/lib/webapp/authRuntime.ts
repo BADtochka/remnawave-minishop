@@ -1,5 +1,6 @@
 import { readEmailCodeLoginDeeplink } from "./deeplinks.js";
 import { isPasswordLoginPath, syncPasswordLoginPath } from "./passwordLoginRoute.js";
+import { shellState } from "./shellState.svelte";
 import type { AuthState } from "./stores/authStore";
 
 type AuthStoreLike = {
@@ -12,15 +13,10 @@ type AuthStoreLike = {
 type AuthRuntimeDeps = {
   authStore: AuthStoreLike;
   cleanDocsDemoRouteQuery: () => void;
-  getEmailLoginDeeplinkConsumed: () => boolean;
   isDocsDemo: boolean;
   readEmailCodeLoginDeeplink?: () => string | null;
   routePathnameFromLocation: () => string;
   routePrefix: string;
-  setActiveTab: (tab: string) => void;
-  setEmailLoginDeeplinkConsumed: (consumed: boolean) => void;
-  setMode: (mode: string) => void;
-  setScreen: (screen: string) => void;
   syncPasswordLoginPath?: typeof syncPasswordLoginPath;
   tick: () => Promise<void>;
 };
@@ -28,18 +24,17 @@ type AuthRuntimeDeps = {
 export function createAuthRuntime({
   authStore,
   cleanDocsDemoRouteQuery,
-  getEmailLoginDeeplinkConsumed,
   isDocsDemo,
   readEmailCodeLoginDeeplink: readEmailDeeplink = readEmailCodeLoginDeeplink,
   routePathnameFromLocation,
   routePrefix,
-  setActiveTab,
-  setEmailLoginDeeplinkConsumed,
-  setMode,
-  setScreen,
   syncPasswordLoginPath: syncPasswordPath = syncPasswordLoginPath,
   tick,
 }: AuthRuntimeDeps) {
+  const setScreen = (screen: string) => {
+    shellState.screen = screen;
+  };
+
   function setPasswordLoginMode(enabled: boolean, replace = false) {
     const nextEnabled = Boolean(enabled);
     authStore.update((state) => ({
@@ -59,10 +54,10 @@ export function createAuthRuntime({
   }
 
   async function startEmailCodeLoginFromDeeplink() {
-    if (getEmailLoginDeeplinkConsumed()) return;
+    if (shellState.emailLoginDeeplinkConsumed) return;
     const emailHint = readEmailDeeplink();
     if (!emailHint) return;
-    setEmailLoginDeeplinkConsumed(true);
+    shellState.emailLoginDeeplinkConsumed = true;
     authStore.clearPendingEmailCode();
     authStore.update((state) => ({
       ...state,
@@ -77,9 +72,9 @@ export function createAuthRuntime({
   }
 
   function showLogin() {
-    setMode("login");
+    shellState.mode = "login";
     setScreen("login");
-    setActiveTab("home");
+    shellState.activeTab = "home";
     setPasswordLoginMode(isPasswordLoginPath(routePathnameFromLocation()), true);
     authStore.restorePendingEmailCode(setScreen);
     void startEmailCodeLoginFromDeeplink();

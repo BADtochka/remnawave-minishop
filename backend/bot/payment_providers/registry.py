@@ -11,6 +11,7 @@ from . import (
     pally,
     paykilla,
     platega,
+    qa,
     severpay,
     stars,
     stripe,
@@ -42,6 +43,7 @@ PAYMENT_PROVIDER_SPECS: tuple[PaymentProviderSpec, ...] = (
     pally.SPEC,
     cloudpayments.SPEC,
     stripe.SPEC,
+    qa.SPEC,
 )
 
 

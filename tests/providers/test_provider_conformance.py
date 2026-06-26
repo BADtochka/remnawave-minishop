@@ -41,6 +41,7 @@ LINKFLOW_BESPOKE = {
     "pally": "answers the callback query mid-flow + per-flow create_bill args",
     "paykilla": "bespoke invoice flow not unified with the shared engine",
     "platega": "sbp/crypto sub-variants, each with its own SPEC and variant routing",
+    "qa": "local signed webhook fixture for full-stack QA, not a real hosted provider",
     "stars": "Telegram Stars in-app invoice; no external payment link or webhook",
     "stripe": "card PaymentIntent / saved-card recurring, not a hosted-link redirect",
     "wata": "multi-profile terminal routing with per-profile signature",
@@ -63,7 +64,7 @@ LINKFLOW_BESPOKE = {
 # map honest: changing a service's base class, or adding/removing a webhook route,
 # fails CI until this inventory is updated to match.
 WEBHOOK_PROFILES = {
-    "base-template": {"cryptopay"},
+    "base-template": {"cryptopay", "qa"},
     "service-route": {
         "cloudpayments",
         "freekassa",

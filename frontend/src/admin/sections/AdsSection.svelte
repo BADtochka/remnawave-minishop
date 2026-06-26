@@ -12,11 +12,7 @@
     AdminTable,
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { TableHandler } from "@vincjo/datatables";
   import type { AdsStore } from "../../lib/admin/stores/adsStore";
   import type { components } from "../../lib/api/openapi.generated";
 
@@ -24,26 +20,31 @@
   type Ad = components["schemas"]["AdOut"];
   type AdDraft = components["schemas"]["AdCreateBody"];
 
-  export let at: TranslateFn;
-  export let fmtMoney: (value: number) => string;
+  let {
+    at,
+    fmtMoney,
+  }: {
+    at: TranslateFn;
+    fmtMoney: (value: number) => string;
+  } = $props();
 
   const ADS_PAGE_SIZE = 10;
   const adsStore = getContext<AdsStore>("adsStore");
-  const adsTable = createAdminDatatable([], { rowsPerPage: ADS_PAGE_SIZE });
-  const adsSignal = watchAdminDatatable(adsTable);
+  const adsTable = new TableHandler<Ad>([], { rowsPerPage: ADS_PAGE_SIZE });
 
-  let ads: Ad[] = [];
-  let adsLoading = false;
-  let adCreateOpen = false;
-  let adDraft: AdDraft = { source: "", start_param: "", cost: 0 };
+  const ads = $derived(adsStore.ads as Ad[]);
+  const adsLoading = $derived(Boolean(adsStore.adsLoading));
+  const adCreateOpen = $derived(Boolean(adsStore.adCreateOpen));
+  const adDraft = $derived(
+    (adsStore.adDraft || { source: "", start_param: "", cost: 0 }) as AdDraft
+  );
+  const adRows = $derived(adsTable.rows as Ad[]);
 
-  $: ({ ads, adsLoading, adCreateOpen, adDraft } = $adsStore);
-  $: {
-    syncAdminDatatable(adsTable, ads);
+  $effect(() => {
+    adsTable.setRows(ads);
     if (adsTable.currentPage > (adsTable.pageCount || 1)) adsTable.setPage(adsTable.pageCount || 1);
-  }
-  $: adRows = $adsSignal.rows as Ad[];
-  $: adHeaders = [
+  });
+  const adHeaders = $derived([
     at("id", {}, "ID"),
     at("ads_col_source", {}, "Источник"),
     at("ads_col_param", {}, "Параметр"),
@@ -52,7 +53,7 @@
     at("ads_col_conversions", {}, "Конверсии"),
     at("ads_col_status", {}, "Статус"),
     at("actions", {}, "Действия"),
-  ];
+  ]);
 
   onMount(() => {
     adsStore.loadAds();
@@ -156,7 +157,7 @@
           type="text"
           placeholder="telegram_ads"
           value={adDraft.source}
-          on:input={(e) =>
+          oninput={(e) =>
             adsStore.updateDraft({ source: (e.currentTarget as HTMLInputElement).value })}
         />
       </AdminField>
@@ -169,7 +170,7 @@
           type="text"
           placeholder="ads_summer25"
           value={adDraft.start_param}
-          on:input={(e) =>
+          oninput={(e) =>
             adsStore.updateDraft({ start_param: (e.currentTarget as HTMLInputElement).value })}
         />
       </AdminField>
@@ -182,7 +183,7 @@
           step="0.01"
           min="0"
           value={String(adDraft.cost)}
-          on:input={(e) =>
+          oninput={(e) =>
             adsStore.updateDraft({ cost: Number((e.currentTarget as HTMLInputElement).value) })}
         />
       </AdminField>

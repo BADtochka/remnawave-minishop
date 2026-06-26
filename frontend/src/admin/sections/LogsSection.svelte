@@ -9,11 +9,7 @@
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
   import { RefreshCw, TriangleAlert, User } from "$components/ui/icons.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { TableHandler } from "@vincjo/datatables";
   import type { LogsStore } from "../../lib/admin/stores/logsStore";
   import type { components } from "../../lib/api/openapi.generated";
 
@@ -21,34 +17,39 @@
   type LogEntry = components["schemas"]["LogOut"];
   type UserKind = "user" | "target";
 
-  export let at: TranslateFn;
-  export let fmtDate: (value: string) => string;
-  export let onOpenUserCard: (userId: number | string | null | undefined) => void = () => {};
+  let {
+    at,
+    fmtDate,
+    onOpenUserCard = () => {},
+  }: {
+    at: TranslateFn;
+    fmtDate: (value: string) => string;
+    onOpenUserCard?: (userId: number | string | null | undefined) => void;
+  } = $props();
 
   const logsStore = getContext<LogsStore>("logsStore");
-  const logsTable = createAdminDatatable();
-  const logsTableSignal = watchAdminDatatable(logsTable);
+  const logsTable = new TableHandler<LogEntry>();
   const LOGS_PAGE_SIZE = 50;
 
-  let logs: LogEntry[] = [];
-  let logsTotal = 0;
-  let logsPage = 0;
-  let logsUserFilter = "";
-  let logsLoading = false;
-  let logsError = "";
+  const logsState = $derived(logsStore);
+  const logs = $derived(logsState.logs as LogEntry[]);
+  const logsTotal = $derived(Number(logsState.logsTotal || 0));
+  const logsPage = $derived(Number(logsState.logsPage || 0));
+  const logsUserFilter = $derived(String(logsState.logsUserFilter || ""));
+  const logsLoading = $derived(Boolean(logsState.logsLoading));
+  const logsError = $derived(String(logsState.logsError || ""));
+  const logRows = $derived(logsTable.rows as LogEntry[]);
 
-  $: ({ logs, logsTotal, logsPage, logsUserFilter, logsLoading, logsError } = $logsStore);
-  $: syncAdminDatatable(logsTable, logs);
-  $: logRows = $logsTableSignal.rows as LogEntry[];
+  $effect(() => logsTable.setRows(logs));
 
-  $: logsPageCount = Math.max(1, Math.ceil(Number(logsTotal || 0) / LOGS_PAGE_SIZE));
-  $: logHeaders = [
+  const logsPageCount = $derived(Math.max(1, Math.ceil(Number(logsTotal || 0) / LOGS_PAGE_SIZE)));
+  const logHeaders = $derived([
     at("date", {}, "Дата"),
     at("event", {}, "Событие"),
     at("user_short", {}, "User"),
     at("target_short", {}, "Target"),
     at("content", {}, "Контент"),
-  ];
+  ]);
 
   function userDisplay(entry: LogEntry, kind: UserKind): string | number {
     const id = kind === "target" ? entry.target_user_id : entry.user_id;
@@ -81,8 +82,8 @@
       class="input"
       placeholder={at("logs_user_filter_placeholder", {}, "Фильтр по ID пользователя")}
       value={logsUserFilter}
-      on:input={(e) => logsStore.setFilter((e.currentTarget as HTMLInputElement).value)}
-      on:keydown={(e) => e.key === "Enter" && logsStore.setPage(0)}
+      oninput={(e) => logsStore.setFilter((e.currentTarget as HTMLInputElement).value)}
+      onkeydown={(e) => e.key === "Enter" && logsStore.setPage(0)}
     />
     <AdminButton
       variant="primary"

@@ -30,24 +30,34 @@
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type ComponentCallback = (...args: never[]) => void;
 
-  export let at: TranslateFn;
-  export let settingsDirty: SettingsDirtyState = {};
-  export let settingsFieldMap = new Map<string, SettingField>();
-  export let settingsSaving = false;
-  export let panelSquadOptions: SelectOption[] = [];
-  export let panelSquadsLoading = false;
-  export let onSettingsSaved: (payload: SettingsSavedPayload) => void | Promise<void> = () => {};
+  let {
+    at,
+    settingsDirty = {},
+    settingsFieldMap = new Map<string, SettingField>(),
+    settingsSaving = false,
+    panelSquadOptions = [],
+    panelSquadsLoading = false,
+    onSettingsSaved = () => {},
+  }: {
+    at: TranslateFn;
+    settingsDirty?: SettingsDirtyState;
+    settingsFieldMap?: Map<string, SettingField>;
+    settingsSaving?: boolean;
+    panelSquadOptions?: SelectOption[];
+    panelSquadsLoading?: boolean;
+    onSettingsSaved?: (payload: SettingsSavedPayload) => void | Promise<void>;
+  } = $props();
 
   const settingsStore = getContext<SettingsStore>("settingsStore");
   const tariffsStore = getContext<TariffsStore>("tariffsStore");
 
-  let selectedTrialSquad = "";
-  let selectedTrialPremiumSquad = "";
-  let trialSquadSelectKey = 0;
-  let trialPremiumSquadSelectKey = 0;
-  let trialDirtyCount = 0;
-
-  $: trialDirtyCount = TRIAL_SETTING_KEYS.filter((key) => Boolean(settingsDirty[key])).length;
+  let selectedTrialSquad = $state("");
+  let selectedTrialPremiumSquad = $state("");
+  let trialSquadSelectKey = $state(0);
+  let trialPremiumSquadSelectKey = $state(0);
+  const trialDirtyCount = $derived(
+    TRIAL_SETTING_KEYS.filter((key) => Boolean(settingsDirty[key])).length
+  );
 
   function valueForKey(
     key: string,

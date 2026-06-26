@@ -9,35 +9,38 @@
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
   import { FileText, User } from "$components/ui/icons.js";
-  import {
-    createAdminDatatable,
-    syncAdminDatatable,
-    watchAdminDatatable,
-  } from "../../lib/admin/datatables.js";
+  import { TableHandler } from "@vincjo/datatables";
   import type { PaymentOut, PaymentsStore } from "../../lib/admin/stores/paymentsStore";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 
-  export let at: TranslateFn = (key) => key;
-  export let fmtDate: (value: string | null | undefined) => string = (value) => String(value || "");
-  export let fmtMoney: (value: number, currency?: string | null) => string = (value) =>
-    String(value);
-  export let paymentStatusVariant: (status: string | null | undefined) => string = () => "muted";
-  export let onOpenUserCard: (userId: number) => void = () => {};
+  let {
+    at = (key) => key,
+    fmtDate = (value) => String(value || ""),
+    fmtMoney = (value) => String(value),
+    paymentStatusVariant = () => "muted",
+    onOpenUserCard = () => {},
+  }: {
+    at?: TranslateFn;
+    fmtDate?: (value: string | null | undefined) => string;
+    fmtMoney?: (value: number, currency?: string | null) => string;
+    paymentStatusVariant?: (status: string | null | undefined) => string;
+    onOpenUserCard?: (userId: number) => void;
+  } = $props();
 
   const paymentsStore = getContext<PaymentsStore>("paymentsStore");
-  const paymentsTable = createAdminDatatable();
-  const paymentsTableSignal = watchAdminDatatable(paymentsTable);
+  const paymentsTable = new TableHandler<PaymentOut>();
   const PAYMENTS_PAGE_SIZE = 25;
-  let payments: PaymentOut[] = [];
-  let paymentsTotal = 0;
-  let paymentsPage = 0;
-  let paymentsLoading = false;
+  const payments = $derived(paymentsStore.payments as PaymentOut[]);
+  const paymentsTotal = $derived(Number(paymentsStore.paymentsTotal || 0));
+  const paymentsPage = $derived(Number(paymentsStore.paymentsPage || 0));
+  const paymentsLoading = $derived(Boolean(paymentsStore.paymentsLoading));
 
-  $: ({ payments, paymentsTotal, paymentsPage, paymentsLoading } = $paymentsStore);
-  $: syncAdminDatatable(paymentsTable, payments);
+  $effect(() => paymentsTable.setRows(payments));
 
-  $: paymentsPageCount = Math.max(1, Math.ceil(Number(paymentsTotal || 0) / PAYMENTS_PAGE_SIZE));
+  const paymentsPageCount = $derived(
+    Math.max(1, Math.ceil(Number(paymentsTotal || 0) / PAYMENTS_PAGE_SIZE))
+  );
 
   function formatTrafficGbCell(v: number | string | null | undefined): string {
     if (v == null || v === "") return "—";
@@ -83,7 +86,7 @@
     return raw || "—";
   }
 
-  $: paymentHeaders = [
+  const paymentHeaders = $derived([
     at("id", {}, "ID"),
     at("user", {}, "Пользователь"),
     at("payments_col_user_id", {}, "ID"),
@@ -94,7 +97,7 @@
     at("description", {}, "Описание"),
     at("status", {}, "Статус"),
     at("date", {}, "Дата"),
-  ];
+  ]);
 
   onMount(() => {
     paymentsStore.loadPayments();
@@ -108,7 +111,7 @@
       rows={8}
       widths={["48px", "148px", "88px", "72px", "72px", "78px", "82px", "140px", "72px", "96px"]}
     />
-  {:else if !$paymentsTableSignal.rows.length}
+  {:else if !paymentsTable.rows.length}
     <AdminEmptyState tone="card"
       ><span class="admin-muted">{at("payments_empty", {}, "Нет платежей")}</span></AdminEmptyState
     >
@@ -129,7 +132,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each $paymentsTableSignal.rows as p (p.payment_id)}
+        {#each paymentsTable.rows as p (p.payment_id)}
           <tr>
             <td class="admin-cell-id" data-label="ID">
               <AdminButton
@@ -160,7 +163,7 @@
               </span>
             </td>
             <td class="admin-cell-mono" data-label={at("payments_col_user_id", {}, "ID")}>
-              {p.user_id != null && p.user_id !== "" ? p.user_id : "—"}
+              {p.user_id != null ? p.user_id : "—"}
             </td>
             <td
               class="admin-cell-traffic-gb"

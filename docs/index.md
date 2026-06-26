@@ -2,6 +2,9 @@
 
 ## Разработка
 
+- [Единый dev stand](development/dev-stand.md) - локальный Docker Compose стенд
+  с Mini Shop, Remnawave Panel, Subscription Page, сидами и командами
+  `npm run dev:stand:*` для full-stack QA.
 - [API плагинов и расширений](development/plugins.md) - хуки Python-плагинов,
   доменные события, feature flags, миграции, локали и правила расширения
   секций админки.
