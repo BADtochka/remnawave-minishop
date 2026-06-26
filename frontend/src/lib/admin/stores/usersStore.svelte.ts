@@ -8,30 +8,34 @@ import {
   buildAdminUserReferralsPath,
   buildAdminUsersPath,
   type ApiResponse,
-  type GetResponse,
 } from "../../webapp/publicApi";
-import type { components } from "../../api/openapi.generated";
+import type { components, operations } from "../../api/openapi.generated";
 
 type AdminErrorResponse = { ok?: false; error?: string; message?: string; detail?: string };
 type AdminApi = <Path extends string>(
   path: Path,
   options?: RequestInit
 ) => Promise<ApiResponse<Path> | AdminErrorResponse>;
-type AdminUsersListResponse = GetResponse<"/api/admin/users">;
-type AdminUserDetailResponse = GetResponse<"/api/admin/users/{user_id}">;
-type AdminUserReferralsResponse = GetResponse<"/api/admin/users/{user_id}/referrals">;
-type AdminLogsResponse = GetResponse<"/api/admin/logs">;
-type AdminListUser = AdminUsersListResponse["users"][number];
-type AdminSubscription = components["schemas"]["AdminSubscriptionOut"] & Record<string, unknown>;
+type AdminUsersListResponse = NonNullable<
+  operations["get_admin_users_list_route"]["responses"][200]["content"]["application/json"]
+>;
+type AdminUserDetailResponse = NonNullable<
+  operations["get_admin_user_detail_route"]["responses"][200]["content"]["application/json"]
+>;
+type AdminUserReferralsResponse = NonNullable<
+  operations["get_admin_user_referrals_route"]["responses"][200]["content"]["application/json"]
+>;
+type AdminLogsResponse = NonNullable<
+  operations["get_admin_logs_route"]["responses"][200]["content"]["application/json"]
+>;
+type AdminListUser = NonNullable<AdminUsersListResponse["users"]>[number];
+type AdminSubscription = components["schemas"]["AdminSubscriptionOut"];
 type AdminUserDetail = AdminUserDetailResponse & {
   active_subscription: AdminSubscription | null;
   subscriptions: AdminSubscription[];
   user: AdminUser;
 };
-type UserLogRow = Record<string, unknown> & {
-  log_id?: number | string;
-  user_id?: number | string | null;
-};
+type UserLogRow = NonNullable<AdminLogsResponse["logs"]>[number];
 type DraftNumber = number | string;
 type AdminStoreState = {
   users: AdminUser[];
@@ -90,8 +94,7 @@ export type AdminUser = Partial<
   components["schemas"]["AdminUserOut"] &
     components["schemas"]["AdminUserWithAvatarOut"] &
     AdminListUser
-> &
-  Record<string, unknown> & { user_id: number | string };
+> & { user_id: number | string };
 type ToastFn = (message: string) => void;
 type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 type PathContext = "users" | "payments" | null;
