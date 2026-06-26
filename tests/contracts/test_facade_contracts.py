@@ -141,6 +141,70 @@ def _collect_runtime_importers() -> dict[str, set[str]]:
     return runtime_importers
 
 
+def test_monkeypatch_targets_avoid_facade_imports() -> None:
+    facade_modules = (
+        "bot.services.subscription_service",
+        "bot.app.web.admin_api",
+        "bot.app.web.subscription_webapp",
+    )
+    offenders: dict[str, set[str]] = {}
+
+    tests_root = _project_root() / "tests"
+
+    for file in tests_root.rglob("*.py"):
+        if "contracts" in file.parts:
+            continue
+
+        try:
+            tree = ast.parse(file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+
+        relative = file.relative_to(_project_root()).as_posix()
+
+        for node in ast.walk(tree):
+            is_patch_call = False
+            if isinstance(node, ast.Call):
+                func = node.func
+                if isinstance(func, ast.Name) and func.id == "patch":
+                    is_patch_call = True
+                elif isinstance(func, ast.Attribute) and func.attr == "patch":
+                    is_patch_call = True
+                elif (
+                    isinstance(func, ast.Attribute)
+                    and func.attr == "setattr"
+                    and isinstance(func.value, ast.Name)
+                    and func.value.id == "monkeypatch"
+                ):
+                    is_patch_call = True
+
+            if not is_patch_call:
+                continue
+
+            if not node.args:
+                continue
+
+            target = node.args[0]
+            if not isinstance(target, ast.Constant) or not isinstance(target.value, str):
+                continue
+
+            target_text = target.value
+            if target_text.startswith("bot.services.subscription_service_impl"):
+                continue
+
+            for facade in facade_modules:
+                if target_text == facade or target_text.startswith(f"{facade}."):
+                    offenders.setdefault(relative, set()).add(target_text)
+                    break
+
+    assert not offenders, (
+        "tests must patch concrete implementation modules, not compatibility facades: "
+        + "; ".join(
+            f"{file}: {sorted(targets)}" for file, targets in sorted(offenders.items())
+        )
+    )
+
+
 def test_runtime_imports_are_frozen() -> None:
     _, _, expected_runtime_importers = _load_baseline()
     actual_runtime_importers = _collect_runtime_importers()
