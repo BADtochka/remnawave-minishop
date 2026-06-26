@@ -2,6 +2,10 @@ from aiogram import Bot, Dispatcher
 from aiohttp import web
 from sqlalchemy.orm import sessionmaker
 
+from bot.app.controllers.dispatcher_context import (
+    get_dispatcher_bot_username,
+    iter_dispatcher_services,
+)
 from bot.app.web.admin_api_impl.auth import (
     admin_auth_middleware,
 )
@@ -12,7 +16,6 @@ from bot.app.web.context import (
     set_bot_username,
     set_core_context,
     set_service_context,
-    workflow_data_for,
 )
 from bot.services.email_auth_service import EmailAuthService
 from config.settings import Settings
@@ -67,22 +70,24 @@ def create_subscription_webapp_application(
 
     from bot.payment_providers import iter_service_keys
 
-    workflow_data = workflow_data_for(dp)
-    for key in (
-        "subscription_service",
-        "promo_code_service",
-        "referral_service",
-        "support_service",
-        "notification_service",
-        "email_auth_service",
-        "panel_service",
-        *iter_service_keys(),
+    for key, service in iter_dispatcher_services(
+        dp,
+        (
+            "subscription_service",
+            "promo_code_service",
+            "referral_service",
+            "support_service",
+            "notification_service",
+            "email_auth_service",
+            "panel_service",
+            *iter_service_keys(),
+        ),
     ):
-        if key in workflow_data:
-            set_service_context(app, key, workflow_data[key])
+        set_service_context(app, key, service)
 
-    if "bot_username" in workflow_data:
-        set_bot_username(app, workflow_data["bot_username"])
+    bot_username = get_dispatcher_bot_username(dp)
+    if bot_username:
+        set_bot_username(app, bot_username)
 
     setup_subscription_webapp_routes(app)
     return app

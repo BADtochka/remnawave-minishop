@@ -241,7 +241,7 @@ class CoreEventReactions:
         self.ctx = ctx
 
     def _notification_service(self) -> Optional[NotificationService]:
-        service = self.ctx.services.get("notification_service")
+        service = self.ctx.notification_service
         if service is not None:
             return service
         if self.ctx.bot is None:
@@ -251,7 +251,7 @@ class CoreEventReactions:
             self.ctx.settings,
             self.ctx.i18n,
             session_factory=self.ctx.session_factory,
-            email_auth_service=self.ctx.services.get("email_auth_service"),
+            email_auth_service=self.ctx.email_auth_service,
         )
 
     async def _load_user(self, user_id: Any) -> Optional[User]:
@@ -633,7 +633,7 @@ class CoreEventReactions:
                     target_user_id,
                 )
 
-        email_service = self.ctx.services.get("email_auth_service")
+        email_service = self.ctx.email_auth_service
         email = str(payload.get("email") or "").strip()
         if email_service is not None and email and _truthy(payload.get("send_user_email")):
             try:

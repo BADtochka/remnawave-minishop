@@ -104,13 +104,6 @@ PAYMENT_SERVICE_KEYS: dict[str, web.AppKey[object]] = {
 }
 
 
-def workflow_data_for(dp: Dispatcher) -> Mapping[str, object]:
-    workflow_data = getattr(dp, "workflow_data", {})
-    if isinstance(workflow_data, Mapping):
-        return workflow_data
-    return {}
-
-
 def _required_value(app: object, app_key: web.AppKey[T], string_key: str) -> T:
     storage = cast(AppStorage, app)
     if app_key in storage:

@@ -18,6 +18,18 @@
 `services`. Словарь `services` — публичная поверхность расширения; ключи должны быть строками,
 а хуки должны терпеть отсутствие optional-полей в вспомогательных entrypoint'ах.
 
+Для first-party core services и типизированного plugin-кода предпочитай helpers на контексте:
+
+- `ctx.require_bot()`, `ctx.require_i18n()`, `ctx.require_session_factory()` — когда entrypoint
+  обязан иметь runtime-объект;
+- `ctx.panel_service`, `ctx.subscription_service`, `ctx.notification_service` и парные
+  `ctx.require_*` helpers — typed доступ к core services без строковых ключей;
+- `ctx.get_service("my_service", MyService)` / `ctx.require_service("my_service", MyService)` —
+  runtime-проверяемый доступ к сервисам, добавленным плагином.
+
+Прямой `ctx.services[...]` остается совместимым API для внешних плагинов и динамических ключей, но
+новый first-party код должен идти через typed helpers, если ключ заранее известен.
+
 Web-плагины получают один из двух scope из `bot.plugins.spec`:
 
 - `WEB_SCOPE_WEBAPP` — Mini App и admin API;

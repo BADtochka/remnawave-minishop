@@ -36,6 +36,19 @@ def test_plugin_base_hooks_are_noops_and_context_services_stays_dict() -> None:
     assert plugin.entitlements_provider() is None
 
 
+def test_plugin_context_typed_service_helpers_keep_services_mapping_compatible() -> None:
+    class SampleService:
+        pass
+
+    service = SampleService()
+    ctx = PluginContext(settings=make_settings(), services={"sample": service})
+
+    assert ctx.services["sample"] is service
+    assert ctx.get_service("sample", SampleService) is service
+    assert ctx.require_service("sample", SampleService) is service
+    assert ctx.get_service("missing", SampleService) is None
+
+
 def test_plugin_setup_subscriber_receives_event_name_and_plain_dict_payload() -> None:
     received = []
 

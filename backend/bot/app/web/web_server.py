@@ -10,11 +10,11 @@ from aiohttp import web
 from aiohttp.web_log import AccessLogger, KeyMethod
 from sqlalchemy.orm import sessionmaker
 
+from bot.app.controllers.dispatcher_context import iter_dispatcher_services
 from bot.app.web.context import (
     get_app_settings,
     set_core_context,
     set_service_context,
-    workflow_data_for,
 )
 from bot.payment_providers import iter_provider_specs, iter_service_keys
 from bot.plugins import (
@@ -82,7 +82,6 @@ def _inject_shared_instances(
         settings=settings,
         async_session_factory=async_session_factory,
     )
-    workflow_data = workflow_data_for(dp)
     shared_keys = [
         "subscription_service",
         "referral_service",
@@ -91,9 +90,8 @@ def _inject_shared_instances(
         "lknpd_service",
         *iter_service_keys(),
     ]
-    for key in shared_keys:
-        if key in workflow_data:
-            set_service_context(app, key, workflow_data[key])
+    for key, service in iter_dispatcher_services(dp, shared_keys):
+        set_service_context(app, key, service)
 
 
 async def build_and_start_web_app(

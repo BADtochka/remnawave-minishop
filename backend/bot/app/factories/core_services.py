@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, TypeAlias
+from typing import Dict, TypeAlias
 
 from bot.services.email_auth_service import EmailAuthService
 from bot.services.notification_service import NotificationService
@@ -29,7 +29,7 @@ class CoreServices:
     panel_webhook_service: PanelWebhookService
     payment_services: PaymentServices
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> Dict[str, object]:
         return {
             "panel_service": self.panel_service,
             "subscription_service": self.subscription_service,
