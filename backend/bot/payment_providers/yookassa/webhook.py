@@ -16,7 +16,7 @@ from bot.middlewares.i18n import JsonI18n
 from bot.services.lknpd_service import LknpdService
 from bot.services.panel_api_service import PanelApiService
 from bot.services.referral_service import ReferralService
-from bot.services.subscription_service import SubscriptionService
+from bot.services.subscription_service_impl.core import SubscriptionService
 from bot.services.user_email_notifications import send_user_notification_email
 from bot.utils.request_security import ip_in_allowlist, request_client_ip
 from config.settings import Settings

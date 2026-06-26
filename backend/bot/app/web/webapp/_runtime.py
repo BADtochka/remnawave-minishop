@@ -48,7 +48,7 @@ from bot.services.email_auth_service import EmailAuthService, is_disposable_emai
 from bot.services.email_templates import render_account_merged
 from bot.services.promo_code_service import PromoCodeService
 from bot.services.referral_service import ReferralService
-from bot.services.subscription_service import SubscriptionService
+from bot.services.subscription_service_impl.core import SubscriptionService
 from bot.utils.config_link import prepare_config_links
 from bot.utils.request_security import parse_ip_entries, request_client_ip
 from bot.utils.text_sanitizer import (

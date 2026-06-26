@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 from bot.middlewares.i18n import JsonI18n
 from bot.services.referral_service import ReferralService
-from bot.services.subscription_service import SubscriptionService
+from bot.services.subscription_service_impl.core import SubscriptionService
 from config.settings import Settings
 from db.dal import payment_dal
 

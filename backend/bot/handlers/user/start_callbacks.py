@@ -16,7 +16,7 @@ from bot.middlewares.i18n import JsonI18n, normalize_locale_language_code
 from bot.services.panel_api_service import PanelApiService
 from bot.services.promo_code_service import PromoCodeService
 from bot.services.referral_service import ReferralService
-from bot.services.subscription_service import SubscriptionService
+from bot.services.subscription_service_impl.core import SubscriptionService
 from bot.utils.callback_answer import (
     callback_data,
     callback_message,

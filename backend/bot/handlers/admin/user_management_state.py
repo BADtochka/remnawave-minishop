@@ -12,7 +12,7 @@ from bot.keyboards.inline.admin_keyboards import get_back_to_admin_panel_keyboar
 from bot.middlewares.i18n import JsonI18n
 from bot.services.panel_api_service import PanelApiService
 from bot.services.referral_service import ReferralService
-from bot.services.subscription_service import SubscriptionService
+from bot.services.subscription_service_impl.core import SubscriptionService
 from bot.states.admin_states import AdminStates
 from bot.utils import get_message_content, send_direct_message
 from bot.utils.callback_answer import (

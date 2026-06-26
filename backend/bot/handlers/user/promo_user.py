@@ -13,7 +13,7 @@ from bot.keyboards.inline.user_keyboards import (
 )
 from bot.middlewares.i18n import JsonI18n
 from bot.services.promo_code_service import PromoCodeService
-from bot.services.subscription_service import SubscriptionService
+from bot.services.subscription_service_impl.core import SubscriptionService
 from bot.states.user_states import UserPromoStates
 from bot.utils.callback_answer import callback_message, message_from_user, safe_answer_callback
 from bot.utils.install_links import (

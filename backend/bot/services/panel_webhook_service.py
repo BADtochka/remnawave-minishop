@@ -32,7 +32,7 @@ from db.models import Subscription, User
 from .panel_api_service import PanelApiService
 
 if TYPE_CHECKING:
-    from bot.services.subscription_service import SubscriptionService
+    from bot.services.subscription_service_impl.core import SubscriptionService
 
 EVENT_MAP = {
     "user.expires_in_72_hours": SubscriptionNotificationStage(
