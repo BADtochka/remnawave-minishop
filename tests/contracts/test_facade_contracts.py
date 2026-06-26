@@ -16,15 +16,17 @@ def _load_baseline() -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     scripts_dir = _project_root() / "scripts"
     exports_path = scripts_dir / "facade_exports_baseline.json"
     imports_path = scripts_dir / "facade_import_baseline.json"
+    runtime_imports_path = scripts_dir / "runtime_import_baseline.json"
 
     return (
         __import__("json").loads(exports_path.read_text(encoding="utf-8")),
         __import__("json").loads(imports_path.read_text(encoding="utf-8")),
+        __import__("json").loads(runtime_imports_path.read_text(encoding="utf-8")),
     )
 
 
 def test_facade_public_exports_are_frozen() -> None:
-    expected_exports, _ = _load_baseline()
+    expected_exports, _, _ = _load_baseline()
     actual_exports = {
         "backend/bot/app/web/admin_api.py": bot.app.web.admin_api.__all__,
         "backend/bot/app/web/subscription_webapp.py": bot.app.web.subscription_webapp.__all__,
@@ -69,9 +71,58 @@ def _collect_facade_importers() -> dict[str, set[str]]:
 
 
 def test_facade_imports_are_explicit_and_frozen() -> None:
-    _, expected_importers = _load_baseline()
+    _, expected_importers, expected_runtime_importers = _load_baseline()
     actual_importers = _collect_facade_importers()
 
     for facade_name, expected in expected_importers.items():
         normalized_expected = sorted(Path(p).as_posix() for p in expected)
         assert sorted(actual_importers[facade_name]) == normalized_expected
+
+
+def _collect_runtime_importers() -> dict[str, set[str]]:
+    runtime_importers = {
+        "admin_api_impl_runtime": set[str](),
+        "webapp_runtime": set[str](),
+    }
+    backend_root = _project_root() / "backend"
+
+    for file in backend_root.rglob("*.py"):
+        if "tests" in file.parts:
+            continue
+
+        relative = file.relative_to(_project_root()).as_posix()
+        is_admin_api_impl = "backend/bot/app/web/admin_api_impl" in file.as_posix()
+        is_webapp_package = "backend/bot/app/web/webapp/" in file.as_posix()
+
+        try:
+            tree = ast.parse(file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+
+            module = node.module or ""
+            if node.level and module == "_runtime":
+                if is_admin_api_impl:
+                    runtime_importers["admin_api_impl_runtime"].add(relative)
+                if is_webapp_package:
+                    runtime_importers["webapp_runtime"].add(relative)
+                continue
+
+            if module == "bot.app.web.admin_api_impl._runtime":
+                runtime_importers["admin_api_impl_runtime"].add(relative)
+            elif module == "bot.app.web.webapp._runtime":
+                runtime_importers["webapp_runtime"].add(relative)
+
+    return runtime_importers
+
+
+def test_runtime_imports_are_frozen() -> None:
+    _, _, expected_runtime_importers = _load_baseline()
+    actual_runtime_importers = _collect_runtime_importers()
+
+    for runtime_name, expected in expected_runtime_importers.items():
+        normalized_expected = sorted(Path(p).as_posix() for p in expected)
+        assert sorted(actual_runtime_importers[runtime_name]) == normalized_expected
