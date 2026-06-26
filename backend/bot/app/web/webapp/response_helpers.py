@@ -1,12 +1,4 @@
-"""Shared helpers for returning Web JSON responses."""
+from bot.app.web.response_helpers import json_response
 
-from __future__ import annotations
-
-from typing import Any, cast
-
-from aiohttp import web
-
-
-def json_response(data: Any = None, **kwargs: Any) -> web.Response:
-    return cast(web.Response, web.json_response(data, **kwargs))
+__all__ = ["json_response"]
 

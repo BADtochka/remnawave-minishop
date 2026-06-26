@@ -42,9 +42,8 @@
       "backend/bot/app/web/webapp"
     ],
     "allowlist": [
-      "backend/bot/app/web/webapp/response_helpers.py",
-      "backend/bot/app/web/admin_api_impl/common.py",
-      "backend/bot/app/web/webapp/_runtime.py"
+      "backend/bot/app/web/response_helpers.py",
+      "backend/bot/app/web/webapp/response_helpers.py"
     ]
   },
   "frontend_weak_typing": {
@@ -105,5 +104,18 @@
       "subscription_service": []
     },
     "allowlist_paths": []
+  },
+  "route_contracts": {
+    "route_setup_scopes": [
+      "backend/bot/app/web/admin_api_impl/routes.py",
+      "backend/bot/app/web/webapp/routes.py"
+    ],
+    "contract_scopes": [
+      "backend/bot/app/web/admin_api_impl",
+      "backend/bot/app/web/webapp/routes.py"
+    ],
+    "path_allowlist": [
+      "/api/admin/payments/export.csv"
+    ]
   }
 }

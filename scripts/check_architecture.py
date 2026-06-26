@@ -28,9 +28,218 @@ def _iter_text_files(scope: str, extensions: set[str]):
     base = ROOT / scope
     if not base.exists():
         return []
+    if base.is_file():
+        return [base] if base.suffix.lower() in extensions else []
+
     return [
-        file for file in base.rglob("*") if file.is_file() and file.suffix.lower() in extensions
+        file
+        for file in base.rglob("*")
+        if file.is_file() and file.suffix.lower() in extensions
     ]
+
+
+def _string_value(node: ast.AST | None) -> str | None:
+    if node is None:
+        return None
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
+
+
+def _is_call_to_register_contract(node: ast.Call) -> bool:
+    return isinstance(node.func, (ast.Name, ast.Attribute)) and (
+        (isinstance(node.func, ast.Name) and node.func.id == "register_contract")
+        or (isinstance(node.func, ast.Attribute) and node.func.attr == "register_contract")
+    )
+
+
+def _is_contract_dict_name(name: str) -> bool:
+    return name.endswith("ROUTE_CONTRACTS") or name.lower() == "route_contracts"
+
+
+def _collect_contract_names(cfg: dict, issues: list[str]) -> set[str]:
+    checks = cfg.get("route_contracts")
+    if not checks:
+        return set()
+
+    contract_names: set[str] = set()
+
+    for scope in checks.get("contract_scopes", []):
+        for file in _iter_text_files(scope, {".py"}):
+            try:
+                tree = ast.parse(file.read_text(encoding="utf-8", errors="ignore"))
+            except Exception:
+                issues.append(
+                    f"[route-contracts] Failed to parse contract file {file.relative_to(ROOT)} for "
+                    "contract collection."
+                )
+                continue
+
+            dict_assignments: dict[str, set[str]] = {}
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                    continue
+
+                target_name = None
+                value = None
+
+                if isinstance(node, ast.Assign):
+                    if len(node.targets) != 1:
+                        continue
+                    value = node.value
+                    if isinstance(node.targets[0], ast.Name):
+                        target_name = node.targets[0].id
+                else:
+                    value = node.value
+                    if value is None:
+                        continue
+                    if isinstance(node.target, ast.Name):
+                        target_name = node.target.id
+
+                if target_name is None or not _is_contract_dict_name(target_name):
+                    continue
+                if not isinstance(value, ast.Dict):
+                    continue
+                assigned_keys = {
+                    key
+                    for key in (
+                        _string_value(key_node)
+                        for key_node in value.keys
+                        if key_node is not None
+                    )
+                    if key is not None
+                }
+                if assigned_keys:
+                    dict_assignments[target_name] = assigned_keys
+                    contract_names.update(assigned_keys)
+
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call) or not _is_call_to_register_contract(node):
+                    continue
+                handler_name = _string_value(node.args[0] if node.args else None)
+                if handler_name:
+                    contract_names.add(handler_name)
+                else:
+                    handler_name_expr = node.args[0] if node.args else None
+                    if (
+                        isinstance(handler_name_expr, ast.Name)
+                        and handler_name_expr.id in dict_assignments
+                    ):
+                        contract_names.update(dict_assignments[handler_name_expr.id])
+
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.For):
+                    continue
+                target_name = None
+                if isinstance(node.target, ast.Name):
+                    target_name = node.target.id
+                elif isinstance(node.target, ast.Tuple) and node.target.elts:
+                    first = node.target.elts[0]
+                    if isinstance(first, ast.Name):
+                        target_name = first.id
+
+                if target_name is None:
+                    continue
+                loop_iter_name = _iter_over_dict_name(node.iter)
+                if not loop_iter_name:
+                    continue
+                if loop_iter_name not in dict_assignments:
+                    continue
+
+                for body_node in node.body:
+                    for call_node in ast.walk(body_node):
+                        if not isinstance(call_node, ast.Call) or not _is_call_to_register_contract(
+                            call_node
+                        ):
+                            continue
+                        arg_name = _string_value(call_node.args[0] if call_node.args else None)
+                        if arg_name != target_name:
+                            continue
+                        contract_names.update(dict_assignments[loop_iter_name])
+
+    return contract_names
+
+
+def _iter_over_dict_name(node: ast.AST | None) -> str | None:
+    if node is None:
+        return None
+    if isinstance(node, ast.Name):
+        return node.id
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+        return None
+    if node.func.attr != "items":
+        return None
+    if isinstance(node.func.value, ast.Name):
+        return node.func.value.id
+    return None
+
+
+def _collect_api_routes(cfg: dict, issues: list[str]) -> list[tuple[str, str]]:
+    checks = cfg.get("route_contracts")
+    if not checks:
+        return []
+
+    route_names: list[tuple[str, str]] = []
+    method_calls = {"add_get", "add_post", "add_put", "add_patch", "add_delete", "add_head"}
+
+    for scope in checks.get("route_setup_scopes", []):
+        for file in _iter_text_files(scope, {".py"}):
+            rel = _to_posix(file)
+            try:
+                tree = ast.parse(file.read_text(encoding="utf-8", errors="ignore"))
+            except Exception:
+                issues.append(
+                    f"[route-contracts] Failed to parse route file {rel} for route-contract check."
+                )
+                continue
+
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                if not isinstance(node.func, ast.Attribute):
+                    continue
+                method = node.func.attr
+                if method not in method_calls:
+                    continue
+
+                handler_arg_index = 1
+                if len(node.args) <= handler_arg_index:
+                    continue
+
+                path = _string_value(node.args[0])
+                if path is None:
+                    continue
+                if not path.startswith("/api/"):
+                    continue
+
+                handler_name: str | None = None
+                if isinstance(node.args[handler_arg_index], ast.Name):
+                    handler_name = node.args[1].id
+                else:
+                    handler_name = _string_value(node.args[handler_arg_index])
+                if handler_name is None:
+                    continue
+
+                path_allowlist = checks.get("path_allowlist", [])
+                if _is_allowed(path, path_allowlist):
+                    continue
+
+                route_names.append((path, handler_name))
+
+    return route_names
+
+
+def _check_route_contract_coverage(cfg: dict, issues: list[str]) -> None:
+    checks = cfg.get("route_contracts")
+    if not checks:
+        return
+
+    contract_names = _collect_contract_names(cfg, issues)
+    for path, handler_name in _collect_api_routes(cfg, issues):
+        if handler_name not in contract_names:
+            issues.append(
+                f"[route-contracts] Route {path} -> {handler_name} has no registered route contract"
+            )
 
 
 def _check_type_ignores(cfg: dict, issues: list[str]) -> None:
@@ -340,6 +549,7 @@ def main() -> int:
     _check_runtime_all_exports(config, issues)
     _check_runtime_import_contract(config, issues)
     _check_facade_import_contract(config, issues)
+    _check_route_contract_coverage(config, issues)
 
     if issues:
         print("Architecture checks failed:")

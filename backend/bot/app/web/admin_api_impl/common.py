@@ -7,6 +7,7 @@ from urllib.parse import parse_qsl, urlsplit, urlunsplit
 from aiohttp import web
 from schemas import AdminSubscriptionOut, AdminUserOut, AdOut, LogOut, PaymentOut
 
+from bot.app.web.response_helpers import json_response
 from config.settings import Settings
 from config.tariffs_config import TariffsConfig
 from db.models import AdCampaign, MessageLog, Payment, PromoCode, Subscription, User
@@ -14,11 +15,11 @@ from db.models import AdCampaign, MessageLog, Payment, PromoCode, Subscription, 
 
 def _ok(payload: Dict[str, Any], **extra: Any) -> web.Response:
     body = {"ok": True, **payload, **extra}
-    return web.json_response(body)
+    return json_response(body)
 
 
 def _error(status: int, code: str, message: str = "") -> web.Response:
-    return web.json_response(
+    return json_response(
         {"ok": False, "error": code, "message": message or code},
         status=status,
     )
@@ -36,7 +37,7 @@ def _error_payload(
         body["message"] = message
     if errors:
         body["errors"] = errors
-    return web.json_response(body, status=status)
+    return json_response(body, status=status)
 
 
 _PANEL_LAST_CONNECTED_KEYS = (
