@@ -53,5 +53,27 @@
       ".js"
     ],
     "allowlist": []
+  },
+  "facade_imports": {
+    "scopes": [
+      "backend"
+    ],
+    "facades": {
+      "admin_api": "bot.app.web.admin_api",
+      "subscription_webapp": "bot.app.web.subscription_webapp",
+      "subscription_service": "bot.services.subscription_service"
+    },
+    "allowed_importers": {
+      "admin_api": [
+        "backend/bot/app/web/admin_api.py",
+        "backend/bot/app/web/web_server.py"
+      ],
+      "subscription_webapp": [
+        "backend/bot/app/web/subscription_webapp.py",
+        "backend/bot/app/web/web_server.py"
+      ],
+      "subscription_service": []
+    },
+    "allowlist_paths": []
   }
 }

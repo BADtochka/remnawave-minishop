@@ -6,6 +6,7 @@ import fnmatch
 import json
 import re
 from pathlib import Path
+import ast
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "scripts" / "architecture_gates.json"
@@ -110,6 +111,67 @@ def _check_frontend_weak_typing(cfg: dict, issues: list[str]) -> None:
                 )
 
 
+def _collect_facade_importers(facade_modules: set[str], file: Path) -> set[str]:
+    imports: set[str] = set()
+    try:
+        tree = ast.parse(file.read_text(encoding="utf-8", errors="ignore"))
+    except Exception:
+        return imports
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                for facade in facade_modules:
+                    if alias.name == facade or alias.name.startswith(f"{facade}."):
+                        imports.add(facade)
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            for facade in facade_modules:
+                if module == facade or module.startswith(f"{facade}."):
+                    imports.add(facade)
+
+    return imports
+
+
+def _check_facade_import_contract(cfg: dict, issues: list[str]) -> None:
+    checks = cfg.get("facade_imports")
+    if not checks:
+        return
+
+    facades = checks.get("facades", {})
+    allowed_importers = {k: set(v) for k, v in checks.get("allowed_importers", {}).items()}
+    path_allowlist = checks.get("allowlist_paths", [])
+
+    actual: dict[str, set[str]] = {name: set() for name in facades}
+    for scope in checks.get("scopes", []):
+        base = ROOT / scope
+        if not base.exists():
+            continue
+
+        for file in base.rglob("*.py"):
+            if "tests" in file.parts:
+                continue
+            rel = _to_posix(file)
+            imported = _collect_facade_importers(set(facades.values()), file)
+            if not imported:
+                continue
+            if _is_allowed(rel, path_allowlist):
+                continue
+
+            for facade_name, module in facades.items():
+                if module not in imported:
+                    continue
+                actual[facade_name].add(rel)
+
+    for facade_name, expected_paths in allowed_importers.items():
+        allowed = {Path(p).as_posix() for p in expected_paths}
+        unexpected = sorted(actual.get(facade_name, set()) - allowed)
+        if unexpected:
+            issues.append(
+                f"[facade-imports] Unexpected {facade_name} importers: {', '.join(unexpected)}"
+            )
+
+
 def main() -> int:
     config = _load_config()
     issues: list[str] = []
@@ -118,6 +180,7 @@ def main() -> int:
     _check_type_ignores(config, issues)
     _check_raw_json_response(config, issues)
     _check_frontend_weak_typing(config, issues)
+    _check_facade_import_contract(config, issues)
 
     if issues:
         print("Architecture checks failed:")
