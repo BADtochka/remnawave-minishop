@@ -111,6 +111,40 @@ def _check_frontend_weak_typing(cfg: dict, issues: list[str]) -> None:
                 )
 
 
+def _check_frontend_api_calls(cfg: dict, issues: list[str]) -> None:
+    checks = cfg.get("frontend_api_calls")
+    if not checks:
+        return
+
+    allowed_calls = set(checks.get("allowed_calls", ["apiUnchecked"]))
+    api_call_re = re.compile(
+        r"(?<![\w$])(?P<call>[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*"
+        r"\(\s*(?P<quote>[\"'`])(?P<path>/api/[^\"'`\n)]*)"
+    )
+    allowlist = set(checks.get("allowlist_paths", []))
+
+    for scope in checks.get("scopes", []):
+        for file in _iter_text_files(scope, {".ts", ".svelte", ".js"}):
+            rel = _to_posix(file)
+            if _is_allowed(rel, list(allowlist)):
+                continue
+
+            file_lines = file.read_text(encoding="utf-8", errors="ignore").splitlines()
+            for line_num, line in enumerate(file_lines, 1):
+                for match in api_call_re.finditer(line):
+                    comment_pos = line.find("//")
+                    if comment_pos != -1 and comment_pos < match.start():
+                        continue
+                    call_name = match.group("call").split(".")[-1]
+                    if call_name != "api" and call_name not in allowed_calls:
+                        continue
+                    issues.append(
+                        f"[frontend-api-path] {rel}:{line_num}: direct "
+                        f"{match.group('call')}('/api/...') call is forbidden "
+                        "without a typed path builder"
+                    )
+
+
 def _check_runtime_all_exports(cfg: dict, issues: list[str]) -> None:
     checks = cfg.get("runtime_all_exports")
     if not checks:
@@ -302,6 +336,7 @@ def main() -> int:
     _check_type_ignores(config, issues)
     _check_raw_json_response(config, issues)
     _check_frontend_weak_typing(config, issues)
+    _check_frontend_api_calls(config, issues)
     _check_runtime_all_exports(config, issues)
     _check_runtime_import_contract(config, issues)
     _check_facade_import_contract(config, issues)

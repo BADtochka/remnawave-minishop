@@ -56,6 +56,15 @@
     ],
     "allowlist": []
   },
+  "frontend_api_calls": {
+    "scopes": [
+      "frontend/src"
+    ],
+    "allowed_calls": [
+      "apiUnchecked"
+    ],
+    "allowlist_paths": []
+  },
   "runtime_all_exports": {
     "paths": [
       "backend/bot/app/web/admin_api_impl/_runtime.py",
