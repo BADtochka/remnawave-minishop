@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import Mapping
 
 import bot.app.web.admin_api
 import bot.app.web.subscription_webapp
@@ -68,6 +69,41 @@ def _collect_facade_importers() -> dict[str, set[str]]:
                             results[name].add(relative)
 
     return results
+
+
+def _module_import_aliases(tree: ast.AST) -> dict[str, str]:
+    alias_to_module: dict[str, str] = {}
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                alias_to_module[alias.asname or alias.name] = alias.name
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            for alias in node.names:
+                alias_to_module[alias.asname or alias.name] = (
+                    f"{module}.{alias.name}" if module else alias.name
+                )
+
+    return alias_to_module
+
+
+def _resolve_module_expression(expr: ast.AST, aliases: Mapping[str, str]) -> str | None:
+    if isinstance(expr, ast.Name):
+        return aliases.get(expr.id)
+
+    if isinstance(expr, ast.Attribute):
+        parts: list[str] = []
+        current: ast.AST = expr
+        while isinstance(current, ast.Attribute):
+            parts.append(current.attr)
+            current = current.value
+        if isinstance(current, ast.Name):
+            root = aliases.get(current.id, current.id)
+            parts.append(root)
+            return ".".join(reversed(parts))
+
+    return None
 
 
 def test_facade_imports_are_explicit_and_frozen() -> None:
@@ -161,6 +197,7 @@ def test_monkeypatch_targets_avoid_facade_imports() -> None:
             continue
 
         relative = file.relative_to(_project_root()).as_posix()
+        import_aliases = _module_import_aliases(tree)
 
         for node in ast.walk(tree):
             is_patch_call = False
@@ -185,10 +222,12 @@ def test_monkeypatch_targets_avoid_facade_imports() -> None:
                 continue
 
             target = node.args[0]
-            if not isinstance(target, ast.Constant) or not isinstance(target.value, str):
-                continue
-
-            target_text = target.value
+            if isinstance(target, ast.Constant) and isinstance(target.value, str):
+                target_text = target.value
+            else:
+                target_text = _resolve_module_expression(target, import_aliases) or ""
+                if not target_text:
+                    continue
             if target_text.startswith("bot.services.subscription_service_impl"):
                 continue
 
