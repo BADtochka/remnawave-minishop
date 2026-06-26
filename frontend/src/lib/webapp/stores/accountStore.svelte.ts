@@ -1,7 +1,16 @@
 import { emailError, buildTelegramOAuthStartUrl } from "../authHelpers.js";
 import type { LoadDataOptions } from "../dataClient";
 import type { ApiClient, PostPayload } from "../publicApi";
-import { unwrap } from "../publicApi";
+import {
+  buildAccountEmailVerifyPath,
+  buildAccountEmailRequestPath,
+  buildAccountLanguagePath,
+  buildAccountPasswordConfirmPath,
+  buildAccountPasswordRequestPath,
+  buildAccountTelegramLinkPath,
+  buildAuthLogoutPath,
+  unwrap,
+} from "../publicApi";
 
 const TELEGRAM_LINK_PENDING_ACTION_STORAGE_KEY = "rw_webapp_telegram_link_pending_action_v1";
 const TELEGRAM_LINK_PENDING_TTL_MS = 10 * 60 * 1000;
@@ -409,7 +418,7 @@ export function createAccountStore({
     setLinkEmailStatus(t("wa_auth_sending_code"));
     try {
       const payload: PostPayload<"/api/account/email/request"> = { email: normalized };
-      const response = await api("/account/email/request", {
+      const response = await api(buildAccountEmailRequestPath(), {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -448,7 +457,7 @@ export function createAccountStore({
         email: s.linkEmailPending,
         code,
       };
-      const response = await api("/account/email/verify", {
+      const response = await api(buildAccountEmailVerifyPath(), {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -475,7 +484,7 @@ export function createAccountStore({
     updateState((s) => ({ ...s, setPasswordBusy: true }));
     setPasswordStatus(t("wa_auth_sending_code"));
     try {
-      const response = await api("/account/password/request", {
+      const response = await api(buildAccountPasswordRequestPath(), {
         method: "POST",
         body: JSON.stringify({} as PostPayload<"/api/account/password/request">),
       });
@@ -508,7 +517,7 @@ export function createAccountStore({
         password_confirm: s.setPasswordConfirm,
         code,
       };
-      const response = await api("/account/password/confirm", {
+      const response = await api(buildAccountPasswordConfirmPath(), {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -535,7 +544,7 @@ export function createAccountStore({
   ) {
     updateState((s) => ({ ...s, linkTelegramBusy: true }));
     try {
-      const response = await api("/account/telegram/link", {
+      const response = await api(buildAccountTelegramLinkPath(), {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -585,7 +594,7 @@ export function createAccountStore({
       const payload: PostPayload<"/api/account/telegram/link"> = {
         auth_data: getDemoTelegramAuthPayload(),
       } as PostPayload<"/api/account/telegram/link">;
-      const response = await api("/account/telegram/link", {
+      const response = await api(buildAccountTelegramLinkPath(), {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -621,7 +630,7 @@ export function createAccountStore({
   ) {
     updateState((s) => ({ ...s, linkTelegramBusy: true }));
     try {
-      const response = await api("/account/telegram/link", {
+      const response = await api(buildAccountTelegramLinkPath(), {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -700,7 +709,7 @@ export function createAccountStore({
     updateState((s) => ({ ...s, languageBusy: true }));
     try {
       const payload: PostPayload<"/api/account/language"> = { language };
-      const response = await api("/account/language", {
+      const response = await api(buildAccountLanguagePath(), {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -720,7 +729,9 @@ export function createAccountStore({
     markManualLogout();
     clearToken();
     try {
-      await publicApi("/auth/logout", { keepalive: true } as PostPayload<"/api/auth/logout">);
+      await publicApi(buildAuthLogoutPath(), {
+        keepalive: true,
+      } as PostPayload<"/api/auth/logout">);
     } catch (_error) {
       void _error;
     }

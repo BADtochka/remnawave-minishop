@@ -1,4 +1,13 @@
-import { buildPaymentStatusPath, buildTariffTopupOptionsPath } from "./publicApi";
+import {
+  buildDeviceTopupOptionsPath,
+  buildPaymentStatusPath,
+  buildPaymentsPath,
+  buildSubscriptionAutoRenewPath,
+  buildTariffChangeOptionsPath,
+  buildTariffChangePath,
+  buildTariffChangePaymentPath,
+  buildTariffTopupOptionsPath,
+} from "./publicApi";
 import type {
   ApiClient,
   DeviceTopupOptionsResponse,
@@ -56,15 +65,15 @@ export function createBillingActions({ api }: { api: BillingApi }): BillingActio
   }
 
   async function fetchDeviceTopupOptions(): Promise<DeviceTopupOptionsResponse> {
-    return api("/devices/topup-options");
+    return api(buildDeviceTopupOptionsPath());
   }
 
   async function fetchTariffChangeOptions(): Promise<TariffChangeOptionsResponse> {
-    return api("/tariffs/change-options");
+    return api(buildTariffChangeOptionsPath());
   }
 
   async function postPayment(body: PostPayload<"/api/payments">): Promise<PaymentCreateResponse> {
-    return api("/payments", { method: "POST", body: JSON.stringify(body) });
+    return api(buildPaymentsPath(), { method: "POST", body: JSON.stringify(body) });
   }
 
   async function fetchPaymentStatus(paymentId: string | number): Promise<PaymentStatusResponse> {
@@ -74,17 +83,17 @@ export function createBillingActions({ api }: { api: BillingApi }): BillingActio
   async function postTariffChange(
     body: PostPayload<"/api/tariffs/change">
   ): Promise<TariffChangeResponse> {
-    return api("/tariffs/change", { method: "POST", body: JSON.stringify(body) });
+    return api(buildTariffChangePath(), { method: "POST", body: JSON.stringify(body) });
   }
 
   async function postTariffChangePayment(
     body: PostPayload<"/api/tariffs/change-payment">
   ): Promise<TariffChangePaymentResponse> {
-    return api("/tariffs/change-payment", { method: "POST", body: JSON.stringify(body) });
+    return api(buildTariffChangePaymentPath(), { method: "POST", body: JSON.stringify(body) });
   }
 
   async function postAutoRenew(enabled: boolean): Promise<SubscriptionAutoRenewResponse> {
-    return api("/subscription/auto-renew", {
+    return api(buildSubscriptionAutoRenewPath(), {
       method: "POST",
       body: JSON.stringify({ enabled: Boolean(enabled) }),
     });

@@ -6,7 +6,14 @@ import {
 } from "../authHelpers.js";
 import type { LoadDataOptions } from "../dataClient";
 import type { ApiClient, PostPayload } from "../publicApi";
-import { unwrap } from "../publicApi";
+import {
+  buildAuthEmailMagicPath,
+  buildAuthEmailPasswordPath,
+  buildAuthEmailRequestPath,
+  buildAuthEmailVerifyPath,
+  buildAuthTokenPath,
+  unwrap,
+} from "../publicApi";
 
 const EMAIL_CODE_PENDING_STORAGE_KEY = "rw_email_code_login_pending_v1";
 const EMAIL_CODE_PENDING_TTL_MS = 10 * 60 * 1000;
@@ -275,7 +282,7 @@ export function createAuthStore({
       const referralParam = readReferralParam(getTg());
       if (referralParam) payload.referral_code = referralParam;
       const response = await publicApi(
-        "/auth/email/magic",
+        buildAuthEmailMagicPath(),
         payload as PostPayload<"/api/auth/email/magic">
       );
       if (response.ok) {
@@ -318,9 +325,13 @@ export function createAuthStore({
             : { auth_data: authData };
       const referralParam = readReferralParam(getTg());
       if (referralParam) payload.referral_code = referralParam;
-      const response = await publicApi("/auth/token", payload as PostPayload<"/api/auth/token">, {
-        signal: options.signal,
-      });
+      const response = await publicApi(
+        buildAuthTokenPath(),
+        payload as PostPayload<"/api/auth/token">,
+        {
+          signal: options.signal,
+        }
+      );
       if (response.ok) {
         const csrfToken = stringField(unwrap(response).csrf_token);
         if (!csrfToken) {
@@ -385,7 +396,7 @@ export function createAuthStore({
       const referralParam = readReferralParam(getTg());
       if (referralParam) payload.referral_code = referralParam;
       const response = await publicApi(
-        "/auth/email/request",
+        buildAuthEmailRequestPath(),
         payload as PostPayload<"/api/auth/email/request">
       );
       if (!response.ok) throw response;
@@ -430,7 +441,7 @@ export function createAuthStore({
     }));
     setAuthStatus(t("wa_auth_checking_password"));
     try {
-      const response = await publicApi("/auth/email/password", {
+      const response = await publicApi(buildAuthEmailPasswordPath(), {
         email: normalized,
         password,
       } as PostPayload<"/api/auth/email/password">);
@@ -470,7 +481,7 @@ export function createAuthStore({
       const referralParam = readReferralParam(getTg());
       if (referralParam) payload.referral_code = referralParam;
       const response = await publicApi(
-        "/auth/email/verify",
+        buildAuthEmailVerifyPath(),
         payload as PostPayload<"/api/auth/email/verify">
       );
       if (!response.ok) throw response;

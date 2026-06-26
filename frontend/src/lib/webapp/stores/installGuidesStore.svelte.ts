@@ -1,8 +1,11 @@
 import type {
   ApiClient,
+  PublicSubscriptionGuidesPath,
   PublicSubscriptionGuidesResponse,
+  SubscriptionGuidesPath,
   SubscriptionGuidesResponse,
 } from "../publicApi";
+import { buildPublicSubscriptionGuidesPath, buildSubscriptionGuidesPath } from "../publicApi";
 import { unwrap } from "../publicApi";
 
 type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
@@ -10,7 +13,6 @@ type GuidesResponse =
   | SubscriptionGuidesResponse
   | PublicSubscriptionGuidesResponse
   | (Record<string, unknown> & { ok?: boolean });
-type GuidesPath = "/subscription-guides" | `/subscription-guides/public/${string}`;
 type InstallGuidesState = {
   enabled: boolean;
   config: Record<string, unknown> | null;
@@ -21,7 +23,7 @@ type InstallGuidesState = {
   loaded: boolean;
 };
 type InFlightGuides = {
-  path: GuidesPath;
+  path: SubscriptionGuidesPath | PublicSubscriptionGuidesPath;
   promise: Promise<InstallGuidesState>;
 };
 
@@ -84,20 +86,26 @@ export function createInstallGuidesStore({
     Object.assign(state, patch);
   }
 
-  function applyResponse(path: GuidesPath, response: GuidesResponse) {
+  function applyResponse(
+    path: SubscriptionGuidesPath | PublicSubscriptionGuidesPath,
+    response: GuidesResponse
+  ) {
     const next = stateFromResponse(response);
     loadedPath = path;
     return assignState(next);
   }
 
-  function fetchGuidesResponse(path: GuidesPath) {
+  function fetchGuidesResponse(path: SubscriptionGuidesPath | PublicSubscriptionGuidesPath) {
     if (path.startsWith("/subscription-guides/public/")) {
-      return api(path as "/subscription-guides/public/{share_token}");
+      return api(path);
     }
-    return api("/subscription-guides");
+    return api(buildSubscriptionGuidesPath());
   }
 
-  async function fetchGuides(path: GuidesPath, force = false) {
+  async function fetchGuides(
+    path: SubscriptionGuidesPath | PublicSubscriptionGuidesPath,
+    force = false
+  ) {
     if (inFlight?.path === path) return inFlight.promise;
     if (!force && state.loaded && loadedPath === path) return state;
     const promise = (async () => {
@@ -135,19 +143,21 @@ export function createInstallGuidesStore({
   }
 
   async function load(force = false) {
-    return fetchGuides("/subscription-guides", force);
+    return fetchGuides(buildSubscriptionGuidesPath(), force);
   }
 
-  function publicPath(shareToken: string): `/subscription-guides/public/${string}` {
-    const encoded = encodeURIComponent(String(shareToken || ""));
-    return `/subscription-guides/public/${encoded}`;
+  function publicPath(shareToken: string): PublicSubscriptionGuidesPath {
+    return buildPublicSubscriptionGuidesPath(shareToken);
   }
 
   async function loadPublic(shareToken: string, force = false) {
     return fetchGuides(publicPath(shareToken), force);
   }
 
-  function hydrate(path: GuidesPath, response: GuidesResponse) {
+  function hydrate(
+    path: SubscriptionGuidesPath | PublicSubscriptionGuidesPath,
+    response: GuidesResponse
+  ) {
     inFlight = null;
     return applyResponse(path, response);
   }

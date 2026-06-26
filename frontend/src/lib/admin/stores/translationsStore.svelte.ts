@@ -162,7 +162,8 @@ export function createTranslationsStore({
     updateState((s) => ({ ...s, translationsLoading: true, translationsDirty: {} }));
     try {
       const data = (await api(buildAdminTranslationsPath())) as
-        TranslationsResponse | AdminErrorResponse;
+        | TranslationsResponse
+        | AdminErrorResponse;
       if (isOkResponse(data)) {
         const result = unwrap(data);
         updateState((s) => ({

@@ -2,6 +2,7 @@ import { withRoutePrefix } from "../routes.js";
 import type {
   ApiClient,
   PostPayload,
+  SupportTicketsListPath,
   SupportTicketCreateResponse,
   SupportTicketDetailResponse,
   SupportTicketReadResponse,
@@ -9,9 +10,11 @@ import type {
   SupportTicketsResponse,
 } from "../publicApi";
 import {
+  buildSupportTicketsPath,
   buildSupportTicketMessagesPath,
   buildSupportTicketPath,
   buildSupportTicketReadPath,
+  buildSupportUnreadPath,
 } from "../publicApi";
 import { unwrap } from "../publicApi";
 
@@ -39,7 +42,6 @@ type CountsRecord = {
   open: number;
   total: number;
 };
-type SupportTicketsListPath = "/support/tickets" | `/support/tickets?${string}`;
 export type SupportState = {
   tickets: TicketRecord[];
   openedTicketId: number | null;
@@ -184,7 +186,7 @@ export function createSupportStore({
   function postCreateTicket(
     payload: PostPayload<"/api/support/tickets">
   ): Promise<SupportTicketCreateResponse> {
-    return api("/support/tickets", {
+    return api(buildSupportTicketsPath(), {
       method: "POST",
       body: JSON.stringify(payload),
     }) as Promise<SupportTicketCreateResponse>;
@@ -269,7 +271,7 @@ export function createSupportStore({
       try {
         const params = new URLSearchParams({ limit: "50", offset: "0" });
         if (filter && filter !== "all") params.set("status", filter);
-        const res = await fetchTicketList(`/support/tickets?${params.toString()}`);
+        const res = await fetchTicketList(buildSupportTicketsPath(params));
         if (requestId !== listRequestSeq) return res;
         if (res?.ok) {
           const payload = unwrap(res);
@@ -441,7 +443,7 @@ export function createSupportStore({
     if (!silent) state.unreadLoading = true;
     unreadPromise = (async () => {
       try {
-        const res = await api("/support/unread");
+        const res = await api(buildSupportUnreadPath());
         if (res?.ok) {
           const payload = unwrap(res);
           const unreadCount = updateUnreadBackoff(payload.unread, options.countEmpty === true);

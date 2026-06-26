@@ -107,9 +107,7 @@ export function createHealthStore({
   }
 
   async function requestHealth(refresh: boolean): Promise<HealthResponse> {
-    const data = (await api(buildAdminHealthPath(refresh))) as
-      | HealthResponse
-      | AdminErrorResponse;
+    const data = (await api(buildAdminHealthPath(refresh))) as HealthResponse | AdminErrorResponse;
     if (!isOkResponse(data)) {
       throw new AdminHealthError(adminErrorMessage(data, at, "load_failed"), data);
     }

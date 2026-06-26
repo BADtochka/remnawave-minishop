@@ -714,9 +714,12 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     if (!s.openedUser) return;
     applyState((st) => ({ ...st, userActionBusy: true }));
     try {
-      const res = await api(buildAdminUserActionPath(s.openedUser.user_id, "telegram-profile-link"), {
-        method: "POST",
-      });
+      const res = await api(
+        buildAdminUserActionPath(s.openedUser.user_id, "telegram-profile-link"),
+        {
+          method: "POST",
+        }
+      );
       if (res?.ok) {
         onToast(at("user_tg_profile_link_sent", {}, "Ссылка отправлена в Telegram"));
       } else {
@@ -889,12 +892,13 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
       const res = await api(
         buildAdminUserActionPath(s.openedUser.user_id, "regular-traffic-override"),
         {
-        method: "POST",
-        body: JSON.stringify({
-          unlimited: Boolean(s.regularUnlimitedDraft),
-          regular_bonus_gb: regularGb,
-        }),
-      });
+          method: "POST",
+          body: JSON.stringify({
+            unlimited: Boolean(s.regularUnlimitedDraft),
+            regular_bonus_gb: regularGb,
+          }),
+        }
+      );
       if (res?.ok) {
         onToast(at("regular_override_saved", {}, "Оверрайд основного трафика сохранён"));
         await refreshOpenedUserDetail({

@@ -1,11 +1,6 @@
 import { writable, type Writable } from "svelte/store";
 
-import {
-  buildMePath,
-  createApiClient,
-  type ApiClient,
-  type MeResponse,
-} from "./publicApi";
+import { buildMePath, createApiClient, type ApiClient, type MeResponse } from "./publicApi";
 
 export type WebappData = MeResponse & Record<string, unknown>;
 

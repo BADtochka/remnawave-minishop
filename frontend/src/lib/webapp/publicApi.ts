@@ -30,8 +30,14 @@ type ResolvedApiPath<Path extends string> = Path extends string
 type KnownApiPath<Path extends string> = Path extends ApiPathInput ? ResolvedApiPath<Path> : never;
 
 type ApiPathInputWithApiPrefix = ApiPath | ApiPathExpanded;
-type ApiPathInputWithoutPrefix = ApiPathInputWithApiPrefix extends `/api${infer Rest}` ? Rest : never;
-type ApiPathInput = ApiPathInputWithApiPrefix | `${ApiPathInputWithApiPrefix}?${string}` | ApiPathInputWithoutPrefix | `${ApiPathInputWithoutPrefix}?${string}`;
+type ApiPathInputWithoutPrefix = ApiPathInputWithApiPrefix extends `/api${infer Rest}`
+  ? Rest
+  : never;
+type ApiPathInput =
+  | ApiPathInputWithApiPrefix
+  | `${ApiPathInputWithApiPrefix}?${string}`
+  | ApiPathInputWithoutPrefix
+  | `${ApiPathInputWithoutPrefix}?${string}`;
 
 type OperationFor<Path extends string, Method extends HttpMethod> =
   KnownApiPath<Path> extends never ? never : NonNullable<paths[KnownApiPath<Path>][Method]>;
@@ -92,6 +98,33 @@ export type TariffChangePaymentResponse = PostResponse<"/api/tariffs/change-paym
 export type TariffTopupOptionsResponse = GetResponse<"/api/tariffs/topup-options">;
 export type TrialActivateResponse = PostResponse<"/api/trial/activate">;
 
+export type AccountEmailRequestPath = "/account/email/request";
+export type AccountEmailVerifyPath = "/account/email/verify";
+export type AccountLanguagePath = "/account/language";
+export type AccountPasswordRequestPath = "/account/password/request";
+export type AccountPasswordConfirmPath = "/account/password/confirm";
+export type AccountTelegramLinkPath = "/account/telegram/link";
+export type AuthEmailMagicPath = "/auth/email/magic";
+export type AuthEmailPasswordPath = "/auth/email/password";
+export type AuthEmailRequestPath = "/auth/email/request";
+export type AuthEmailVerifyPath = "/auth/email/verify";
+export type AuthLogoutPath = "/auth/logout";
+export type AuthTokenPath = "/auth/token";
+export type DeviceTopupOptionsPath = "/devices/topup-options";
+export type DevicesDisconnectPath = "/devices/disconnect";
+export type TariffChangeOptionsPath = "/tariffs/change-options";
+export type TariffChangePath = "/tariffs/change";
+export type TariffChangePaymentPath = "/tariffs/change-payment";
+export type SubscriptionAutoRenewPath = "/subscription/auto-renew";
+export type ReferralWelcomeBonusClaimPath = "/referral/welcome-bonus/claim";
+export type PromoApplyPath = "/promo/apply";
+export type TrialActivatePath = "/trial/activate";
+export type SupportTicketsListPath = "/support/tickets" | `/support/tickets?${string}`;
+export type SupportUnreadPath = "/support/unread";
+export type SubscriptionGuidesPath = "/subscription-guides";
+export type PublicSubscriptionGuidesPath = `/subscription-guides/public/${string}`;
+export type PaymentsPath = "/payments";
+
 type MockContext = Record<string, unknown>;
 export type MockApi = (
   path: string,
@@ -128,6 +161,66 @@ export function buildMePath(fresh: boolean = false): MePath {
   return fresh ? "/me?fresh=1" : "/me";
 }
 
+export function buildAccountEmailRequestPath(): AccountEmailRequestPath {
+  return "/account/email/request";
+}
+
+export function buildAccountEmailVerifyPath(): AccountEmailVerifyPath {
+  return "/account/email/verify";
+}
+
+export function buildAccountLanguagePath(): AccountLanguagePath {
+  return "/account/language";
+}
+
+export function buildAccountPasswordRequestPath(): AccountPasswordRequestPath {
+  return "/account/password/request";
+}
+
+export function buildAccountPasswordConfirmPath(): AccountPasswordConfirmPath {
+  return "/account/password/confirm";
+}
+
+export function buildAccountTelegramLinkPath(): AccountTelegramLinkPath {
+  return "/account/telegram/link";
+}
+
+export function buildAuthEmailMagicPath(): AuthEmailMagicPath {
+  return "/auth/email/magic";
+}
+
+export function buildAuthEmailPasswordPath(): AuthEmailPasswordPath {
+  return "/auth/email/password";
+}
+
+export function buildAuthEmailRequestPath(): AuthEmailRequestPath {
+  return "/auth/email/request";
+}
+
+export function buildAuthEmailVerifyPath(): AuthEmailVerifyPath {
+  return "/auth/email/verify";
+}
+
+export function buildAuthLogoutPath(): AuthLogoutPath {
+  return "/auth/logout";
+}
+
+export function buildAuthTokenPath(): AuthTokenPath {
+  return "/auth/token";
+}
+
+export function buildDevicesPath(): "/devices" {
+  return "/devices";
+}
+
+export function buildDevicesDisconnectPath(): DevicesDisconnectPath {
+  return "/devices/disconnect";
+}
+
+export function buildDeviceTopupOptionsPath(): DeviceTopupOptionsPath {
+  return "/devices/topup-options";
+}
+
 export type AdminHealthPath = "/admin/health" | "/admin/health?refresh=1";
 export function buildAdminHealthPath(refresh: boolean = false): AdminHealthPath {
   return refresh ? "/admin/health?refresh=1" : "/admin/health";
@@ -148,8 +241,61 @@ export function buildSupportTicketPath(ticketId: string | number): SupportTicket
   return `/support/tickets/${encodeURIComponent(String(ticketId))}` as SupportTicketPath;
 }
 
+export function buildSupportTicketsPath(params?: URLSearchParams): SupportTicketsListPath {
+  const query = params?.toString();
+  return (query ? `/support/tickets?${query}` : "/support/tickets") as SupportTicketsListPath;
+}
+
+export function buildSupportUnreadPath(): SupportUnreadPath {
+  return "/support/unread";
+}
+
+export function buildPublicSubscriptionGuidesPath(
+  token: string | number
+): PublicSubscriptionGuidesPath {
+  return `/subscription-guides/public/${encodeURIComponent(String(token))}` as PublicSubscriptionGuidesPath;
+}
+
+export function buildTariffChangeOptionsPath(): TariffChangeOptionsPath {
+  return "/tariffs/change-options";
+}
+
+export function buildTariffChangePath(): TariffChangePath {
+  return "/tariffs/change";
+}
+
+export function buildTariffChangePaymentPath(): TariffChangePaymentPath {
+  return "/tariffs/change-payment";
+}
+
+export function buildSubscriptionAutoRenewPath(): SubscriptionAutoRenewPath {
+  return "/subscription/auto-renew";
+}
+
+export function buildReferralWelcomeBonusClaimPath(): ReferralWelcomeBonusClaimPath {
+  return "/referral/welcome-bonus/claim";
+}
+
+export function buildPromoApplyPath(): PromoApplyPath {
+  return "/promo/apply";
+}
+
+export function buildTrialActivatePath(): TrialActivatePath {
+  return "/trial/activate";
+}
+
+export function buildSubscriptionGuidesPath(): SubscriptionGuidesPath {
+  return "/subscription-guides";
+}
+
+export function buildPaymentsPath(): PaymentsPath {
+  return "/payments";
+}
+
 export type SupportTicketMessagesPath = "/support/tickets/{id}/messages";
-export function buildSupportTicketMessagesPath(ticketId: string | number): SupportTicketMessagesPath {
+export function buildSupportTicketMessagesPath(
+  ticketId: string | number
+): SupportTicketMessagesPath {
   return `/support/tickets/${encodeURIComponent(String(ticketId))}/messages` as SupportTicketMessagesPath;
 }
 
@@ -240,7 +386,9 @@ export function buildAdminSupportTicketMessagesPath(
 }
 
 export type AdminSupportTicketReadPath = "/admin/support/tickets/{id}/read";
-export function buildAdminSupportTicketReadPath(ticketId: string | number): AdminSupportTicketReadPath {
+export function buildAdminSupportTicketReadPath(
+  ticketId: string | number
+): AdminSupportTicketReadPath {
   return `/admin/support/tickets/${encodeURIComponent(String(ticketId))}/read` as AdminSupportTicketReadPath;
 }
 
@@ -387,7 +535,10 @@ export function createApiClient({
   const isFormDataBody = (body: BodyInit | null | undefined) =>
     typeof FormData !== "undefined" && body instanceof FormData;
 
-  async function requestJson(path: string, options: RequestInit = {}): Promise<Record<string, unknown>> {
+  async function requestJson(
+    path: string,
+    options: RequestInit = {}
+  ): Promise<Record<string, unknown>> {
     if (mockApi) return (await mockApi(path, options, getMockContext())) as Record<string, unknown>;
 
     const method = String(options.method || "GET").toUpperCase();
@@ -418,7 +569,10 @@ export function createApiClient({
     return (await requestJson(path, options)) as ApiResponse<Path>;
   }
 
-  async function apiUnchecked(path: string, options: RequestInit = {}): Promise<Record<string, unknown>> {
+  async function apiUnchecked(
+    path: string,
+    options: RequestInit = {}
+  ): Promise<Record<string, unknown>> {
     return requestJson(path, options);
   }
 

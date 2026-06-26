@@ -1,5 +1,5 @@
 import type { ApiClient, DevicesResponse, PostPayload } from "../publicApi";
-import { unwrap } from "../publicApi";
+import { buildDevicesDisconnectPath, buildDevicesPath, unwrap } from "../publicApi";
 
 type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 type DeviceRecord = Record<string, unknown>;
@@ -55,7 +55,7 @@ export function createDevicesStore({
       store.devicesIsError = false;
       store.devicesErrorCode = "";
       try {
-        const response = await api("/devices");
+        const response = await api(buildDevicesPath());
         if (!response?.ok) throw response;
         const payload = unwrap(response);
         store.devicesData = payload;
@@ -85,7 +85,7 @@ export function createDevicesStore({
       if (!token || store.deviceDisconnectBusy) return;
       store.deviceDisconnectBusy = true;
       try {
-        const response = await api("/devices/disconnect", {
+        const response = await api(buildDevicesDisconnectPath(), {
           method: "POST",
           body: JSON.stringify({ token } satisfies PostPayload<"/api/devices/disconnect">),
         });

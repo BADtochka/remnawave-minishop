@@ -1,6 +1,11 @@
 import type { LoadDataOptions } from "../dataClient";
 import type { ApiClient, PostPayload, TrialActivateResponse } from "../publicApi";
-import { unwrap } from "../publicApi";
+import {
+  buildPromoApplyPath,
+  buildReferralWelcomeBonusClaimPath,
+  buildTrialActivatePath,
+  unwrap,
+} from "../publicApi";
 
 type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 type MaybeRecord = Record<string, unknown>;
@@ -117,7 +122,7 @@ export function createActionsStore({
     state.promoStatus = "";
     try {
       const payload: PostPayload<"/api/promo/apply"> = { code };
-      const response = await api("/promo/apply", {
+      const response = await api(buildPromoApplyPath(), {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -140,7 +145,7 @@ export function createActionsStore({
 
   async function claimReferralWelcomeBonus() {
     try {
-      const response = await api("/referral/welcome-bonus/claim", {
+      const response = await api(buildReferralWelcomeBonusClaimPath(), {
         method: "POST",
         body: JSON.stringify({} as PostPayload<"/api/referral/welcome-bonus/claim">),
       });
@@ -163,7 +168,7 @@ export function createActionsStore({
     state.trialActivationResult = null;
     state.trialActivationError = "";
     try {
-      const response = await api("/trial/activate", {
+      const response = await api(buildTrialActivatePath(), {
         method: "POST",
         body: JSON.stringify({} as PostPayload<"/api/trial/activate">),
       });
