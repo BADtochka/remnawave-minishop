@@ -4265,6 +4265,30 @@
             ],
             "default": null,
             "title": "Language"
+          },
+          "referral_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Referral Code"
+          },
+          "start_param": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Start Param"
           }
         },
         "required": [
@@ -9011,10 +9035,12 @@
                   "properties": {
                     "config": {
                       "additionalProperties": true,
+                      "description": "Runtime Mini App config assembled from settings and theme catalog.",
                       "type": "object"
                     },
                     "i18n": {
                       "additionalProperties": true,
+                      "description": "Locale dictionary keyed by language and translation key.",
                       "type": "object"
                     },
                     "ok": {
@@ -9165,22 +9191,300 @@
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "current_limit": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "extra_hwid_devices": {
+                      "type": "integer"
+                    },
+                    "extra_hwid_devices_valid_until": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "extra_hwid_devices_valid_until_text": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "ok": {
                       "const": true,
                       "type": "boolean"
                     },
                     "plans": {
                       "items": {
-                        "additionalProperties": true,
+                        "additionalProperties": false,
+                        "properties": {
+                          "billing_model": {
+                            "type": "string"
+                          },
+                          "currency": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "device_count": {
+                            "type": "integer"
+                          },
+                          "hwid_device_limit": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "hwid_device_packages": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "billing_model": {
+                                  "type": "string"
+                                },
+                                "currency": {
+                                  "type": "string"
+                                },
+                                "device_count": {
+                                  "type": "integer"
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "months": {
+                                  "type": "number"
+                                },
+                                "price": {
+                                  "type": "number"
+                                },
+                                "sale_mode": {
+                                  "type": "string"
+                                },
+                                "stars_price": {
+                                  "type": "integer"
+                                },
+                                "subtitle": {
+                                  "type": "string"
+                                },
+                                "tariff_key": {
+                                  "type": "string"
+                                },
+                                "tariff_name": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "hwid_renewal": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "active_until": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "active_until_text": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "available": {
+                                "type": "boolean"
+                              },
+                              "currency": {
+                                "type": "string"
+                              },
+                              "device_count": {
+                                "type": "integer"
+                              },
+                              "price": {
+                                "type": "number"
+                              },
+                              "pricing_period_months": {
+                                "type": "integer"
+                              },
+                              "stars_price": {
+                                "type": "integer"
+                              },
+                              "valid_from": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "valid_from_text": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "valid_until": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "valid_until_text": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "is_default_tariff": {
+                            "type": "boolean"
+                          },
+                          "monthly_gb": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "months": {
+                            "type": "number"
+                          },
+                          "price": {
+                            "type": "number"
+                          },
+                          "proration_ratio": {
+                            "type": "number"
+                          },
+                          "sale_mode": {
+                            "type": "string"
+                          },
+                          "squad_uuids": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "stars_price": {
+                            "type": "integer"
+                          },
+                          "subtitle": {
+                            "type": "string"
+                          },
+                          "tariff_key": {
+                            "type": "string"
+                          },
+                          "tariff_name": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "traffic_gb": {
+                            "type": "number"
+                          },
+                          "valid_from": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "valid_from_text": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "valid_until": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "valid_until_text": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
                         "type": "object"
                       },
                       "type": "array"
+                    },
+                    "premium_baseline_bytes": {
+                      "type": "integer"
+                    },
+                    "premium_bonus_bytes": {
+                      "type": "integer"
+                    },
+                    "premium_is_limited": {
+                      "type": "boolean"
+                    },
+                    "premium_limit_bytes": {
+                      "type": "integer"
+                    },
+                    "premium_node_labels": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "premium_squad_labels": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "premium_title": {
+                      "type": "string"
+                    },
+                    "premium_topup_balance_bytes": {
+                      "type": "integer"
+                    },
+                    "premium_topup_used_bytes": {
+                      "type": "integer"
+                    },
+                    "premium_traffic_percent": {
+                      "type": "integer"
+                    },
+                    "premium_unlimited_override": {
+                      "type": "boolean"
+                    },
+                    "premium_used_bytes": {
+                      "type": "integer"
+                    },
+                    "renewal_available": {
+                      "type": "boolean"
+                    },
+                    "renewal_recommended_count": {
+                      "type": "integer"
                     },
                     "tariff_key": {
                       "type": "string"
                     },
                     "tariff_name": {
                       "type": "string"
+                    },
+                    "topup_kind": {
+                      "type": "string"
+                    },
+                    "traffic_percent": {
+                      "type": "integer"
+                    },
+                    "warning_levels": {
+                      "items": {
+                        "type": "number"
+                      },
+                      "type": "array"
                     }
                   },
                   "required": [
@@ -9219,6 +9523,7 @@
                   "properties": {
                     "i18n": {
                       "additionalProperties": true,
+                      "description": "Locale dictionary keyed by language and translation key.",
                       "type": "object"
                     },
                     "ok": {
@@ -9260,10 +9565,790 @@
                     "ok": {
                       "const": true,
                       "type": "boolean"
+                    },
+                    "payment_methods": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "type": "string"
+                          },
+                          "icon": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "min_amount": {
+                            "type": "number"
+                          },
+                          "minimum_amount": {
+                            "type": "number"
+                          },
+                          "minimum_amount_text": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "plans": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "billing_model": {
+                            "type": "string"
+                          },
+                          "currency": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "device_count": {
+                            "type": "integer"
+                          },
+                          "hwid_device_limit": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "hwid_device_packages": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "billing_model": {
+                                  "type": "string"
+                                },
+                                "currency": {
+                                  "type": "string"
+                                },
+                                "device_count": {
+                                  "type": "integer"
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "months": {
+                                  "type": "number"
+                                },
+                                "price": {
+                                  "type": "number"
+                                },
+                                "sale_mode": {
+                                  "type": "string"
+                                },
+                                "stars_price": {
+                                  "type": "integer"
+                                },
+                                "subtitle": {
+                                  "type": "string"
+                                },
+                                "tariff_key": {
+                                  "type": "string"
+                                },
+                                "tariff_name": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "hwid_renewal": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "active_until": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "active_until_text": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "available": {
+                                "type": "boolean"
+                              },
+                              "currency": {
+                                "type": "string"
+                              },
+                              "device_count": {
+                                "type": "integer"
+                              },
+                              "price": {
+                                "type": "number"
+                              },
+                              "pricing_period_months": {
+                                "type": "integer"
+                              },
+                              "stars_price": {
+                                "type": "integer"
+                              },
+                              "valid_from": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "valid_from_text": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "valid_until": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "valid_until_text": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "is_default_tariff": {
+                            "type": "boolean"
+                          },
+                          "monthly_gb": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "months": {
+                            "type": "number"
+                          },
+                          "price": {
+                            "type": "number"
+                          },
+                          "proration_ratio": {
+                            "type": "number"
+                          },
+                          "sale_mode": {
+                            "type": "string"
+                          },
+                          "squad_uuids": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "stars_price": {
+                            "type": "integer"
+                          },
+                          "subtitle": {
+                            "type": "string"
+                          },
+                          "tariff_key": {
+                            "type": "string"
+                          },
+                          "tariff_name": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "traffic_gb": {
+                            "type": "number"
+                          },
+                          "valid_from": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "valid_from_text": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "valid_until": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "valid_until_text": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "referral": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "bonus_details": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "details": {
+                                "items": {
+                                  "additionalProperties": true,
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "friend_days": {
+                                "type": "integer"
+                              },
+                              "friend_max_days": {
+                                "type": "integer"
+                              },
+                              "friend_min_days": {
+                                "type": "integer"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "inviter_days": {
+                                "type": "integer"
+                              },
+                              "inviter_max_days": {
+                                "type": "integer"
+                              },
+                              "inviter_min_days": {
+                                "type": "integer"
+                              },
+                              "months": {
+                                "type": "integer"
+                              },
+                              "tariff_key": {
+                                "type": "string"
+                              },
+                              "tariff_name": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "bot_link": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "code": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "invited_count": {
+                          "type": "integer"
+                        },
+                        "one_bonus_per_referee": {
+                          "type": "boolean"
+                        },
+                        "purchased_count": {
+                          "type": "integer"
+                        },
+                        "webapp_link": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "welcome_bonus_block_reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "welcome_bonus_days": {
+                          "type": "integer"
+                        },
+                        "welcome_bonus_requires_telegram": {
+                          "type": "boolean"
+                        },
+                        "welcome_bonus_without_telegram_enabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "settings": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "email_auth_enabled": {
+                          "type": "boolean"
+                        },
+                        "my_devices_enabled": {
+                          "type": "boolean"
+                        },
+                        "server_status_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "subscription_guides_enabled": {
+                          "type": "boolean"
+                        },
+                        "subscription_purchase_description": {
+                          "type": "string"
+                        },
+                        "support_ticket_max_body_length": {
+                          "type": "integer"
+                        },
+                        "support_ticket_max_subject_length": {
+                          "type": "integer"
+                        },
+                        "support_tickets_enabled": {
+                          "type": "boolean"
+                        },
+                        "support_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "traffic_mode": {
+                          "type": "boolean"
+                        },
+                        "trial_available": {
+                          "type": "boolean"
+                        },
+                        "trial_block_reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "trial_duration_days": {
+                          "type": "integer"
+                        },
+                        "trial_enabled": {
+                          "type": "boolean"
+                        },
+                        "trial_requires_telegram": {
+                          "type": "boolean"
+                        },
+                        "trial_traffic_limit_gb": {
+                          "type": "number"
+                        },
+                        "trial_traffic_strategy": {
+                          "type": "string"
+                        },
+                        "trial_without_telegram_enabled": {
+                          "type": "boolean"
+                        },
+                        "user_hwid_device_limit": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "subscription": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "auto_renew_available": {
+                          "type": "boolean"
+                        },
+                        "auto_renew_can_enable": {
+                          "type": "boolean"
+                        },
+                        "auto_renew_enabled": {
+                          "type": "boolean"
+                        },
+                        "auto_renew_provider_label": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "base_hwid_device_limit": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "billing_model": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "can_topup_devices": {
+                          "type": "boolean"
+                        },
+                        "can_topup_premium_traffic": {
+                          "type": "boolean"
+                        },
+                        "can_topup_regular_traffic": {
+                          "type": "boolean"
+                        },
+                        "can_topup_traffic": {
+                          "type": "boolean"
+                        },
+                        "config_link": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "connect_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "days_left": {
+                          "type": "integer"
+                        },
+                        "device_topup_renewal_available": {
+                          "type": "boolean"
+                        },
+                        "end_date": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "end_date_text": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "extra_hwid_devices": {
+                          "type": "integer"
+                        },
+                        "extra_hwid_devices_next_valid_from": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "extra_hwid_devices_valid_until": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "extra_hwid_devices_valid_until_text": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "install_share_token": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "install_share_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "is_throttled": {
+                          "type": "boolean"
+                        },
+                        "max_devices": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "panel_short_uuid": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "period_start_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "premium_baseline_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "premium_bonus_bytes": {
+                          "type": "integer"
+                        },
+                        "premium_is_limited": {
+                          "type": "boolean"
+                        },
+                        "premium_limit": {
+                          "type": "string"
+                        },
+                        "premium_limit_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "premium_node_labels": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "premium_squad_labels": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "premium_title": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "premium_topup_balance_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "premium_topup_used_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "premium_unlimited_override": {
+                          "type": "boolean"
+                        },
+                        "premium_used": {
+                          "type": "string"
+                        },
+                        "premium_used_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "provider": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "regular_bonus_bytes": {
+                          "type": "integer"
+                        },
+                        "regular_unlimited_override": {
+                          "type": "boolean"
+                        },
+                        "remaining_text": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "tariff_description": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "tariff_key": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "tariff_name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "tier_baseline_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "topup_balance_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "traffic_limit": {
+                          "type": "string"
+                        },
+                        "traffic_limit_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "traffic_limit_strategy": {
+                          "type": "string"
+                        },
+                        "traffic_used": {
+                          "type": "string"
+                        },
+                        "traffic_used_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "support_unread_count": {
+                      "type": "integer"
+                    },
+                    "themes_catalog": {
+                      "additionalProperties": true,
+                      "properties": {
+                        "default_theme": {
+                          "type": "string"
+                        },
+                        "themes": {
+                          "items": {
+                            "additionalProperties": true,
+                            "properties": {
+                              "default": {
+                                "type": "boolean"
+                              },
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "user": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "email": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "email_verified": {
+                          "type": "boolean"
+                        },
+                        "first_name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "id": {
+                          "type": "integer"
+                        },
+                        "is_admin": {
+                          "type": "boolean"
+                        },
+                        "language_code": {
+                          "type": "string"
+                        },
+                        "password_auth_enabled": {
+                          "type": "boolean"
+                        },
+                        "telegram_id": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "telegram_linked": {
+                          "type": "boolean"
+                        },
+                        "telegram_notifications_enabled": {
+                          "type": "boolean"
+                        },
+                        "telegram_notifications_need_prompt": {
+                          "type": "boolean"
+                        },
+                        "telegram_notifications_start_link": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "telegram_notifications_status": {
+                          "type": "string"
+                        },
+                        "telegram_photo_url": {
+                          "type": "string"
+                        },
+                        "username": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": "object"
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "user",
+                    "subscription",
+                    "referral",
+                    "plans",
+                    "payment_methods",
+                    "themes_catalog",
+                    "support_unread_count",
+                    "settings"
                   ],
                   "type": "object"
                 }
@@ -9321,6 +10406,7 @@
                     },
                     "payment": {
                       "additionalProperties": true,
+                      "description": "Provider-specific payment payload returned by the selected integration.",
                       "type": "object"
                     },
                     "payment_id": {
@@ -9396,6 +10482,7 @@
                     },
                     "payment": {
                       "additionalProperties": true,
+                      "description": "Provider-specific payment payload returned by the selected integration.",
                       "type": "object"
                     },
                     "payment_id": {
@@ -9565,6 +10652,7 @@
                   "properties": {
                     "config": {
                       "additionalProperties": true,
+                      "description": "Resolved subscription guide config from admin override or panel.",
                       "type": "object"
                     },
                     "enabled": {
@@ -9629,6 +10717,7 @@
                   "properties": {
                     "config": {
                       "additionalProperties": true,
+                      "description": "Resolved subscription guide config from admin override or panel.",
                       "type": "object"
                     },
                     "enabled": {
@@ -9646,6 +10735,7 @@
                     },
                     "subscription": {
                       "additionalProperties": true,
+                      "description": "Public install subscription context resolved by share token.",
                       "type": "object"
                     }
                   },
@@ -10071,13 +11161,17 @@
                       "const": true,
                       "type": "boolean"
                     },
-                    "subscription": {
-                      "additionalProperties": true,
-                      "type": "object"
+                    "subscription_id": {
+                      "type": "integer"
+                    },
+                    "tariff_key": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "subscription_id",
+                    "tariff_key"
                   ],
                   "type": "object"
                 }
@@ -10111,7 +11205,27 @@
                   "additionalProperties": false,
                   "properties": {
                     "current": {
-                      "additionalProperties": true,
+                      "additionalProperties": false,
+                      "properties": {
+                        "billing_model": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "tariff_key": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tariff_key",
+                        "title",
+                        "description",
+                        "billing_model"
+                      ],
                       "type": "object"
                     },
                     "ok": {
@@ -10120,7 +11234,87 @@
                     },
                     "targets": {
                       "items": {
-                        "additionalProperties": true,
+                        "additionalProperties": false,
+                        "properties": {
+                          "actions": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "converted_gb": {
+                                  "type": "number"
+                                },
+                                "converted_hwid_days": {
+                                  "type": "integer"
+                                },
+                                "converted_hwid_gb": {
+                                  "type": "number"
+                                },
+                                "converted_hwid_value_rub": {
+                                  "type": "number"
+                                },
+                                "currency": {
+                                  "type": "string"
+                                },
+                                "days_after": {
+                                  "type": "integer"
+                                },
+                                "kind": {
+                                  "type": "string"
+                                },
+                                "mode": {
+                                  "type": "string"
+                                },
+                                "months": {
+                                  "type": "integer"
+                                },
+                                "price": {
+                                  "type": "number"
+                                },
+                                "remaining_days": {
+                                  "type": "integer"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "traffic_gb": {
+                                  "type": "number"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "billing_model": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "monthly_gb": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "options": {
+                            "additionalProperties": true,
+                            "description": "Raw switch calculation details from the subscription service.",
+                            "type": "object"
+                          },
+                          "tariff_key": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "tariff_key",
+                          "title",
+                          "description",
+                          "billing_model",
+                          "actions"
+                        ],
                         "type": "object"
                       },
                       "type": "array"
@@ -10187,6 +11381,7 @@
                     },
                     "payment": {
                       "additionalProperties": true,
+                      "description": "Provider-specific payment payload returned by the selected integration.",
                       "type": "object"
                     },
                     "payment_id": {
@@ -10236,22 +11431,300 @@
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "current_limit": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "extra_hwid_devices": {
+                      "type": "integer"
+                    },
+                    "extra_hwid_devices_valid_until": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "extra_hwid_devices_valid_until_text": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "ok": {
                       "const": true,
                       "type": "boolean"
                     },
                     "plans": {
                       "items": {
-                        "additionalProperties": true,
+                        "additionalProperties": false,
+                        "properties": {
+                          "billing_model": {
+                            "type": "string"
+                          },
+                          "currency": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "device_count": {
+                            "type": "integer"
+                          },
+                          "hwid_device_limit": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "hwid_device_packages": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "billing_model": {
+                                  "type": "string"
+                                },
+                                "currency": {
+                                  "type": "string"
+                                },
+                                "device_count": {
+                                  "type": "integer"
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "months": {
+                                  "type": "number"
+                                },
+                                "price": {
+                                  "type": "number"
+                                },
+                                "sale_mode": {
+                                  "type": "string"
+                                },
+                                "stars_price": {
+                                  "type": "integer"
+                                },
+                                "subtitle": {
+                                  "type": "string"
+                                },
+                                "tariff_key": {
+                                  "type": "string"
+                                },
+                                "tariff_name": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "hwid_renewal": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "active_until": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "active_until_text": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "available": {
+                                "type": "boolean"
+                              },
+                              "currency": {
+                                "type": "string"
+                              },
+                              "device_count": {
+                                "type": "integer"
+                              },
+                              "price": {
+                                "type": "number"
+                              },
+                              "pricing_period_months": {
+                                "type": "integer"
+                              },
+                              "stars_price": {
+                                "type": "integer"
+                              },
+                              "valid_from": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "valid_from_text": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "valid_until": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "valid_until_text": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "is_default_tariff": {
+                            "type": "boolean"
+                          },
+                          "monthly_gb": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "months": {
+                            "type": "number"
+                          },
+                          "price": {
+                            "type": "number"
+                          },
+                          "proration_ratio": {
+                            "type": "number"
+                          },
+                          "sale_mode": {
+                            "type": "string"
+                          },
+                          "squad_uuids": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "stars_price": {
+                            "type": "integer"
+                          },
+                          "subtitle": {
+                            "type": "string"
+                          },
+                          "tariff_key": {
+                            "type": "string"
+                          },
+                          "tariff_name": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "traffic_gb": {
+                            "type": "number"
+                          },
+                          "valid_from": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "valid_from_text": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "valid_until": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "valid_until_text": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
                         "type": "object"
                       },
                       "type": "array"
+                    },
+                    "premium_baseline_bytes": {
+                      "type": "integer"
+                    },
+                    "premium_bonus_bytes": {
+                      "type": "integer"
+                    },
+                    "premium_is_limited": {
+                      "type": "boolean"
+                    },
+                    "premium_limit_bytes": {
+                      "type": "integer"
+                    },
+                    "premium_node_labels": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "premium_squad_labels": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "premium_title": {
+                      "type": "string"
+                    },
+                    "premium_topup_balance_bytes": {
+                      "type": "integer"
+                    },
+                    "premium_topup_used_bytes": {
+                      "type": "integer"
+                    },
+                    "premium_traffic_percent": {
+                      "type": "integer"
+                    },
+                    "premium_unlimited_override": {
+                      "type": "boolean"
+                    },
+                    "premium_used_bytes": {
+                      "type": "integer"
+                    },
+                    "renewal_available": {
+                      "type": "boolean"
+                    },
+                    "renewal_recommended_count": {
+                      "type": "integer"
                     },
                     "tariff_key": {
                       "type": "string"
                     },
                     "tariff_name": {
                       "type": "string"
+                    },
+                    "topup_kind": {
+                      "type": "string"
+                    },
+                    "traffic_percent": {
+                      "type": "integer"
+                    },
+                    "warning_levels": {
+                      "items": {
+                        "type": "number"
+                      },
+                      "type": "array"
                     }
                   },
                   "required": [
@@ -10363,6 +11836,6 @@
   },
   "x-generated-from": {
     "plugins": "core+builtin only",
-    "router": "bot.app.web.subscription_webapp.setup_subscription_webapp_routes"
+    "router": "bot.app.web.webapp.routes.setup_subscription_webapp_routes"
   }
 }

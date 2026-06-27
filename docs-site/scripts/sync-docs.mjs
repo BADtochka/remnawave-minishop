@@ -8,6 +8,7 @@ const sourceDir = path.join(repoRoot, 'docs');
 const outputDir = path.join(siteRoot, 'src', 'content', 'docs');
 
 const descriptions = {
+  'api/index.md': 'HTTP API, OpenAPI-спецификация, доменные события и точки расширения Remnawave Minishop.',
   'getting-started/demo.md': 'Как устроен статический демо-режим Remnawave Minishop и почему он собирается только вместе с документацией.',
   'index.md': 'Документация по запуску, настройке и сопровождению Telegram Mini App для Remnawave.',
   'getting-started/overview.md': 'Что входит в Remnawave Minishop и как связаны бот, Mini App, backend, worker и Remnawave Panel.',
