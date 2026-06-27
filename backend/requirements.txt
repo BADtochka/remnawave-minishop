@@ -3,11 +3,11 @@ aiogram @ https://github.com/aiogram/aiogram/archive/8c2f78d51f10f3e2189d3828ba8
 python-dotenv==1.2.2
 aiohttp>=3.14.1,<4
 pydantic==2.13.4
-yookassa==3.10.1
+yookassa==3.11.0
 httpx>=0.27.0
 pydantic-settings==2.14.2
 email-validator==2.3.0
-sqlalchemy[asyncio]==2.0.49
+sqlalchemy[asyncio]==2.0.51
 asyncpg==0.31.0
 # NB: caps certifi at <2024 (metadata-only); the Dockerfile force-upgrades
 # certifi after install and pip-audit ignores PYSEC-2024-230 in CI. Revisit
