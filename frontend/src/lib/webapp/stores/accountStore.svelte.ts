@@ -23,8 +23,7 @@ type TelegramSdk = {
   ensureForAction(): Promise<unknown>;
 };
 type TelegramLinkPendingAction =
-  | typeof TELEGRAM_LINK_ACTION_TRIAL
-  | typeof TELEGRAM_LINK_ACTION_REFERRAL_WELCOME;
+  typeof TELEGRAM_LINK_ACTION_TRIAL | typeof TELEGRAM_LINK_ACTION_REFERRAL_WELCOME;
 type AccountStoreDeps = {
   api: ApiClient["api"];
   publicApi: ApiClient["publicApi"];

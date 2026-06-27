@@ -9,8 +9,7 @@
     setPage: (page: number) => void;
   };
   type PageItem =
-    | { type: "ellipsis"; key: string }
-    | { type: "page"; key: string; index: number; label: number };
+    { type: "ellipsis"; key: string } | { type: "page"; key: string; index: number; label: number };
 
   let {
     meta = "",

@@ -11,9 +11,7 @@ import { unwrap } from "../publicApi";
 
 type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 type GuidesResponse =
-  | SubscriptionGuidesResponse
-  | PublicSubscriptionGuidesResponse
-  | (WebappRecord & { ok?: boolean });
+  SubscriptionGuidesResponse | PublicSubscriptionGuidesResponse | (WebappRecord & { ok?: boolean });
 type InstallGuidesState = {
   enabled: boolean;
   config: WebappRecord | null;

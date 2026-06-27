@@ -69,8 +69,7 @@ export function createStatsStore({ api, onToast, at }: StatsStoreOptions): Stats
     state.syncBusy = true;
     try {
       const res = (await api(buildAdminSyncPath(), { method: "POST" })) as
-        | SyncResponse
-        | AdminErrorResponse;
+        SyncResponse | AdminErrorResponse;
       if (isOkResponse(res)) {
         onToast(at("sync_started", {}, "Синхронизация запущена"));
         await loadStats();

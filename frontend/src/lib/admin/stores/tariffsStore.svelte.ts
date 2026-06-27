@@ -51,11 +51,7 @@ type TariffDraftRow = Record<string, unknown>;
 export type TariffDraft = ReturnType<typeof emptyTariffDraft> & Record<string, unknown>;
 export type DraftSquadField = "squadUuids" | "premiumSquadUuids";
 export type DraftRowsField =
-  | "periodRows"
-  | "topupRows"
-  | "premiumTopupRows"
-  | "trafficRows"
-  | "hwidRows";
+  "periodRows" | "topupRows" | "premiumTopupRows" | "trafficRows" | "hwidRows";
 export type TariffEditorTab = "general" | "pricing" | "topup" | "premium" | "hwid";
 export type TariffsState = {
   tariffsCatalog: TariffsCatalog;
@@ -220,8 +216,7 @@ export function createTariffsStore({
     updateStore((s) => ({ ...s, panelSquadsLoading: true }));
     try {
       const data = (await api(buildAdminPanelInternalSquadsPath())) as
-        | GetResponse<"/api/admin/panel/internal-squads">
-        | AdminErrorResponse;
+        GetResponse<"/api/admin/panel/internal-squads"> | AdminErrorResponse;
       if (isOkResponse(data)) {
         const result = unwrap(data);
         updateStore((s) => ({ ...s, panelSquads: normalizePanelSquads(result.squads) }));

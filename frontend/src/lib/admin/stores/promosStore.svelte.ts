@@ -90,8 +90,7 @@ export function createPromosStore({
         page_size: String(PROMOS_PAGE_SIZE),
       });
       const data = (await api(buildAdminPromosPath(params))) as
-        | PromosListResponse
-        | AdminErrorResponse;
+        PromosListResponse | AdminErrorResponse;
       if (isOkResponse(data)) {
         const payload = unwrap(data);
         state.promos = payload.promos || [];

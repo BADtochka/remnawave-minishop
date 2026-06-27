@@ -240,8 +240,7 @@ export function createAdminSupportStore({
         if (value) params.set(key, value);
       }
       const res = (await api(buildAdminSupportTicketsPath(params))) as
-        | AdminSupportTicketsResponse
-        | AdminErrorResponse;
+        AdminSupportTicketsResponse | AdminErrorResponse;
       if (res?.ok) {
         const payload = unwrap(res);
         updateState((s) => ({ ...s, tickets: asTickets(payload.tickets) }));
@@ -255,8 +254,7 @@ export function createAdminSupportStore({
     const id = Number(ticketId);
     if (!id) return null;
     const res = (await api(buildAdminSupportTicketPath(id))) as
-      | AdminSupportTicketDetailResponse
-      | AdminErrorResponse;
+      AdminSupportTicketDetailResponse | AdminErrorResponse;
     if (!res?.ok) return res;
     const payload = unwrap(res);
 
@@ -303,8 +301,7 @@ export function createAdminSupportStore({
     if (!opts.skipPush) pushTicketPath(id);
     try {
       const res = (await api(buildAdminSupportTicketPath(id))) as
-        | AdminSupportTicketDetailResponse
-        | AdminErrorResponse;
+        AdminSupportTicketDetailResponse | AdminErrorResponse;
       if (res?.ok) {
         const payload = unwrap(res);
         updateState((s) =>

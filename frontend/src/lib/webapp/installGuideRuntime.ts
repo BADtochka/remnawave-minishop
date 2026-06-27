@@ -13,8 +13,7 @@ type InstallGuideButton = InstallGuideRecord & {
   type?: unknown;
 };
 export type InstallGuideButtonAction =
-  | { kind: "copy"; value: string }
-  | { kind: "open"; value: string };
+  { kind: "copy"; value: string } | { kind: "open"; value: string };
 
 const colorTokens: Record<string, string> = {
   amber: "#f59e0b",

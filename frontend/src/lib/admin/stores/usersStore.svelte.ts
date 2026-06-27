@@ -199,8 +199,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
       }
       if (s.usersSort) params.set("sort", s.usersSort);
       const data = (await api(buildAdminUsersPath(params))) as
-        | AdminUsersListResponse
-        | AdminErrorResponse;
+        AdminUsersListResponse | AdminErrorResponse;
       if (data?.ok) {
         applyState((st) => ({
           ...st,
@@ -233,8 +232,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     if (!opts.skipPush) _pushUserPath(userId);
     try {
       const res = (await api(buildAdminUserPath(userId))) as
-        | AdminUserDetailResponse
-        | AdminErrorResponse;
+        AdminUserDetailResponse | AdminErrorResponse;
       if (res?.ok) {
         applyState((s) => {
           if (!_isCurrentUserRequest(s, requestId, userId)) return s;
@@ -271,8 +269,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
     if (!userId) return null;
     const requestId = _openUserRequestId;
     const res = (await api(buildAdminUserPath(userId))) as
-      | AdminUserDetailResponse
-      | AdminErrorResponse;
+      AdminUserDetailResponse | AdminErrorResponse;
     if (res?.ok) {
       applyState((s) => {
         if (!_isCurrentUserRequest(s, requestId, userId)) return s;
@@ -320,8 +317,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
         user_id: String(userId),
       });
       const data = (await api(buildAdminUserLogsPath(params))) as
-        | AdminLogsResponse
-        | AdminErrorResponse;
+        AdminLogsResponse | AdminErrorResponse;
       if (data?.ok) {
         applyState((st) => {
           if (!st.openedUser || st.openedUser.user_id !== userId) return st;
@@ -365,8 +361,7 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
         page_size: String(s.userReferralsPageSize || USERS_PAGE_SIZE),
       });
       const data = (await api(buildAdminUserReferralsPath(userId, params))) as
-        | AdminUserReferralsResponse
-        | AdminErrorResponse;
+        AdminUserReferralsResponse | AdminErrorResponse;
       if (data?.ok) {
         applyState((st) => {
           if (!st.openedUser || st.openedUser.user_id !== userId) return st;
