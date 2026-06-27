@@ -61,5 +61,4 @@
   aria-label={ariaLabel || placeholder}
   oninput={forwardInput}
   onkeydown={forwardKeydown}
-  {...rest}
-></textarea>
+  {...rest}></textarea>
