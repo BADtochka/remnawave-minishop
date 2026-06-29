@@ -3722,9 +3722,16 @@
   width: min(980px, calc(100vw - 32px));
 }
 
+.admin-tariff-dialog > .dialog-body-scroll,
+.admin-tariff-dialog .dialog-body-scroll > .scroll-area__viewport {
+  height: 100%;
+  min-height: 0;
+}
+
 .admin-tariff-dialog > .dialog-head,
 .admin-tariff-dialog > .dialog-body-scroll,
 .admin-tariff-dialog .dialog-body-scroll > .scroll-area__viewport,
+.admin-tariff-dialog .admin-tariff-dialog-stack,
 .admin-tariff-dialog .admin-tabs-root,
 .admin-tariff-dialog .admin-tabs-list,
 .admin-tariff-dialog .admin-tabs-content,
@@ -3744,12 +3751,36 @@
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
+  min-height: 100% !important;
+}
+
+.admin-tariff-dialog .admin-tariff-dialog-stack {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.admin-tariff-dialog .admin-tabs-root {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .admin-tariff-dialog .admin-tabs-list {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
+}
+
+.admin-tariff-dialog .admin-dialog-actions {
+  flex: 0 0 auto;
+  margin-top: auto;
+}
+
+@media (min-width: 721px) {
+  .admin-tariff-dialog {
+    height: 100%;
+    max-height: 100%;
+  }
 }
 
 .admin-editor-section {
@@ -3862,7 +3893,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding-top: 2px;
+  padding-top: 12px;
 }
 
 @media (max-width: 1023px) {
