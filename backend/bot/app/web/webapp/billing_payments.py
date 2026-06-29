@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from aiohttp import web
@@ -49,11 +50,15 @@ class CheckoutPromoResult:
     promo_code_id: int
     code: str
     effects: PromoEffects
+    base_amount: float
     effective_amount: float
     effective_stars: Optional[int]
     discount_percent: float
     discount_amount: float
     effect_summary: str
+    charged_months: Optional[int]
+    charged_gb: Optional[float]
+    quoted_at: datetime
 
 
 @dataclass(frozen=True)
@@ -121,6 +126,12 @@ async def _resolve_checkout_promo(
             "promo_code_not_applicable",
             "Code does not apply to this purchase",
         )
+    if effects.is_bonus_days_only and sale_base != "subscription":
+        return None, CheckoutPromoError(
+            400,
+            "promo_code_not_applicable",
+            "Code does not apply to this purchase",
+        )
 
     decision = await evaluate_promo_redemption(
         PromoRedemptionContext(
@@ -175,14 +186,43 @@ async def _resolve_checkout_promo(
             promo_code_id=int(promo.promo_code_id),
             code=str(promo.code or lookup_code),
             effects=effects,
+            base_amount=base_amount,
             effective_amount=effective.amount,
             effective_stars=effective.stars,
             discount_percent=effective.total_discount_percent,
             discount_amount=effective.discount_amount,
             effect_summary=summarize_effects(effects),
+            charged_months=months,
+            charged_gb=traffic_units,
+            quoted_at=datetime.now(timezone.utc),
         ),
         None,
     )
+
+
+def _payment_amount_error(
+    *,
+    request: web.Request,
+    settings: Settings,
+    method: str,
+    currency: str,
+    amount: float,
+    is_admin: bool = False,
+) -> CheckoutPromoError | None:
+    from bot.payment_providers import get_provider_spec
+
+    provider_spec = get_provider_spec(method)
+    if provider_spec is None or not provider_spec.create_webapp_payment:
+        return CheckoutPromoError(400, "payment_unavailable", "Payment method unavailable")
+    if not provider_spec.is_usable_for_payment_amount(settings, currency, amount):
+        return CheckoutPromoError(
+            400,
+            "payment_amount_below_minimum",
+            "Payment amount is below the provider minimum",
+        )
+    if not provider_spec.is_visible_for_user(settings, request.app, is_admin=is_admin):
+        return CheckoutPromoError(400, "payment_unavailable", "Payment method unavailable")
+    return None
 
 
 async def quote_promo_route(request: web.Request) -> web.Response:
@@ -197,6 +237,8 @@ async def quote_promo_route(request: web.Request) -> web.Response:
         db_user = await user_dal.get_user_by_id(session, user_id)
         if not db_user or db_user.is_banned:
             return _json_error(403, "access_denied", "Access denied")
+        admin_ids = {int(item) for item in (settings.ADMIN_IDS or [])}
+        is_admin = bool(db_user.telegram_id and int(db_user.telegram_id) in admin_ids)
 
         base_quote, quote_error = await _resolve_base_payment_quote(
             request=request,
@@ -239,12 +281,33 @@ async def quote_promo_route(request: web.Request) -> web.Response:
                 }
             )
 
+        payment_error = _payment_amount_error(
+            request=request,
+            settings=settings,
+            method=method,
+            currency=base_quote.default_currency_code,
+            amount=promo_result.effective_amount,
+            is_admin=is_admin,
+        )
+        if payment_error is not None:
+            return web.json_response(
+                {
+                    "ok": True,
+                    "valid": False,
+                    "payable": False,
+                    "reason": payment_error.message,
+                    "reason_key": payment_error.code,
+                }
+            )
+
         return web.json_response(
             {
                 "ok": True,
                 "valid": True,
+                "payable": True,
                 "code": promo_result.code,
                 "promo_code_id": promo_result.promo_code_id,
+                "currency": base_quote.default_currency_code,
                 "discount_percent": promo_result.discount_percent,
                 "base_amount": base_quote.price,
                 "effective_amount": promo_result.effective_amount,
@@ -775,6 +838,8 @@ async def create_payment_route(request: web.Request) -> web.Response:
                     stars_price = None
         admin_ids = {int(item) for item in (settings.ADMIN_IDS or [])}
         is_admin = bool(db_user.telegram_id and int(db_user.telegram_id) in admin_ids)
+        base_price = float(price or 0)
+        base_stars_price = stars_price
         promo_result, promo_error = await _resolve_checkout_promo(
             session=session,
             settings=settings,
@@ -784,8 +849,8 @@ async def create_payment_route(request: web.Request) -> web.Response:
             payment_units=payment_units,
             traffic_gb=traffic_gb_for_payment,
             method=method,
-            base_amount=float(price or 0),
-            base_stars=stars_price,
+            base_amount=base_price,
+            base_stars=base_stars_price,
         )
         if promo_error is not None:
             return promo_error.to_response()
@@ -809,6 +874,7 @@ async def create_payment_route(request: web.Request) -> web.Response:
             is_admin=is_admin,
             hwid_quote=hwid_quote,
             promo_code_id=promo_result.promo_code_id if promo_result else None,
+            promo_result=promo_result,
         )
 
 
@@ -850,6 +916,7 @@ async def _create_subscription_payment(
     is_admin: bool = False,
     hwid_quote: Optional[Dict[str, Any]] = None,
     promo_code_id: Optional[int] = None,
+    promo_result: Optional[CheckoutPromoResult] = None,
 ) -> web.Response:
     settings: Settings = get_settings(request)
     payment_currency = (currency or default_payment_currency_code_for_settings(settings)).upper()
@@ -924,6 +991,29 @@ async def _create_subscription_payment(
             hwid_proration_ratio=hwid_quote.get("proration_ratio") if hwid_quote else None,
             hwid_full_price=hwid_quote.get("full_price") if hwid_quote else None,
             promo_code_id=promo_code_id,
+            promo_effect_summary=promo_result.effect_summary if promo_result else None,
+            promo_bonus_days=promo_result.effects.bonus_days if promo_result else None,
+            promo_discount_percent=promo_result.effects.discount_percent if promo_result else None,
+            promo_duration_multiplier=(
+                promo_result.effects.duration_multiplier
+                if promo_result and promo_result.effects.duration_multiplier != 1.0
+                else None
+            ),
+            promo_traffic_multiplier=(
+                promo_result.effects.traffic_multiplier
+                if promo_result and promo_result.effects.traffic_multiplier != 1.0
+                else None
+            ),
+            promo_applies_to=promo_result.effects.applies_to if promo_result else None,
+            promo_min_subscription_months=promo_result.effects.min_subscription_months
+            if promo_result
+            else None,
+            promo_min_traffic_gb=promo_result.effects.min_traffic_gb if promo_result else None,
+            checkout_base_amount=promo_result.base_amount if promo_result else None,
+            checkout_discount_amount=promo_result.discount_amount if promo_result else None,
+            checkout_charged_months=promo_result.charged_months if promo_result else None,
+            checkout_charged_gb=promo_result.charged_gb if promo_result else None,
+            checkout_quoted_at=promo_result.quoted_at if promo_result else None,
         )
         if provider_spec.reuse_webapp_payment:
             from bot.payment_providers.shared import reusable_webapp_payment_response

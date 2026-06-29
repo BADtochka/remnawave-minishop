@@ -2656,10 +2656,30 @@ export interface components {
        */
       applies_to: string | null;
       /**
+       * Base Amount
+       * @default null
+       */
+      base_amount: number | null;
+      /**
        * Bonus Days
        * @default null
        */
       bonus_days: number | null;
+      /**
+       * Charged Gb
+       * @default null
+       */
+      charged_gb: number | null;
+      /**
+       * Charged Months
+       * @default null
+       */
+      charged_months: number | null;
+      /**
+       * Discount Amount
+       * @default null
+       */
+      discount_amount: number | null;
       /**
        * Discount Percent
        * @default null
@@ -2675,6 +2695,16 @@ export interface components {
        * @default null
        */
       effect_summary: string | null;
+      /**
+       * Granted Days
+       * @default null
+       */
+      granted_days: number | null;
+      /**
+       * Granted Gb
+       * @default null
+       */
+      granted_gb: number | null;
       /**
        * Payment Amount
        * @default null
@@ -2861,6 +2891,11 @@ export interface components {
        */
       bonus_days: number | null;
       /**
+       * Clear Valid Until
+       * @default null
+       */
+      clear_valid_until: unknown;
+      /**
        * Discount Percent
        * @default null
        */
@@ -2900,6 +2935,11 @@ export interface components {
        * @default null
        */
       traffic_multiplier: number | null;
+      /**
+       * Valid Until
+       * @default null
+       */
+      valid_until: string | null;
     };
     /**
      * SupportCountsOut
@@ -6616,6 +6656,7 @@ export interface operations {
             base_amount?: number;
             base_stars?: number | null;
             code?: string;
+            currency?: string;
             discount_amount?: number;
             discount_percent?: number;
             effect_summary?: string;
@@ -6625,6 +6666,7 @@ export interface operations {
             min_traffic_gb?: number | null;
             /** @constant */
             ok: true;
+            payable?: boolean;
             promo_code_id?: number;
             reason?: string | null;
             reason_key?: string | null;

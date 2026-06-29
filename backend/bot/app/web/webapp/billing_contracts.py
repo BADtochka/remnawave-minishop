@@ -29,8 +29,10 @@ from .payloads import (
 PROMO_QUOTE_RESPONSE_SCHEMA = ok_envelope_with(
     {
         "valid": BOOLEAN_SCHEMA,
+        "payable": BOOLEAN_SCHEMA,
         "code": STRING_SCHEMA,
         "promo_code_id": INTEGER_SCHEMA,
+        "currency": STRING_SCHEMA,
         "discount_percent": NUMBER_SCHEMA,
         "base_amount": NUMBER_SCHEMA,
         "effective_amount": NUMBER_SCHEMA,

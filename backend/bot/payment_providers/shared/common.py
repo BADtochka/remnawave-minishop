@@ -255,6 +255,19 @@ async def create_base_payment_record(
     hwid_proration_ratio: Optional[float] = None,
     hwid_full_price: Optional[float] = None,
     promo_code_id: Optional[int] = None,
+    promo_effect_summary: Optional[str] = None,
+    promo_bonus_days: Optional[int] = None,
+    promo_discount_percent: Optional[float] = None,
+    promo_duration_multiplier: Optional[float] = None,
+    promo_traffic_multiplier: Optional[float] = None,
+    promo_applies_to: Optional[str] = None,
+    promo_min_subscription_months: Optional[int] = None,
+    promo_min_traffic_gb: Optional[float] = None,
+    checkout_base_amount: Optional[float] = None,
+    checkout_discount_amount: Optional[float] = None,
+    checkout_charged_months: Optional[int] = None,
+    checkout_charged_gb: Optional[float] = None,
+    checkout_quoted_at: Optional[Any] = None,
 ) -> Payment:
     payment = await payment_dal.create_payment_record(
         session,
@@ -276,6 +289,19 @@ async def create_base_payment_record(
             "hwid_proration_ratio": hwid_proration_ratio,
             "hwid_full_price": hwid_full_price,
             "promo_code_id": promo_code_id,
+            "promo_effect_summary": promo_effect_summary,
+            "promo_bonus_days": promo_bonus_days,
+            "promo_discount_percent": promo_discount_percent,
+            "promo_duration_multiplier": promo_duration_multiplier,
+            "promo_traffic_multiplier": promo_traffic_multiplier,
+            "promo_applies_to": promo_applies_to,
+            "promo_min_subscription_months": promo_min_subscription_months,
+            "promo_min_traffic_gb": promo_min_traffic_gb,
+            "checkout_base_amount": checkout_base_amount,
+            "checkout_discount_amount": checkout_discount_amount,
+            "checkout_charged_months": checkout_charged_months,
+            "checkout_charged_gb": checkout_charged_gb,
+            "checkout_quoted_at": checkout_quoted_at,
         },
     )
     await session.commit()
@@ -315,6 +341,19 @@ async def create_webapp_payment_record(
         hwid_proration_ratio=ctx.hwid_proration_ratio,
         hwid_full_price=ctx.hwid_full_price,
         promo_code_id=ctx.promo_code_id,
+        promo_effect_summary=ctx.promo_effect_summary,
+        promo_bonus_days=ctx.promo_bonus_days,
+        promo_discount_percent=ctx.promo_discount_percent,
+        promo_duration_multiplier=ctx.promo_duration_multiplier,
+        promo_traffic_multiplier=ctx.promo_traffic_multiplier,
+        promo_applies_to=ctx.promo_applies_to,
+        promo_min_subscription_months=ctx.promo_min_subscription_months,
+        promo_min_traffic_gb=ctx.promo_min_traffic_gb,
+        checkout_base_amount=ctx.checkout_base_amount,
+        checkout_discount_amount=ctx.checkout_discount_amount,
+        checkout_charged_months=ctx.checkout_charged_months,
+        checkout_charged_gb=ctx.checkout_charged_gb,
+        checkout_quoted_at=ctx.checkout_quoted_at,
     )
 
 
@@ -347,6 +386,7 @@ async def reusable_webapp_payment_response(
         purchased_hwid_devices=amounts.purchased_hwid_devices,
         tariff_key=amounts.tariff_key,
         promo_code_id=ctx.promo_code_id,
+        promo_effect_summary=ctx.promo_effect_summary,
         since_minutes=since_minutes,
     )
     if payment is None:

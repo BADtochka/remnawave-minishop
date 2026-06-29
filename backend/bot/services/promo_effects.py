@@ -92,6 +92,39 @@ class PromoEffects:
         model = type("PromoEffectsPayload", (), dict(payload))()
         return cls.from_model(model)
 
+    @classmethod
+    def from_payment_snapshot(cls, payment: Any) -> "PromoEffects | None":
+        summary = getattr(payment, "promo_effect_summary", None)
+        has_snapshot = summary is not None or any(
+            getattr(payment, attr, None) is not None
+            for attr in (
+                "promo_bonus_days",
+                "promo_discount_percent",
+                "promo_duration_multiplier",
+                "promo_traffic_multiplier",
+                "promo_applies_to",
+                "promo_min_subscription_months",
+                "promo_min_traffic_gb",
+            )
+        )
+        if not has_snapshot:
+            return None
+        discount = _optional_float(getattr(payment, "promo_discount_percent", None))
+        applies_to = str(getattr(payment, "promo_applies_to", None) or PROMO_APPLIES_TO_ALL).strip()
+        return cls(
+            bonus_days=max(0, int(getattr(payment, "promo_bonus_days", 0) or 0)),
+            discount_percent=discount if discount and discount > 0 else None,
+            duration_multiplier=_optional_float(getattr(payment, "promo_duration_multiplier", None))
+            or 1.0,
+            traffic_multiplier=_optional_float(getattr(payment, "promo_traffic_multiplier", None))
+            or 1.0,
+            applies_to=applies_to if applies_to in ALLOWED_PROMO_SCOPES else PROMO_APPLIES_TO_ALL,
+            min_subscription_months=_optional_int(
+                getattr(payment, "promo_min_subscription_months", None)
+            ),
+            min_traffic_gb=_optional_float(getattr(payment, "promo_min_traffic_gb", None)),
+        )
+
     @property
     def has_discount(self) -> bool:
         return self.discount_percent is not None and self.discount_percent > 0
@@ -115,6 +148,7 @@ class PromoEffects:
             and not self.has_discount
             and not self.has_multiplier
             and not self.has_threshold
+            and self.applies_to in {PROMO_APPLIES_TO_ALL, PROMO_APPLIES_TO_SUBSCRIPTION}
         )
 
     def applies_to_sale_mode(self, sale_mode_base: str) -> bool:
@@ -177,6 +211,24 @@ def validate_effects(
         PROMO_APPLIES_TO_TRAFFIC_TOPUP,
     }:
         errors.append("traffic_threshold_scope_mismatch")
+    if effects.bonus_days > 0 and effects.applies_to not in {
+        PROMO_APPLIES_TO_ALL,
+        PROMO_APPLIES_TO_SUBSCRIPTION,
+    }:
+        errors.append("bonus_days_scope_mismatch")
+    if effects.duration_multiplier > 1.0 and effects.applies_to not in {
+        PROMO_APPLIES_TO_ALL,
+        PROMO_APPLIES_TO_SUBSCRIPTION,
+    }:
+        errors.append("duration_multiplier_scope_mismatch")
+    if effects.traffic_multiplier > 1.0 and effects.applies_to not in {
+        PROMO_APPLIES_TO_ALL,
+        PROMO_APPLIES_TO_TRAFFIC,
+        PROMO_APPLIES_TO_TRAFFIC_TOPUP,
+    }:
+        errors.append("traffic_multiplier_scope_mismatch")
+    if effects.applies_to == PROMO_APPLIES_TO_HWID and not effects.has_discount:
+        errors.append("hwid_scope_requires_discount")
     if errors:
         raise PromoEffectsValidationError(",".join(errors))
 

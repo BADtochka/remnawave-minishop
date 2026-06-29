@@ -94,6 +94,14 @@ def _optional_float(value: Any) -> Optional[float]:
         return None
 
 
+def _first_optional_float(*values: Any) -> Optional[float]:
+    for value in values:
+        parsed = _optional_float(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
 def _optional_positive_int(value: Any) -> Optional[int]:
     number = _optional_float(value)
     if number is None or not number.is_integer():
@@ -276,8 +284,14 @@ def resolve_payment_success_snapshot(
         promo_code_id=_optional_int(
             payload.get("promo_code_id") or _getattr_or_none(payment, "promo_code_id")
         ),
-        base_amount=_optional_float(payload.get("base_amount")),
-        discount_amount=_optional_float(payload.get("discount_amount")),
+        base_amount=_first_optional_float(
+            payload.get("base_amount"),
+            _getattr_or_none(payment, "checkout_base_amount"),
+        ),
+        discount_amount=_first_optional_float(
+            payload.get("discount_amount"),
+            _getattr_or_none(payment, "checkout_discount_amount"),
+        ),
         purchases=purchases,
     )
 

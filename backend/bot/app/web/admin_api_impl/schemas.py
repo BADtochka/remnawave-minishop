@@ -80,6 +80,8 @@ class PromoUpdateBody(HttpBodyModel):
     min_traffic_gb: float | None = Field(default=None, gt=0)
     max_activations: int | None = Field(default=None, gt=0)
     origin: str | None = None
+    valid_until: datetime | None = None
+    clear_valid_until: Any = None
 
     @field_validator("applies_to", "origin", mode="before")
     @classmethod
@@ -346,6 +348,14 @@ def _float_or_none(value: Any) -> float | None:
         return None
 
 
+def _first_float_or_none(*values: Any) -> float | None:
+    for value in values:
+        parsed = _float_or_none(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
 class PromoActivationOut(HttpResponseModel):
     activation_id: int
     promo_id: int
@@ -367,6 +377,12 @@ class PromoActivationOut(HttpResponseModel):
     duration_multiplier: float | None = None
     traffic_multiplier: float | None = None
     applies_to: str | None = None
+    base_amount: float | None = None
+    discount_amount: float | None = None
+    charged_months: int | None = None
+    charged_gb: float | None = None
+    granted_days: int | None = None
+    granted_gb: float | None = None
 
     @classmethod
     def from_orm_activation(cls, activation: Any) -> "PromoActivationOut":
@@ -408,6 +424,40 @@ class PromoActivationOut(HttpResponseModel):
             duration_multiplier=_float_or_none(getattr(activation, "duration_multiplier", None)),
             traffic_multiplier=_float_or_none(getattr(activation, "traffic_multiplier", None)),
             applies_to=getattr(activation, "applies_to", None),
+            base_amount=_first_float_or_none(
+                getattr(activation, "base_amount", None),
+                getattr(loaded_payment, "checkout_base_amount", None)
+                if loaded_payment is not None
+                else None,
+            ),
+            discount_amount=_first_float_or_none(
+                getattr(activation, "discount_amount", None),
+                getattr(loaded_payment, "checkout_discount_amount", None)
+                if loaded_payment is not None
+                else None,
+            ),
+            charged_months=(
+                int(getattr(activation, "charged_months", 0) or 0)
+                if getattr(activation, "charged_months", None) is not None
+                else (
+                    int(getattr(loaded_payment, "checkout_charged_months", 0) or 0)
+                    if loaded_payment is not None
+                    and getattr(loaded_payment, "checkout_charged_months", None) is not None
+                    else None
+                )
+            ),
+            charged_gb=_first_float_or_none(
+                getattr(activation, "charged_gb", None),
+                getattr(loaded_payment, "checkout_charged_gb", None)
+                if loaded_payment is not None
+                else None,
+            ),
+            granted_days=(
+                int(getattr(activation, "granted_days", 0) or 0)
+                if getattr(activation, "granted_days", None) is not None
+                else None
+            ),
+            granted_gb=_float_or_none(getattr(activation, "granted_gb", None)),
         )
 
 

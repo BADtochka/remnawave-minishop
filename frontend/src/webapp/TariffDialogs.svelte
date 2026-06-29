@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowRight, CheckCircle2, LockKeyhole } from "$components/ui/icons.js";
+  import { ArrowRight, CheckCircle2, LockKeyhole, X } from "$components/ui/icons.js";
 
   import Button from "$components/ui/button.svelte";
   import {
@@ -104,6 +104,10 @@
   function priceLabel(plan: AnyRecord | null) {
     return priceLabelFn(plan, selectedMethod);
   }
+  function checkoutPlanPriceLabel(plan: AnyRecord | null) {
+    if (checkoutPromoAppliedCode && checkoutPromoPriceText) return checkoutPromoPriceText;
+    return priceLabel(plan);
+  }
   function planKey(plan: AnyRecord | null) {
     return planKeyFn(plan);
   }
@@ -169,7 +173,7 @@
       });
     }
     if (mode === "buy_period") {
-      return `${action?.title || ""} · ${priceLabel(action)}`;
+      return `${action?.title || ""} - ${priceLabel(action)}`;
     }
     return action?.title || mode;
   }
@@ -204,7 +208,7 @@
       t(
         "wa_topup_carryover",
         {},
-        "Докупленный трафик не сгорает: сначала расходуется месячный лимит, затем докупленный остаток."
+        "Purchased traffic does not expire: monthly allowance is spent first, then the purchased balance."
       ),
     ];
   }
@@ -461,7 +465,7 @@
             <span class="checkout-promo-chip">
               {checkoutPromoAppliedCode}
               <button type="button" onclick={clearCheckoutPromo} aria-label={t("wa_remove")}>
-                ×
+                <X size={14} />
               </button>
             </span>
           {:else}
@@ -484,7 +488,7 @@
           <StatusMessage error={checkoutPromoIsError}>
             {checkoutPromoStatus}
             {#if checkoutPromoPriceText}
-              · {checkoutPromoPriceText}
+              - {checkoutPromoPriceText}
             {/if}
           </StatusMessage>
         {/if}
@@ -495,7 +499,7 @@
         disabled={!selectedTopupPlan || !topupPaymentMethodSelected || payBusy}
       >
         {t("wa_buy_traffic")}
-        {selectedTopupPlan ? priceLabel(selectedTopupPlan) : ""}
+        {selectedTopupPlan ? checkoutPlanPriceLabel(selectedTopupPlan) : ""}
         <LockKeyhole size={17} />
       </Button>
     {:else}
@@ -559,7 +563,7 @@
             <span class="checkout-promo-chip">
               {checkoutPromoAppliedCode}
               <button type="button" onclick={clearCheckoutPromo} aria-label={t("wa_remove")}>
-                ×
+                <X size={14} />
               </button>
             </span>
           {:else}
@@ -582,7 +586,7 @@
           <StatusMessage error={checkoutPromoIsError}>
             {checkoutPromoStatus}
             {#if checkoutPromoPriceText}
-              · {checkoutPromoPriceText}
+              - {checkoutPromoPriceText}
             {/if}
           </StatusMessage>
         {/if}
@@ -593,7 +597,7 @@
         disabled={!selectedDeviceTopupPlan || !devicePaymentMethodSelected || payBusy}
       >
         {t("wa_pay")}
-        {selectedDeviceTopupPlan ? priceLabel(selectedDeviceTopupPlan) : ""}
+        {selectedDeviceTopupPlan ? checkoutPlanPriceLabel(selectedDeviceTopupPlan) : ""}
         <LockKeyhole size={17} />
       </Button>
     {:else}

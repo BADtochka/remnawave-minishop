@@ -6,6 +6,7 @@
     CircleX,
     LockKeyhole,
     TriangleAlert,
+    X,
   } from "$components/ui/icons.js";
   import { Tooltip } from "$components/ui/primitives.js";
 
@@ -198,6 +199,10 @@
   }
   function paymentPriceLabel(plan: AnyRecord | null) {
     return priceLabelFn(planWithSelectedHwidRenewal(plan), selectedMethod);
+  }
+  function checkoutPaymentPriceLabel(plan: AnyRecord | null) {
+    if (checkoutPromoAppliedCode && checkoutPromoPriceText) return checkoutPromoPriceText;
+    return paymentPriceLabel(plan);
   }
   const selectedPlanForPayment = $derived(planWithSelectedHwidRenewal(selectedPlan));
   const paymentMethods = $derived(methodsForPlan(methods, selectedPlanForPayment));
@@ -437,7 +442,7 @@
               <span class="checkout-promo-chip">
                 {checkoutPromoAppliedCode}
                 <button type="button" onclick={clearCheckoutPromo} aria-label={t("wa_remove")}>
-                  ×
+                  <X size={14} />
                 </button>
               </span>
             {:else}
@@ -460,7 +465,7 @@
             <StatusMessage error={checkoutPromoIsError}>
               {checkoutPromoStatus}
               {#if checkoutPromoPriceText}
-                · {checkoutPromoPriceText}
+                - {checkoutPromoPriceText}
               {/if}
             </StatusMessage>
           {/if}
@@ -471,7 +476,7 @@
           disabled={!selectedPlan || !paymentMethodSelected || payBusy}
         >
           {t("wa_pay")}
-          {selectedPlan ? paymentPriceLabel(selectedPlan) : ""}
+          {selectedPlan ? checkoutPaymentPriceLabel(selectedPlan) : ""}
           <LockKeyhole size={17} />
         </Button>
       {:else}
@@ -562,7 +567,7 @@
             <span class="checkout-promo-chip">
               {checkoutPromoAppliedCode}
               <button type="button" onclick={clearCheckoutPromo} aria-label={t("wa_remove")}>
-                ×
+                <X size={14} />
               </button>
             </span>
           {:else}
@@ -585,7 +590,7 @@
           <StatusMessage error={checkoutPromoIsError}>
             {checkoutPromoStatus}
             {#if checkoutPromoPriceText}
-              · {checkoutPromoPriceText}
+              - {checkoutPromoPriceText}
             {/if}
           </StatusMessage>
         {/if}
@@ -596,7 +601,7 @@
         disabled={!selectedPlan || !paymentMethodSelected || payBusy}
       >
         {t("wa_pay")}
-        {selectedPlan ? paymentPriceLabel(selectedPlan) : ""}
+        {selectedPlan ? checkoutPaymentPriceLabel(selectedPlan) : ""}
         <LockKeyhole size={17} />
       </Button>
     {/if}

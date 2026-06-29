@@ -8,7 +8,7 @@ from bot.infra.grants import GrantContext, resolve_effective_grant
 from bot.services.payment_promo import consume_payment_promo, load_payment_promo_effects
 from bot.utils.date_utils import month_start
 from config.tariffs_config import Tariff
-from db.dal import subscription_dal, tariff_dal, user_dal
+from db.dal import payment_dal, subscription_dal, tariff_dal, user_dal
 from db.models import Subscription
 
 from ._typing import SubscriptionServiceMixinContract
@@ -48,21 +48,12 @@ class TrafficMixin(SubscriptionServiceMixinContract):
         charged_gb = float(traffic_gb)
         granted_gb = charged_gb
         if promo_code_id_from_payment:
+            payment = await payment_dal.get_payment_by_db_id(session, payment_db_id)
             promo_model, promo_effects = await load_payment_promo_effects(
                 session,
-                promo_code_id_from_payment,
+                payment or promo_code_id_from_payment,
             )
             if promo_model is not None and promo_effects is not None:
-                consumed = await consume_payment_promo(
-                    session=session,
-                    user_id=user_id,
-                    promo_model=promo_model,
-                    effects=promo_effects,
-                    payment_id=payment_db_id,
-                    sale_mode_base=sale_mode,
-                    months=None,
-                    traffic_gb=charged_gb,
-                )
                 grant = resolve_effective_grant(
                     GrantContext(
                         sale_mode_base=sale_mode,
@@ -71,10 +62,24 @@ class TrafficMixin(SubscriptionServiceMixinContract):
                         months=None,
                         charged_gb=charged_gb,
                         scope="regular",
-                        promo=promo_effects if consumed else None,
+                        promo=promo_effects,
                     )
                 )
-                granted_gb = charged_gb * grant.traffic_multiplier
+                quoted_granted_gb = charged_gb * grant.traffic_multiplier
+                consumed = await consume_payment_promo(
+                    session=session,
+                    user_id=user_id,
+                    promo_model=promo_model,
+                    effects=promo_effects,
+                    payment_id=payment_db_id,
+                    payment=payment,
+                    sale_mode_base=sale_mode,
+                    months=None,
+                    traffic_gb=charged_gb,
+                    granted_gb=quoted_granted_gb,
+                )
+                if consumed:
+                    granted_gb = quoted_granted_gb
 
         await self._record_payment_context(
             session,
@@ -256,21 +261,12 @@ class TrafficMixin(SubscriptionServiceMixinContract):
         charged_gb = float(traffic_gb)
         granted_gb = charged_gb
         if promo_code_id_from_payment:
+            payment = await payment_dal.get_payment_by_db_id(session, payment_db_id)
             promo_model, promo_effects = await load_payment_promo_effects(
                 session,
-                promo_code_id_from_payment,
+                payment or promo_code_id_from_payment,
             )
             if promo_model is not None and promo_effects is not None:
-                consumed = await consume_payment_promo(
-                    session=session,
-                    user_id=user_id,
-                    promo_model=promo_model,
-                    effects=promo_effects,
-                    payment_id=payment_db_id,
-                    sale_mode_base="topup",
-                    months=None,
-                    traffic_gb=charged_gb,
-                )
                 grant = resolve_effective_grant(
                     GrantContext(
                         sale_mode_base="topup",
@@ -279,10 +275,24 @@ class TrafficMixin(SubscriptionServiceMixinContract):
                         months=None,
                         charged_gb=charged_gb,
                         scope="regular",
-                        promo=promo_effects if consumed else None,
+                        promo=promo_effects,
                     )
                 )
-                granted_gb = charged_gb * grant.traffic_multiplier
+                quoted_granted_gb = charged_gb * grant.traffic_multiplier
+                consumed = await consume_payment_promo(
+                    session=session,
+                    user_id=user_id,
+                    promo_model=promo_model,
+                    effects=promo_effects,
+                    payment_id=payment_db_id,
+                    payment=payment,
+                    sale_mode_base="topup",
+                    months=None,
+                    traffic_gb=charged_gb,
+                    granted_gb=quoted_granted_gb,
+                )
+                if consumed:
+                    granted_gb = quoted_granted_gb
 
         await self._record_payment_context(
             session,
@@ -398,21 +408,12 @@ class TrafficMixin(SubscriptionServiceMixinContract):
         charged_gb = float(traffic_gb)
         granted_gb = charged_gb
         if promo_code_id_from_payment:
+            payment = await payment_dal.get_payment_by_db_id(session, payment_db_id)
             promo_model, promo_effects = await load_payment_promo_effects(
                 session,
-                promo_code_id_from_payment,
+                payment or promo_code_id_from_payment,
             )
             if promo_model is not None and promo_effects is not None:
-                consumed = await consume_payment_promo(
-                    session=session,
-                    user_id=user_id,
-                    promo_model=promo_model,
-                    effects=promo_effects,
-                    payment_id=payment_db_id,
-                    sale_mode_base="premium_topup",
-                    months=None,
-                    traffic_gb=charged_gb,
-                )
                 grant = resolve_effective_grant(
                     GrantContext(
                         sale_mode_base="premium_topup",
@@ -421,10 +422,24 @@ class TrafficMixin(SubscriptionServiceMixinContract):
                         months=None,
                         charged_gb=charged_gb,
                         scope="premium",
-                        promo=promo_effects if consumed else None,
+                        promo=promo_effects,
                     )
                 )
-                granted_gb = charged_gb * grant.traffic_multiplier
+                quoted_granted_gb = charged_gb * grant.traffic_multiplier
+                consumed = await consume_payment_promo(
+                    session=session,
+                    user_id=user_id,
+                    promo_model=promo_model,
+                    effects=promo_effects,
+                    payment_id=payment_db_id,
+                    payment=payment,
+                    sale_mode_base="premium_topup",
+                    months=None,
+                    traffic_gb=charged_gb,
+                    granted_gb=quoted_granted_gb,
+                )
+                if consumed:
+                    granted_gb = quoted_granted_gb
 
         await self._record_payment_context(
             session,

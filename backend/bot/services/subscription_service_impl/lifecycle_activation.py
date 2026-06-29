@@ -222,19 +222,9 @@ class SubscriptionLifecycleActivationMixin(SubscriptionServiceMixinContract):
         if promo_code_id_from_payment:
             promo_model, promo_effects = await load_payment_promo_effects(
                 session,
-                promo_code_id_from_payment,
+                payment or promo_code_id_from_payment,
             )
             if promo_model is not None and promo_effects is not None:
-                consumed = await consume_payment_promo(
-                    session=session,
-                    user_id=user_id,
-                    promo_model=promo_model,
-                    effects=promo_effects,
-                    payment_id=payment_db_id,
-                    sale_mode_base="subscription",
-                    months=months_int,
-                    traffic_gb=None,
-                )
                 grant = resolve_effective_grant(
                     GrantContext(
                         sale_mode_base="subscription",
@@ -243,10 +233,22 @@ class SubscriptionLifecycleActivationMixin(SubscriptionServiceMixinContract):
                         months=months_int,
                         charged_gb=None,
                         scope="regular",
-                        promo=promo_effects if consumed else None,
+                        promo=promo_effects,
                         period_start=start_date,
                         base_period_end=end_after_months,
                     )
+                )
+                consumed = await consume_payment_promo(
+                    session=session,
+                    user_id=user_id,
+                    promo_model=promo_model,
+                    effects=promo_effects,
+                    payment_id=payment_db_id,
+                    payment=payment,
+                    sale_mode_base="subscription",
+                    months=months_int,
+                    traffic_gb=None,
+                    granted_days=grant.extra_days,
                 )
                 if consumed:
                     applied_promo_bonus_days = grant.extra_days

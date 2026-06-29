@@ -222,6 +222,19 @@ class Payment(Base):
     hwid_proration_ratio = Column(Float, nullable=True)
     hwid_full_price = Column(Float, nullable=True)
     promo_code_id = Column(Integer, ForeignKey("promo_codes.promo_code_id"), nullable=True)
+    promo_effect_summary = Column(String, nullable=True)
+    promo_bonus_days = Column(Integer, nullable=True)
+    promo_discount_percent = Column(Numeric(5, 2), nullable=True)
+    promo_duration_multiplier = Column(Numeric(6, 3), nullable=True)
+    promo_traffic_multiplier = Column(Numeric(6, 3), nullable=True)
+    promo_applies_to = Column(String(32), nullable=True)
+    promo_min_subscription_months = Column(Integer, nullable=True)
+    promo_min_traffic_gb = Column(Numeric(10, 2), nullable=True)
+    checkout_base_amount = Column(Float, nullable=True)
+    checkout_discount_amount = Column(Float, nullable=True)
+    checkout_charged_months = Column(Integer, nullable=True)
+    checkout_charged_gb = Column(Float, nullable=True)
+    checkout_quoted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
@@ -386,6 +399,7 @@ class PromoCode(Base):
     created_by_admin_id = Column(BigInteger, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     valid_until = Column(DateTime(timezone=True), nullable=True)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
 
     activations = relationship(
         "PromoCodeActivation", back_populates="promo_code", cascade="all, delete-orphan"
@@ -407,6 +421,12 @@ class PromoCodeActivation(Base):
     duration_multiplier = Column(Numeric(6, 3), nullable=True)
     traffic_multiplier = Column(Numeric(6, 3), nullable=True)
     applies_to = Column(String(32), nullable=True)
+    base_amount = Column(Float, nullable=True)
+    discount_amount = Column(Float, nullable=True)
+    charged_months = Column(Integer, nullable=True)
+    charged_gb = Column(Float, nullable=True)
+    granted_days = Column(Integer, nullable=True)
+    granted_gb = Column(Float, nullable=True)
 
     promo_code = relationship("PromoCode", back_populates="activations")
     user = relationship("User", back_populates="promo_code_activations")

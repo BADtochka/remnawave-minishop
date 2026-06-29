@@ -250,7 +250,9 @@ export function createBillingStore({
   }
 
   function checkoutQuoteKey(): string {
-    const code = String(state.checkoutPromoAppliedCode || "").trim();
+    const code = String(
+      state.checkoutPromoAppliedCode || (state.checkoutPromoIsError ? state.checkoutPromoInput : "")
+    ).trim();
     if (!code || !state.selectedMethod) return "";
     if (state.paymentModalOpen && state.selectedPlan) {
       return [
@@ -295,9 +297,10 @@ export function createBillingStore({
 
   function promoPriceText(payload: BillingRecord): string {
     const stars = payload.effective_stars;
-    if (typeof stars === "number" && stars > 0) return `${stars} ⭐`;
+    if (typeof stars === "number" && stars > 0) return `${stars} stars`;
     const amount = Number(payload.effective_amount || 0);
-    return amount > 0 ? `${amount.toFixed(2)}` : "";
+    const currency = stringField(payload.currency);
+    return amount > 0 ? `${amount.toFixed(2)}${currency ? ` ${currency}` : ""}` : "";
   }
 
   async function applyCheckoutPromo(): Promise<void> {
@@ -310,12 +313,14 @@ export function createBillingStore({
       }));
       return;
     }
+    const attemptedCode = stringField(body.promo_code);
     try {
       const response = await billing.quotePromo(body);
       const payload = unwrapBilling(response);
       if (!payload.valid) {
         updateState((s) => ({
           ...s,
+          checkoutPromoInput: attemptedCode,
           checkoutPromoAppliedCode: "",
           checkoutPromoIsError: true,
           checkoutPromoStatus:
@@ -336,6 +341,7 @@ export function createBillingStore({
     } catch (error: unknown) {
       updateState((s) => ({
         ...s,
+        checkoutPromoInput: attemptedCode,
         checkoutPromoAppliedCode: "",
         checkoutPromoIsError: true,
         checkoutPromoStatus:

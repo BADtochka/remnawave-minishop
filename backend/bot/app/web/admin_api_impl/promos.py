@@ -155,6 +155,10 @@ async def admin_promo_update_route(request: web.Request) -> web.Response:
             update_data[field] = getattr(body, field)
     if "max_activations" in fields_set and body.max_activations is not None:
         update_data["max_activations"] = int(body.max_activations)
+    if "clear_valid_until" in fields_set and bool(body.clear_valid_until):
+        update_data["valid_until"] = None
+    elif "valid_until" in fields_set:
+        update_data["valid_until"] = body.valid_until
 
     if not update_data:
         return _error(400, "no_changes")

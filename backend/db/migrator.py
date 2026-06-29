@@ -1261,6 +1261,55 @@ def _migration_0039_add_promo_activation_effect_snapshots(connection: Connection
         connection.execute(text(stmt))
 
 
+def _migration_0040_add_code_checkout_snapshots(connection: Connection) -> None:
+    inspector = inspect(connection)
+    payment_columns: Set[str] = {col["name"] for col in inspector.get_columns("payments")}
+    activation_columns: Set[str] = {
+        col["name"] for col in inspector.get_columns("promo_code_activations")
+    }
+    code_columns: Set[str] = {col["name"] for col in inspector.get_columns("promo_codes")}
+    statements: List[str] = []
+
+    payment_additions = {
+        "promo_effect_summary": "VARCHAR",
+        "promo_bonus_days": "INTEGER",
+        "promo_discount_percent": "NUMERIC(5, 2)",
+        "promo_duration_multiplier": "NUMERIC(6, 3)",
+        "promo_traffic_multiplier": "NUMERIC(6, 3)",
+        "promo_applies_to": "VARCHAR(32)",
+        "promo_min_subscription_months": "INTEGER",
+        "promo_min_traffic_gb": "NUMERIC(10, 2)",
+        "checkout_base_amount": "DOUBLE PRECISION",
+        "checkout_discount_amount": "DOUBLE PRECISION",
+        "checkout_charged_months": "INTEGER",
+        "checkout_charged_gb": "DOUBLE PRECISION",
+        "checkout_quoted_at": "TIMESTAMPTZ",
+    }
+    for column, column_type in payment_additions.items():
+        if column not in payment_columns:
+            statements.append(f"ALTER TABLE payments ADD COLUMN {column} {column_type}")
+
+    activation_additions = {
+        "base_amount": "DOUBLE PRECISION",
+        "discount_amount": "DOUBLE PRECISION",
+        "charged_months": "INTEGER",
+        "charged_gb": "DOUBLE PRECISION",
+        "granted_days": "INTEGER",
+        "granted_gb": "DOUBLE PRECISION",
+    }
+    for column, column_type in activation_additions.items():
+        if column not in activation_columns:
+            statements.append(
+                f"ALTER TABLE promo_code_activations ADD COLUMN {column} {column_type}"
+            )
+
+    if "archived_at" not in code_columns:
+        statements.append("ALTER TABLE promo_codes ADD COLUMN archived_at TIMESTAMPTZ")
+
+    for stmt in statements:
+        connection.execute(text(stmt))
+
+
 MIGRATIONS: List[Migration] = [
     Migration(
         id="0001_add_channel_subscription_fields",
@@ -1456,6 +1505,11 @@ MIGRATIONS: List[Migration] = [
         id="0039_add_promo_activation_effect_snapshots",
         description="Snapshot code effects on activation records",
         upgrade=_migration_0039_add_promo_activation_effect_snapshots,
+    ),
+    Migration(
+        id="0040_add_code_checkout_snapshots",
+        description="Snapshot code checkout terms and archive used codes safely",
+        upgrade=_migration_0040_add_code_checkout_snapshots,
     ),
 ]
 

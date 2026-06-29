@@ -2605,6 +2605,18 @@
             "default": null,
             "title": "Applies To"
           },
+          "base_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Base Amount"
+          },
           "bonus_days": {
             "anyOf": [
               {
@@ -2616,6 +2628,42 @@
             ],
             "default": null,
             "title": "Bonus Days"
+          },
+          "charged_gb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Charged Gb"
+          },
+          "charged_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Charged Months"
+          },
+          "discount_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Discount Amount"
           },
           "discount_percent": {
             "anyOf": [
@@ -2652,6 +2700,30 @@
             ],
             "default": null,
             "title": "Effect Summary"
+          },
+          "granted_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Granted Days"
+          },
+          "granted_gb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Granted Gb"
           },
           "payment_amount": {
             "anyOf": [
@@ -3086,6 +3158,10 @@
             "default": null,
             "title": "Bonus Days"
           },
+          "clear_valid_until": {
+            "default": null,
+            "title": "Clear Valid Until"
+          },
           "discount_percent": {
             "anyOf": [
               {
@@ -3180,6 +3256,19 @@
             ],
             "default": null,
             "title": "Traffic Multiplier"
+          },
+          "valid_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Valid Until"
           }
         },
         "title": "PromoUpdateBody",
@@ -11541,6 +11630,9 @@
                     "code": {
                       "type": "string"
                     },
+                    "currency": {
+                      "type": "string"
+                    },
                     "discount_amount": {
                       "type": "number"
                     },
@@ -11573,6 +11665,9 @@
                     },
                     "ok": {
                       "const": true,
+                      "type": "boolean"
+                    },
+                    "payable": {
                       "type": "boolean"
                     },
                     "promo_code_id": {

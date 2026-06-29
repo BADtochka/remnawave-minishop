@@ -117,6 +117,9 @@
     at("date", {}, "Date"),
     at("payment_detail_payment_section", {}, "Payment"),
     at("amount", {}, "Amount"),
+    at("promo_col_base_amount", {}, "Base"),
+    at("promo_col_discount_amount", {}, "Discount"),
+    at("promo_col_grant", {}, "Grant"),
     at("promo_col_effect", {}, "Effect"),
     at("status", {}, "Status"),
     at("provider", {}, "Provider"),
@@ -141,9 +144,9 @@
   }
 
   function numberText(value: number | string | null | undefined): string {
-    if (value == null || value === "") return "—";
+    if (value == null || value === "") return "-";
     const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return "—";
+    if (!Number.isFinite(parsed)) return "-";
     return Math.abs(parsed - Math.round(parsed)) < 1e-9
       ? String(Math.round(parsed))
       : String(Math.round(parsed * 100) / 100);
@@ -179,7 +182,7 @@
         )
       );
     }
-    return parts.join(", ") || "—";
+    return parts.join(", ") || "-";
   }
 
   function promoType(promo: Promo | PromoPatch): string {
@@ -212,7 +215,7 @@
   function effectText(promo: EffectLike): string {
     if (promo.effect_summary) return promo.effect_summary;
     const parts = effectPieces(promo);
-    return parts.length ? parts.join(" + ") : "—";
+    return parts.length ? parts.join(" + ") : "-";
   }
 
   function promoStatus(promo: Promo): { label: string; variant: "success" | "warning" | "muted" } {
@@ -229,7 +232,7 @@
   function activationEffectText(row: PromoActivation): string {
     if (row.effect_summary) return row.effect_summary;
     const parts = effectPieces(row);
-    return parts.length ? parts.join(" + ") : "—";
+    return parts.length ? parts.join(" + ") : "-";
   }
 
   function paymentLabel(row: PromoActivation): string {
@@ -238,8 +241,63 @@
   }
 
   function amountLabel(row: PromoActivation): string {
-    if (row.payment_amount == null) return "—";
+    if (row.payment_amount == null) return "-";
     return fmtMoney(Number(row.payment_amount), row.payment_currency);
+  }
+
+  function baseAmountLabel(row: PromoActivation): string {
+    if (row.base_amount == null) return "-";
+    return fmtMoney(Number(row.base_amount), row.payment_currency);
+  }
+
+  function discountAmountLabel(row: PromoActivation): string {
+    if (row.discount_amount == null || Number(row.discount_amount || 0) <= 0) return "-";
+    return fmtMoney(Number(row.discount_amount), row.payment_currency);
+  }
+
+  function gbText(value: number | null | undefined): string {
+    if (value == null) return "";
+    return `${numberText(value)} GB`;
+  }
+
+  function grantLabel(row: PromoActivation): string {
+    const parts: string[] = [];
+    if (Number(row.granted_days || 0) > 0) {
+      parts.push(`+${numberText(row.granted_days)} ${at("days_short", {}, "d")}`);
+    }
+    if (row.charged_gb != null && row.granted_gb != null) {
+      parts.push(`${gbText(row.charged_gb)} -> ${gbText(row.granted_gb)}`);
+    } else if (row.granted_gb != null) {
+      parts.push(gbText(row.granted_gb));
+    }
+    if (row.charged_months != null && Number(row.granted_days || 0) > 0) {
+      parts.push(`${numberText(row.charged_months)} mo`);
+    }
+    return parts.join(", ") || "-";
+  }
+
+  function validUntilInputValue(value: string | null | undefined): string {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const offsetMs = date.getTimezoneOffset() * 60_000;
+    return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+  }
+
+  function localDateTimeToIso(value: string): string | null {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const date = new Date(trimmed);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toISOString();
+  }
+
+  function updateEditValidUntil(value: string): void {
+    const iso = localDateTimeToIso(value);
+    promosStore.updateEditDraft({
+      valid_until: iso,
+      clear_valid_until: iso ? false : true,
+    } as Partial<PromoPatch>);
   }
 
   function inputValue(event: Event): string {
@@ -331,7 +389,7 @@
               <AdminBadge variant={status.variant}>{status.label}</AdminBadge>
             </td>
             <td data-label={at("promo_col_valid_until", {}, "Valid until")}>
-              {p.valid_until ? fmtDateShort(p.valid_until) : "∞"}
+              {p.valid_until ? fmtDateShort(p.valid_until) : at("unlimited", {}, "Unlimited")}
             </td>
             <td class="admin-cell-mono" data-label={at("promo_col_origin", {}, "Origin")}>
               {p.origin || "admin"}
@@ -502,8 +560,8 @@
           <Input
             type="number"
             class="input"
-            min="1"
-            value={String(promoDraft.valid_days)}
+            min="0"
+            value={promoDraft.valid_days ? String(promoDraft.valid_days) : ""}
             oninput={(e) => updateCreateNumber("valid_days", inputValue(e))}
           />
         </AdminField>
@@ -669,6 +727,33 @@
             />
           </AdminField>
         </div>
+        <div class="admin-form-row-2">
+          <AdminField label={at("promo_col_valid_until", {}, "Valid until")}>
+            <Input
+              type="datetime-local"
+              class="input"
+              value={promoEditDraft.clear_valid_until
+                ? ""
+                : validUntilInputValue(promoEditDraft.valid_until || promoEditing.valid_until)}
+              disabled={Boolean(promoEditDraft.clear_valid_until)}
+              oninput={(e) => updateEditValidUntil(inputValue(e))}
+            />
+          </AdminField>
+          <AdminField label={at("unlimited", {}, "Unlimited")}>
+            <label class="admin-promo-check-row">
+              <Checkbox
+                checked={Boolean(promoEditDraft.clear_valid_until)}
+                ariaLabel={at("unlimited", {}, "Unlimited")}
+                onCheckedChange={(checked) =>
+                  promosStore.updateEditDraft({
+                    clear_valid_until: checked,
+                    valid_until: checked ? null : promoEditing.valid_until,
+                  } as Partial<PromoPatch>)}
+              />
+              <span>{at("unlimited", {}, "Unlimited")}</span>
+            </label>
+          </AdminField>
+        </div>
       </div>
       <div class="admin-dialog-actions">
         <AdminButton onclick={promosStore.closeEditPromo}
@@ -700,7 +785,18 @@
       <AdminTableSkeleton
         headers={activationHeaders}
         rows={6}
-        widths={["160px", "104px", "72px", "86px", "120px", "86px", "90px"]}
+        widths={[
+          "160px",
+          "104px",
+          "72px",
+          "86px",
+          "86px",
+          "86px",
+          "120px",
+          "120px",
+          "86px",
+          "90px",
+        ]}
       />
     {:else if !activationRows.length}
       <AdminEmptyState tone="card">
@@ -715,6 +811,9 @@
               <th>{at("date", {}, "Date")}</th>
               <th>{at("payment_detail_payment_section", {}, "Payment")}</th>
               <th>{at("amount", {}, "Amount")}</th>
+              <th>{at("promo_col_base_amount", {}, "Base")}</th>
+              <th>{at("promo_col_discount_amount", {}, "Discount")}</th>
+              <th>{at("promo_col_grant", {}, "Grant")}</th>
               <th>{at("promo_col_effect", {}, "Effect")}</th>
               <th>{at("status", {}, "Status")}</th>
               <th>{at("provider", {}, "Provider")}</th>
@@ -749,6 +848,15 @@
                   {paymentLabel(row)}
                 </td>
                 <td data-label={at("amount", {}, "Amount")}>{amountLabel(row)}</td>
+                <td data-label={at("promo_col_base_amount", {}, "Base")}>
+                  {baseAmountLabel(row)}
+                </td>
+                <td data-label={at("promo_col_discount_amount", {}, "Discount")}>
+                  {discountAmountLabel(row)}
+                </td>
+                <td class="admin-cell-wrap" data-label={at("promo_col_grant", {}, "Grant")}>
+                  {grantLabel(row)}
+                </td>
                 <td class="admin-cell-wrap" data-label={at("promo_col_effect", {}, "Effect")}>
                   {activationEffectText(row)}
                 </td>
@@ -764,7 +872,7 @@
                   {/if}
                 </td>
                 <td data-label={at("provider", {}, "Provider")}>
-                  {row.payment_provider || "—"}
+                  {row.payment_provider || "-"}
                 </td>
               </tr>
             {/each}
@@ -829,7 +937,7 @@
   }
 
   :global(.admin-promo-activations-table) {
-    min-width: 860px;
+    min-width: 1180px;
   }
 
   .admin-promos-user-cell {

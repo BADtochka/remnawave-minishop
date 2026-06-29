@@ -188,6 +188,32 @@ class PromoCodeService:
         if tariffs_config:
             default_tariff_key = getattr(tariffs_config, "default_tariff", None)
 
+        activation = await promo_code_dal.consume_promo_activation(
+            session,
+            promo_data.promo_code_id,
+            user_id,
+            payment_id=None,
+            enforce_limit=True,
+            effect_summary=summarize_effects(effects),
+            bonus_days=effects.bonus_days,
+            discount_percent=effects.discount_percent,
+            duration_multiplier=(
+                effects.duration_multiplier if effects.duration_multiplier != 1.0 else None
+            ),
+            traffic_multiplier=(
+                effects.traffic_multiplier if effects.traffic_multiplier != 1.0 else None
+            ),
+            applies_to=effects.applies_to,
+            granted_days=bonus_days,
+        )
+        if activation is None:
+            logging.warning(
+                "Failed to consume code %s for standalone activation by user %s",
+                promo_data.code,
+                user_id,
+            )
+            return False, _("error_applying_promo_bonus")
+
         new_end_date = await self.subscription_service.extend_active_subscription_days(
             session=session,
             user_id=user_id,
@@ -196,47 +222,27 @@ class PromoCodeService:
             tariff_key=default_tariff_key,
         )
 
-        if new_end_date:
-            activation_recorded = await promo_code_dal.record_promo_activation(
+        if not new_end_date:
+            await promo_code_dal.release_promo_activation(
                 session,
                 promo_data.promo_code_id,
                 user_id,
                 payment_id=None,
-                effect_summary=summarize_effects(effects),
-                bonus_days=effects.bonus_days,
-                discount_percent=effects.discount_percent,
-                duration_multiplier=(
-                    effects.duration_multiplier if effects.duration_multiplier != 1.0 else None
-                ),
-                traffic_multiplier=(
-                    effects.traffic_multiplier if effects.traffic_multiplier != 1.0 else None
-                ),
-                applies_to=effects.applies_to,
             )
-            promo_incremented = await promo_code_dal.increment_promo_code_usage(
-                session, promo_data.promo_code_id
-            )
-
-            if activation_recorded and promo_incremented:
-                await security_dal.clear_throttle_state(
-                    session,
-                    scope=security_dal.PROMO_CODE_APPLY_SCOPE,
-                    identifier=throttle_identifier,
-                )
-                await events.emit_model(
-                    PromoCodeAppliedPayload(
-                        user_id=user_id,
-                        code=applied_code,
-                        bonus_days=bonus_days,
-                        new_end_date=new_end_date,
-                    )
-                )
-
-                return True, new_end_date
-            else:
-                logging.error(
-                    f"Failed to record activation or increment usage for promo {promo_data.code} by user {user_id}"  # noqa: E501
-                )
-                return False, _("error_applying_promo_bonus")
-        else:
             return False, _("error_applying_promo_bonus")
+
+        await security_dal.clear_throttle_state(
+            session,
+            scope=security_dal.PROMO_CODE_APPLY_SCOPE,
+            identifier=throttle_identifier,
+        )
+        await events.emit_model(
+            PromoCodeAppliedPayload(
+                user_id=user_id,
+                code=applied_code,
+                bonus_days=bonus_days,
+                new_end_date=new_end_date,
+            )
+        )
+
+        return True, new_end_date

@@ -250,6 +250,74 @@ def test_promo_update_rejects_max_activations_below_current_count():
     session.commit.assert_not_awaited()
 
 
+def test_promo_update_can_clear_valid_until():
+    async def run():
+        session = _FakeSession()
+        promo = _promo()
+        request = _FakeRequest(
+            {"clear_valid_until": True},
+            app={"async_session_factory": lambda: session, "settings": _settings()},
+            match_info={"promo_id": "5"},
+        )
+
+        with (
+            patch.object(promos_module, "_require_admin_user_id", return_value=100),
+            patch.object(
+                promos_module.promo_code_dal,
+                "get_promo_code_by_id",
+                AsyncMock(return_value=promo),
+            ),
+            patch.object(
+                promos_module.promo_code_dal,
+                "update_promo_code",
+                AsyncMock(return_value=promo),
+            ) as update_promo,
+        ):
+            response = await promos_module.admin_promo_update_route(request)
+        return response, session, update_promo
+
+    response, session, update_promo = asyncio.run(run())
+
+    assert response.status == 200
+    update_promo.assert_awaited_once_with(session, 5, {"valid_until": None})
+    session.commit.assert_awaited_once()
+
+
+def test_promo_update_accepts_explicit_valid_until():
+    expires_at = datetime(2026, 2, 1, 12, 0, tzinfo=timezone.utc)
+
+    async def run():
+        session = _FakeSession()
+        promo = _promo()
+        request = _FakeRequest(
+            {"valid_until": expires_at.isoformat()},
+            app={"async_session_factory": lambda: session, "settings": _settings()},
+            match_info={"promo_id": "5"},
+        )
+
+        with (
+            patch.object(promos_module, "_require_admin_user_id", return_value=100),
+            patch.object(
+                promos_module.promo_code_dal,
+                "get_promo_code_by_id",
+                AsyncMock(return_value=promo),
+            ),
+            patch.object(
+                promos_module.promo_code_dal,
+                "update_promo_code",
+                AsyncMock(return_value=promo),
+            ) as update_promo,
+        ):
+            response = await promos_module.admin_promo_update_route(request)
+        return response, session, update_promo
+
+    response, session, update_promo = asyncio.run(run())
+
+    assert response.status == 200
+    update_promo.assert_awaited_once_with(session, 5, {"valid_until": expires_at})
+    session.commit.assert_awaited_once()
+
+
 def test_promo_activations_route_returns_user_and_payment_context():
     async def run():
         session = _FakeSession()
@@ -271,6 +339,10 @@ def test_promo_activations_route_returns_user_and_payment_context():
             sale_mode="subscription@standard",
             description="Subscription",
             created_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            checkout_base_amount=100.0,
+            checkout_discount_amount=20.0,
+            checkout_charged_months=3,
+            checkout_charged_gb=None,
         )
         activation = SimpleNamespace(
             activation_id=9,
@@ -286,6 +358,12 @@ def test_promo_activations_route_returns_user_and_payment_context():
             duration_multiplier=None,
             traffic_multiplier=None,
             applies_to="subscription",
+            base_amount=None,
+            discount_amount=0.0,
+            charged_months=None,
+            charged_gb=None,
+            granted_days=14,
+            granted_gb=None,
         )
         request = _FakeRequest(
             {},
@@ -321,6 +399,9 @@ def test_promo_activations_route_returns_user_and_payment_context():
     get_activations.assert_awaited_once_with(session, 5, limit=25, offset=0)
     body = _json_body(response)
     assert body["total"] == 1
-    assert body["activations"] == [
-        PromoActivationOut.from_orm_activation(activation).model_dump(mode="json")
-    ]
+    serialized = PromoActivationOut.from_orm_activation(activation).model_dump(mode="json")
+    assert serialized["base_amount"] == 100.0
+    assert serialized["discount_amount"] == 0.0
+    assert serialized["charged_months"] == 3
+    assert serialized["granted_days"] == 14
+    assert body["activations"] == [serialized]

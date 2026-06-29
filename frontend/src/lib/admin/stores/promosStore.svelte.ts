@@ -104,6 +104,8 @@ const defaultPromoPatchDraft = (): PromoPatch => ({
   min_traffic_gb: null,
   origin: null,
   max_activations: null,
+  valid_until: null,
+  clear_valid_until: null,
 });
 
 function promoToPatchDraft(promo: Promo): PromoPatch {
@@ -118,6 +120,8 @@ function promoToPatchDraft(promo: Promo): PromoPatch {
     min_traffic_gb: promo.min_traffic_gb,
     origin: promo.origin,
     max_activations: promo.max_activations,
+    valid_until: promo.valid_until,
+    clear_valid_until: false,
   };
 }
 
