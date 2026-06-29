@@ -611,6 +611,11 @@
               <div class="admin-setting-control">
                 <div class="admin-setting-switch">
                   <Switch.Root
+                    aria-label={at(
+                      "tariffs_legacy_refs",
+                      {},
+                      "Старые ref-ссылки с ID пользователя"
+                    )}
                     checked={boolValue("LEGACY_REFS", settingsDirty, settingsFieldMap)}
                     onCheckedChange={(checked) => setSetting("LEGACY_REFS", checked)}
                     class="admin-switch-root"
@@ -650,6 +655,7 @@
                   <strong>{months} {at("months_short", {}, "mo")}</strong>
                   <div class="admin-setting-switch">
                     <Switch.Root
+                      aria-label={`${at("tariffs_legacy_enabled", {}, "Enabled")} ${months} ${at("months_short", {}, "mo")}`}
                       checked={boolValue(enabledKey, settingsDirty, settingsFieldMap)}
                       onCheckedChange={(checked) => setSetting(enabledKey, checked)}
                       class="admin-switch-root"

@@ -698,7 +698,6 @@
     </div>
   {/if}
 {/snippet}
-
 {#snippet renderField(field: AdminSettingField)}
   {@const revealed = isSecretRevealed(field.key)}
   <div class="admin-setting" class:is-overridden={isOverridden(field)}>
@@ -721,6 +720,7 @@
       {#if field.type === "bool"}
         <div class="admin-setting-switch">
           <Switch.Root
+            aria-label={fieldLabelText(field)}
             checked={Boolean(valueFor(field))}
             onCheckedChange={(checked) => setBoolField(field, checked)}
             class="admin-switch-root"

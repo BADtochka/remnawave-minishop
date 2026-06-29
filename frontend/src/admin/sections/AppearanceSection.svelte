@@ -615,35 +615,8 @@
     activateDefaultTheme();
   }
 
-  function isThemeControlTarget(target: EventTarget | null | undefined): boolean {
-    return (
-      target instanceof Element &&
-      Boolean(target.closest("button,input,label,.admin-theme-card-option,.ui-range-input"))
-    );
-  }
-
-  function selectDefaultTheme(event: MouseEvent | KeyboardEvent | null = null): void {
-    if (isThemeControlTarget(event?.target)) return;
-    activateDefaultTheme();
-  }
-
-  function handleDefaultThemeKeydown(event: KeyboardEvent): void {
-    if (isThemeControlTarget(event?.target)) return;
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    activateDefaultTheme();
-  }
-
-  function selectTheme(theme: ThemeEntry, event: MouseEvent | KeyboardEvent | null = null): void {
-    if (isThemeControlTarget(event?.target)) return;
+  function selectTheme(theme: ThemeEntry): void {
     if (!themesSaving) themesStore.setCurrentTheme(theme.key);
-  }
-
-  function handleThemeKeydown(event: KeyboardEvent, theme: ThemeEntry): void {
-    if (isThemeControlTarget(event?.target)) return;
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    selectTheme(theme);
   }
 
   function clonePreviewCatalog(catalog: ThemeCatalog = themesCatalog): ThemeCatalog {
@@ -821,6 +794,11 @@
           <section class="appearance-control-card">
             <label class="appearance-switch">
               <Switch.Root
+                aria-label={at(
+                  "appearance_use_custom_favicon",
+                  {},
+                  "Использовать отдельную favicon"
+                )}
                 bind:checked={faviconUseCustomDraft}
                 onCheckedChange={setCustomFavicon}
                 class="admin-switch-root"
@@ -921,8 +899,6 @@
             {isDefaultVariantDirty}
             {defaultVariantTitle}
             {themeDescription}
-            {selectDefaultTheme}
-            {handleDefaultThemeKeydown}
             {activateDefaultThemeFromClick}
             {setDefaultVariantFromSwitch}
             {previewDefaultVariantFromClick}
@@ -968,7 +944,6 @@
             {themeLogoScaleInputHandler}
             {previewThemeClickHandler}
             {selectTheme}
-            {handleThemeKeydown}
           />
         {/if}
       </div>

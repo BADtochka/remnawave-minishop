@@ -75,7 +75,196 @@ function activeAdminSection(page: Page, id: string): Locator {
   return page.locator(`.admin-section-stage[data-admin-active-section="${id}"]:not([inert])`);
 }
 
+async function assertNoDuplicateIds(page: Page, phase: string): Promise<void> {
+  const duplicates = await page.locator("[id]").evaluateAll((elements) => {
+    const seen = new Map<string, number>();
+    for (const element of elements) {
+      const html = element as HTMLElement;
+      if (html.closest("[inert]")) continue;
+      const id = html.id;
+      if (!id) continue;
+      seen.set(id, (seen.get(id) ?? 0) + 1);
+    }
+    return Array.from(seen.entries())
+      .filter(([, count]) => count > 1)
+      .map(([id, count]) => `${id} (${count})`);
+  });
+  expect(duplicates, `${phase}: element ids must be unique`).toEqual([]);
+}
+
+async function assertInteractiveControlsNamed(page: Page, phase: string): Promise<void> {
+  const violations = await page
+    .locator(
+      [
+        "button",
+        "a[href]",
+        '[role="button"]',
+        '[role="link"]',
+        '[role="tab"]',
+        '[role="radio"]',
+        '[role="checkbox"]',
+        '[role="menuitem"]',
+      ].join(", ")
+    )
+    .evaluateAll((elements) => {
+      const isVisible = (element: Element): boolean => {
+        const html = element as HTMLElement;
+        const style = window.getComputedStyle(html);
+        const rect = html.getBoundingClientRect();
+        return (
+          !html.closest("[inert]") &&
+          !html.closest('[aria-hidden="true"]') &&
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      };
+      const labelFromIds = (ids: string): string =>
+        ids
+          .split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent ?? "")
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+      const accessibleName = (element: Element): string => {
+        const ariaLabel = element.getAttribute("aria-label")?.trim();
+        if (ariaLabel) return ariaLabel;
+        const labelledBy = element.getAttribute("aria-labelledby")?.trim();
+        if (labelledBy) {
+          const labelledText = labelFromIds(labelledBy);
+          if (labelledText) return labelledText;
+        }
+        const title = element.getAttribute("title")?.trim();
+        if (title) return title;
+        return (element.textContent ?? "").replace(/\s+/g, " ").trim();
+      };
+      const describe = (element: Element): string => {
+        const html = element as HTMLElement;
+        const role = html.getAttribute("role");
+        const id = html.id ? `#${html.id}` : "";
+        const className = (html.getAttribute("class") ?? "")
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .join(".");
+        return `${html.tagName.toLowerCase()}${id}${role ? `[role=${role}]` : ""}${className ? `.${className}` : ""}`;
+      };
+      return elements
+        .filter(isVisible)
+        .filter((element) => !accessibleName(element))
+        .map(describe);
+    });
+  expect(violations, `${phase}: visible interactive controls must have an accessible name`).toEqual(
+    []
+  );
+}
+
+async function assertNoNestedInteractiveControls(page: Page, phase: string): Promise<void> {
+  const violations = await page
+    .locator(
+      [
+        "button",
+        "a[href]",
+        '[role="button"]',
+        '[role="link"]',
+        '[role="tab"]',
+        '[role="radio"]',
+        '[role="checkbox"]',
+        '[role="switch"]',
+      ].join(", ")
+    )
+    .evaluateAll((elements) => {
+      const interactiveSelector = [
+        "button",
+        "a[href]",
+        "input:not([type='hidden'])",
+        "select",
+        "textarea",
+        '[role="button"]',
+        '[role="link"]',
+        '[role="tab"]',
+        '[role="radio"]',
+        '[role="checkbox"]',
+        '[role="switch"]',
+        '[role="menuitem"]',
+      ].join(", ");
+      const isVisible = (element: Element): boolean => {
+        const html = element as HTMLElement;
+        const style = window.getComputedStyle(html);
+        const rect = html.getBoundingClientRect();
+        return (
+          !html.closest("[inert]") &&
+          !html.closest('[aria-hidden="true"]') &&
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      };
+      const describe = (element: Element): string => {
+        const html = element as HTMLElement;
+        const role = html.getAttribute("role");
+        const id = html.id ? `#${html.id}` : "";
+        const className = (html.getAttribute("class") ?? "")
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .join(".");
+        return `${html.tagName.toLowerCase()}${id}${role ? `[role=${role}]` : ""}${className ? `.${className}` : ""}`;
+      };
+      return elements.filter(isVisible).flatMap((element) => {
+        const nested = Array.from(element.querySelectorAll(interactiveSelector)).filter(isVisible);
+        return nested.length
+          ? [`${describe(element)} contains ${nested.map(describe).slice(0, 3).join(", ")}`]
+          : [];
+      });
+    });
+  expect(violations, `${phase}: interactive controls must not contain nested controls`).toEqual([]);
+}
+
+async function assertImagesNamed(page: Page, phase: string): Promise<void> {
+  const violations = await page.locator("img").evaluateAll((elements) =>
+    elements
+      .filter((element) => {
+        const image = element as HTMLImageElement;
+        const style = window.getComputedStyle(image);
+        const rect = image.getBoundingClientRect();
+        return (
+          !image.closest("[inert]") &&
+          !image.closest('[aria-hidden="true"]') &&
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      })
+      .filter((element) => {
+        const image = element as HTMLImageElement;
+        return (
+          image.getAttribute("role") !== "presentation" &&
+          image.getAttribute("aria-hidden") !== "true" &&
+          !image.hasAttribute("alt") &&
+          !image.hasAttribute("aria-label") &&
+          !image.hasAttribute("aria-labelledby")
+        );
+      })
+      .map((element) => {
+        const image = element as HTMLImageElement;
+        return `img${image.className ? `.${String(image.className).split(/\s+/).filter(Boolean).slice(0, 2).join(".")}` : ""}`;
+      })
+  );
+  expect(violations, `${phase}: visible images must have alt text or be marked decorative`).toEqual(
+    []
+  );
+}
+
 async function assertFormFieldsNamed(page: Page, phase: string): Promise<void> {
+  await assertNoDuplicateIds(page, phase);
+  await assertInteractiveControlsNamed(page, phase);
+  await assertNoNestedInteractiveControls(page, phase);
+  await assertImagesNamed(page, phase);
+
   const violations = await page
     .locator('input:not([type="hidden"]), textarea, select')
     .evaluateAll((elements) =>

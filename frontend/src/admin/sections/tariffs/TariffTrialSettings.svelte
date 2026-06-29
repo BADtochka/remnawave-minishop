@@ -260,6 +260,7 @@
             <div class="admin-setting-control">
               <div class="admin-setting-switch">
                 <Switch.Root
+                  aria-label={at("tariffs_trial_enabled", {}, "Триал включён")}
                   checked={boolValue("TRIAL_ENABLED", settingsDirty, settingsFieldMap)}
                   onCheckedChange={(checked) => setSetting("TRIAL_ENABLED", checked)}
                   class="admin-switch-root"
@@ -302,6 +303,11 @@
             <div class="admin-setting-control">
               <div class="admin-setting-switch">
                 <Switch.Root
+                  aria-label={at(
+                    "tariffs_trial_without_telegram_enabled",
+                    {},
+                    "Триал без Telegram"
+                  )}
                   checked={boolValue(
                     "TRIAL_WITHOUT_TELEGRAM_ENABLED",
                     settingsDirty,

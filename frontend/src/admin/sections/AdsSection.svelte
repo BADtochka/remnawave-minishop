@@ -118,7 +118,13 @@
               <AdminButton size="sm" onclick={() => adsStore.toggleAd(ad)}>
                 {ad.is_active ? at("btn_disable", {}, "Выкл") : at("btn_enable", {}, "Вкл")}
               </AdminButton>
-              <AdminButton size="sm" variant="danger" onclick={() => adsStore.deleteAd(ad)}>
+              <AdminButton
+                size="sm"
+                variant="danger"
+                title={at("btn_delete", {}, "Удалить")}
+                aria-label={at("btn_delete", {}, "Удалить")}
+                onclick={() => adsStore.deleteAd(ad)}
+              >
                 <Trash2 size={13} />
               </AdminButton>
             </td>

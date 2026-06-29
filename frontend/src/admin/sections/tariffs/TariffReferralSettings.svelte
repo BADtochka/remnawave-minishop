@@ -234,6 +234,11 @@
             <div class="admin-setting-control">
               <div class="admin-setting-switch">
                 <Switch.Root
+                  aria-label={at(
+                    "tariffs_referral_without_telegram",
+                    {},
+                    "Начислять welcome bonus без Telegram"
+                  )}
                   checked={boolValue(
                     "REFERRAL_WELCOME_BONUS_WITHOUT_TELEGRAM_ENABLED",
                     settingsDirty,
@@ -325,6 +330,11 @@
             <div class="admin-setting-control">
               <div class="admin-setting-switch">
                 <Switch.Root
+                  aria-label={at(
+                    "tariffs_referral_one_bonus_per_referee",
+                    {},
+                    "Бонусы только за первый платёж приглашённого"
+                  )}
                   checked={boolValue(
                     "REFERRAL_ONE_BONUS_PER_REFEREE",
                     settingsDirty,

@@ -174,13 +174,14 @@
 
       <div class="admin-action-row admin-action-row-bordered">
         <Switch.Root
+          aria-labelledby="tariff-enabled-toggle-label"
           checked={tariffDraft.enabled}
           onCheckedChange={(v) => (tariffDraft.enabled = v)}
           class="admin-switch-root"
         >
           <Switch.Thumb class="admin-switch-thumb" />
         </Switch.Root>
-        <Label.Root class="admin-action-label">
+        <Label.Root id="tariff-enabled-toggle-label" class="admin-action-label">
           <strong
             >{tariffDraft.enabled
               ? at("tariff_visible", {}, "Тариф виден на витрине")

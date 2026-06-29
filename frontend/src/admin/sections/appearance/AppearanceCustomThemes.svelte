@@ -29,7 +29,6 @@
     themeLogoScaleInputHandler,
     previewThemeClickHandler,
     selectTheme,
-    handleThemeKeydown,
   }: {
     at: TranslateFn;
     customThemes?: ThemeEntry[];
@@ -58,8 +57,7 @@
     themeLogoScaleSelectHandler: (theme: ThemeEntry, mode: LogoMode) => SelectCallback;
     themeLogoScaleInputHandler: (theme: ThemeEntry, mode: LogoMode) => (event: Event) => void;
     previewThemeClickHandler: (theme: ThemeEntry) => (event: MouseEvent) => void;
-    selectTheme: (theme: ThemeEntry, event: MouseEvent | KeyboardEvent | null) => void;
-    handleThemeKeydown: (event: KeyboardEvent, theme: ThemeEntry) => void;
+    selectTheme: (theme: ThemeEntry) => void;
   } = $props();
 </script>
 
@@ -87,16 +85,11 @@
       {#each customThemes as theme (theme.key)}
         {@const isCurrent = theme.key === activeKey}
         <div
-          role="button"
-          tabindex={themesSaving ? -1 : 0}
           class="admin-theme-card"
           class:is-current={isCurrent}
           class:is-disabled={theme.enabled === false}
           class:is-dirty={isThemeDirty(theme)}
-          aria-pressed={isCurrent}
-          aria-disabled={themesSaving}
-          onclick={(event) => selectTheme(theme, event)}
-          onkeydown={(event) => handleThemeKeydown(event, theme)}
+          aria-current={isCurrent ? "true" : undefined}
         >
           <span class="admin-theme-card-main">
             <span class="admin-theme-card-title">
@@ -229,6 +222,12 @@
             </span>
           </div>
           <div class="appearance-theme-actions">
+            {#if !isCurrent}
+              <AdminButton size="sm" onclick={() => selectTheme(theme)} disabled={themesSaving}>
+                <Check size={13} />
+                {at("appearance_use_theme", {}, "Выбрать")}
+              </AdminButton>
+            {/if}
             <AdminButton size="sm" variant="ghost" onclick={previewThemeClickHandler(theme)}>
               <ExternalLink size={13} />
               {at("appearance_preview_theme", {}, "Предпросмотр")}
