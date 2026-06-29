@@ -142,7 +142,7 @@
       <span class="admin-muted">{at("promo_activations_empty", {}, "No activations")}</span>
     </AdminEmptyState>
   {:else}
-    <ScrollArea class="admin-promo-activations-scroll" maxHeight="min(58vh, 520px)">
+    <ScrollArea class="admin-promo-activations-scroll" maxHeight="none">
       <AdminTable class="admin-promo-activations-table">
         <thead>
           <tr>
@@ -238,12 +238,22 @@
 <style>
   .admin-promo-activations-body {
     display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
     gap: 12px;
+    height: 100%;
+    min-height: 0;
     min-width: 0;
   }
 
   :global(.admin-promo-activations-scroll) {
+    height: 100%;
+    min-height: 0;
     width: 100%;
+    max-height: none !important;
+  }
+
+  :global(.admin-promo-activations-scroll .scroll-area__viewport) {
+    min-height: 0;
   }
 
   :global(.admin-promo-activations-table) {
@@ -283,6 +293,16 @@
   }
 
   @media (max-width: 720px) {
+    .admin-promo-activations-body {
+      grid-template-rows: auto auto;
+      height: auto;
+    }
+
+    :global(.admin-promo-activations-scroll) {
+      height: auto;
+      max-height: min(58vh, 520px) !important;
+    }
+
     :global(.admin-promo-activations-table) {
       min-width: 0;
     }

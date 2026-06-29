@@ -162,29 +162,29 @@
       </div>
       {#if option.kind === "bonus_days"}
         <div class="admin-promo-effect-mode" class:is-dirty={bonusModeDirty}>
-          <AdminField label={at("promo_bonus_mode_label", {}, "Grant mode")}>
-            <label class="admin-promo-check-row">
-              <Checkbox
-                checked={bonusRequiresPayment}
-                ariaLabel={at("promo_bonus_mode_payment", {}, "Grant after payment")}
-                onCheckedChange={toggleBonusRequiresPayment}
-              />
-              <span>{at("promo_bonus_mode_payment", {}, "Grant after payment")}</span>
-            </label>
-          </AdminField>
-          <small>
-            {bonusRequiresPayment
-              ? at(
-                  "promo_bonus_mode_payment_hint",
-                  {},
-                  "The user is sent to checkout; days are added only after a paid subscription purchase."
-                )
-              : at(
-                  "promo_bonus_mode_instant_hint",
-                  {},
-                  "The user receives the days immediately when the code is activated."
-                )}
-          </small>
+          <label class="admin-promo-effect-mode-line">
+            <Checkbox
+              checked={bonusRequiresPayment}
+              ariaLabel={at("promo_bonus_mode_payment", {}, "Grant after payment")}
+              onCheckedChange={toggleBonusRequiresPayment}
+            />
+            <span class="admin-promo-effect-mode-label">
+              {at("promo_bonus_mode_payment", {}, "Grant after payment")}
+            </span>
+            <small>
+              {bonusRequiresPayment
+                ? at(
+                    "promo_bonus_mode_payment_hint",
+                    {},
+                    "The user is sent to checkout; days are added only after a paid subscription purchase."
+                  )
+                : at(
+                    "promo_bonus_mode_instant_hint",
+                    {},
+                    "The user receives the days immediately when the code is activated."
+                  )}
+            </small>
+          </label>
           {#if bonusModeDirty}
             <AdminBadge variant="warning">{at("settings_badge_dirty", {}, "Changed")}</AdminBadge>
           {/if}
@@ -266,11 +266,12 @@
   }
 
   .admin-promo-effect-mode {
-    display: grid;
+    display: flex;
+    align-items: center;
     grid-column: 2 / -1;
-    gap: 6px;
+    gap: 8px;
     min-width: 0;
-    padding: 8px;
+    padding: 6px 8px;
     border: 1px solid transparent;
     border-radius: 8px;
     background: color-mix(in srgb, var(--accent) 5%, transparent);
@@ -281,22 +282,35 @@
     background: color-mix(in srgb, var(--warning, #f59e0b) 7%, transparent);
   }
 
-  .admin-promo-check-row {
-    display: inline-flex;
+  .admin-promo-effect-mode-line {
+    display: flex;
     align-items: center;
-    min-height: 38px;
     gap: 8px;
+    min-width: 0;
+    flex: 1 1 auto;
     color: var(--admin-text);
   }
 
+  .admin-promo-effect-mode-label {
+    flex: 0 0 auto;
+    color: var(--admin-text);
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.25;
+  }
+
   .admin-promo-effect-mode small {
+    min-width: 0;
+    overflow: hidden;
     color: var(--admin-muted);
     font-size: 12px;
     line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .admin-promo-effect-mode :global(.admin-badge) {
-    justify-self: start;
+    flex: 0 0 auto;
   }
 
   @media (max-width: 720px) {
@@ -307,6 +321,25 @@
     .admin-promo-effect-input,
     .admin-promo-effect-mode {
       grid-column: 2;
+    }
+
+    .admin-promo-effect-mode {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .admin-promo-effect-mode-line {
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .admin-promo-effect-mode small {
+      flex-basis: 100%;
+      white-space: normal;
+    }
+
+    .admin-promo-effect-mode :global(.admin-badge) {
+      align-self: flex-start;
     }
   }
 </style>
