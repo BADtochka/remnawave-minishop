@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup
@@ -70,6 +70,15 @@ class TariffWorkerRegularMixin:
         ) -> None: ...
         async def _user_lang(self, session: AsyncSession, user_id: int) -> str: ...
         def _usage_placeholders(self, used_bytes: int, limit_bytes: int) -> dict: ...
+        def _traffic_next_reset_note(
+            self,
+            translate: Callable[..., str],
+            *,
+            kind: str,
+            period_start_at: Optional[datetime],
+            reset_available_bytes: int,
+            user_lang: str,
+        ) -> str: ...
         def _traffic_topup_markup(
             self, user_lang: str, kind: str
         ) -> Optional[InlineKeyboardMarkup]: ...
@@ -565,6 +574,13 @@ class TariffWorkerRegularMixin:
             left_pct = max(0, 100 - level)
             tariff_name = hd.quote(str(tariff.name(user_lang)))
             usage = self._usage_placeholders(used_val, limit_val)
+            reset_note = self._traffic_next_reset_note(
+                _,
+                kind="regular",
+                period_start_at=warning_period_start if tariff.billing_model == "period" else None,
+                reset_available_bytes=limit_val,
+                user_lang=user_lang,
+            )
             if level < 100:
                 text = _(
                     "traffic_warning_regular_almost",
@@ -580,6 +596,8 @@ class TariffWorkerRegularMixin:
                     **usage,
                 )
                 subject_key = "email_traffic_warning_regular_depleted_subject"
+            if reset_note:
+                text = f"{text}\n\n{reset_note}"
             warning_key = (
                 "traffic_warning_regular_almost"
                 if level < 100

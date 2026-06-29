@@ -438,6 +438,8 @@
   "traffic_reset_premium_notification": "✅ Лимит премиум-серверов тарифа <b>{tariff_name}</b> сброшен.\n\n<b>Новый период:</b>\nснова доступно — <b>{available}</b>\nиспользовано после сброса — <b>{used}</b>\nлимит — <b>{limit_total}</b>\n\nЛимит действует на:\n{servers}\n\nВсё в порядке: премиум-трафик докупать не нужно.",
   "traffic_warning_premium_generic_servers": "• серверы с премиум-доступом по вашему тарифу",
   "traffic_warning_premium_servers_more": "… и ещё серверов: {count}",
+  "traffic_warning_regular_next_reset_note": "Трафик будет сброшен <b>{reset_date}</b>, и вам снова будет доступно <b>{reset_available}</b>.",
+  "traffic_warning_premium_next_reset_note": "Премиум-трафик будет сброшен <b>{reset_date}</b>, и вам снова будет доступно <b>{reset_available}</b> для премиум-серверов.",
   "traffic_warn_btn_topup_webapp_regular": "Докупить трафик",
   "traffic_warn_btn_topup_webapp_premium": "Докупить премиум-трафик",
   "traffic_warn_btn_topup_regular": "Докупить трафик",

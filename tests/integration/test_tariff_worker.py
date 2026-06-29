@@ -40,8 +40,22 @@ class _FormatI18n:
             "traffic_reset_premium_notification": (
                 "premium reset {available} {used} {limit_total}\n{servers}"
             ),
+            "traffic_warning_regular_almost": "regular almost {left_pct} {limit_total}",
+            "traffic_warning_regular_depleted": "regular depleted {limit_total}",
+            "traffic_warning_premium_almost": (
+                "premium almost {left_pct} {limit_total}\n{servers}"
+            ),
+            "traffic_warning_premium_depleted": "premium depleted {limit_total}\n{servers}",
             "traffic_warning_premium_generic_servers": "premium servers",
             "traffic_warning_premium_servers_more": "and {count} more",
+            "traffic_warning_regular_next_reset_note": (
+                "regular next {reset_date} {reset_available}"
+            ),
+            "traffic_warning_premium_next_reset_note": (
+                "premium next {reset_date} {reset_available}"
+            ),
+            "traffic_warn_btn_topup_webapp_regular": "Top up traffic",
+            "traffic_warn_btn_topup_webapp_premium": "Top up premium traffic",
         }
         return templates.get(key, key).format(**kwargs)
 
@@ -179,6 +193,60 @@ class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
         has_warning.assert_not_awaited()
         bot.send_message.assert_not_awaited()
 
+    async def test_regular_warning_mentions_next_reset_and_regular_limit(self):
+        bot = AsyncMock()
+        worker = TariffTrafficWorker(
+            settings=SimpleNamespace(
+                DEFAULT_LANGUAGE="ru",
+                SUBSCRIPTION_MINI_APP_URL="https://app.example.com",
+                email_auth_configured=False,
+                tariff_traffic_warning_levels=[85],
+            ),
+            session_factory=SimpleNamespace(),
+            panel_service=SimpleNamespace(),
+            subscription_service=SimpleNamespace(),
+            bot=bot,
+            i18n=_FormatI18n(),
+        )
+        worker._user_lang = AsyncMock(return_value="ru")
+        worker._send_traffic_warning_email = AsyncMock()
+        sub = SimpleNamespace(
+            subscription_id=12,
+            user_id=123,
+            traffic_used_bytes=90,
+            traffic_limit_bytes=200,
+            is_throttled=False,
+        )
+
+        with (
+            patch(
+                "bot.services.tariff_worker_regular.tariff_dal.get_warning",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "bot.services.tariff_worker_regular.tariff_dal.create_warning",
+                new=AsyncMock(),
+            ),
+            patch(
+                "bot.services.tariff_worker_regular.log_user_message_delivery",
+                new=AsyncMock(),
+            ),
+        ):
+            await worker._maybe_warn_or_throttle(
+                AsyncMock(),
+                sub,
+                _PeriodTariff(),
+                used=180,
+                limit=200,
+                warning_period_start=datetime(2026, 6, 1, tzinfo=timezone.utc),
+            )
+
+        bot.send_message.assert_awaited_once()
+        sent_text = bot.send_message.await_args.args[1]
+        self.assertIn("regular next 01.07.2026 200 B", sent_text)
+        email_text = worker._send_traffic_warning_email.await_args.kwargs["message_text"]
+        self.assertIn("regular next 01.07.2026 200 B", email_text)
+
     async def test_premium_reset_notice_waits_for_restored_panel_access(self):
         settings = SimpleNamespace(
             DEFAULT_LANGUAGE="en",
@@ -259,6 +327,65 @@ class TariffWorkerTests(unittest.IsolatedAsyncioTestCase):
         sent_text = bot.send_message.await_args.args[1]
         self.assertIn("premium reset", sent_text)
         self.assertIn("Premium A", sent_text)
+
+    async def test_premium_warning_mentions_next_reset_and_premium_limit(self):
+        bot = AsyncMock()
+        subscription_service = SimpleNamespace(
+            premium_access_for_tariff=AsyncMock(
+                return_value={"node_labels": ["Premium A"], "squad_labels": []}
+            )
+        )
+        worker = TariffTrafficWorker(
+            settings=SimpleNamespace(
+                DEFAULT_LANGUAGE="en",
+                SUBSCRIPTION_MINI_APP_URL="https://app.example.com",
+                email_auth_configured=False,
+                tariff_traffic_warning_levels=[85],
+            ),
+            session_factory=SimpleNamespace(),
+            panel_service=SimpleNamespace(),
+            subscription_service=subscription_service,
+            bot=bot,
+            i18n=_FormatI18n(),
+        )
+        worker._user_lang = AsyncMock(return_value="en")
+        worker._send_traffic_warning_email = AsyncMock()
+        sub = SimpleNamespace(
+            subscription_id=13,
+            user_id=123,
+            premium_baseline_bytes=200,
+            premium_topup_balance_bytes=80,
+            premium_bonus_bytes=0,
+        )
+
+        with (
+            patch(
+                "bot.services.tariff_worker_premium.tariff_dal.get_warning",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "bot.services.tariff_worker_premium.tariff_dal.create_warning",
+                new=AsyncMock(),
+            ),
+            patch(
+                "bot.services.tariff_worker_premium.log_user_message_delivery",
+                new=AsyncMock(),
+            ),
+        ):
+            await worker._maybe_warn_premium_squad_limit(
+                AsyncMock(),
+                sub,
+                _PremiumTariff(),
+                used=270,
+                limit=300,
+                period_start_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+            )
+
+        bot.send_message.assert_awaited_once()
+        sent_text = bot.send_message.await_args.args[1]
+        self.assertIn("premium next 2026-07-01 280 B", sent_text)
+        email_text = worker._send_traffic_warning_email.await_args.kwargs["message_text"]
+        self.assertIn("premium next 2026-07-01 280 B", email_text)
 
     async def test_db_tick_retries_deadlock_once(self):
         class FakeSession:

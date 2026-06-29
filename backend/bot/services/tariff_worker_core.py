@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional
 
 from aiogram import Bot
@@ -15,6 +16,7 @@ from bot.services.message_audit import log_user_message_delivery
 from bot.services.panel_api_service import PanelApiService
 from bot.services.subscription_service_impl.core import SubscriptionService
 from bot.services.user_email_notifications import send_user_notification_email
+from bot.utils.date_utils import add_months, month_start
 from bot.utils.mini_app_url import subscription_mini_app_topup_url
 from config.settings import Settings
 from db.advisory_locks import acquire_subscription_background_sync_lock
@@ -123,6 +125,41 @@ class TariffWorkerCoreMixin:
             "available": hd.quote(self._fmt_bytes(remaining_b)),
             "limit_total": hd.quote(self._fmt_bytes(lim_b)),
         }
+
+    def _traffic_next_reset_note(
+        self,
+        translate: Callable[..., str],
+        *,
+        kind: str,
+        period_start_at: Optional[datetime],
+        reset_available_bytes: int,
+        user_lang: str,
+    ) -> str:
+        if period_start_at is None:
+            return ""
+        key = (
+            "traffic_warning_premium_next_reset_note"
+            if str(kind or "").lower() == "premium"
+            else "traffic_warning_regular_next_reset_note"
+        )
+        next_reset_at = add_months(month_start(period_start_at), 1)
+        return str(
+            translate(
+                key,
+                reset_date=hd.quote(self._format_traffic_reset_date(next_reset_at, user_lang)),
+                reset_available=hd.quote(self._fmt_bytes(max(0, int(reset_available_bytes or 0)))),
+            )
+        )
+
+    @staticmethod
+    def _format_traffic_reset_date(value: datetime, user_lang: str) -> str:
+        reset_at = value
+        if reset_at.tzinfo is not None:
+            reset_at = reset_at.astimezone(timezone.utc)
+        lang = str(user_lang or "").lower()
+        if lang.startswith("ru"):
+            return reset_at.strftime("%d.%m.%Y")
+        return reset_at.date().isoformat()
 
     def _traffic_notice_channels_available(self) -> bool:
         return bool(self.bot) or bool(getattr(self.settings, "email_auth_configured", False))
