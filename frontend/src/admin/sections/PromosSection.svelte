@@ -109,7 +109,6 @@
     at("promo_col_activations", {}, "Uses"),
     at("promo_col_status", {}, "Status"),
     at("promo_col_valid_until", {}, "Valid until"),
-    at("promo_col_origin", {}, "Origin"),
     at("actions", {}, "Actions"),
   ]);
   const activationHeaders = $derived([
@@ -336,7 +335,7 @@
       headers={promoHeaders}
       rows={6}
       actionColumn
-      widths={["92px", "86px", "132px", "96px", "104px", "78px", "78px", "96px", "76px", "132px"]}
+      widths={["92px", "86px", "132px", "96px", "104px", "78px", "78px", "96px", "132px"]}
     />
   {:else if !promos.length}
     <AdminEmptyState tone="card">
@@ -354,7 +353,6 @@
           <th>{at("promo_col_activations", {}, "Uses")}</th>
           <th>{at("promo_col_status", {}, "Status")}</th>
           <th>{at("promo_col_valid_until", {}, "Valid until")}</th>
-          <th>{at("promo_col_origin", {}, "Origin")}</th>
           <th class="admin-cell-actions">{at("actions", {}, "Actions")}</th>
         </tr>
       </thead>
@@ -391,9 +389,6 @@
             <td data-label={at("promo_col_valid_until", {}, "Valid until")}>
               {p.valid_until ? fmtDateShort(p.valid_until) : at("unlimited", {}, "Unlimited")}
             </td>
-            <td class="admin-cell-mono" data-label={at("promo_col_origin", {}, "Origin")}>
-              {p.origin || "admin"}
-            </td>
             <td class="admin-cell-actions" data-label={at("actions", {}, "Actions")}>
               <AdminButton
                 size="icon"
@@ -413,7 +408,11 @@
               >
                 <FileText size={14} />
               </AdminButton>
-              <AdminButton size="sm" onclick={() => promosStore.togglePromo(p)}>
+              <AdminButton
+                class="admin-promo-toggle-btn"
+                size="sm"
+                onclick={() => promosStore.togglePromo(p)}
+              >
                 {p.is_active ? at("btn_disable", {}, "Off") : at("btn_enable", {}, "On")}
               </AdminButton>
               <AdminButton
@@ -546,7 +545,7 @@
           />
         </AdminField>
       </div>
-      <div class="admin-form-row-3">
+      <div class="admin-form-row-2">
         <AdminField label={at("promo_label_max_activations", {}, "Max uses")}>
           <Input
             type="number"
@@ -563,15 +562,6 @@
             min="0"
             value={promoDraft.valid_days ? String(promoDraft.valid_days) : ""}
             oninput={(e) => updateCreateNumber("valid_days", inputValue(e))}
-          />
-        </AdminField>
-        <AdminField label={at("promo_col_origin", {}, "Origin")}>
-          <Input
-            type="text"
-            class="input"
-            value={promoDraft.origin || "admin"}
-            oninput={(e) =>
-              promosStore.updateDraft({ origin: (e.currentTarget as HTMLInputElement).value })}
           />
         </AdminField>
       </div>
@@ -594,15 +584,31 @@
     : at("promo_edit_title_empty", {}, "Edit code")}
   closeLabel={at("close", {}, "Close")}
   onclose={promosStore.closeEditPromo}
-  class="admin-dialog admin-dialog-compact admin-promo-dialog"
+  class="admin-dialog admin-promo-dialog admin-promo-edit-dialog"
 >
   {#if promoEditing}
-    <div class="admin-form" data-dialog-content>
-      <div class="admin-dialog-form-section">
+    {@const editStatus = promoStatus(promoEditing)}
+    <div class="admin-promo-edit-body" data-dialog-content>
+      <div class="admin-promo-edit-summary">
+        <div class="admin-promo-edit-summary-main">
+          <span>{at("promo_label_code", {}, "Code")}</span>
+          <strong>{promoEditing.code}</strong>
+        </div>
+        <div class="admin-promo-edit-summary-meta">
+          <AdminBadge variant={editStatus.variant}>{editStatus.label}</AdminBadge>
+          <span class="admin-promo-edit-summary-uses">
+            {promoEditing.current_activations}/{promoEditing.max_activations}
+          </span>
+        </div>
+      </div>
+
+      <section class="admin-editor-section admin-promo-editor-section">
+        <header class="admin-editor-section-head">
+          <div class="admin-editor-section-title">
+            <strong>{at("promo_section_basics", {}, "Basics")}</strong>
+          </div>
+        </header>
         <div class="admin-form-row-2">
-          <AdminField label={at("promo_label_code", {}, "Code")}>
-            <Input type="text" class="input" value={promoEditing.code} disabled />
-          </AdminField>
           <AdminField label={at("promo_col_status", {}, "Status")}>
             <label class="admin-promo-check-row">
               <Checkbox
@@ -613,98 +619,12 @@
               <span>{at("badge_active", {}, "Active")}</span>
             </label>
           </AdminField>
-        </div>
-        <div class="admin-form-row-2">
           <AdminField label={at("promo_label_scope", {}, "Scope")}>
             <AdminSelect
               value={promoEditDraft.applies_to || "all"}
               items={scopeItems}
               placeholder={at("promo_label_scope", {}, "Scope")}
               onValueChange={(value: string) => promosStore.updateEditDraft({ applies_to: value })}
-            />
-          </AdminField>
-          <AdminField label={at("promo_col_origin", {}, "Origin")}>
-            <Input
-              type="text"
-              class="input"
-              value={promoEditDraft.origin || "admin"}
-              oninput={(e) =>
-                promosStore.updateEditDraft({
-                  origin: (e.currentTarget as HTMLInputElement).value,
-                })}
-            />
-          </AdminField>
-        </div>
-        <div class="admin-form-row-3">
-          <AdminField label={at("promo_label_bonus_days", {}, "Bonus days")}>
-            <Input
-              type="number"
-              class="input"
-              min="0"
-              value={String(promoEditDraft.bonus_days || 0)}
-              oninput={(e) => updateEditNumber("bonus_days", inputValue(e))}
-            />
-          </AdminField>
-          <AdminField label={at("promo_label_discount", {}, "Discount %")}>
-            <Input
-              type="number"
-              class="input"
-              min="0"
-              max="100"
-              step="0.01"
-              value={promoEditDraft.discount_percent == null
-                ? ""
-                : String(promoEditDraft.discount_percent)}
-              oninput={(e) => updateEditNumber("discount_percent", inputValue(e))}
-            />
-          </AdminField>
-          <AdminField label={at("promo_label_duration_multiplier", {}, "Duration x")}>
-            <Input
-              type="number"
-              class="input"
-              min="1"
-              step="0.001"
-              value={promoEditDraft.duration_multiplier == null
-                ? ""
-                : String(promoEditDraft.duration_multiplier)}
-              oninput={(e) => updateEditNumber("duration_multiplier", inputValue(e))}
-            />
-          </AdminField>
-        </div>
-        <div class="admin-form-row-3">
-          <AdminField label={at("promo_label_traffic_multiplier", {}, "Traffic x")}>
-            <Input
-              type="number"
-              class="input"
-              min="1"
-              step="0.001"
-              value={promoEditDraft.traffic_multiplier == null
-                ? ""
-                : String(promoEditDraft.traffic_multiplier)}
-              oninput={(e) => updateEditNumber("traffic_multiplier", inputValue(e))}
-            />
-          </AdminField>
-          <AdminField label={at("promo_label_min_months", {}, "Min months")}>
-            <Input
-              type="number"
-              class="input"
-              min="1"
-              value={promoEditDraft.min_subscription_months == null
-                ? ""
-                : String(promoEditDraft.min_subscription_months)}
-              oninput={(e) => updateEditNumber("min_subscription_months", inputValue(e))}
-            />
-          </AdminField>
-          <AdminField label={at("promo_label_min_gb", {}, "Min GB")}>
-            <Input
-              type="number"
-              class="input"
-              min="0"
-              step="0.01"
-              value={promoEditDraft.min_traffic_gb == null
-                ? ""
-                : String(promoEditDraft.min_traffic_gb)}
-              oninput={(e) => updateEditNumber("min_traffic_gb", inputValue(e))}
             />
           </AdminField>
         </div>
@@ -754,8 +674,98 @@
             </label>
           </AdminField>
         </div>
-      </div>
-      <div class="admin-dialog-actions">
+      </section>
+
+      <section class="admin-editor-section admin-promo-editor-section">
+        <header class="admin-editor-section-head">
+          <div class="admin-editor-section-title">
+            <strong>{at("promo_col_effect", {}, "Effect")}</strong>
+          </div>
+        </header>
+        <div class="admin-form-row-3">
+          <AdminField label={at("promo_label_bonus_days", {}, "Bonus days")}>
+            <Input
+              type="number"
+              class="input"
+              min="0"
+              value={String(promoEditDraft.bonus_days || 0)}
+              oninput={(e) => updateEditNumber("bonus_days", inputValue(e))}
+            />
+          </AdminField>
+          <AdminField label={at("promo_label_discount", {}, "Discount %")}>
+            <Input
+              type="number"
+              class="input"
+              min="0"
+              max="100"
+              step="0.01"
+              value={promoEditDraft.discount_percent == null
+                ? ""
+                : String(promoEditDraft.discount_percent)}
+              oninput={(e) => updateEditNumber("discount_percent", inputValue(e))}
+            />
+          </AdminField>
+          <AdminField label={at("promo_label_duration_multiplier", {}, "Duration x")}>
+            <Input
+              type="number"
+              class="input"
+              min="1"
+              step="0.001"
+              value={promoEditDraft.duration_multiplier == null
+                ? ""
+                : String(promoEditDraft.duration_multiplier)}
+              oninput={(e) => updateEditNumber("duration_multiplier", inputValue(e))}
+            />
+          </AdminField>
+          <AdminField label={at("promo_label_traffic_multiplier", {}, "Traffic x")}>
+            <Input
+              type="number"
+              class="input"
+              min="1"
+              step="0.001"
+              value={promoEditDraft.traffic_multiplier == null
+                ? ""
+                : String(promoEditDraft.traffic_multiplier)}
+              oninput={(e) => updateEditNumber("traffic_multiplier", inputValue(e))}
+            />
+          </AdminField>
+        </div>
+      </section>
+
+      <section class="admin-editor-section admin-promo-editor-section">
+        <header class="admin-editor-section-head">
+          <div class="admin-editor-section-title">
+            <strong>{at("promo_col_eligibility", {}, "Eligibility")}</strong>
+          </div>
+        </header>
+        <div class="admin-form-row-2">
+          <AdminField label={at("promo_label_min_months", {}, "Min months")}>
+            <Input
+              type="number"
+              class="input"
+              min="1"
+              value={promoEditDraft.min_subscription_months == null
+                ? ""
+                : String(promoEditDraft.min_subscription_months)}
+              oninput={(e) => updateEditNumber("min_subscription_months", inputValue(e))}
+            />
+          </AdminField>
+          <AdminField label={at("promo_label_min_gb", {}, "Min GB")}>
+            <Input
+              type="number"
+              class="input"
+              min="0"
+              step="0.01"
+              value={promoEditDraft.min_traffic_gb == null
+                ? ""
+                : String(promoEditDraft.min_traffic_gb)}
+              oninput={(e) => updateEditNumber("min_traffic_gb", inputValue(e))}
+            />
+          </AdminField>
+        </div>
+      </section>
+
+      <div class="admin-dialog-actions admin-promo-dialog-actions">
         <AdminButton onclick={promosStore.closeEditPromo}
           >{at("btn_cancel", {}, "Cancel")}</AdminButton
         >
@@ -899,7 +909,7 @@
 
 <style>
   .admin-promos-table-wrap :global(.admin-promos-table) {
-    min-width: 980px;
+    min-width: 900px;
   }
 
   .admin-promos-table-wrap :global(.admin-cell-actions) {
@@ -911,6 +921,31 @@
     min-height: 28px;
     padding: 0 8px;
     font-family: var(--font-mono);
+  }
+
+  .admin-promos-table-wrap :global(.admin-promo-toggle-btn.admin-btn) {
+    height: 34px;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 8px;
+  }
+
+  :global(.admin-promo-dialog) {
+    width: min(860px, calc(100vw - 32px));
+    max-height: min(100%, 780px);
+  }
+
+  :global(.admin-promo-edit-dialog) {
+    width: min(960px, calc(100vw - 32px));
+  }
+
+  :global(.admin-promo-dialog > .dialog-body-scroll),
+  :global(.admin-promo-dialog .dialog-body-scroll > .scroll-area__viewport),
+  :global(.admin-promo-dialog .dialog-body-scroll > .scroll-area__viewport > div) {
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 
   .admin-form-row-3 {
@@ -927,9 +962,80 @@
     color: var(--admin-text);
   }
 
+  .admin-promo-edit-body {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .admin-promo-edit-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--admin-border);
+    border-radius: 8px;
+    background: var(--admin-surface-2);
+    min-width: 0;
+  }
+
+  .admin-promo-edit-summary-main {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .admin-promo-edit-summary-main span,
+  .admin-promo-edit-summary-uses {
+    color: var(--admin-muted);
+    font-size: 12px;
+  }
+
+  .admin-promo-edit-summary-main strong {
+    color: var(--admin-text);
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 750;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-promo-edit-summary-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  .admin-promo-editor-section {
+    gap: 12px;
+  }
+
+  .admin-promo-editor-section .admin-editor-section-head {
+    min-height: 20px;
+  }
+
   .admin-promo-activations-body {
     display: grid;
     gap: 12px;
+    min-width: 0;
+  }
+
+  :global(.admin-promo-activations-dialog) {
+    width: min(1380px, calc(100vw - 24px));
+    max-height: min(100%, 820px);
+  }
+
+  :global(.admin-promo-activations-dialog > .dialog-body-scroll),
+  :global(.admin-promo-activations-dialog .dialog-body-scroll > .scroll-area__viewport),
+  :global(.admin-promo-activations-dialog .dialog-body-scroll > .scroll-area__viewport > div) {
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 
   :global(.admin-promo-activations-scroll) {
@@ -980,6 +1086,23 @@
     .admin-promos-table-wrap :global(.admin-promos-table),
     :global(.admin-promo-activations-table) {
       min-width: 0;
+    }
+
+    :global(.admin-promo-dialog),
+    :global(.admin-promo-edit-dialog),
+    :global(.admin-promo-activations-dialog) {
+      width: min(100%, calc(100vw - 24px));
+      padding: 14px;
+      border-radius: 18px;
+    }
+
+    .admin-promo-edit-summary {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .admin-promo-edit-summary-meta {
+      justify-content: flex-start;
     }
   }
 </style>
