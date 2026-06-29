@@ -281,6 +281,29 @@ class PanelApiServiceLoggingTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(service._request.await_count, 3)
 
+    async def test_get_user_devices_accepts_remnawave_devices_object(self):
+        service = self._make_service()
+        service._request = AsyncMock(
+            return_value={
+                "response": {
+                    "total": 1,
+                    "devices": [{"hwid": "device-1", "deviceModel": "Laptop"}],
+                }
+            }
+        )
+
+        result = await service.get_user_devices("user-uuid")
+
+        self.assertEqual(result, [{"hwid": "device-1", "deviceModel": "Laptop"}])
+
+    async def test_get_user_devices_keeps_empty_panel_devices_list(self):
+        service = self._make_service()
+        service._request = AsyncMock(return_value={"response": {"total": 0, "devices": []}})
+
+        result = await service.get_user_devices("user-uuid")
+
+        self.assertEqual(result, [])
+
     async def test_get_subscription_page_config_by_short_uuid_uses_panel_endpoint(self):
         service = self._make_service()
         panel_payload = {"config": {"version": "1"}}

@@ -24,6 +24,16 @@ def _json_dict_list(value: object) -> Optional[List[Dict[str, Any]]]:
     return [item for item in value if isinstance(item, dict)]
 
 
+def _panel_devices_list(value: object) -> Optional[List[Dict[str, Any]]]:
+    if isinstance(value, dict):
+        for key in ("devices", "items", "data"):
+            devices = _json_dict_list(value.get(key))
+            if devices is not None:
+                return devices
+        return None
+    return _json_dict_list(value)
+
+
 def _panel_dict_response(response_data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not response_data or response_data.get("error"):
         return None
@@ -140,13 +150,18 @@ class PanelApiResourcesMixin:
             f"user:{user_uuid}",
             lambda: self._get_user_devices_uncached(user_uuid),
         )
-        return _json_dict_list(cached)
+        return _panel_devices_list(cached)
 
     async def _get_user_devices_uncached(self, user_uuid: str) -> Optional[List[Dict[str, Any]]]:
         endpoint = f"/hwid/devices/{user_uuid}"
         response_data = await self._request("GET", endpoint, log_full_response=False)
-        if response_data and not response_data.get("error") and "response" in response_data:
-            return _json_dict_list(response_data.get("response"))
+        if response_data and not response_data.get("error"):
+            for key in ("response", "data"):
+                if key not in response_data:
+                    continue
+                devices = _panel_devices_list(response_data.get(key))
+                if devices is not None:
+                    return devices
         logging.error(
             "Failed to get user devices for user %s (panel response redacted).", user_uuid
         )
