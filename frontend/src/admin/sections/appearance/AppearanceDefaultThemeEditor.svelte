@@ -171,6 +171,14 @@
       class:is-dirty={isThemeDirty(defaultTheme)}
       aria-current={defaultThemeIsCurrent ? "true" : undefined}
     >
+      <button
+        type="button"
+        class="theme-card-select-hitbox"
+        aria-label={at("appearance_use_default_theme", {}, "Выбрать тему по-умолчанию")}
+        aria-pressed={defaultThemeIsCurrent}
+        disabled={themesSaving || defaultThemeIsCurrent}
+        onclick={activateDefaultThemeFromClick}
+      ></button>
       <div class="default-theme-head">
         <div>
           <div class="default-theme-title">

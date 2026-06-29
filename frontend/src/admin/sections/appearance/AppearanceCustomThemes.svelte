@@ -90,7 +90,20 @@
           class:is-disabled={theme.enabled === false}
           class:is-dirty={isThemeDirty(theme)}
           aria-current={isCurrent ? "true" : undefined}
+          data-theme-key={theme.key}
         >
+          <button
+            type="button"
+            class="theme-card-select-hitbox"
+            aria-label={at(
+              "appearance_use_theme_named",
+              { title: themeTitle(theme) },
+              `Выбрать ${themeTitle(theme)}`
+            )}
+            aria-pressed={isCurrent}
+            disabled={themesSaving || isCurrent}
+            onclick={() => selectTheme(theme)}
+          ></button>
           <span class="admin-theme-card-main">
             <span class="admin-theme-card-title">
               <strong>{themeTitle(theme)}</strong>
@@ -222,12 +235,6 @@
             </span>
           </div>
           <div class="appearance-theme-actions">
-            {#if !isCurrent}
-              <AdminButton size="sm" onclick={() => selectTheme(theme)} disabled={themesSaving}>
-                <Check size={13} />
-                {at("appearance_use_theme", {}, "Выбрать")}
-              </AdminButton>
-            {/if}
             <AdminButton size="sm" variant="ghost" onclick={previewThemeClickHandler(theme)}>
               <ExternalLink size={13} />
               {at("appearance_preview_theme", {}, "Предпросмотр")}

@@ -324,6 +324,14 @@ async function clickFirstVisibleEnabled(locator: Locator): Promise<boolean> {
   return false;
 }
 
+async function clickCardBody(page: Page, card: Locator, phase: string): Promise<void> {
+  await card.scrollIntoViewIfNeeded();
+  const box = await card.boundingBox();
+  expect(box, `${phase}: card must have a clickable box`).not.toBeNull();
+  if (!box) return;
+  await page.mouse.click(box.x + Math.min(24, box.width / 2), box.y + Math.min(24, box.height / 2));
+}
+
 async function exerciseDialogTabs(
   card: Locator,
   expectedCount: number,
@@ -728,6 +736,22 @@ test("webapp and admin sections, dialogs, tabs stay interactive without console 
   await expect(appearanceStage.locator(".appearance-logo-grid").first()).toBeVisible();
   await expect(appearanceStage.locator(".appearance-theme-section").first()).toBeVisible();
   await assertFormFieldsNamed(page, "admin-appearance:panels");
+
+  setPhase("admin-appearance:theme-card-select");
+  const inactiveThemeCard = appearanceStage.locator(".admin-theme-card:not(.is-current)").first();
+  await expect(inactiveThemeCard).toBeVisible();
+  const inactiveThemeKey = await inactiveThemeCard.getAttribute("data-theme-key");
+  expect(inactiveThemeKey, "admin-appearance:theme-card-select: theme key").toBeTruthy();
+  await clickCardBody(page, inactiveThemeCard, "admin-appearance:theme-card-select");
+  const selectedThemeCard = appearanceStage.locator(
+    `.admin-theme-card[data-theme-key="${inactiveThemeKey}"]`
+  );
+  await expect(selectedThemeCard).toHaveClass(/is-current/);
+
+  const defaultThemeCard = appearanceStage.locator(".default-theme-editor");
+  await clickCardBody(page, defaultThemeCard, "admin-appearance:default-card-select");
+  await expect(defaultThemeCard).toHaveClass(/is-current/);
+  await assertFormFieldsNamed(page, "admin-appearance:theme-card-select");
 
   setPhase("admin-translations:panels");
   const translationsStage = await openAdminSection(page, "translations");
