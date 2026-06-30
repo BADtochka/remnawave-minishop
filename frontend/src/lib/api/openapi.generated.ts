@@ -3991,11 +3991,11 @@ export interface operations {
               removed_panel_user_uuid: string | null;
               removed_user_id: number;
             };
-            csrf_token?: string;
+            csrf_token: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
-            token?: string;
+            token: string;
             user_id?: number | null;
           };
         };
@@ -4112,11 +4112,11 @@ export interface operations {
               removed_panel_user_uuid: string | null;
               removed_user_id: number;
             };
-            csrf_token?: string;
+            csrf_token: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
-            token?: string;
+            token: string;
             user_id?: number | null;
           };
         };
@@ -5778,11 +5778,11 @@ export interface operations {
               removed_panel_user_uuid: string | null;
               removed_user_id: number;
             };
-            csrf_token?: string;
+            csrf_token: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
-            token?: string;
+            token: string;
             user_id?: number | null;
           };
         };
@@ -5819,11 +5819,11 @@ export interface operations {
               removed_panel_user_uuid: string | null;
               removed_user_id: number;
             };
-            csrf_token?: string;
+            csrf_token: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
-            token?: string;
+            token: string;
             user_id?: number | null;
           };
         };
@@ -5890,11 +5890,11 @@ export interface operations {
               removed_panel_user_uuid: string | null;
               removed_user_id: number;
             };
-            csrf_token?: string;
+            csrf_token: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
-            token?: string;
+            token: string;
             user_id?: number | null;
           };
         };
@@ -5980,11 +5980,11 @@ export interface operations {
               removed_panel_user_uuid: string | null;
               removed_user_id: number;
             };
-            csrf_token?: string;
+            csrf_token: string;
             /** @constant */
             ok: true;
             telegram_id?: number | null;
-            token?: string;
+            token: string;
             user_id?: number | null;
           };
         };

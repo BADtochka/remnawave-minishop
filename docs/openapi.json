@@ -5571,7 +5571,9 @@
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "token",
+                    "csrf_token"
                   ],
                   "type": "object"
                 }
@@ -5841,7 +5843,9 @@
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "token",
+                    "csrf_token"
                   ],
                   "type": "object"
                 }
@@ -9342,7 +9346,9 @@
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "token",
+                    "csrf_token"
                   ],
                   "type": "object"
                 }
@@ -9453,7 +9459,9 @@
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "token",
+                    "csrf_token"
                   ],
                   "type": "object"
                 }
@@ -9617,7 +9625,9 @@
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "token",
+                    "csrf_token"
                   ],
                   "type": "object"
                 }
@@ -9802,7 +9812,9 @@
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "token",
+                    "csrf_token"
                   ],
                   "type": "object"
                 }

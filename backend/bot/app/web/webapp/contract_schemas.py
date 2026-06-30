@@ -60,7 +60,7 @@ AUTH_RESPONSE_SCHEMA: dict[str, Any] = ok_envelope_with(
         "csrf_token": STRING_SCHEMA,
         "account_merge": ACCOUNT_MERGE_SCHEMA,
     },
-    required=[],
+    required=["token", "csrf_token"],
 )
 EMAIL_REQUEST_RESPONSE_SCHEMA: dict[str, Any] = ok_envelope_with(
     {
