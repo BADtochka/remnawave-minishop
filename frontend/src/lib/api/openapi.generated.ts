@@ -3995,6 +3995,7 @@ export interface operations {
             /** @constant */
             ok: true;
             telegram_id?: number | null;
+            token?: string;
             user_id?: number | null;
           };
         };
@@ -4115,6 +4116,7 @@ export interface operations {
             /** @constant */
             ok: true;
             telegram_id?: number | null;
+            token?: string;
             user_id?: number | null;
           };
         };
@@ -5780,6 +5782,7 @@ export interface operations {
             /** @constant */
             ok: true;
             telegram_id?: number | null;
+            token?: string;
             user_id?: number | null;
           };
         };
@@ -5820,6 +5823,7 @@ export interface operations {
             /** @constant */
             ok: true;
             telegram_id?: number | null;
+            token?: string;
             user_id?: number | null;
           };
         };
@@ -5890,6 +5894,7 @@ export interface operations {
             /** @constant */
             ok: true;
             telegram_id?: number | null;
+            token?: string;
             user_id?: number | null;
           };
         };
@@ -5979,6 +5984,7 @@ export interface operations {
             /** @constant */
             ok: true;
             telegram_id?: number | null;
+            token?: string;
             user_id?: number | null;
           };
         };

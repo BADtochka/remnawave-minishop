@@ -5560,6 +5560,9 @@
                         "null"
                       ]
                     },
+                    "token": {
+                      "type": "string"
+                    },
                     "user_id": {
                       "type": [
                         "integer",
@@ -5826,6 +5829,9 @@
                         "integer",
                         "null"
                       ]
+                    },
+                    "token": {
+                      "type": "string"
                     },
                     "user_id": {
                       "type": [
@@ -9325,6 +9331,9 @@
                         "null"
                       ]
                     },
+                    "token": {
+                      "type": "string"
+                    },
                     "user_id": {
                       "type": [
                         "integer",
@@ -9432,6 +9441,9 @@
                         "integer",
                         "null"
                       ]
+                    },
+                    "token": {
+                      "type": "string"
                     },
                     "user_id": {
                       "type": [
@@ -9593,6 +9605,9 @@
                         "integer",
                         "null"
                       ]
+                    },
+                    "token": {
+                      "type": "string"
                     },
                     "user_id": {
                       "type": [
@@ -9775,6 +9790,9 @@
                         "integer",
                         "null"
                       ]
+                    },
+                    "token": {
+                      "type": "string"
                     },
                     "user_id": {
                       "type": [

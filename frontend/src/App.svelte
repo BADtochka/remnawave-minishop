@@ -256,6 +256,7 @@
   const dataClient = createWebappDataClient({
     apiBase: CFG.apiBase,
     csrfCookieName: CSRF_COOKIE_NAME,
+    getAuthToken: () => shellState.token,
     getCsrfToken: () => shellState.csrfToken,
     onUnauthorized: () => {
       clearToken();

@@ -148,6 +148,7 @@ export type MockApi = (
 type ApiClientOptions = {
   apiBase?: string;
   csrfCookieName?: string;
+  getAuthToken?: () => string;
   getCsrfToken?: () => string;
   onUnauthorized?: () => void;
   mockApi?: MockApi | null;
@@ -599,6 +600,7 @@ export function unwrap<T extends { ok: boolean }>(response: T): Extract<T, { ok:
 export function createApiClient({
   apiBase = "",
   csrfCookieName = "rw_webapp_csrf",
+  getAuthToken = () => "",
   getCsrfToken = () => "",
   onUnauthorized = () => {},
   mockApi = null,
@@ -617,6 +619,10 @@ export function createApiClient({
     const headers = new Headers(options.headers);
 
     const csrf = getCsrfToken() || readCookie(csrfCookieName) || "";
+    const authToken = getAuthToken();
+    if (authToken && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${authToken}`);
+    }
     if (csrf && ["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
       headers.set("X-CSRF-Token", csrf);
     }
