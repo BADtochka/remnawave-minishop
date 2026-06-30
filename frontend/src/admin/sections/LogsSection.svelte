@@ -8,6 +8,7 @@
     AdminPagination,
     AdminTable,
     AdminTableSkeleton,
+    VirtualTableRows,
   } from "$components/patterns/admin/index.js";
   import { RefreshCw, TriangleAlert, User } from "$components/ui/icons.js";
   import { TableHandler } from "@vincjo/datatables";
@@ -140,8 +141,13 @@
           <th>{at("content", {}, "Контент")}</th>
         </tr>
       </thead>
-      <tbody>
-        {#each logRows as entry (entry.log_id)}
+      <VirtualTableRows
+        rows={logRows}
+        colspan={5}
+        rowHeight={72}
+        getKey={(entry, index) => entry.log_id ?? index}
+      >
+        {#snippet children(entry)}
           <tr>
             <td data-label={at("date", {}, "Дата")}
               >{entry.timestamp ? fmtDate(entry.timestamp) : "—"}</td
@@ -197,8 +203,8 @@
               >{entry.content || ""}</td
             >
           </tr>
-        {/each}
-      </tbody>
+        {/snippet}
+      </VirtualTableRows>
     </AdminTable>
   {/if}
 </div>

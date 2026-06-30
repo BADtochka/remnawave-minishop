@@ -20,6 +20,7 @@
     AdminSelect,
     AdminTable,
     AdminTableSkeleton,
+    VirtualTableRows,
   } from "$components/patterns/admin/index.js";
   import { onMount } from "svelte";
   import { trafficOfLabel } from "../../lib/admin/format.js";
@@ -546,8 +547,13 @@
           {/each}
         </tr>
       </thead>
-      <tbody>
-        {#each usersTable.rows as user (user.user_id)}
+      <VirtualTableRows
+        rows={usersTable.rows}
+        colspan={8}
+        rowHeight={76}
+        getKey={(user) => user.user_id}
+      >
+        {#snippet children(user)}
           {@const avatar = resolvedAvatarUrl(user)}
           {@const badge = panelStatusBadge(user)}
           <tr
@@ -638,8 +644,8 @@
               {fmtDateShort(user.registration_date)}
             </td>
           </tr>
-        {/each}
-      </tbody>
+        {/snippet}
+      </VirtualTableRows>
     </AdminTable>
   {/if}
 </div>

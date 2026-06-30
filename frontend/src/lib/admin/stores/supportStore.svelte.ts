@@ -14,6 +14,7 @@ import {
 } from "../../webapp/publicApi";
 import { withRoutePrefix } from "../../webapp/routes.js";
 import { adminErrorMessage } from "../errors.js";
+import { defineRawStateProperty } from "./rawStateProperty";
 import { snapshotForPayload } from "./snapshotForPayload.svelte";
 
 type AdminErrorResponse = { ok?: false; error?: string; message?: string };
@@ -69,6 +70,9 @@ export type AdminSupportState = {
   sending: boolean;
   composerInternalNote: boolean;
 };
+
+type RawSupportState = Pick<AdminSupportState, "tickets" | "messages">;
+type ProxiedSupportState = Omit<AdminSupportState, keyof RawSupportState>;
 
 type AdminSupportStoreOptions = {
   api: AdminApi;
@@ -151,8 +155,9 @@ export function createAdminSupportStore({
   const HIDDEN_POLL_MS = 300_000;
   const ERROR_POLL_MS = 90_000;
 
-  const state = $state<AdminSupportState>({
-    tickets: [],
+  let tickets = $state.raw<SupportTicket[]>([]);
+  let messages = $state.raw<SupportMessage[]>([]);
+  const state = $state<ProxiedSupportState>({
     stats: {
       active: 0,
       closed: 0,
@@ -172,11 +177,23 @@ export function createAdminSupportStore({
     loading: false,
     openedTicketId: null,
     openedTicket: null,
-    messages: [],
     userSnapshot: null,
     detailLoading: false,
     sending: false,
     composerInternalNote: false,
+  });
+  const store = Object.create(state) as AdminSupportStore;
+  defineRawStateProperty(store, "tickets", {
+    get: () => tickets,
+    set: (value) => {
+      tickets = value;
+    },
+  });
+  defineRawStateProperty(store, "messages", {
+    get: () => messages,
+    set: (value) => {
+      messages = value;
+    },
   });
 
   let statsPollTimer: number | null = null;
@@ -192,13 +209,13 @@ export function createAdminSupportStore({
 
   function getSnapshot() {
     return snapshotForPayload({
-      tickets: state.tickets,
+      tickets,
       stats: state.stats,
       filters: state.filters,
       loading: state.loading,
       openedTicketId: state.openedTicketId,
       openedTicket: state.openedTicket,
-      messages: state.messages,
+      messages,
       userSnapshot: state.userSnapshot,
       detailLoading: state.detailLoading,
       sending: state.sending,
@@ -207,9 +224,13 @@ export function createAdminSupportStore({
   }
 
   function updateState(updater: (snapshot: AdminSupportState) => AdminSupportState): void {
-    const next = updater(state);
-    if (next === state) return;
-    Object.assign(state, next);
+    const current = getSnapshot();
+    const next = updater(current);
+    if (next === current) return;
+    const { tickets: nextTickets, messages: nextMessages, ...nextState } = next;
+    tickets = nextTickets;
+    messages = nextMessages;
+    Object.assign(state, nextState);
   }
 
   function currentOpenedTicketId() {
@@ -532,7 +553,7 @@ export function createAdminSupportStore({
     stopRealtimeListeners();
   }
 
-  return Object.assign(state, {
+  return Object.assign(store, {
     setActive,
     loadStats,
     loadList,

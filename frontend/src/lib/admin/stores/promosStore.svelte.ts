@@ -13,6 +13,12 @@ import {
 import type { components } from "../../api/openapi.generated";
 import { snapshotForPayload } from "./snapshotForPayload.svelte";
 import { defineRawStateProperty } from "./rawStateProperty";
+import {
+  fetchAdminQuery,
+  invalidateAdminQuery,
+  type AdminQueryClient,
+  type AdminQueryKey,
+} from "./adminQueryCache";
 
 type AdminErrorResponse = { ok?: false; error?: string; message?: string; detail?: string };
 type AdminApi = <Path extends Parameters<ApiClient["api"]>[0]>(
@@ -65,9 +71,10 @@ type PromosStoreOptions = {
   api: AdminApi;
   onToast: ToastFn;
   at?: TranslateFn;
+  queryClient?: AdminQueryClient | null;
 };
 export type PromosStore = PromosState & {
-  loadPromos: () => Promise<void>;
+  loadPromos: (options?: { refresh?: boolean }) => Promise<void>;
   createPromo: () => Promise<void>;
   savePromo: () => Promise<void>;
   togglePromo: (promo: Promo) => Promise<void>;
@@ -88,6 +95,18 @@ export type PromosStore = PromosState & {
 
 function isOkResponse<T extends { ok: true }>(response: T | AdminErrorResponse): response is T {
   return response.ok === true;
+}
+
+const PROMOS_QUERY_KEY = ["admin", "promos"] as const;
+const PROMO_ACTIVATIONS_QUERY_KEY = ["admin", "promos", "activations"] as const;
+
+class AdminPromosError extends Error {
+  payload: AdminErrorResponse;
+
+  constructor(message: string, payload: AdminErrorResponse) {
+    super(message);
+    this.payload = payload;
+  }
 }
 
 const defaultPromoDraft = (): PromoDraft => ({
@@ -169,6 +188,7 @@ export function createPromosStore({
   api,
   onToast,
   at = (key, _params, fallback) => fallback || key,
+  queryClient = null,
 }: PromosStoreOptions): PromosStore {
   let promos = $state.raw<Promo[]>([]);
   let promoActivations = $state.raw<PromoActivation[]>([]);
@@ -204,20 +224,78 @@ export function createPromosStore({
   const PROMOS_PAGE_SIZE = 25;
   const ACTIVATIONS_PAGE_SIZE = 25;
 
-  async function loadPromos(): Promise<void> {
+  function promosQueryKey(page: number): AdminQueryKey {
+    return [
+      PROMOS_QUERY_KEY[0],
+      PROMOS_QUERY_KEY[1],
+      {
+        page,
+      },
+    ];
+  }
+
+  async function requestPromos(page: number): Promise<PromosListResponse> {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(PROMOS_PAGE_SIZE),
+    });
+    const data = (await api(buildAdminPromosPath(params))) as
+      PromosListResponse | AdminErrorResponse;
+    if (!isOkResponse(data)) {
+      throw new AdminPromosError(adminErrorMessage(data, at, "Error"), data);
+    }
+    return data;
+  }
+
+  function promoActivationsQueryKey(promoId: number, page: number): AdminQueryKey {
+    return [
+      PROMO_ACTIVATIONS_QUERY_KEY[0],
+      PROMO_ACTIVATIONS_QUERY_KEY[1],
+      PROMO_ACTIVATIONS_QUERY_KEY[2],
+      promoId,
+      page,
+    ];
+  }
+
+  async function requestPromoActivations(
+    promoId: number,
+    page: number
+  ): Promise<PromoActivationsResponse> {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(ACTIVATIONS_PAGE_SIZE),
+    });
+    const data = (await api(buildAdminPromoActivationsPath(promoId, params))) as
+      PromoActivationsResponse | AdminErrorResponse;
+    if (!isOkResponse(data)) {
+      throw new AdminPromosError(adminErrorMessage(data, at, "Error"), data);
+    }
+    return data;
+  }
+
+  function invalidatePromosQueries(): void {
+    invalidateAdminQuery(queryClient, PROMOS_QUERY_KEY);
+    invalidateAdminQuery(queryClient, PROMO_ACTIVATIONS_QUERY_KEY);
+  }
+
+  async function loadPromos({ refresh = false }: { refresh?: boolean } = {}): Promise<void> {
     state.promosLoading = true;
     const currentPage = state.promosPage;
     try {
-      const params = new URLSearchParams({
-        page: String(currentPage),
-        page_size: String(PROMOS_PAGE_SIZE),
+      const data = await fetchAdminQuery({
+        queryClient,
+        queryKey: promosQueryKey(currentPage),
+        queryFn: () => requestPromos(currentPage),
+        refresh,
       });
-      const data = (await api(buildAdminPromosPath(params))) as
-        PromosListResponse | AdminErrorResponse;
-      if (isOkResponse(data)) {
-        const payload = unwrap(data);
-        promos = payload.promos || [];
-        state.promosTotal = payload.total || 0;
+      const payload = unwrap(data);
+      promos = payload.promos || [];
+      state.promosTotal = payload.total || 0;
+    } catch (error) {
+      if (error instanceof AdminPromosError) {
+        onToast(adminErrorMessage(error.payload, at, "Error"));
+      } else {
+        onToast(error instanceof Error ? error.message : String(error || "Error"));
       }
     } finally {
       state.promosLoading = false;
@@ -233,10 +311,11 @@ export function createPromosStore({
     })) as PromoCreateResponse | AdminErrorResponse;
 
     if (isOkResponse(res)) {
+      invalidatePromosQueries();
       onToast(at("promo_created_toast", {}, "Code created"));
       state.promoCreateOpen = false;
       state.promoDraft = defaultPromoDraft();
-      await loadPromos();
+      await loadPromos({ refresh: true });
     } else {
       onToast(adminErrorMessage(res, at, "Error"));
     }
@@ -252,6 +331,7 @@ export function createPromosStore({
       body: JSON.stringify(draft),
     })) as PromoPatchResponse | AdminErrorResponse;
     if (isOkResponse(res)) {
+      invalidatePromosQueries();
       const payload = unwrap(res);
       promos = promos.map((p) => (p.id === promo.id ? payload.promo : p));
       state.promoEditing = payload.promo;
@@ -272,6 +352,7 @@ export function createPromosStore({
       body: JSON.stringify(body),
     })) as PromoPatchResponse | AdminErrorResponse;
     if (isOkResponse(res)) {
+      invalidatePromosQueries();
       const payload = unwrap(res);
       promos = promos.map((p) => (p.id === promo.id ? payload.promo : p));
     } else {
@@ -283,6 +364,7 @@ export function createPromosStore({
     const path = buildAdminPromoPath(promo.id);
     const res = (await api(path, { method: "DELETE" })) as PromoDeleteResponse | AdminErrorResponse;
     if (isOkResponse(res)) {
+      invalidatePromosQueries();
       promos = promos.filter((p) => p.id !== promo.id);
       if (state.promoEditing?.id === promo.id) closeEditPromo();
       if (state.promoActivationsPromo?.id === promo.id) closeActivations();
@@ -329,18 +411,19 @@ export function createPromosStore({
     state.promoActivationsLoading = true;
     state.promoActivationsPage = page;
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(ACTIVATIONS_PAGE_SIZE),
+      const data = await fetchAdminQuery({
+        queryClient,
+        queryKey: promoActivationsQueryKey(promo.id, page),
+        queryFn: () => requestPromoActivations(promo.id, page),
       });
-      const data = (await api(buildAdminPromoActivationsPath(promo.id, params))) as
-        PromoActivationsResponse | AdminErrorResponse;
-      if (isOkResponse(data)) {
-        const payload = unwrap(data);
-        promoActivations = payload.activations || [];
-        state.promoActivationsTotal = payload.total || 0;
+      const payload = unwrap(data);
+      promoActivations = payload.activations || [];
+      state.promoActivationsTotal = payload.total || 0;
+    } catch (error) {
+      if (error instanceof AdminPromosError) {
+        onToast(adminErrorMessage(error.payload, at, "Error"));
       } else {
-        onToast(adminErrorMessage(data, at, "Error"));
+        onToast(error instanceof Error ? error.message : String(error || "Error"));
       }
     } finally {
       state.promoActivationsLoading = false;

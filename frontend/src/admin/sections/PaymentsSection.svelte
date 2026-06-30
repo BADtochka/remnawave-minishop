@@ -8,6 +8,7 @@
     AdminPagination,
     AdminTable,
     AdminTableSkeleton,
+    VirtualTableRows,
   } from "$components/patterns/admin/index.js";
   import { FileText, User } from "$components/ui/icons.js";
   import { TableHandler } from "@vincjo/datatables";
@@ -132,8 +133,13 @@
           <th>{at("date", {}, "Дата")}</th>
         </tr>
       </thead>
-      <tbody>
-        {#each paymentsTable.rows as p (p.payment_id)}
+      <VirtualTableRows
+        rows={paymentsTable.rows}
+        colspan={10}
+        rowHeight={62}
+        getKey={(p) => p.payment_id}
+      >
+        {#snippet children(p)}
           <tr>
             <td class="admin-cell-id" data-label="ID">
               <AdminButton
@@ -188,8 +194,8 @@
             </td>
             <td data-label={at("date", {}, "Дата")}>{fmtDate(p.created_at)}</td>
           </tr>
-        {/each}
-      </tbody>
+        {/snippet}
+      </VirtualTableRows>
     </AdminTable>
   {/if}
 </div>

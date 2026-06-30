@@ -10,11 +10,14 @@
 
   import BrandMark from "$lib/webapp/BrandMark.svelte";
   import AdminHeaderActions from "./AdminHeaderActions.svelte";
-  import PaymentDetailModal from "./sections/PaymentDetailModal.svelte";
-  import TariffEditorModal from "./sections/TariffEditorModal.svelte";
-  import UserDetailModal from "./sections/UserDetailModal.svelte";
+  import AdminLazyModals from "./AdminLazyModals.svelte";
   import { ADMIN_SECTION_GROUPS, ADMIN_SECTIONS } from "./sections/registry";
   import ConfigAlertsBanner from "./ConfigAlertsBanner.svelte";
+  import {
+    createAdminSectionComponentLoader,
+    dynamicComponent,
+    type DynamicComponent,
+  } from "./adminLazyComponents";
   import { createAdsStore } from "../lib/admin/stores/adsStore.js";
   import { createBackupsStore } from "../lib/admin/stores/backupsStore.js";
   import { createBroadcastStore } from "../lib/admin/stores/broadcastStore.js";
@@ -75,7 +78,6 @@
   import type { TariffsCatalog } from "../lib/admin/stores/tariffsStore";
   import type { TranslationsSavedPayload } from "../lib/admin/stores/translationsStore";
   import type { AdminUser } from "../lib/admin/stores/usersStore";
-  import type { ComponentType, SvelteComponent } from "svelte";
 
   type AdminApi = Parameters<typeof createAdsStore>[0]["api"] &
     Parameters<typeof createThemesStore>[0]["api"];
@@ -92,7 +94,6 @@
     items: Array<AdminSectionDescriptor & { label: string }>;
   };
   type PanelStatusBadge = { label: string; variant: "success" | "danger" | "warning" | "muted" };
-  type DynamicComponent = ComponentType<SvelteComponent<Record<string, unknown>>>;
 
   let {
     api,
@@ -262,14 +263,25 @@
     isCompact && (adminLanguageMenuOpen || adminLanguageClickGuard)
   );
 
-  const reduceMotion = $derived(prefersReducedMotion.current);
-
   function flash(text: string): void {
     onToast(text);
   }
 
-  function dynamicComponent(component: unknown): DynamicComponent {
-    return component as DynamicComponent;
+  function sectionFade() {
+    return { duration: prefersReducedMotion.current ? 0 : 200 };
+  }
+
+  function sidebarBackdropFade() {
+    return { duration: prefersReducedMotion.current ? 0 : 180 };
+  }
+
+  const sectionComponentLoader = createAdminSectionComponentLoader();
+  let sectionLoadToken = 0;
+  let activeSectionComponent = $state<DynamicComponent | null>(null);
+  let activeSectionLoading = $state(false);
+
+  function warmSectionComponent(section: AdminSectionDescriptor): void {
+    sectionComponentLoader.warm(section);
   }
 
   const adminQueryClient = new QueryClient({
@@ -297,9 +309,20 @@
     onToast: flash,
     at,
     routePrefix: stableRoutePrefix,
+    queryClient: adminQueryClient,
   });
-  const promosStore = createPromosStore({ api: stableApi, onToast: flash, at });
-  const statsStore = createStatsStore({ api: stableApi, onToast: flash, at });
+  const promosStore = createPromosStore({
+    api: stableApi,
+    onToast: flash,
+    at,
+    queryClient: adminQueryClient,
+  });
+  const statsStore = createStatsStore({
+    api: stableApi,
+    onToast: flash,
+    at,
+    queryClient: adminQueryClient,
+  });
   const supportStore = createAdminSupportStore({
     api: stableApi,
     onToast: flash,
@@ -324,6 +347,7 @@
     onToast: flash,
     at,
     routePrefix: stableRoutePrefix,
+    queryClient: adminQueryClient,
   });
 
   setPromosStore(promosStore);
@@ -368,6 +392,30 @@
   );
 
   const gravatarCache = createGravatarCache(() => usersStore.updateState({}));
+
+  $effect(() => {
+    const section = activeSection;
+    const token = ++sectionLoadToken;
+    activeSectionComponent = null;
+    if (!section) {
+      activeSectionLoading = false;
+      return;
+    }
+    activeSectionLoading = true;
+    void sectionComponentLoader
+      .load(section)
+      .then((component) => {
+        if (token !== sectionLoadToken) return;
+        activeSectionComponent = component;
+      })
+      .catch((error: unknown) => {
+        if (token !== sectionLoadToken) return;
+        flash(error instanceof Error ? error.message : String(error || "section_load_failed"));
+      })
+      .finally(() => {
+        if (token === sectionLoadToken) activeSectionLoading = false;
+      });
+  });
 
   function setActive(id: string): void {
     const next = normalizeSection(id);
@@ -645,9 +693,6 @@
     };
   });
 
-  const sectionFade = $derived(reduceMotion ? { duration: 0 } : { duration: 200 });
-  const sidebarBackdropFade = $derived(reduceMotion ? { duration: 0 } : { duration: 180 });
-
   $effect(() => {
     const currentUserRouteKey = userRouteKey();
     if (currentUserRouteKey !== lastUserRouteKey) {
@@ -699,8 +744,8 @@
       type="button"
       class="admin-sidebar-backdrop"
       aria-label={at("close_menu", {}, "Закрыть меню")}
-      in:fade={sidebarBackdropFade}
-      out:fade={sidebarBackdropFade}
+      in:fade={sidebarBackdropFade()}
+      out:fade={sidebarBackdropFade()}
       onclick={() => (sidebarOpen = false)}
     ></button>
   {/if}
@@ -741,6 +786,8 @@
             class="admin-nav-item"
             class:active={active === item.id}
             data-admin-section={item.id}
+            onfocus={() => warmSectionComponent(item)}
+            onpointerenter={() => warmSectionComponent(item)}
             onclick={() => setActive(item.id)}
           >
             <NavIcon size={16} />
@@ -858,11 +905,11 @@
         <div
           class="admin-section-stage"
           data-admin-active-section={active}
-          in:fade={sectionFade}
-          out:fade={sectionFade}
+          in:fade={sectionFade()}
+          out:fade={sectionFade()}
         >
-          {#if activeSection}
-            {@const ActiveSectionComponent = dynamicComponent(activeSection.component)}
+          {#if activeSectionComponent}
+            {@const ActiveSectionComponent = activeSectionComponent}
             <ActiveSectionComponent
               {at}
               {brand}
@@ -887,6 +934,12 @@
               onSettingsPathChange={(path: SettingsPath) => (settingsPath = path)}
               initialTicketId={readSupportTicketIdFromPath()}
             />
+          {:else if activeSectionLoading}
+            <div class="admin-section-loading" aria-busy="true" aria-live="polite">
+              <span class="admin-skeleton admin-skeleton-line admin-skeleton-line-short"></span>
+              <span class="admin-skeleton admin-skeleton-line admin-skeleton-line-strong"></span>
+              <span class="admin-skeleton admin-skeleton-line"></span>
+            </div>
           {/if}
         </div>
       {/key}
@@ -894,31 +947,22 @@
   </section>
 </div>
 
-<TariffEditorModal {at} />
-
-<PaymentDetailModal
-  {at}
-  {fmtDate}
-  {fmtMoney}
-  {paymentStatusVariant}
-  onOpenUserCard={openPaymentUserCard}
-/>
-
-<UserDetailModal
+<AdminLazyModals
   {at}
   {fmtDate}
   {fmtDateShort}
   {fmtMoney}
-  {resolvedAvatarUrl}
-  {userDisplayName}
-  {userSecondaryName}
-  {userInitials}
-  {userTelegramProfileLink}
-  {userTelegramProfileLinkKind}
   {openTelegramProfileLink}
   {paymentStatusVariant}
-  {trafficPercentValue}
+  {resolvedAvatarUrl}
   {trafficLeftLabel}
   {trafficOfLabel}
-  onClose={closeUserCard}
+  {trafficPercentValue}
+  {userDisplayName}
+  {userInitials}
+  {userSecondaryName}
+  {userTelegramProfileLink}
+  {userTelegramProfileLinkKind}
+  onCloseUser={closeUserCard}
+  onOpenPaymentUserCard={openPaymentUserCard}
 />

@@ -23,6 +23,7 @@ from .asset_paths import (
 from .assets import (
     admin_css_asset_route,
     admin_js_asset_route,
+    admin_js_chunk_asset_route,
     app_deeplink_route,
     bootstrap_route,
     css_asset_route,
@@ -150,6 +151,10 @@ def setup_subscription_webapp_routes(app: web.Application) -> None:
     app.router.add_get(r"/webapp-theme-assets/{path:.+}", theme_asset_route)
     app.router.add_get("/subscription_webapp.min.{asset_hash}.js", js_asset_route)
     app.router.add_get("/subscription_webapp.js", js_asset_route)
+    app.router.add_get(
+        r"/subscription_webapp_admin.{chunk_name:[A-Za-z0-9_-]+}.{asset_hash:[A-Za-z0-9_-]+}.js",
+        admin_js_chunk_asset_route,
+    )
     app.router.add_get("/subscription_webapp_admin.min.{asset_hash}.js", admin_js_asset_route)
     app.router.add_get("/subscription_webapp_admin.js", admin_js_asset_route)
     app.router.add_post("/api/auth/telegram/nonce", telegram_oauth_nonce_route)

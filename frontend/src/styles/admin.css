@@ -372,6 +372,13 @@
   width: 100%;
 }
 
+.admin-section-loading {
+  display: grid;
+  gap: 14px;
+  width: min(720px, 100%);
+  padding: 8px 0;
+}
+
 .admin-config-alerts {
   display: flex;
   flex-direction: column;

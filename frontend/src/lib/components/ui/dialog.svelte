@@ -30,15 +30,21 @@
     children,
   } = $props();
 
-  const reduceMotion = $derived(prefersReducedMotion.current);
+  function backdropTransition() {
+    return prefersReducedMotion.current ? { duration: 0 } : { duration: 200 };
+  }
 
-  const backdropTransition = $derived(reduceMotion ? { duration: 0 } : { duration: 200 });
-  const cardIn = $derived(
-    reduceMotion ? { duration: 0, y: 0 } : { duration: 260, y: 16, easing: cubicOut }
-  );
-  const cardOut = $derived(
-    reduceMotion ? { duration: 0, y: 0 } : { duration: 200, y: 10, easing: cubicOut }
-  );
+  function cardIn() {
+    return prefersReducedMotion.current
+      ? { duration: 0, y: 0 }
+      : { duration: 260, y: 16, easing: cubicOut };
+  }
+
+  function cardOut() {
+    return prefersReducedMotion.current
+      ? { duration: 0, y: 0 }
+      : { duration: 200, y: 10, easing: cubicOut };
+  }
 </script>
 
 {#if open}
@@ -48,10 +54,10 @@
       type="button"
       aria-label={closeLabel}
       onclick={onclose}
-      in:fade={backdropTransition}
-      out:fade={backdropTransition}
+      in:fade={backdropTransition()}
+      out:fade={backdropTransition()}
     ></button>
-    <section class={cn("dialog-card", className)} in:fly={cardIn} out:fly={cardOut}>
+    <section class={cn("dialog-card", className)} in:fly={cardIn()} out:fly={cardOut()}>
       <div class="dialog-head">
         <div class:dialog-title-with-icon={titleIcon} class="dialog-title-block">
           {#if titleIcon}

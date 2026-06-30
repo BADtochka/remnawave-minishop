@@ -7,6 +7,7 @@ import {
   type GetResponse,
 } from "../../webapp/publicApi";
 import type { components } from "../../api/openapi.generated";
+import { defineRawStateProperty } from "./rawStateProperty";
 import { snapshotForPayload } from "./snapshotForPayload.svelte";
 
 type AdminErrorResponse = {
@@ -77,6 +78,8 @@ export type TranslationsState = {
   translationsPath: string;
   translationsOverrideCount: number;
 };
+type RawTranslationsState = Pick<TranslationsState, "translationGroups" | "translationLanguages">;
+type ProxiedTranslationsStore = Omit<TranslationsStore, keyof RawTranslationsState>;
 type TranslationsStoreOptions = {
   api: AdminApi;
   onToast: ToastFn;
@@ -138,9 +141,9 @@ export function createTranslationsStore({
   onToast,
   at,
 }: TranslationsStoreOptions): TranslationsStore {
-  const state = $state<TranslationsStore>({
-    translationGroups: [],
-    translationLanguages: [],
+  let translationGroups = $state.raw<TranslationGroup[]>([]);
+  let translationLanguages = $state.raw<TranslationLanguage[]>([]);
+  const state = $state<ProxiedTranslationsStore>({
     translationsLoading: false,
     translationsDirty: {},
     translationsSaving: false,
@@ -153,11 +156,32 @@ export function createTranslationsStore({
     addTranslationLanguage,
     saveTranslations,
   });
+  const store = Object.create(state) as TranslationsStore;
+  defineRawStateProperty(store, "translationGroups", {
+    get: () => translationGroups,
+    set: (value) => {
+      translationGroups = value;
+    },
+  });
+  defineRawStateProperty(store, "translationLanguages", {
+    get: () => translationLanguages,
+    set: (value) => {
+      translationLanguages = value;
+    },
+  });
 
   function updateState(updater: (snapshot: TranslationsStore) => TranslationsStore): void {
-    const next = updater(state);
-    if (next === state) return;
-    Object.assign(state, next);
+    const current = { ...state, translationGroups, translationLanguages } as TranslationsStore;
+    const next = updater(current);
+    if (next === current) return;
+    const {
+      translationGroups: nextGroups,
+      translationLanguages: nextLanguages,
+      ...nextState
+    } = next;
+    translationGroups = nextGroups;
+    translationLanguages = nextLanguages;
+    Object.assign(state, nextState);
   }
 
   async function loadTranslations(): Promise<void> {
@@ -285,5 +309,12 @@ export function createTranslationsStore({
     }
   }
 
-  return state;
+  return Object.assign(store, {
+    loadTranslations,
+    markDirty,
+    clearDirty,
+    resetField,
+    addTranslationLanguage,
+    saveTranslations,
+  });
 }

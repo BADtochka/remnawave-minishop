@@ -13,6 +13,7 @@
     AdminSelect,
     AdminTable,
     AdminTableSkeleton,
+    VirtualTableRows,
   } from "$components/patterns/admin/index.js";
   import { TableHandler } from "@vincjo/datatables";
   import PromoActivationsPanel from "./promos/PromoActivationsPanel.svelte";
@@ -516,8 +517,8 @@
           <th class="admin-cell-actions">{at("actions", {}, "Actions")}</th>
         </tr>
       </thead>
-      <tbody>
-        {#each promoRows as p (p.id)}
+      <VirtualTableRows rows={promoRows} colspan={9} rowHeight={70} getKey={(p) => p.id}>
+        {#snippet children(p)}
           {@const status = promoStatus(p)}
           <tr data-admin-code-id={p.id}>
             <td class="admin-cell-mono" data-label={at("promo_csv_code", {}, "Code")}>{p.code}</td>
@@ -593,8 +594,8 @@
               </div>
             </td>
           </tr>
-        {/each}
-      </tbody>
+        {/snippet}
+      </VirtualTableRows>
     </AdminTable>
   {/if}
 </div>
