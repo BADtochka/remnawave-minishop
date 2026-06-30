@@ -61,6 +61,11 @@ class PanelApiServiceLoggingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_endpoint_log_label("/users/by-telegram-id/42"), "/users/by-telegram-id")
         self.assertEqual(_endpoint_log_label("/users/stream?size=1000"), "/users/stream")
         self.assertEqual(_endpoint_log_label("/users/some-uuid/actions/enable"), "/users")
+        self.assertEqual(_endpoint_log_label("/hwid/devices/stats"), "/hwid/devices/stats")
+        self.assertEqual(
+            _endpoint_log_label("/hwid/devices/top-users?size=10"),
+            "/hwid/devices/top-users",
+        )
         self.assertEqual(
             _endpoint_log_label("/internal-squads/squad-uuid/bulk-actions/add-users"),
             "/internal-squads",
@@ -304,6 +309,70 @@ class PanelApiServiceLoggingTests(unittest.IsolatedAsyncioTestCase):
         result = await service.get_user_devices("user-uuid")
 
         self.assertEqual(result, [])
+
+    async def test_get_hwid_devices_stats_returns_by_platform_by_app(self):
+        service = self._make_service()
+        panel_payload = {
+            "byPlatform": [{"platform": "ios", "count": 2, "byApp": [{"app": "Happ", "count": 2}]}],
+            "stats": {
+                "totalUniqueDevices": 2,
+                "totalHwidDevices": 2,
+                "averageHwidDevicesPerUser": 1,
+            },
+        }
+        service._request = AsyncMock(return_value={"response": panel_payload})
+
+        result = await service.get_hwid_devices_stats()
+
+        self.assertEqual(result, panel_payload)
+        service._request.assert_awaited_once_with(
+            "GET",
+            "/hwid/devices/stats",
+            log_full_response=False,
+        )
+
+    async def test_get_hwid_devices_top_users_uses_panel_endpoint(self):
+        service = self._make_service()
+        panel_payload = {"users": [{"userId": 2, "devicesCount": 3}]}
+        service._request = AsyncMock(return_value={"response": panel_payload})
+
+        result = await service.get_hwid_devices_top_users(start=5, size=20)
+
+        self.assertEqual(result, panel_payload)
+        service._request.assert_awaited_once_with(
+            "GET",
+            "/hwid/devices/top-users",
+            params={"start": 5, "size": 20},
+            log_full_response=False,
+        )
+
+    async def test_restart_node_sends_force_restart_body(self):
+        service = self._make_service()
+        service._request = AsyncMock(return_value={"response": {"ok": True}})
+
+        result = await service.restart_node("node-uuid", force_restart=True)
+
+        self.assertTrue(result)
+        service._request.assert_awaited_once_with(
+            "POST",
+            "/nodes/node-uuid/actions/restart",
+            json={"forceRestart": True},
+            log_full_response=False,
+        )
+
+    async def test_restart_all_nodes_sends_force_restart_body(self):
+        service = self._make_service()
+        service._request = AsyncMock(return_value={"response": {"ok": True}})
+
+        result = await service.restart_all_nodes(force_restart=False)
+
+        self.assertTrue(result)
+        service._request.assert_awaited_once_with(
+            "POST",
+            "/nodes/actions/restart-all",
+            json={"forceRestart": False},
+            log_full_response=False,
+        )
 
     async def test_get_subscription_page_config_by_short_uuid_uses_panel_endpoint(self):
         service = self._make_service()

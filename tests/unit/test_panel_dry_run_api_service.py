@@ -125,6 +125,29 @@ class PanelDryRunApiServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(second)
         service._request_once.assert_awaited_once()
 
+    async def test_restart_node_is_intercepted_with_force_restart_body(self):
+        service = PanelDryRunApiService(_settings())
+        service._request_once = AsyncMock()
+
+        result = await service.restart_node("node-uuid", force_restart=True)
+
+        self.assertTrue(result)
+        service._request_once.assert_not_awaited()
+
+    async def test_restart_all_nodes_requires_force_restart_bool_in_dry_run(self):
+        service = PanelDryRunApiService(_settings())
+
+        response = await service._request(
+            "POST",
+            "/nodes/actions/restart-all",
+            json={},
+            log_full_response=False,
+        )
+
+        self.assertTrue(response["error"])
+        self.assertEqual(response["status_code"], 400)
+        self.assertIn("forceRestart must be a boolean.", response["details"]["errors"])
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

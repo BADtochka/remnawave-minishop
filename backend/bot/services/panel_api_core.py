@@ -27,6 +27,8 @@ _ENDPOINT_LOG_LABELS = (
     "/subscriptions/subpage-config",
     "/subscription-page-configs",
     "/hwid/devices/delete",
+    "/hwid/devices/stats",
+    "/hwid/devices/top-users",
     "/hwid/devices",
     "/system/stats/bandwidth",
     "/system/stats/nodes",
