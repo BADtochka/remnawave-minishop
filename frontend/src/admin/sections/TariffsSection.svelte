@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getSettingsStore, getTariffsStore } from "$lib/admin/context";
   import { Input } from "$components/ui/index.js";
   import {
     ChevronRight,
@@ -9,7 +10,7 @@
     TriangleAlert,
     X,
   } from "$components/ui/icons.js";
-  import { getContext, onMount } from "svelte";
+  import { onMount } from "svelte";
   import { AdminBadge, AdminButton, AdminEmptyState } from "$components/patterns/admin/index.js";
   import { Switch } from "$components/ui/primitives.js";
   import TariffReferralSettings from "./tariffs/TariffReferralSettings.svelte";
@@ -32,13 +33,11 @@
     ProviderCurrencySupport,
     Tariff,
     TariffsCatalog,
-    TariffsStore,
   } from "$lib/admin/stores/tariffsStore";
   import type {
     SettingField,
     SettingsSavedPayload,
     SettingsSection,
-    SettingsStore,
   } from "$lib/admin/stores/settingsStore";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
@@ -56,8 +55,8 @@
     onOpenSettingsPath?: (path: string[]) => void;
   } = $props();
 
-  const tariffsStore = getContext<TariffsStore>("tariffsStore");
-  const settingsStore = getContext<SettingsStore>("settingsStore");
+  const tariffsStore = getTariffsStore();
+  const settingsStore = getSettingsStore();
 
   const tariffsState = $derived(tariffsStore);
   const tariffsCatalog: TariffsCatalog = $derived(tariffsState.tariffsCatalog);

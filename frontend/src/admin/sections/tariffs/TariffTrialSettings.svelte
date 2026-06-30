@@ -1,9 +1,9 @@
 <script lang="ts">
+  import { getSettingsStore, getTariffsStore } from "$lib/admin/context";
   import { Input } from "$components/ui/index.js";
   import { Save, X } from "$components/ui/icons.js";
   import { AdminBadge, AdminButton, AdminSelect } from "$components/patterns/admin/index.js";
   import { Switch } from "$components/ui/primitives.js";
-  import { getContext } from "svelte";
   import {
     TRAFFIC_STRATEGY_OPTIONS,
     TRIAL_GENERAL_KEYS,
@@ -20,12 +20,7 @@
     type SelectOption,
     type SettingsDirtyState,
   } from "$lib/admin/tariffSettings";
-  import type {
-    SettingField,
-    SettingsSavedPayload,
-    SettingsStore,
-  } from "$lib/admin/stores/settingsStore";
-  import type { TariffsStore } from "$lib/admin/stores/tariffsStore";
+  import type { SettingField, SettingsSavedPayload } from "$lib/admin/stores/settingsStore";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type ComponentCallback = (...args: never[]) => void;
@@ -48,8 +43,8 @@
     onSettingsSaved?: (payload: SettingsSavedPayload) => void | Promise<void>;
   } = $props();
 
-  const settingsStore = getContext<SettingsStore>("settingsStore");
-  const tariffsStore = getContext<TariffsStore>("tariffsStore");
+  const settingsStore = getSettingsStore();
+  const tariffsStore = getTariffsStore();
 
   let selectedTrialSquad = $state("");
   let selectedTrialPremiumSquad = $state("");

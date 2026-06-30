@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getSettingsStore } from "$lib/admin/context";
   import { ColorInput, FileInput, Input, Textarea } from "$components/ui/index.js";
   import { Check, Copy, Eye, EyeOff, FileText, X } from "$components/ui/icons.js";
   import * as UiIcons from "$components/ui/icons.js";
@@ -11,7 +12,8 @@
     AdminEmptyState,
     AdminSelect,
   } from "$components/patterns/admin/index.js";
-  import { getContext, onDestroy, onMount, tick } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
+  import { prefersReducedMotion } from "svelte/motion";
   import { withRoutePrefix } from "$lib/webapp/routes.js";
   import {
     SETTINGS_SECTION_IDS_HIDDEN_IN_GENERAL_SETTINGS,
@@ -40,7 +42,6 @@
     SettingsDirtyEntry,
     SettingsSavedPayload,
     SettingsSection,
-    SettingsStore,
   } from "$lib/admin/stores/settingsStore";
   import type {
     AdminSettingField,
@@ -77,7 +78,7 @@
     onSettingsPathChange?: (path: SettingsPath) => void;
   } = $props();
 
-  const settingsStore = getContext<SettingsStore>("settingsStore");
+  const settingsStore = getSettingsStore();
 
   const rawSettingsSections = $derived((settingsStore.settingsSections || []) as SettingsSection[]);
   const settingsSections = $derived(rawSettingsSections as AdminSettingsSection[]);
@@ -237,14 +238,6 @@
     );
   }
 
-  function prefersReducedMotion(): boolean {
-    return (
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    );
-  }
-
   function scrollSettingsAnchorIntoView(
     anchorKey: string,
     behavior: "auto" | "smooth" | "instant",
@@ -349,7 +342,7 @@
     armSettingsAnchorScrollCancel();
     scheduleSettingsAnchorScrollFrame(() => {
       scheduleSettingsAnchorScrollFrame(() => {
-        scrollSettingsAnchorIntoView(anchorKey, prefersReducedMotion() ? "auto" : "smooth", {
+        scrollSettingsAnchorIntoView(anchorKey, prefersReducedMotion.current ? "auto" : "smooth", {
           focus: true,
         });
         for (const delay of [180, 360]) {

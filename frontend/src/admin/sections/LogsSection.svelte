@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { getLogsStore } from "$lib/admin/context";
   import { Input } from "$components/ui/index.js";
-  import { getContext, onMount } from "svelte";
+  import { onMount } from "svelte";
   import {
     AdminButton,
     AdminEmptyState,
@@ -10,7 +11,6 @@
   } from "$components/patterns/admin/index.js";
   import { RefreshCw, TriangleAlert, User } from "$components/ui/icons.js";
   import { TableHandler } from "@vincjo/datatables";
-  import type { LogsStore } from "../../lib/admin/stores/logsStore";
   import type { components } from "../../lib/api/openapi.generated";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
@@ -27,7 +27,7 @@
     onOpenUserCard?: (userId: number | string | null | undefined) => void;
   } = $props();
 
-  const logsStore = getContext<LogsStore>("logsStore");
+  const logsStore = getLogsStore();
   const logsTable = new TableHandler<LogEntry>();
   const LOGS_PAGE_SIZE = 50;
 

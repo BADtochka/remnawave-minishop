@@ -1,7 +1,9 @@
 <script lang="ts">
   import { QueryClient } from "@tanstack/svelte-query";
   import { ArrowLeft, Check, ChevronsUpDown, Globe2, Menu } from "$components/ui/icons.js";
-  import { onMount, setContext } from "svelte";
+  import { onMount } from "svelte";
+  import { MediaQuery } from "svelte/reactivity";
+  import { prefersReducedMotion } from "svelte/motion";
   import { fade } from "svelte/transition";
   import { Select } from "$components/ui/primitives.js";
   import { AdminBadge, AdminButton } from "$components/patterns/admin/index.js";
@@ -52,6 +54,22 @@
     withRoutePrefix,
   } from "../lib/webapp/routes.js";
   import { buildAdminPaymentsExportPath } from "../lib/webapp/publicApi";
+  import {
+    setAdsStore,
+    setAdminSupportStore,
+    setBackupsStore,
+    setBroadcastStore,
+    setHealthStore,
+    setLogsStore,
+    setPaymentsStore,
+    setPromosStore,
+    setSettingsStore,
+    setStatsStore,
+    setTariffsStore,
+    setThemesStore,
+    setTranslationsStore,
+    setUsersStore,
+  } from "../lib/admin/context";
   import type { AdminSectionDescriptor } from "./sections/registry";
   import type { SettingsSavedPayload } from "../lib/admin/stores/settingsStore";
   import type { TariffsCatalog } from "../lib/admin/stores/tariffsStore";
@@ -230,8 +248,9 @@
     }
   });
 
+  const compactQuery = new MediaQuery("max-width: 720px", false);
   let sidebarOpen = $state(false);
-  let isCompact = $state(false);
+  const isCompact = $derived(compactQuery.current);
   let dismissedUserRouteKey = $state("");
   let lastUserRouteKey = $state("");
   let adminLanguageMenuOpen = $state(false);
@@ -243,13 +262,7 @@
     isCompact && (adminLanguageMenuOpen || adminLanguageClickGuard)
   );
 
-  function readReduceMotion() {
-    return (
-      typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    );
-  }
-
-  let reduceMotion = $state(readReduceMotion());
+  const reduceMotion = $derived(prefersReducedMotion.current);
 
   function flash(text: string): void {
     onToast(text);
@@ -313,20 +326,20 @@
     routePrefix: stableRoutePrefix,
   });
 
-  setContext("promosStore", promosStore);
-  setContext("adsStore", adsStore);
-  setContext("healthStore", healthStore);
-  setContext("backupsStore", backupsStore);
-  setContext("broadcastStore", broadcastStore);
-  setContext("logsStore", logsStore);
-  setContext("paymentsStore", paymentsStore);
-  setContext("statsStore", statsStore);
-  setContext("adminSupportStore", supportStore);
-  setContext("settingsStore", settingsStore);
-  setContext("usersStore", usersStore);
-  setContext("tariffsStore", tariffsStore);
-  setContext("themesStore", themesStore);
-  setContext("translationsStore", translationsStore);
+  setPromosStore(promosStore);
+  setAdsStore(adsStore);
+  setHealthStore(healthStore);
+  setBackupsStore(backupsStore);
+  setBroadcastStore(broadcastStore);
+  setLogsStore(logsStore);
+  setPaymentsStore(paymentsStore);
+  setStatsStore(statsStore);
+  setAdminSupportStore(supportStore);
+  setSettingsStore(settingsStore);
+  setUsersStore(usersStore);
+  setTariffsStore(tariffsStore);
+  setThemesStore(themesStore);
+  setTranslationsStore(translationsStore);
 
   $effect(() => {
     usersStore.setActive(active);
@@ -571,11 +584,6 @@
     }
   }
 
-  let compactMql: MediaQueryList | null = null;
-  function onCompactChange(event: MediaQueryListEvent | MediaQueryList): void {
-    isCompact = Boolean(event?.matches);
-  }
-
   function clearAdminLanguageClickGuard(): void {
     if (adminLanguageClickGuardTimer) {
       window.clearTimeout(adminLanguageClickGuardTimer);
@@ -617,22 +625,6 @@
 
   onMount(() => {
     adminQueryClient.mount();
-    reduceMotion = readReduceMotion();
-    let motionMql: MediaQueryList | null = null;
-    const onMotionChange = (): void => {
-      reduceMotion = readReduceMotion();
-    };
-    if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
-      motionMql = window.matchMedia("(prefers-reduced-motion: reduce)");
-      reduceMotion = motionMql.matches;
-      motionMql.addEventListener("change", onMotionChange);
-    }
-    if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
-      compactMql = window.matchMedia("(max-width: 720px)");
-      isCompact = compactMql.matches;
-      if (compactMql.addEventListener) compactMql.addEventListener("change", onCompactChange);
-      else if (compactMql.addListener) compactMql.addListener(onCompactChange);
-    }
     if (typeof window !== "undefined") {
       window.addEventListener("popstate", onPopState);
     }
@@ -646,12 +638,6 @@
         ? window.setInterval(() => void healthStore.loadHealth(), 5 * 60 * 1000)
         : null;
     return () => {
-      if (motionMql) motionMql.removeEventListener("change", onMotionChange);
-      if (compactMql) {
-        if (compactMql.removeEventListener)
-          compactMql.removeEventListener("change", onCompactChange);
-        else if (compactMql.removeListener) compactMql.removeListener(onCompactChange);
-      }
       if (typeof window !== "undefined") window.removeEventListener("popstate", onPopState);
       if (healthTimer !== null) window.clearInterval(healthTimer);
       adminQueryClient.unmount();

@@ -1,10 +1,10 @@
 <script lang="ts">
+  import { getTariffsStore } from "$lib/admin/context";
   import { Input, Sortable } from "$components/ui/index.js";
   import { Tabs } from "$components/ui/primitives.js";
   import { AdminButton } from "$components/patterns/admin/index.js";
   import { Plus, Trash2 } from "$components/ui/icons.js";
-  import { getContext } from "svelte";
-  import type { TariffDraft, TariffsCatalog, TariffsStore } from "$lib/admin/stores/tariffsStore";
+  import type { TariffDraft, TariffsCatalog } from "$lib/admin/stores/tariffsStore";
   import {
     currencyPriceAriaLabel as formatCurrencyPriceAriaLabel,
     currencyPriceColumnLabel as formatCurrencyPriceColumnLabel,
@@ -19,7 +19,7 @@
 
   let { at }: { at: TranslateFn } = $props();
 
-  const tariffsStore = getContext<TariffsStore>("tariffsStore");
+  const tariffsStore = getTariffsStore();
   const tariffsState = $derived(tariffsStore);
   const tariffDraft: TariffDraft = $derived(tariffsState.tariffDraft);
   const tariffsCatalog: TariffsCatalog = $derived(tariffsState.tariffsCatalog);

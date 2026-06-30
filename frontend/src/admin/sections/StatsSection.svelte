@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getPaymentsStore, getStatsStore } from "$lib/admin/context";
   import {
     Activity,
     FileText,
@@ -9,7 +10,7 @@
     User,
     Zap,
   } from "$components/ui/icons.js";
-  import { getContext, onMount } from "svelte";
+  import { onMount } from "svelte";
 
   import Badge from "$components/ui/badge.svelte";
   import { ScrollArea } from "$components/ui/index.js";
@@ -48,8 +49,8 @@
     type RevenueKpis,
     type RevenuePoint,
   } from "$lib/admin/statsDerivations";
-  import type { PaymentOut, PaymentsStore } from "$lib/admin/stores/paymentsStore";
-  import type { StatsState, StatsStore } from "$lib/admin/stores/statsStore";
+  import type { PaymentOut } from "$lib/admin/stores/paymentsStore";
+  import type { StatsState } from "$lib/admin/stores/statsStore";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type FormatterFn = (value: unknown, currency?: string) => string;
@@ -75,8 +76,8 @@
     onOpenUserCard?: (userId: unknown) => void;
   } = $props();
 
-  const paymentsStore = getContext<PaymentsStore>("paymentsStore");
-  const statsStore = getContext<StatsStore>("statsStore");
+  const paymentsStore = getPaymentsStore();
+  const statsStore = getStatsStore();
 
   const statsState = $derived(statsStore);
   const rawStats: StatsState["stats"] = $derived(statsState.stats);

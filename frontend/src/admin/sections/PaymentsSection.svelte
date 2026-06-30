@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { getContext, onMount } from "svelte";
+  import { getPaymentsStore } from "$lib/admin/context";
+  import { onMount } from "svelte";
   import {
     AdminBadge,
     AdminButton,
@@ -10,7 +11,7 @@
   } from "$components/patterns/admin/index.js";
   import { FileText, User } from "$components/ui/icons.js";
   import { TableHandler } from "@vincjo/datatables";
-  import type { PaymentOut, PaymentsStore } from "../../lib/admin/stores/paymentsStore";
+  import type { PaymentOut } from "../../lib/admin/stores/paymentsStore";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 
@@ -28,7 +29,7 @@
     onOpenUserCard?: (userId: number) => void;
   } = $props();
 
-  const paymentsStore = getContext<PaymentsStore>("paymentsStore");
+  const paymentsStore = getPaymentsStore();
   const paymentsTable = new TableHandler<PaymentOut>();
   const PAYMENTS_PAGE_SIZE = 25;
   const payments = $derived(paymentsStore.payments as PaymentOut[]);

@@ -1,19 +1,19 @@
 <script lang="ts">
+  import { getTariffsStore } from "$lib/admin/context";
   import { Tabs } from "$components/ui/primitives.js";
   import Dialog from "$components/ui/dialog.svelte";
   import { Save, Trash2 } from "$components/ui/icons.js";
   import { AdminButton } from "$components/patterns/admin/index.js";
-  import { getContext } from "svelte";
   import TariffEditorGeneralTab from "./tariffs/TariffEditorGeneralTab.svelte";
   import TariffEditorHwidTab from "./tariffs/TariffEditorHwidTab.svelte";
   import TariffEditorPremiumTab from "./tariffs/TariffEditorPremiumTab.svelte";
   import TariffEditorPricingTab from "./tariffs/TariffEditorPricingTab.svelte";
   import TariffEditorTopupTab from "./tariffs/TariffEditorTopupTab.svelte";
-  import type { Tariff, TariffsStore } from "$lib/admin/stores/tariffsStore";
+  import type { Tariff } from "$lib/admin/stores/tariffsStore";
   import type { TranslateFn } from "./tariffs/tariffEditorTabUtils.js";
 
   let { at }: { at: TranslateFn } = $props();
-  const tariffsStore = getContext<TariffsStore>("tariffsStore");
+  const tariffsStore = getTariffsStore();
 
   const tariffsState = $derived(tariffsStore);
   const tariffEditorOpen = $derived(Boolean(tariffsState.tariffEditorOpen));

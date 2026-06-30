@@ -9,6 +9,7 @@ import {
 } from "../../webapp/publicApi";
 import type { components } from "../../api/openapi.generated";
 import { adminErrorMessage } from "../errors.js";
+import { defineRawStateProperty } from "./rawStateProperty";
 
 const PAYMENTS_PAGE_SIZE = 25;
 
@@ -69,14 +70,21 @@ export function createPaymentsStore({
   at = (key, _params, fallback) => fallback || key,
   routePrefix = "",
 }: PaymentsStoreOptions): PaymentsStore {
-  const state = $state<PaymentsState>({
-    payments: [],
+  let payments = $state.raw<PaymentOut[]>([]);
+  const state = $state<Omit<PaymentsState, "payments">>({
     paymentsTotal: 0,
     paymentsPage: 0,
     paymentsLoading: false,
     openedPaymentId: null,
     openedPayment: null,
     paymentDetailLoading: false,
+  });
+  const store = Object.create(state) as PaymentsStore;
+  defineRawStateProperty(store, "payments", {
+    get: () => payments,
+    set: (value) => {
+      payments = value;
+    },
   });
 
   let active = "stats";
@@ -111,7 +119,7 @@ export function createPaymentsStore({
       )) as PaymentsListResponse | AdminErrorResponse;
       if (isOkResponse(data)) {
         const result = unwrap(data);
-        state.payments = result.payments || [];
+        payments = result.payments || [];
         state.paymentsTotal = result.total || 0;
       }
     } finally {
@@ -181,7 +189,7 @@ export function createPaymentsStore({
     }
   }
 
-  return Object.assign(state, {
+  return Object.assign(store, {
     setActive,
     loadPayments,
     setPage,

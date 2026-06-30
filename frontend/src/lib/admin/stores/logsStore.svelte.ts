@@ -7,6 +7,7 @@ import {
   type GetResponse,
 } from "../../webapp/publicApi";
 import type { components } from "../../api/openapi.generated";
+import { defineRawStateProperty } from "./rawStateProperty";
 
 const LOGS_QUERY_KEY = ["admin", "logs"] as const;
 const LOGS_STALE_MS = 30 * 1000;
@@ -70,13 +71,20 @@ export function createLogsStore({
   onToast = () => {},
   queryClient = null,
 }: LogsStoreOptions): LogsStore {
-  const state = $state<LogsState>({
-    logs: [],
+  let logs = $state.raw<LogEntry[]>([]);
+  const state = $state<Omit<LogsState, "logs">>({
     logsTotal: 0,
     logsPage: 0,
     logsUserFilter: "",
     logsLoading: false,
     logsError: "",
+  });
+  const store = Object.create(state) as LogsStore;
+  defineRawStateProperty(store, "logs", {
+    get: () => logs,
+    set: (value) => {
+      logs = value;
+    },
   });
 
   let requestSeq = 0;
@@ -131,7 +139,7 @@ export function createLogsStore({
     try {
       const data = await queryLogs(currentPage, filter, refresh);
       if (seq === requestSeq) {
-        state.logs = data.logs || [];
+        logs = data.logs || [];
         state.logsTotal = data.total || 0;
         state.logsError = "";
       }
@@ -157,7 +165,7 @@ export function createLogsStore({
     state.logsUserFilter = filter;
   }
 
-  return Object.assign(state, {
+  return Object.assign(store, {
     loadLogs,
     setPage,
     setFilter,

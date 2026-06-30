@@ -2,6 +2,7 @@
   import { X } from "$components/ui/icons.js";
   import { cn } from "$lib/utils.js";
   import { cubicOut } from "svelte/easing";
+  import { prefersReducedMotion } from "svelte/motion";
   import { fade, fly } from "svelte/transition";
   import Button from "./button.svelte";
   import ScrollArea from "./scroll-area.svelte";
@@ -29,24 +30,7 @@
     children,
   } = $props();
 
-  function readReduceMotion() {
-    return (
-      typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    );
-  }
-
-  let reduceMotion = $state(readReduceMotion());
-
-  $effect(() => {
-    reduceMotion = readReduceMotion();
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const handler = () => {
-      reduceMotion = mq.matches;
-    };
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  });
+  const reduceMotion = $derived(prefersReducedMotion.current);
 
   const backdropTransition = $derived(reduceMotion ? { duration: 0 } : { duration: 200 });
   const cardIn = $derived(

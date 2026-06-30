@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getUsersStore } from "$lib/admin/context";
   import { Input } from "$components/ui/index.js";
   import {
     ArrowDown,
@@ -20,10 +21,10 @@
     AdminTable,
     AdminTableSkeleton,
   } from "$components/patterns/admin/index.js";
-  import { getContext, onMount } from "svelte";
+  import { onMount } from "svelte";
   import { trafficOfLabel } from "../../lib/admin/format.js";
   import { TableHandler } from "@vincjo/datatables";
-  import type { AdminUser, UsersStore } from "../../lib/admin/stores/usersStore";
+  import type { AdminUser } from "../../lib/admin/stores/usersStore";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type SelectOption = { value: string; label: string };
@@ -71,7 +72,7 @@
     userSecondaryName = () => "",
   }: UsersSectionProps = $props();
 
-  const usersStore = getContext<UsersStore>("usersStore");
+  const usersStore = getUsersStore();
   const usersTable = new TableHandler<AdminUser>();
   const usersState = $derived(usersStore);
   const users = $derived(usersState.users);

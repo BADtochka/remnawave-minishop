@@ -12,6 +12,7 @@ import {
 } from "../../webapp/publicApi";
 import type { components } from "../../api/openapi.generated";
 import { snapshotForPayload } from "./snapshotForPayload.svelte";
+import { defineRawStateProperty } from "./rawStateProperty";
 
 type AdminErrorResponse = { ok?: false; error?: string; message?: string; detail?: string };
 type AdminApi = <Path extends Parameters<ApiClient["api"]>[0]>(
@@ -169,8 +170,9 @@ export function createPromosStore({
   onToast,
   at = (key, _params, fallback) => fallback || key,
 }: PromosStoreOptions): PromosStore {
-  const state = $state<PromosState>({
-    promos: [],
+  let promos = $state.raw<Promo[]>([]);
+  let promoActivations = $state.raw<PromoActivation[]>([]);
+  const state = $state<Omit<PromosState, "promos" | "promoActivations">>({
     promosTotal: 0,
     promosPage: 0,
     promosLoading: false,
@@ -181,10 +183,22 @@ export function createPromosStore({
     promoEditDraft: defaultPromoPatchDraft(),
     promoActivationsOpen: false,
     promoActivationsPromo: null,
-    promoActivations: [],
     promoActivationsTotal: 0,
     promoActivationsPage: 0,
     promoActivationsLoading: false,
+  });
+  const store = Object.create(state) as PromosStore;
+  defineRawStateProperty(store, "promos", {
+    get: () => promos,
+    set: (value) => {
+      promos = value;
+    },
+  });
+  defineRawStateProperty(store, "promoActivations", {
+    get: () => promoActivations,
+    set: (value) => {
+      promoActivations = value;
+    },
   });
 
   const PROMOS_PAGE_SIZE = 25;
@@ -202,7 +216,7 @@ export function createPromosStore({
         PromosListResponse | AdminErrorResponse;
       if (isOkResponse(data)) {
         const payload = unwrap(data);
-        state.promos = payload.promos || [];
+        promos = payload.promos || [];
         state.promosTotal = payload.total || 0;
       }
     } finally {
@@ -239,7 +253,7 @@ export function createPromosStore({
     })) as PromoPatchResponse | AdminErrorResponse;
     if (isOkResponse(res)) {
       const payload = unwrap(res);
-      state.promos = state.promos.map((p) => (p.id === promo.id ? payload.promo : p));
+      promos = promos.map((p) => (p.id === promo.id ? payload.promo : p));
       state.promoEditing = payload.promo;
       state.promoEditDraft = promoToPatchDraft(payload.promo);
       state.promoEditOpen = false;
@@ -259,7 +273,7 @@ export function createPromosStore({
     })) as PromoPatchResponse | AdminErrorResponse;
     if (isOkResponse(res)) {
       const payload = unwrap(res);
-      state.promos = state.promos.map((p) => (p.id === promo.id ? payload.promo : p));
+      promos = promos.map((p) => (p.id === promo.id ? payload.promo : p));
     } else {
       onToast(adminErrorMessage(res, at, "Error"));
     }
@@ -269,7 +283,7 @@ export function createPromosStore({
     const path = buildAdminPromoPath(promo.id);
     const res = (await api(path, { method: "DELETE" })) as PromoDeleteResponse | AdminErrorResponse;
     if (isOkResponse(res)) {
-      state.promos = state.promos.filter((p) => p.id !== promo.id);
+      promos = promos.filter((p) => p.id !== promo.id);
       if (state.promoEditing?.id === promo.id) closeEditPromo();
       if (state.promoActivationsPromo?.id === promo.id) closeActivations();
       onToast(at("promo_deleted_toast", {}, "Code deleted"));
@@ -304,7 +318,7 @@ export function createPromosStore({
   function closeActivations(): void {
     state.promoActivationsOpen = false;
     state.promoActivationsPromo = null;
-    state.promoActivations = [];
+    promoActivations = [];
     state.promoActivationsTotal = 0;
     state.promoActivationsPage = 0;
   }
@@ -323,7 +337,7 @@ export function createPromosStore({
         PromoActivationsResponse | AdminErrorResponse;
       if (isOkResponse(data)) {
         const payload = unwrap(data);
-        state.promoActivations = payload.activations || [];
+        promoActivations = payload.activations || [];
         state.promoActivationsTotal = payload.total || 0;
       } else {
         onToast(adminErrorMessage(data, at, "Error"));
@@ -350,7 +364,7 @@ export function createPromosStore({
     state.promoDraft = { ...state.promoDraft, ...fields };
   }
 
-  return Object.assign(state, {
+  return Object.assign(store, {
     loadPromos,
     createPromo,
     savePromo,

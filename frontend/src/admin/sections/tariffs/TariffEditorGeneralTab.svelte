@@ -1,16 +1,11 @@
 <script lang="ts">
+  import { getTariffsStore } from "$lib/admin/context";
   import { Input } from "$components/ui/index.js";
   import { Tabs, Switch, Label } from "$components/ui/primitives.js";
   import { AdminSelect } from "$components/patterns/admin/index.js";
   import { X } from "$components/ui/icons.js";
-  import { getContext } from "svelte";
   import { normalizeUuidList } from "$lib/admin/tariffDraft.js";
-  import type {
-    PanelSquad,
-    TariffDraft,
-    TariffsCatalog,
-    TariffsStore,
-  } from "$lib/admin/stores/tariffsStore";
+  import type { PanelSquad, TariffDraft, TariffsCatalog } from "$lib/admin/stores/tariffsStore";
   import {
     addDraftSquad,
     conversionCurrencyLabel as formatConversionCurrencyLabel,
@@ -23,7 +18,7 @@
 
   let { at }: { at: TranslateFn } = $props();
 
-  const tariffsStore = getContext<TariffsStore>("tariffsStore");
+  const tariffsStore = getTariffsStore();
   const tariffsState = $derived(tariffsStore);
   const tariffDraft: TariffDraft = $derived(tariffsState.tariffDraft);
   const panelSquadsLoading = $derived(Boolean(tariffsState.panelSquadsLoading));

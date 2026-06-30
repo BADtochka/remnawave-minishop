@@ -8,6 +8,7 @@ import {
   buildAdminStatsPath,
   buildAdminSyncPath,
 } from "../../webapp/publicApi";
+import { defineRawStateProperty } from "./rawStateProperty";
 
 type AdminErrorResponse = { ok?: false; error?: string; message?: string; detail?: string };
 type AdminApi = <Path extends Parameters<ApiClient["api"]>[0]>(
@@ -39,11 +40,18 @@ function isOkResponse<T extends { ok: true }>(response: T | AdminErrorResponse):
 }
 
 export function createStatsStore({ api, onToast, at }: StatsStoreOptions): StatsStore {
-  const state = $state<StatsState>({
-    stats: null,
+  let stats = $state.raw<StatsResponse | null>(null);
+  const state = $state<Omit<StatsState, "stats">>({
     statsLoading: false,
     statsError: "",
     syncBusy: false,
+  });
+  const store = Object.create(state) as StatsStore;
+  defineRawStateProperty(store, "stats", {
+    get: () => stats,
+    set: (value) => {
+      stats = value;
+    },
   });
 
   async function loadStats(): Promise<void> {
@@ -54,7 +62,7 @@ export function createStatsStore({ api, onToast, at }: StatsStoreOptions): Stats
       if (!isOkResponse(data)) {
         state.statsError = adminErrorMessage(data, at, "load_failed");
       } else {
-        state.stats = unwrap(data);
+        stats = unwrap(data);
       }
     } catch (e: unknown) {
       state.statsError = e instanceof Error ? e.message : String(e);
@@ -81,7 +89,7 @@ export function createStatsStore({ api, onToast, at }: StatsStoreOptions): Stats
     }
   }
 
-  return Object.assign(state, {
+  return Object.assign(store, {
     loadStats,
     triggerSync,
   });

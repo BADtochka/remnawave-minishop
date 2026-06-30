@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { getSettingsStore, getThemesStore } from "$lib/admin/context";
   import { FileText, RefreshCw, Save } from "$components/ui/icons.js";
   import { AdminBadge, AdminButton, AdminEmptyState } from "$components/patterns/admin/index.js";
   import { FileInput, Input } from "$components/ui/index.js";
   import { Switch } from "$components/ui/primitives.js";
-  import { getContext, onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   import {
     firstFontFamily,
@@ -34,9 +35,7 @@
     SettingsDirtyEntry,
     SettingsSavedPayload,
     SettingsSection,
-    SettingsStore,
   } from "$lib/admin/stores/settingsStore";
-  import type { ThemesStore } from "$lib/admin/stores/themesStore";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type SettingsDirtyState = Record<string, SettingsDirtyEntry>;
@@ -58,8 +57,8 @@
     appFaviconUseCustom?: boolean;
   } = $props();
 
-  const settingsStore = getContext<SettingsStore>("settingsStore");
-  const themesStore = getContext<ThemesStore>("themesStore");
+  const settingsStore = getSettingsStore();
+  const themesStore = getThemesStore();
   const APPEARANCE_SETTING_KEYS = new Set([
     "SUBSCRIPTION_MINI_APP_URL",
     "WEBAPP_PRIMARY_COLOR",

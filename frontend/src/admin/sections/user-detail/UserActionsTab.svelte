@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getUsersStore } from "$lib/admin/context";
   import { Label, Tabs } from "$components/ui/primitives.js";
   import { Checkbox, Input, Textarea } from "$components/ui/index.js";
   import {
@@ -8,8 +9,7 @@
     AdminSelect,
   } from "$components/patterns/admin/index.js";
   import { Eye, Plus, RefreshCw, Send, Trash2, UserMinus, UserPlus } from "$components/ui/icons.js";
-  import { getContext } from "svelte";
-  import type { AdminUser, UsersStore } from "$lib/admin/stores/usersStore";
+  import type { AdminUser } from "$lib/admin/stores/usersStore";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type ComponentCallback = (...args: never[]) => void;
@@ -86,7 +86,7 @@
     grantTrafficGbValid = false,
   }: Props = $props();
 
-  const usersStore = getContext<UsersStore>("usersStore");
+  const usersStore = getUsersStore();
 
   const activeSubscription = $derived(openedUserDetail?.active_subscription ?? null);
   const extraHwidDevices = $derived(Number(activeSubscription?.extra_hwid_devices || 0));

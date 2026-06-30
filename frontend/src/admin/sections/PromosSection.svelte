@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { getPromosStore } from "$lib/admin/context";
   import { Checkbox, Input, Tabs } from "$components/ui/index.js";
   import { FileText, Sliders, Trash2 } from "$components/ui/icons.js";
-  import { getContext, onMount } from "svelte";
+  import { onMount } from "svelte";
   import Dialog from "$components/ui/dialog.svelte";
   import {
     AdminBadge,
@@ -17,7 +18,6 @@
   import PromoActivationsPanel from "./promos/PromoActivationsPanel.svelte";
   import PromoCreateDialog from "./promos/PromoCreateDialog.svelte";
   import PromoEffectSelector from "./promos/PromoEffectSelector.svelte";
-  import type { PromosStore } from "../../lib/admin/stores/promosStore";
   import type { components } from "../../lib/api/openapi.generated";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
@@ -94,7 +94,7 @@
     onOpenUserCard?: (userId: number) => void;
   } = $props();
 
-  const promosStore = getContext<PromosStore>("promosStore");
+  const promosStore = getPromosStore();
   const promosTable = new TableHandler<Promo>();
 
   const promos = $derived(promosStore.promos as Promo[]);
