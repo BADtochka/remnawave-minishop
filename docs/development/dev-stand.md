@@ -24,17 +24,24 @@ npm run dev:stand:up
 
 ## Версии
 
-Пинованные версии, проверенные 2026-06-25:
+Пинованные версии, проверенные 2026-06-30:
 
-- Remnawave Panel `v2.7.4` (`remnawave/backend:2.7.4`)
-- Remnawave Subscription Page `7.2.4`
-  (`remnawave/subscription-page:7.2.4`)
+- Remnawave Panel `v2.8.0` (`remnawave/backend:2.8.0`)
+- Remnawave Node `v2.8.0` (`remnawave/node:2.8.0`)
+- Remnawave Subscription Page `7.2.6`
+  (`remnawave/subscription-page:7.2.6`)
+
+Текущий автоматический dev stand поднимает локальную Panel и Subscription Page.
+Отдельная Remnawave Node не стартует без регистрации ноды в панели и `SECRET_KEY`;
+`REMNAWAVE_NODE_VERSION` фиксирует версию для локальной node-части стенда, если она
+поднимается отдельно.
 
 Чтобы обновить Remnawave, поменяйте в `.env.remnawave-dev`:
 
 ```env
-REMNAWAVE_DEV_VERSION=2.7.4
-REMNAWAVE_SUBSCRIPTION_PAGE_VERSION=7.2.4
+REMNAWAVE_DEV_VERSION=2.8.0
+REMNAWAVE_NODE_VERSION=2.8.0
+REMNAWAVE_SUBSCRIPTION_PAGE_VERSION=7.2.6
 ```
 
 Эти же версии зафиксированы в `deploy/dev/remnawave-versions.lock.json`.
@@ -197,7 +204,7 @@ docker compose --env-file .env.remnawave-dev `
   -f docker-compose.remnawave-dev.yml `
   --profile seed `
   exec -T remnawave-db psql -U postgres -d postgres `
-  -c "select token_name from api_tokens where uuid='30000000-0000-4000-8000-000000000001'; select username from users where username like 'runes_%' order by username;"
+  -c "select name from api_tokens where uuid='30000000-0000-4000-8000-000000000001'; select username from users where username like 'runes_%' order by username;"
 ```
 
 ## Автоматизация реальных QA-сценариев

@@ -59,6 +59,7 @@ class PanelApiServiceLoggingTests(unittest.IsolatedAsyncioTestCase):
             "/users/by-email",
         )
         self.assertEqual(_endpoint_log_label("/users/by-telegram-id/42"), "/users/by-telegram-id")
+        self.assertEqual(_endpoint_log_label("/users/stream?size=1000"), "/users/stream")
         self.assertEqual(_endpoint_log_label("/users/some-uuid/actions/enable"), "/users")
         self.assertEqual(
             _endpoint_log_label("/internal-squads/squad-uuid/bulk-actions/add-users"),
@@ -377,6 +378,54 @@ class PanelApiServiceLoggingTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(get_calls, 2)
 
+    async def test_get_all_panel_users_uses_stream_cursor_pagination(self):
+        service = self._make_service()
+        calls = []
+
+        async def fake_request(method, endpoint, **kwargs):
+            calls.append((endpoint, kwargs.get("params") or {}))
+            params = kwargs.get("params") or {}
+            if endpoint == "/users/stream" and not params.get("cursor"):
+                return {
+                    "response": {
+                        "users": [{"uuid": "user-1"}],
+                        "nextCursor": "cursor-2",
+                    }
+                }
+            if endpoint == "/users/stream" and params.get("cursor") == "cursor-2":
+                return {"response": {"users": [{"uuid": "user-2"}]}}
+            return {"error": True, "status_code": 500}
+
+        service._request = AsyncMock(side_effect=fake_request)
+
+        users = await service.get_all_panel_users()
+
+        self.assertEqual(users, [{"uuid": "user-1"}, {"uuid": "user-2"}])
+        self.assertEqual(
+            calls,
+            [
+                ("/users/stream", {"size": 1000}),
+                ("/users/stream", {"size": 1000, "cursor": "cursor-2"}),
+            ],
+        )
+
+    async def test_get_all_panel_users_falls_back_to_legacy_when_stream_is_missing(self):
+        service = self._make_service()
+        calls = []
+
+        async def fake_request(method, endpoint, **kwargs):
+            calls.append(endpoint)
+            if endpoint == "/users/stream":
+                return {"error": True, "status_code": 404}
+            return {"response": {"users": [{"uuid": "legacy-user"}]}}
+
+        service._request = AsyncMock(side_effect=fake_request)
+
+        users = await service.get_all_panel_users()
+
+        self.assertEqual(users, [{"uuid": "legacy-user"}])
+        self.assertEqual(calls, ["/users/stream", "/users"])
+
     async def test_get_all_panel_users_falls_back_to_100_when_large_page_fails(self):
         service = self._make_service()
         requested_sizes = []
@@ -394,7 +443,7 @@ class PanelApiServiceLoggingTests(unittest.IsolatedAsyncioTestCase):
         users = await service.get_all_panel_users()
 
         self.assertEqual(users, [{"uuid": "user-uuid"}])
-        self.assertEqual(requested_sizes, [1000, 100])
+        self.assertEqual(requested_sizes, [1000, 1000, 100])
 
 
 if __name__ == "__main__":

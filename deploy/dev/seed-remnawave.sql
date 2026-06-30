@@ -1,14 +1,17 @@
 DELETE FROM api_tokens
-WHERE token = 'dev-token-placeholder';
+WHERE uuid = '30000000-0000-4000-8000-000000000001';
 
-INSERT INTO api_tokens (uuid, token, token_name)
+INSERT INTO api_tokens (uuid, name, scopes, expire_at)
 VALUES (
     '30000000-0000-4000-8000-000000000001',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiMzAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIiwidXNlcm5hbWUiOm51bGwsInJvbGUiOiJBUEkiLCJpYXQiOjAsImV4cCI6OTk5OTk5OTk5OX0.ILbG2DvyxMN6m7zGXYmaUTd1gbZsRDJHFYLc_yZQjgY',
-    'Mini Shop local QA token'
+    'Mini Shop local QA token',
+    ARRAY['*'],
+    now() + interval '99999 days'
 )
-ON CONFLICT (token) DO UPDATE SET
-    token_name = EXCLUDED.token_name,
+ON CONFLICT (uuid) DO UPDATE SET
+    name = EXCLUDED.name,
+    scopes = EXCLUDED.scopes,
+    expire_at = EXCLUDED.expire_at,
     updated_at = now();
 
 WITH upserted_users AS (

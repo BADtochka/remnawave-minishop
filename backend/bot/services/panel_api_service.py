@@ -15,6 +15,7 @@ _ENDPOINT_LOG_LABELS = (
     "/users/by-telegram-id",
     "/users/by-username",
     "/users/by-email",
+    "/users/stream",
     "/users",
     "/external-squads",
     "/subscriptions/subpage-config",

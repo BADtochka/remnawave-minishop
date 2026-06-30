@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import AsyncMock
 
+from bot.services import panel_api_squads
 from bot.services.panel_dry_run_api_service import PanelDryRunApiService
 from tests.support.settings_stub import settings_stub
 
@@ -23,6 +24,12 @@ def _settings(**overrides):
 
 
 class PanelDryRunApiServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        panel_api_squads._HAPP_ENCRYPT_UNAVAILABLE = False
+
+    async def asyncTearDown(self):
+        panel_api_squads._HAPP_ENCRYPT_UNAVAILABLE = False
+
     async def test_update_user_details_returns_synthetic_success_without_http_write(self):
         service = PanelDryRunApiService(_settings())
         service._request_once = AsyncMock()
@@ -105,6 +112,17 @@ class PanelDryRunApiServiceTests(unittest.IsolatedAsyncioTestCase):
         result = await service.encrypt_happ_link("https://panel.example.test/sub/abc")
 
         self.assertEqual(result, "happ://crypt4/test")
+        service._request_once.assert_awaited_once()
+
+    async def test_happ_encrypt_404_disables_repeated_remote_calls(self):
+        service = PanelDryRunApiService(_settings())
+        service._request_once = AsyncMock(return_value={"error": True, "status_code": 404})
+
+        first = await service.encrypt_happ_link("https://panel.example.test/sub/abc")
+        second = await service.encrypt_happ_link("https://panel.example.test/sub/abc")
+
+        self.assertIsNone(first)
+        self.assertIsNone(second)
         service._request_once.assert_awaited_once()
 
 
