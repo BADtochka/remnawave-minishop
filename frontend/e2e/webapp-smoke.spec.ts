@@ -721,7 +721,15 @@ test("webapp and admin sections, dialogs, tabs stay interactive without console 
   await expect(tariffDialog).toBeVisible();
   await assertFormFieldsNamed(page, "admin-tariffs:edit-dialog");
   await exerciseDialogTabs(tariffDialog, 5, setPhase, "admin-tariffs:edit-tabs");
-  await closeDialog(tariffDialog);
+
+  setPhase("admin-tariffs:edit-save");
+  await tariffDialog.getByRole("tab").nth(0).click();
+  await tariffDialog.locator('input[placeholder="100"]:visible').fill("750");
+  await tariffDialog.getByRole("tab").nth(1).click();
+  await tariffDialog.locator('input[placeholder="299"]:visible').first().fill("250");
+  await tariffDialog.locator(".admin-dialog-actions").getByRole("button").last().click();
+  await expect(tariffDialog).toBeHidden();
+  await expect(page.locator(".admin-tariff-card").first()).toContainText("750 GB");
 
   setPhase("admin-tariffs:delete-dialog");
   await page.locator('[data-admin-action="open-tariff-delete"]').first().click();

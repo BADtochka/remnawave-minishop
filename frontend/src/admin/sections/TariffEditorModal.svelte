@@ -90,6 +90,43 @@
     tariffsStore.addDraftRow(field, row);
   }
 
+  function draftRowKey(_row: DraftRow, index: number): number {
+    return index;
+  }
+
+  function inputValue(event: Event): string {
+    return (event.currentTarget as HTMLInputElement | null)?.value ?? "";
+  }
+
+  function setDraftField(field: string, value: unknown): void {
+    tariffsStore.updateDraftField(field, value);
+  }
+
+  function setBillingModel(value: string): void {
+    setDraftField("billing_model", value);
+  }
+
+  function draftInputHandler(field: string): (event: Event) => void {
+    return (event) => setDraftField(field, inputValue(event));
+  }
+
+  function setDraftRowValue(
+    field: DraftRowsField,
+    index: number,
+    key: string,
+    value: unknown
+  ): void {
+    tariffsStore.updateDraftRow(field, index, { [key]: value });
+  }
+
+  function draftRowInputHandler(
+    field: DraftRowsField,
+    index: number,
+    key: string
+  ): (event: Event) => void {
+    return (event) => setDraftRowValue(field, index, key, inputValue(event));
+  }
+
   const movePremiumTopupRow = ((from: number, to: number) =>
     moveDraftRow("premiumTopupRows", from, to)) as ComponentCallback;
   const movePeriodRow = ((from: number, to: number) =>
@@ -148,7 +185,8 @@
               class="input"
               type="text"
               placeholder="standard"
-              bind:value={tariffsStore.tariffDraft.key}
+              value={tariffDraft.key}
+              oninput={draftInputHandler("key")}
             />
           </Label.Root>
 
@@ -166,9 +204,10 @@
               )}</small
             >
             <AdminSelect
-              bind:value={tariffsStore.tariffDraft.billing_model}
+              value={String(tariffDraft.billing_model || "period")}
               items={billingModelOptions}
               ariaLabel={at("tariff_label_model", {}, "Модель")}
+              onValueChange={setBillingModel}
             />
           </div>
         </div>
@@ -177,7 +216,7 @@
           <Switch.Root
             aria-labelledby="tariff-enabled-toggle-label"
             checked={tariffDraft.enabled}
-            onCheckedChange={(v) => (tariffDraft.enabled = v)}
+            onCheckedChange={(value) => setDraftField("enabled", value)}
             class="admin-switch-root"
           >
             <Switch.Thumb class="admin-switch-thumb" />
@@ -205,7 +244,8 @@
               class="input"
               type="text"
               placeholder={at("tariff_placeholder_name_ru", {}, "Стандарт")}
-              bind:value={tariffsStore.tariffDraft.nameRu}
+              value={tariffDraft.nameRu}
+              oninput={draftInputHandler("nameRu")}
             />
           </Label.Root>
           <Label.Root class="admin-field-label">
@@ -214,7 +254,8 @@
               class="input"
               type="text"
               placeholder={at("tariff_placeholder_name_en", {}, "Standard")}
-              bind:value={tariffsStore.tariffDraft.nameEn}
+              value={tariffDraft.nameEn}
+              oninput={draftInputHandler("nameEn")}
             />
           </Label.Root>
         </div>
@@ -226,7 +267,8 @@
               class="input"
               type="text"
               placeholder={at("tariff_placeholder_desc_ru", {}, "Базовый набор серверов")}
-              bind:value={tariffsStore.tariffDraft.descriptionRu}
+              value={tariffDraft.descriptionRu}
+              oninput={draftInputHandler("descriptionRu")}
             />
           </Label.Root>
           <Label.Root class="admin-field-label">
@@ -235,7 +277,8 @@
               class="input"
               type="text"
               placeholder={at("tariff_placeholder_desc_en", {}, "Base server pool")}
-              bind:value={tariffsStore.tariffDraft.descriptionEn}
+              value={tariffDraft.descriptionEn}
+              oninput={draftInputHandler("descriptionEn")}
             />
           </Label.Root>
         </div>
@@ -287,7 +330,8 @@
               type="number"
               min="0"
               placeholder="5"
-              bind:value={tariffsStore.tariffDraft.hwid_device_limit}
+              value={tariffDraft.hwid_device_limit}
+              oninput={draftInputHandler("hwid_device_limit")}
             />
           </Label.Root>
           {#if tariffDraft.billing_model === "period"}
@@ -306,7 +350,8 @@
                 min="0"
                 step="0.1"
                 placeholder="100"
-                bind:value={tariffsStore.tariffDraft.monthly_gb}
+                value={tariffDraft.monthly_gb}
+                oninput={draftInputHandler("monthly_gb")}
               />
             </Label.Root>
           {:else}
@@ -325,7 +370,8 @@
                 min="0"
                 step="0.01"
                 placeholder="20"
-                bind:value={tariffsStore.tariffDraft.conversion_rate_rub_per_gb}
+                value={tariffDraft.conversion_rate_rub_per_gb}
+                oninput={draftInputHandler("conversion_rate_rub_per_gb")}
               />
             </Label.Root>
           {/if}
@@ -366,7 +412,8 @@
                 class="input"
                 type="text"
                 placeholder={at("tariff_placeholder_premium_name_ru", {}, "Premium-серверы")}
-                bind:value={tariffsStore.tariffDraft.premiumNameRu}
+                value={tariffDraft.premiumNameRu}
+                oninput={draftInputHandler("premiumNameRu")}
               />
             </Label.Root>
             <Label.Root class="admin-field-label">
@@ -382,7 +429,8 @@
                 class="input"
                 type="text"
                 placeholder={at("tariff_placeholder_premium_name_en", {}, "Premium servers")}
-                bind:value={tariffsStore.tariffDraft.premiumNameEn}
+                value={tariffDraft.premiumNameEn}
+                oninput={draftInputHandler("premiumNameEn")}
               />
             </Label.Root>
           </div>
@@ -437,7 +485,8 @@
                 min="0"
                 step="0.1"
                 placeholder="50"
-                bind:value={tariffsStore.tariffDraft.premium_monthly_gb}
+                value={tariffDraft.premium_monthly_gb}
+                oninput={draftInputHandler("premium_monthly_gb")}
               />
             </Label.Root>
           </div>
@@ -475,6 +524,7 @@
               <Sortable
                 items={tariffDraft.premiumTopupRows}
                 class="admin-row-editor-line admin-row-editor-drag"
+                getKey={draftRowKey}
                 handleLabel={at("tariff_package_reorder", {}, "Перетащите, чтобы изменить порядок")}
                 onReorder={movePremiumTopupRow}
               >
@@ -485,7 +535,8 @@
                     min="0.1"
                     step="0.1"
                     placeholder="10"
-                    bind:value={row.gb}
+                    value={row.gb}
+                    oninput={draftRowInputHandler("premiumTopupRows", index, "gb")}
                     aria-label={at("tariff_col_volume_gb", {}, "Объём premium-пакета в GB")}
                   />
                   <Input
@@ -494,7 +545,8 @@
                     min="0"
                     step="0.01"
                     placeholder="199"
-                    bind:value={row.price}
+                    value={row.price}
+                    oninput={draftRowInputHandler("premiumTopupRows", index, "price")}
                     aria-label={currencyPriceAriaLabel}
                   />
                   <Input
@@ -503,7 +555,8 @@
                     min="0"
                     step="1"
                     placeholder="100"
-                    bind:value={row.stars}
+                    value={row.stars}
+                    oninput={draftRowInputHandler("premiumTopupRows", index, "stars")}
                     aria-label={at(
                       "tariff_label_price_stars",
                       {},
@@ -574,6 +627,7 @@
                 <Sortable
                   items={tariffDraft.periodRows}
                   class="admin-row-editor-line admin-row-editor-period"
+                  getKey={draftRowKey}
                   handleLabel={at(
                     "tariff_period_reorder",
                     {},
@@ -587,7 +641,8 @@
                       type="number"
                       min="1"
                       placeholder="1"
-                      bind:value={row.months}
+                      value={row.months}
+                      oninput={draftRowInputHandler("periodRows", index, "months")}
                       aria-label={at("tariff_col_period_months", {}, "Срок (месяцы)")}
                     />
                     <Input
@@ -596,7 +651,8 @@
                       min="0"
                       step="0.01"
                       placeholder="299"
-                      bind:value={row.rub}
+                      value={row.rub}
+                      oninput={draftRowInputHandler("periodRows", index, "rub")}
                       aria-label={currencyPriceAriaLabel}
                     />
                     <Input
@@ -605,7 +661,8 @@
                       min="0"
                       step="1"
                       placeholder="150"
-                      bind:value={row.stars}
+                      value={row.stars}
+                      oninput={draftRowInputHandler("periodRows", index, "stars")}
                       aria-label={at("tariff_label_price_stars", {}, "Цена в Telegram Stars")}
                     />
                     <Input
@@ -614,7 +671,8 @@
                       min="0"
                       step="1"
                       placeholder="3"
-                      bind:value={row.referral_inviter}
+                      value={row.referral_inviter}
+                      oninput={draftRowInputHandler("periodRows", index, "referral_inviter")}
                       aria-label={at("tariff_label_ref_inviter", {}, "Бонус приглашающему")}
                     />
                     <Input
@@ -623,7 +681,8 @@
                       min="0"
                       step="1"
                       placeholder="1"
-                      bind:value={row.referral_referee}
+                      value={row.referral_referee}
+                      oninput={draftRowInputHandler("periodRows", index, "referral_referee")}
                       aria-label={at("tariff_label_ref_referee", {}, "Бонус приглашённому")}
                     />
                     <AdminButton
@@ -672,6 +731,7 @@
                 <Sortable
                   items={tariffDraft.trafficRows}
                   class="admin-row-editor-line admin-row-editor-drag"
+                  getKey={draftRowKey}
                   handleLabel={at(
                     "tariff_package_reorder",
                     {},
@@ -686,7 +746,8 @@
                       min="0.1"
                       step="0.1"
                       placeholder="50"
-                      bind:value={row.gb}
+                      value={row.gb}
+                      oninput={draftRowInputHandler("trafficRows", index, "gb")}
                       aria-label={at("tariff_col_volume_gb", {}, "Объём пакета в GB")}
                     />
                     <Input
@@ -695,7 +756,8 @@
                       min="0"
                       step="0.01"
                       placeholder="299"
-                      bind:value={row.price}
+                      value={row.price}
+                      oninput={draftRowInputHandler("trafficRows", index, "price")}
                       aria-label={currencyPriceAriaLabel}
                     />
                     <Input
@@ -704,7 +766,8 @@
                       min="0"
                       step="1"
                       placeholder="150"
-                      bind:value={row.stars}
+                      value={row.stars}
+                      oninput={draftRowInputHandler("trafficRows", index, "stars")}
                       aria-label={at(
                         "tariff_label_price_stars",
                         {},
@@ -761,6 +824,7 @@
                 <Sortable
                   items={tariffDraft.topupRows}
                   class="admin-row-editor-line admin-row-editor-drag"
+                  getKey={draftRowKey}
                   handleLabel={at(
                     "tariff_package_reorder",
                     {},
@@ -775,7 +839,8 @@
                       min="0.1"
                       step="0.1"
                       placeholder="20"
-                      bind:value={row.gb}
+                      value={row.gb}
+                      oninput={draftRowInputHandler("topupRows", index, "gb")}
                       aria-label={at("tariff_col_volume_gb", {}, "Объём пакета в GB")}
                     />
                     <Input
@@ -784,7 +849,8 @@
                       min="0"
                       step="0.01"
                       placeholder="149"
-                      bind:value={row.price}
+                      value={row.price}
+                      oninput={draftRowInputHandler("topupRows", index, "price")}
                       aria-label={currencyPriceAriaLabel}
                     />
                     <Input
@@ -793,7 +859,8 @@
                       min="0"
                       step="1"
                       placeholder="75"
-                      bind:value={row.stars}
+                      value={row.stars}
+                      oninput={draftRowInputHandler("topupRows", index, "stars")}
                       aria-label={at(
                         "tariff_label_price_stars",
                         {},
@@ -861,6 +928,7 @@
               <Sortable
                 items={tariffDraft.hwidRows}
                 class="admin-row-editor-line admin-row-editor-drag"
+                getKey={draftRowKey}
                 handleLabel={at("tariff_package_reorder", {}, "Перетащите, чтобы изменить порядок")}
                 onReorder={moveHwidRow}
               >
@@ -871,7 +939,8 @@
                     min="1"
                     step="1"
                     placeholder="1"
-                    bind:value={row.count}
+                    value={row.count}
+                    oninput={draftRowInputHandler("hwidRows", index, "count")}
                     aria-label={at(
                       "tariff_label_hwid_count_full",
                       {},
@@ -884,7 +953,8 @@
                     min="0"
                     step="0.01"
                     placeholder="99"
-                    bind:value={row.price}
+                    value={row.price}
+                    oninput={draftRowInputHandler("hwidRows", index, "price")}
                     aria-label={currencyPriceAriaLabel}
                   />
                   <Input
@@ -893,7 +963,8 @@
                     min="0"
                     step="1"
                     placeholder="50"
-                    bind:value={row.stars}
+                    value={row.stars}
+                    oninput={draftRowInputHandler("hwidRows", index, "stars")}
                     aria-label={at("tariff_label_price_stars", {}, "Цена пакета в Telegram Stars")}
                   />
                   <AdminButton

@@ -1,5 +1,11 @@
 export function structuredCloneSafe(value) {
-  if (typeof structuredClone === "function") return structuredClone(value);
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(value);
+    } catch (_error) {
+      void _error;
+    }
+  }
   return JSON.parse(JSON.stringify(value));
 }
 

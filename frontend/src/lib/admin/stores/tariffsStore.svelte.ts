@@ -90,6 +90,8 @@ export type TariffsStore = TariffsState & {
   setDefaultTariff: (key: string) => Promise<void>;
   setDefaultCurrency: (value: string) => Promise<void>;
   deleteTariff: () => Promise<void>;
+  updateDraftField: (field: string, value: unknown) => void;
+  updateDraftRow: (field: DraftRowsField, index: number, updates: TariffDraftRow) => void;
   addDraftRow: (field: DraftRowsField, row: TariffDraftRow) => void;
   removeDraftRow: (field: DraftRowsField, index: number) => void;
   moveDraftRow: (field: DraftRowsField, fromIndex: number, toIndex: number) => void;
@@ -169,6 +171,8 @@ export function createTariffsStore({
     setDefaultTariff,
     setDefaultCurrency,
     deleteTariff,
+    updateDraftField,
+    updateDraftRow,
     addDraftRow,
     removeDraftRow,
     moveDraftRow,
@@ -417,6 +421,19 @@ export function createTariffsStore({
       { ...cloneCatalog(s.tariffsCatalog), default_tariff: defaultTariff, tariffs },
       at("tariff_deleted", {}, "Тариф удалён")
     );
+  }
+
+  function updateDraftField(field: string, value: unknown): void {
+    updateStore((s) => ({ ...s, tariffDraft: { ...s.tariffDraft, [field]: value } }));
+  }
+
+  function updateDraftRow(field: DraftRowsField, index: number, updates: TariffDraftRow): void {
+    updateStore((s) => {
+      const rows = [...draftArray(s.tariffDraft, field)];
+      if (index < 0 || index >= rows.length) return s;
+      rows[index] = { ...(rows[index] as TariffDraftRow), ...updates };
+      return { ...s, tariffDraft: { ...s.tariffDraft, [field]: rows } };
+    });
   }
 
   function addDraftRow(field: DraftRowsField, row: TariffDraftRow): void {

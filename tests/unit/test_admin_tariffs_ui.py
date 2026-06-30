@@ -2,6 +2,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TARIFF_EDITOR = REPO_ROOT / "frontend/src/admin/sections/TariffEditorModal.svelte"
+TARIFFS_SECTION = REPO_ROOT / "frontend/src/admin/sections/TariffsSection.svelte"
 
 
 def test_create_tariff_save_button_uses_store_validation_instead_of_key_disable():
@@ -11,3 +12,22 @@ def test_create_tariff_save_button_uses_store_validation_instead_of_key_disable(
 
     assert "disabled={tariffsSaving}" in save_block
     assert "!tariffDraft.key.trim()" not in save_block
+
+
+def test_tariff_editor_updates_draft_through_store_methods():
+    source = TARIFF_EDITOR.read_text(encoding="utf-8")
+
+    assert "bind:value={tariffsStore.tariffDraft" not in source
+    assert "bind:value={row." not in source
+    assert "tariffDraft.enabled =" not in source
+    assert "updateDraftField(" in source
+    assert "updateDraftRow(" in source
+
+
+def test_tariff_cards_show_regular_traffic_limit():
+    source = TARIFFS_SECTION.read_text(encoding="utf-8")
+    facts_start = source.index('class="admin-tariff-facts"')
+    facts_block = source[facts_start : source.index("</div>", facts_start)]
+
+    assert "tariff_regular_traffic" in facts_block
+    assert "tariffMonthlyTrafficLimit(tariff)" in facts_block

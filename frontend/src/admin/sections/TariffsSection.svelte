@@ -127,6 +127,15 @@
       .join(" · ");
   }
 
+  function tariffMonthlyTrafficLimit(tariff: Tariff): string {
+    if (tariff.billing_model === "traffic") return "—";
+    const monthlyGb = Number(tariff.monthly_gb || 0);
+    if (!Number.isFinite(monthlyGb) || monthlyGb <= 0) {
+      return at("tariff_traffic_unlimited", {}, "Безлимит");
+    }
+    return `${monthlyGb} GB`;
+  }
+
   function boolValue(
     key: string,
     dirty: SettingsDirtyState = settingsDirty,
@@ -457,6 +466,10 @@
                   <span>{tariffPriceSummary(tariff)}</span>
                   <span
                     >{at("tariff_squads", {}, "Squads")}: {(tariff.squad_uuids || []).length}</span
+                  >
+                  <span
+                    >{at("tariff_regular_traffic", {}, "Обычный трафик")}:
+                    {tariffMonthlyTrafficLimit(tariff)}</span
                   >
                   <span
                     >{at("tariff_premium", {}, "Premium")}: {(tariff.premium_squad_uuids || [])
