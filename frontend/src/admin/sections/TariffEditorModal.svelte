@@ -917,7 +917,7 @@
       <AdminButton
         variant="primary"
         onclick={tariffsStore.saveTariffDraft}
-        disabled={tariffsSaving || !tariffDraft.key.trim()}
+        disabled={tariffsSaving}
       >
         <Save size={14} />
         {tariffsSaving
