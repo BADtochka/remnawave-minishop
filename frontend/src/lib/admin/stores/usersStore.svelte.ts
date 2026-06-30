@@ -2,6 +2,7 @@ import { adminErrorMessage } from "../errors.js";
 import { userDisplayName } from "../users.js";
 import { withRoutePrefix } from "../../webapp/routes.js";
 import { snapshotForPayload } from "./snapshotForPayload.svelte";
+import { defineRawStateProperty } from "./rawStateProperty";
 import {
   buildAdminUserActionPath,
   buildAdminUserLogsPath,
@@ -28,30 +29,84 @@ import {
   type OpenUserOptions,
   type PathContext,
   type SnapshotOptions,
+  type UserLogRow,
   type UsersStoreOptions,
 } from "./usersStoreState";
 
 export type { AdminUser } from "./usersStoreState";
 
+type RawUsersState = Pick<AdminStoreState, "users" | "userReferrals" | "userLogs">;
+type ProxiedUsersState = Omit<AdminStoreState, keyof RawUsersState>;
+
 export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersStoreOptions) {
-  const initialState = createInitialUsersState();
-  const state = $state<AdminStoreState>({ ...initialState });
-  const stateKeys = Object.keys(initialState) as Array<keyof AdminStoreState>;
+  const {
+    users: initialUsers,
+    userReferrals: initialUserReferrals,
+    userLogs: initialUserLogs,
+    ...initialProxiedState
+  } = createInitialUsersState();
+  let users = $state.raw<AdminUser[]>(initialUsers);
+  let userReferrals = $state.raw<AdminUser[]>(initialUserReferrals);
+  let userLogs = $state.raw<UserLogRow[]>(initialUserLogs);
+  const state = $state<ProxiedUsersState>({ ...initialProxiedState });
+  const stateKeys = Object.keys(initialProxiedState) as Array<keyof ProxiedUsersState>;
+  const store = Object.create(state) as AdminStoreState;
+  defineRawStateProperty(store, "users", {
+    get: () => users,
+    set: (value) => {
+      users = value;
+    },
+  });
+  defineRawStateProperty(store, "userReferrals", {
+    get: () => userReferrals,
+    set: (value) => {
+      userReferrals = value;
+    },
+  });
+  defineRawStateProperty(store, "userLogs", {
+    get: () => userLogs,
+    set: (value) => {
+      userLogs = value;
+    },
+  });
 
   let _activeRef = "stats"; // fallback if active isn't tracked
   let _pathContext: PathContext = null;
   let _openUserRequestId = 0;
 
   function applyState(updater: (snapshot: AdminStoreState) => AdminStoreState): void {
-    const next = updater(state);
-    if (next === state) return;
-    Object.assign(state, next);
+    const current = readCurrentState();
+    const next = updater(current);
+    if (next === current) return;
+    assignState(next);
+  }
+
+  function assignState(next: Partial<AdminStoreState>): void {
+    const {
+      users: nextUsers,
+      userReferrals: nextUserReferrals,
+      userLogs: nextUserLogs,
+      ...nextState
+    } = next;
+    if (nextUsers !== undefined && nextUsers !== users) users = nextUsers;
+    if (nextUserReferrals !== undefined && nextUserReferrals !== userReferrals) {
+      userReferrals = nextUserReferrals;
+    }
+    if (nextUserLogs !== undefined && nextUserLogs !== userLogs) userLogs = nextUserLogs;
+    Object.assign(state, nextState);
+  }
+
+  function readCurrentState(): AdminStoreState {
+    return {
+      ...(Object.fromEntries(stateKeys.map((key) => [key, state[key]])) as ProxiedUsersState),
+      users,
+      userReferrals,
+      userLogs,
+    } satisfies AdminStoreState;
   }
 
   function readStateSnapshot(): AdminStoreState {
-    return snapshotForPayload(
-      Object.fromEntries(stateKeys.map((key) => [key, state[key]])) as AdminStoreState
-    );
+    return snapshotForPayload(readCurrentState());
   }
 
   function _openingUserModalState(
@@ -793,10 +848,10 @@ export function createUsersStore({ api, onToast, at, routePrefix = "" }: UsersSt
 
   function updateState(updates: Partial<AdminStoreState>) {
     if (!Object.keys(updates).length) return;
-    Object.assign(state, updates);
+    assignState(updates);
   }
 
-  return Object.assign(state, {
+  return Object.assign(store, {
     updateState,
     setActive,
     loadUsers,
