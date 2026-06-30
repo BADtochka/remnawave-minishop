@@ -207,11 +207,11 @@ Remnawave Panel.
 
 Тестовые пользователи:
 
-| Telegram/user ID | Email | Состояние |
-| --- | --- | --- |
-| `910000001` | `runes.admin@example.com` | активная standard-подписка, admin ID |
-| `910000002` | `runes.active@example.com` | активная premium-подписка около лимита трафика |
-| `910000003` | `runes.expired@example.com` | истекшая подписка |
+| Telegram/user ID | Email | Состояние | HWID devices |
+| --- | --- | --- | --- |
+| `910000001` | `runes.admin@example.com` | активная standard-подписка, admin ID | 2 из 3 |
+| `910000002` | `runes.active@example.com` | активная premium-подписка около лимита трафика | 3 из 5 |
+| `910000003` | `runes.expired@example.com` | истекшая подписка | 1 из 1 |
 
 Повторный запуск сидов:
 
