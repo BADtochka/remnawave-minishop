@@ -45,10 +45,56 @@
       ? { duration: 0, y: 0 }
       : { duration: 200, y: 10, easing: cubicOut };
   }
+
+  function stopScrollPropagation(event) {
+    event.stopPropagation();
+    if (event.target instanceof Element && event.target.closest(".dialog-body-scroll")) return;
+    event.preventDefault();
+  }
+
+  function readScrollLockCount(body) {
+    const count = Number(body.dataset.dialogScrollLockCount || "0");
+    return Number.isFinite(count) ? count : 0;
+  }
+
+  function lockBodyScroll() {
+    if (typeof document === "undefined") return () => {};
+    const { body } = document;
+    const count = readScrollLockCount(body);
+    if (count === 0) {
+      body.dataset.dialogPreviousOverflow = body.style.overflow;
+      body.style.overflow = "hidden";
+    }
+    body.dataset.dialogScrollLockCount = String(count + 1);
+
+    return () => {
+      const nextCount = Math.max(0, readScrollLockCount(body) - 1);
+      if (nextCount > 0) {
+        body.dataset.dialogScrollLockCount = String(nextCount);
+        return;
+      }
+      body.style.overflow = body.dataset.dialogPreviousOverflow || "";
+      delete body.dataset.dialogPreviousOverflow;
+      delete body.dataset.dialogScrollLockCount;
+    };
+  }
+
+  $effect(() => {
+    if (!open) return;
+    return lockBodyScroll();
+  });
 </script>
 
 {#if open}
-  <div class="dialog" role="dialog" aria-modal="true" aria-label={title}>
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-label={title}
+    tabindex="-1"
+    onwheel={stopScrollPropagation}
+    ontouchmove={stopScrollPropagation}
+  >
     <button
       class="dialog-backdrop"
       type="button"

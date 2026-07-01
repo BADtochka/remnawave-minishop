@@ -51,6 +51,7 @@
 
 .dialog-body-scroll > .scroll-area__viewport {
   display: grid;
+  overscroll-behavior: contain;
 }
 
 .dialog-head {
