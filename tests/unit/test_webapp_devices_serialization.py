@@ -225,5 +225,10 @@ class WebAppDevicesPayloadTests(IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status, 200)
         panel_service.disconnect_device.assert_awaited_once_with("panel-user", "ABC123XYZ")
-        invalidate_caches.assert_awaited_once_with(settings, 42, include_devices=True)
+        invalidate_caches.assert_awaited_once_with(
+            settings,
+            42,
+            include_devices=True,
+            include_me=False,
+        )
         session.commit.assert_awaited_once()

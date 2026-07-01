@@ -214,7 +214,12 @@ async def disconnect_device_route(request: web.Request) -> web.Response:
         success = await panel_service.disconnect_device(panel_user_uuid, target_hwid)
         if not success:
             return _json_error(502, "device_disconnect_failed", "Failed to disconnect device")
-        await invalidate_webapp_user_caches(settings, user_id, include_devices=True)
+        await invalidate_webapp_user_caches(
+            settings,
+            user_id,
+            include_devices=True,
+            include_me=False,
+        )
         await session.commit()
 
     return json_response({"ok": True})

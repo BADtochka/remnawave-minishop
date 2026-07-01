@@ -10,6 +10,7 @@ function jsonResponse(payload = {}, status = 200) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -27,5 +28,25 @@ describe("createApiClient", () => {
     const requestOptions = fetchMock.mock.calls[0][1];
     expect(requestOptions.credentials).toBe("same-origin");
     expect(requestOptions.headers.get("Authorization")).toBe("Bearer session-token");
+  });
+
+  it("aborts stalled authenticated API requests", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener("abort", () => {
+            reject(options.signal.reason);
+          });
+        })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createApiClient({ requestTimeoutMs: 25 });
+    const request = client.api("/me");
+    const rejection = expect(request).rejects.toMatchObject({ name: "TimeoutError" });
+
+    await vi.advanceTimersByTimeAsync(25);
+    await rejection;
   });
 });

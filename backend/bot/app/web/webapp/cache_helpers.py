@@ -156,6 +156,7 @@ async def invalidate_webapp_user_caches(
     settings: Settings,
     *user_ids: Optional[int],
     include_devices: bool = False,
+    include_me: bool = True,
 ) -> None:
     keys: list[str] = []
     seen: set[int] = set()
@@ -169,8 +170,9 @@ async def invalidate_webapp_user_caches(
         if user_id in seen:
             continue
         seen.add(user_id)
-        keys.append(redis_key(settings, "cache", "webapp", "me", user_id))
-        invalidate_local_webapp_user_payload(settings, "me", user_id)
+        if include_me:
+            keys.append(redis_key(settings, "cache", "webapp", "me", user_id))
+            invalidate_local_webapp_user_payload(settings, "me", user_id)
         if include_devices:
             keys.append(redis_key(settings, "cache", "webapp", "devices", user_id))
             invalidate_local_webapp_user_payload(settings, "devices", user_id)
