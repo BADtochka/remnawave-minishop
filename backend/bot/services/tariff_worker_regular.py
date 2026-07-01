@@ -15,6 +15,7 @@ from bot.services.panel_api_service import PanelApiService
 from bot.services.subscription_service_impl.core import SubscriptionService
 from bot.utils.date_utils import add_months, month_start
 from config.settings import Settings
+from config.traffic_strategy import canonical_traffic_limit_strategy
 from db.dal import tariff_dal, user_dal
 from db.models import Subscription
 
@@ -69,6 +70,7 @@ class TariffWorkerRegularMixin:
             panel_view: str = "unknown",
         ) -> None: ...
         async def _user_lang(self, session: AsyncSession, user_id: int) -> str: ...
+        def _period_tariff_traffic_strategy(self) -> str: ...
         def _usage_placeholders(self, used_bytes: int, limit_bytes: int) -> dict: ...
         def _traffic_next_reset_note(
             self,
@@ -364,7 +366,8 @@ class TariffWorkerRegularMixin:
         limit: Optional[int],
         panel_strategy: Optional[str],
     ) -> None:
-        if str(panel_strategy or "").upper() == "MONTH":
+        target_strategy = self._period_tariff_traffic_strategy()
+        if canonical_traffic_limit_strategy(panel_strategy) == target_strategy:
             return
         rb = int(getattr(sub, "regular_bonus_bytes", 0) or 0)
         if bool(getattr(sub, "regular_unlimited_override", False)):
@@ -386,7 +389,7 @@ class TariffWorkerRegularMixin:
             panel_user_uuid=sub.panel_user_uuid,
             expire_at=sub.end_date,
             traffic_limit_bytes=traffic_limit_bytes,
-            traffic_limit_strategy="MONTH",
+            traffic_limit_strategy=target_strategy,
         )
         payload["activeInternalSquads"] = self.subscription_service._panel_squads_for_tariff(
             tariff,
@@ -465,6 +468,8 @@ class TariffWorkerRegularMixin:
         *,
         previous_period_start: Optional[datetime],
     ) -> None:
+        if self._period_tariff_traffic_strategy() == "NO_RESET":
+            return
         if not self._traffic_notice_channels_available():
             return
         if bool(getattr(sub, "regular_unlimited_override", False)):

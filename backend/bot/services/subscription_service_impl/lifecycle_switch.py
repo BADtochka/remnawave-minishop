@@ -246,7 +246,11 @@ class SubscriptionLifecycleSwitchMixin(SubscriptionServiceMixinContract):
             expire_at=updated.end_date,
             status="ACTIVE",
             traffic_limit_bytes=updated.traffic_limit_bytes,
-            traffic_limit_strategy="NO_RESET" if target.billing_model == "traffic" else "MONTH",
+            traffic_limit_strategy=(
+                "NO_RESET"
+                if target.billing_model == "traffic"
+                else self._period_tariff_traffic_strategy()
+            ),
             hwid_device_limit=self._effective_hwid_limit(base_hwid_limit, extra_hwid_devices),
         )
         panel_payload["activeInternalSquads"] = self._panel_squads_for_tariff(

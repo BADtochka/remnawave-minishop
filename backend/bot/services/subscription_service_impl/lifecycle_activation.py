@@ -407,7 +407,7 @@ class SubscriptionLifecycleActivationMixin(SubscriptionServiceMixinContract):
             expire_at=final_end_date,
             status="ACTIVE",
             traffic_limit_bytes=traffic_limit_bytes,
-            traffic_limit_strategy="MONTH" if tariff else self.settings.USER_TRAFFIC_STRATEGY,
+            traffic_limit_strategy=self._period_tariff_traffic_strategy(),
             hwid_device_limit=effective_hwid_limit,
         )
         if tariff:
@@ -750,11 +750,7 @@ class SubscriptionLifecycleActivationMixin(SubscriptionServiceMixinContract):
                     else None
                 ),
                 traffic_limit_strategy=(
-                    "MONTH"
-                    if panel_tariff and panel_tariff.billing_model == "period"
-                    else self.settings.USER_TRAFFIC_STRATEGY
-                    if panel_tariff
-                    else None
+                    self._period_tariff_traffic_strategy() if panel_tariff else None
                 ),
                 hwid_device_limit=(
                     self._effective_hwid_limit(

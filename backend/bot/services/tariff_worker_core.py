@@ -19,6 +19,7 @@ from bot.services.user_email_notifications import send_user_notification_email
 from bot.utils.date_utils import add_months, month_start
 from bot.utils.mini_app_url import subscription_mini_app_topup_url
 from config.settings import Settings
+from config.traffic_strategy import normalize_traffic_limit_strategy
 from db.advisory_locks import acquire_subscription_background_sync_lock
 from db.dal import user_dal
 from db.models import Subscription
@@ -113,6 +114,19 @@ class TariffWorkerCoreMixin:
         except Exception:
             logging.exception("TariffTrafficWorker: failed to load user language for %s", user_id)
         return str(self.settings.DEFAULT_LANGUAGE)
+
+    def _period_tariff_traffic_strategy(self) -> str:
+        strategy_getter = getattr(
+            self.subscription_service,
+            "_period_tariff_traffic_strategy",
+            None,
+        )
+        if callable(strategy_getter):
+            return str(strategy_getter())
+        return normalize_traffic_limit_strategy(
+            getattr(self.settings, "USER_TRAFFIC_STRATEGY", "MONTH"),
+            default="MONTH",
+        )
 
     def _usage_placeholders(self, used_bytes: int, limit_bytes: int) -> dict:
         """Formatted traffic stats for warning messages (HTML-safe quoted)."""

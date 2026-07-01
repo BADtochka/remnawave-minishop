@@ -58,6 +58,7 @@ class TariffWorkerPremiumMixin:
         PREMIUM_RESET_NOTICE_LEVEL: int
 
         async def _user_lang(self, session: AsyncSession, user_id: int) -> str: ...
+        def _period_tariff_traffic_strategy(self) -> str: ...
         def _usage_placeholders(self, used_bytes: int, limit_bytes: int) -> dict: ...
         def _traffic_next_reset_note(
             self,
@@ -127,13 +128,22 @@ class TariffWorkerPremiumMixin:
                 sub.premium_is_limited = False
             return
 
-        premium_period_start = month_start(now)
+        premium_period_start = self.subscription_service._premium_accounting_period_start(
+            sub,
+            now,
+        )
         is_trial_premium_tariff = bool(getattr(tariff, "key", "") == "trial")
         previous_premium_period_start = getattr(sub, "premium_period_start_at", None)
         same_period = self._same_premium_period(
             previous_premium_period_start,
             premium_period_start,
         )
+        if (
+            self._period_tariff_traffic_strategy() == "NO_RESET"
+            and previous_premium_period_start is not None
+            and premium_period_start != month_start(now)
+        ):
+            same_period = True
         premium_baseline = int(tariff.premium_monthly_bytes or 0)
         premium_topup_balance = int(sub.premium_topup_balance_bytes or 0)
         premium_topup_used = (
@@ -160,7 +170,7 @@ class TariffWorkerPremiumMixin:
             logging.warning("Premium squads for tariff %s have no accessible nodes", tariff.key)
             return
 
-        start_date = now.date().replace(day=1).isoformat()
+        start_date = premium_period_start.date().isoformat()
         end_date = now.date().isoformat()
         premium_used = await self._premium_usage_for_user(
             sub.panel_user_uuid,
@@ -317,6 +327,8 @@ class TariffWorkerPremiumMixin:
         period_start_at: datetime,
         previous_period_start: Optional[datetime],
     ) -> None:
+        if self._period_tariff_traffic_strategy() == "NO_RESET":
+            return
         if not self._traffic_notice_channels_available():
             return
         if not self._traffic_reset_notice_is_reassuring(used, limit):
@@ -422,6 +434,8 @@ class TariffWorkerPremiumMixin:
         if value is None:
             return False
         try:
+            if month_start(premium_period_start) != premium_period_start:
+                return bool(value == premium_period_start)
             return bool(month_start(value) == premium_period_start)
         except Exception:
             return False
