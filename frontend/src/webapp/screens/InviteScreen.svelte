@@ -13,45 +13,29 @@
   import Card from "$components/ui/card.svelte";
   import Input from "$components/ui/input.svelte";
   import { StatusMessage } from "$components/patterns/webapp/index.js";
-
-  type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
-  type Action = () => void | Promise<void>;
-  type CopyText = (text?: string, message?: string) => void | Promise<void>;
-
-  type Referral = Record<string, unknown> & {
-    bot_link?: string;
-    webapp_link?: string;
-  };
-
-  type ReferralBonus = Record<string, unknown> & {
-    details?: ReferralBonus[];
-    friend_days?: unknown;
-    friend_max_days?: unknown;
-    friend_min_days?: unknown;
-    id?: string | number;
-    inviter_days?: unknown;
-    inviter_max_days?: unknown;
-    inviter_min_days?: unknown;
-    months?: unknown;
-    tariff_key?: string;
-    tariff_name?: string;
-    title?: string;
-  };
+  import type {
+    CopyTextAction,
+    ReferralBonusDetail,
+    ReferralState,
+    StringAction,
+    Translate,
+    VoidAction,
+  } from "$lib/webapp/types.js";
 
   type Props = {
-    applyPromo?: Action;
-    clearPromoFieldError?: Action;
-    copyText?: CopyText;
+    applyPromo?: VoidAction;
+    clearPromoFieldError?: VoidAction;
+    copyText?: CopyTextAction;
     promoBusy?: boolean;
     promoCode?: string;
     promoFieldError?: string;
     promoIsError?: boolean;
     promoStatus?: string;
-    referral?: Referral;
-    referralBonusDetails?: ReferralBonus[];
+    referral?: ReferralState;
+    referralBonusDetails?: ReferralBonusDetail[];
     referralOneBonusPerReferee?: boolean;
     referralWelcomeBonusDays?: number;
-    setPromoCode?: (value: string) => void;
+    setPromoCode?: StringAction;
     t?: Translate;
   };
 
@@ -68,7 +52,7 @@
     applyPromo = () => {},
     setPromoCode = () => {},
     clearPromoFieldError = () => {},
-    copyText = () => {},
+    copyText = async () => {},
     t = (key) => key,
   }: Props = $props();
 
@@ -115,7 +99,7 @@
         <code>{referral.webapp_link || referral.bot_link || t("wa_link_unavailable")}</code>
         <Button
           class="referral-copy-button"
-          onclick={() => copyText(referral.webapp_link || referral.bot_link, t("wa_link_copied"))}
+          onclick={() => copyText(String(referral.webapp_link || referral.bot_link || ""), t("wa_link_copied"))}
         >
           {t("wa_copy")}
           <Copy size={17} />

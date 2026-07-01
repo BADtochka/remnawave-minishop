@@ -31,6 +31,7 @@
     methodSelectable,
     methodsForPlan,
   } from "../lib/webapp/tariffs.js";
+  import type { TariffView, TermUnitLabel } from "$lib/webapp/types.js";
 
   type AnyRecord = Record<string, any>;
   type DeviceToDisconnect = {
@@ -130,7 +131,7 @@
     plans?: AnyRecord[];
     selectedMethod?: string;
     selectedPlan?: AnyRecord | null;
-    selectedTariff?: AnyRecord | null;
+    selectedTariff?: TariffView | null;
     selectedTariffKey?: string;
     selectedTariffPlans?: AnyRecord[];
     renewHwidDevices?: boolean;
@@ -147,7 +148,7 @@
     singleTariffMode?: boolean;
     subscription?: AnyRecord;
     subscriptionPurchaseDescription?: string;
-    tariffCatalog?: AnyRecord[];
+    tariffCatalog?: TariffView[];
     tariffMode?: boolean;
     trafficMode?: boolean;
     closeDeviceDisconnectDialog?: VoidAction;
@@ -169,9 +170,9 @@
     continueWithSelectedTariff?: VoidAction;
     requestLinkEmailCode?: VoidAction;
     requestSetPasswordCode?: VoidAction;
-    selectTariff?: (tariff: AnyRecord) => void;
+    selectTariff?: (tariff: TariffView) => void;
     t?: Translate;
-    termUnitLabel?: (value: number, unit: string) => string;
+    termUnitLabel?: TermUnitLabel;
     verifyLinkEmailCode?: VoidAction;
     confirmSetPassword?: VoidAction;
   } = $props();

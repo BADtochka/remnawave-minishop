@@ -43,7 +43,7 @@ export type StringAction = (value: string) => void;
 export type OpenLinkAction = (url: string) => void;
 export type CopyTextAction = (text: string, message?: string) => Promise<void>;
 export type BooleanAction = (value: boolean) => void;
-export type TermUnitLabel = (value: number, unit: "day" | "month") => string;
+export type TermUnitLabel = (value: number, unit: string) => string;
 
 type MeOkResponse = Extract<MeResponse, { ok: true }>;
 
@@ -61,18 +61,19 @@ export type WebappConfig = BootstrapResponse["config"] &
     apiBase?: string;
     appRepositoryUrl?: unknown;
     appVersion?: unknown;
-    emailAuthEnabled?: unknown;
+    emailAuthEnabled?: boolean;
     faviconUseCustom?: unknown;
     language?: string;
     languages?: LanguageOption[] | unknown[];
+    registrationInviteOnlyEnabled?: boolean;
     themePreviewKey?: unknown;
   };
 export type AppSettings = MeOkResponse["settings"] & WebappRecord;
 export type ReferralState = MeOkResponse["referral"] & WebappRecord;
 export type ReferralBonusDetail = NonNullable<ReferralState["bonus_details"]>[number] &
   WebappRecord;
-export type DevicesData = DevicesResponse & WebappRecord;
-export type DeviceView = NonNullable<DevicesData["devices"]>[number] & WebappRecord;
+export type DevicesData = Partial<DevicesResponse> & WebappRecord;
+export type DeviceView = NonNullable<DevicesResponse["devices"]>[number] & WebappRecord;
 export type TrialActivationResult = TrialActivateResponse & WebappRecord;
 export type BillingOptionsResponse = TariffTopupOptionsResponse & WebappRecord;
 export type DeviceTopupOptions = DeviceTopupOptionsResponse & WebappRecord;

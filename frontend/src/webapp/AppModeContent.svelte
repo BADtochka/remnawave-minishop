@@ -2,7 +2,6 @@
   import BrandMark from "$lib/webapp/BrandMark.svelte";
   import type { AppActionRuntime } from "../lib/webapp/appActionRuntime.js";
   import type { AppShellView } from "../lib/webapp/appShellView.js";
-  import type { LanguageOption } from "../lib/webapp/languageView.js";
   import type { AccountStore } from "../lib/webapp/stores/accountStore.js";
   import type { ActionsStore } from "../lib/webapp/stores/actionsStore.js";
   import type { AuthStore } from "../lib/webapp/stores/authStore.js";
@@ -14,11 +13,43 @@
   import AuthenticatedScreens from "./AuthenticatedScreens.svelte";
   import AuthScreen from "./auth/AuthScreen.svelte";
   import InstallGuideScreen from "./screens/InstallGuideScreen.svelte";
+  import type {
+    AppSettings,
+    BooleanAction,
+    BrandConfig,
+    CopyTextAction,
+    DevicesData,
+    LanguageOption,
+    OpenLinkAction,
+    PaymentMethod,
+    PlanView,
+    ReferralBonusDetail,
+    ReferralState,
+    StringAction,
+    SubscriptionView,
+    TariffView,
+    TermUnitLabel,
+    Translate,
+    TrialActivationResult,
+    UserProfile,
+    VoidAction,
+    WebappConfig,
+    WebappRecord,
+  } from "$lib/webapp/types.js";
 
-  type AnyRecord = Record<string, any>;
-  type Action = (...args: any[]) => any;
-  type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
-  const noopAction: Action = () => {};
+  type AppLaunchAction = (target?: string) => boolean | void;
+  type RefreshAppLaunchAction = () => string;
+  type SubmitEmailOnEnterAction = (event: KeyboardEvent) => void;
+  type LoadDevicesAction = (force?: boolean) => void;
+
+  const noopAction: VoidAction = () => {};
+  const noopOpenLink: OpenLinkAction = () => {};
+  const noopCopyText: CopyTextAction = async () => {};
+  const noopStringAction: StringAction = () => {};
+  const noopAppLaunchAction: AppLaunchAction = () => false;
+  const noopRefreshAppLaunchTarget: RefreshAppLaunchAction = () => "";
+  const noopSubmitEmailOnEnter: SubmitEmailOnEnterAction = () => {};
+  const noopTermUnitLabel: TermUnitLabel = () => "";
   const noopPrimaryPayActionLabel = () => "";
 
   type Props = {
@@ -26,52 +57,52 @@
     shellView?: AppShellView | null;
     appActions?: AppActionRuntime | null;
     actionsStore: ActionsStore;
-    activateTrial?: Action;
+    activateTrial?: VoidAction;
     activationSuccessDialogOpen?: boolean;
     activationSuccessUseInstallGuides?: boolean;
     activeTab?: string;
-    adminBundleApi?: AnyRecord | null;
+    adminBundleApi?: WebappRecord | null;
     adminBundleError?: string;
     adminMountTarget?: HTMLElement | null;
     appLaunchTarget?: string;
-    appSettings?: AnyRecord;
-    applyPromo?: Action;
+    appSettings?: AppSettings;
+    applyPromo?: VoidAction;
     authBusy?: boolean;
     authIsError?: boolean;
     authResendCooldown?: number;
     authStatus?: string;
     authStore: AuthStore;
     autoRenewBusy?: boolean;
-    backToTariffList?: Action;
+    backToTariffList?: VoidAction;
     billingStore: BillingStore;
-    brand?: AnyRecord;
+    brand?: BrandConfig;
     brandTitle?: string;
     canChangeTariff?: boolean;
-    cfg?: AnyRecord;
-    clearPromoFieldError?: Action;
-    closeActivationSuccessDialog?: Action;
-    closeDeviceTopupModal?: Action;
-    continueWithSelectedTariff?: Action;
-    copyText?: Action;
+    cfg?: WebappConfig;
+    clearPromoFieldError?: VoidAction;
+    closeActivationSuccessDialog?: VoidAction;
+    closeDeviceTopupModal?: VoidAction;
+    continueWithSelectedTariff?: VoidAction;
+    copyText?: CopyTextAction;
     currentLang?: string;
     currentLanguageOption?: LanguageOption | null;
     currentTariffName?: string;
     devicesBusy?: boolean;
-    devicesData?: AnyRecord | null;
+    devicesData?: DevicesData | null;
     devicesEnabled?: boolean;
     devicesErrorCode?: string;
     devicesIsError?: boolean;
     devicesLoaded?: boolean;
     devicesStatus?: string;
     devicesStore: DevicesStore;
-    disconnectDevice?: Action;
+    disconnectDevice?: VoidAction;
     emailAuthEnabled?: boolean;
     emailLinkStatus?: string;
-    goDevices?: Action;
-    goHome?: Action;
-    goInvite?: Action;
-    goSettings?: Action;
-    goSupport?: Action;
+    goDevices?: VoidAction;
+    goHome?: VoidAction;
+    goInvite?: VoidAction;
+    goSettings?: VoidAction;
+    goSupport?: VoidAction;
     hasActiveTariffSubscription?: boolean;
     hasMultipleTariffs?: boolean;
     hasUnlinkedIdentity?: boolean;
@@ -82,35 +113,35 @@
     languageMenuOpen?: boolean;
     languageOptions?: LanguageOption[];
     linkEmailBusy?: boolean;
-    linkTelegramAndActivateTrial?: Action;
-    linkTelegramAndClaimReferralWelcome?: Action;
+    linkTelegramAndActivateTrial?: VoidAction;
+    linkTelegramAndClaimReferralWelcome?: VoidAction;
     linkTelegramBusy?: boolean;
-    loadDevices?: Action;
+    loadDevices?: LoadDevicesAction;
     loginEmailFieldError?: string;
     loginEmailTooltipOpen?: boolean;
-    methods?: AnyRecord[];
+    methods?: PaymentMethod[];
     mode?: string;
-    openAdminPanel?: Action;
-    openAppLaunchTarget?: Action;
-    openAppLink?: Action;
-    openConnectLink?: Action;
-    openDeviceTopupModal?: Action;
-    openExternalLink?: Action;
-    openInstallOrConnect?: Action;
-    openLoginTelegram?: Action;
-    openPaymentModal?: Action;
-    openPremiumTopupModal?: Action;
-    openPublicConnectLink?: Action;
-    openRegularTopupModal?: Action;
-    openSettingsLinkEmailDialog?: Action;
-    openSettingsSetPasswordDialog?: Action;
-    openTariffChangeModal?: Action;
-    openTelegramNotificationsBot?: Action;
-    openTrialInstallOrConnect?: Action;
+    openAdminPanel?: VoidAction;
+    openAppLaunchTarget?: AppLaunchAction;
+    openAppLink?: OpenLinkAction;
+    openConnectLink?: VoidAction;
+    openDeviceTopupModal?: VoidAction;
+    openExternalLink?: OpenLinkAction;
+    openInstallOrConnect?: VoidAction;
+    openLoginTelegram?: VoidAction;
+    openPaymentModal?: VoidAction;
+    openPremiumTopupModal?: VoidAction;
+    openPublicConnectLink?: VoidAction;
+    openRegularTopupModal?: VoidAction;
+    openSettingsLinkEmailDialog?: VoidAction;
+    openSettingsSetPasswordDialog?: VoidAction;
+    openTariffChangeModal?: VoidAction;
+    openTelegramNotificationsBot?: VoidAction;
+    openTrialInstallOrConnect?: VoidAction;
     passwordLoginFallback?: boolean;
     passwordLoginMode?: boolean;
     pendingEmail?: string;
-    plans?: AnyRecord[];
+    plans?: PlanView[];
     premiumTrafficTopupBarClickable?: boolean;
     premiumTrafficTopupUnlocked?: boolean;
     primaryPayActionLabel?: () => string;
@@ -123,29 +154,29 @@
     promoFieldError?: string;
     promoIsError?: boolean;
     promoStatus?: string;
-    publicInstallSubscription?: AnyRecord | null;
+    publicInstallSubscription?: SubscriptionView | null;
     publicInstallToken?: string;
-    referral?: AnyRecord;
-    referralBonusDetails?: AnyRecord[];
+    referral?: ReferralState;
+    referralBonusDetails?: ReferralBonusDetail[];
     referralOneBonusPerReferee?: boolean;
     referralWelcomeBonusDays?: number;
-    refreshAppLaunchTarget?: Action;
+    refreshAppLaunchTarget?: RefreshAppLaunchAction;
     regularTrafficTopupBarClickable?: boolean;
     regularTrafficTopupUnlocked?: boolean;
     screen?: string;
-    selectedTariff?: AnyRecord | null;
-    selectedTariffPlans?: AnyRecord[];
-    selectTariff?: Action;
+    selectedTariff?: TariffView | null;
+    selectedTariffPlans?: PlanView[];
+    selectTariff?: (tariff: TariffView) => void;
     serverStatusUrl?: string;
-    setLanguageMenuOpen: (open: boolean) => void;
-    setPasswordLoginMode: (enabled: boolean) => void;
-    setPromoCode?: (value: string) => void;
+    setLanguageMenuOpen: BooleanAction;
+    setPasswordLoginMode: BooleanAction;
+    setPromoCode?: StringAction;
     shellStyle?: string;
     shellThemeClass?: string;
     shellToneClass?: string;
     singleTariffMode?: boolean;
-    submitEmailOnEnter?: Action;
-    subscription?: AnyRecord;
+    submitEmailOnEnter?: SubmitEmailOnEnterAction;
+    subscription?: SubscriptionView;
     subscriptionPurchaseDescription?: string;
     supportEnabled?: boolean;
     supportStore: SupportStore;
@@ -154,7 +185,7 @@
     supportUnreadLoading?: boolean;
     supportUrl?: string;
     t: Translate;
-    tariffCatalog?: AnyRecord[];
+    tariffCatalog?: TariffView[];
     tariffMode?: boolean;
     telegramLoginBusy?: boolean;
     telegramLoginChecking?: boolean;
@@ -167,16 +198,16 @@
     telegramNotificationsStatus?: string;
     telegramPlatform?: string;
     telegramProfileName?: string;
-    termUnitLabel?: Action;
-    toggleAutoRenew?: Action;
+    termUnitLabel?: TermUnitLabel;
+    toggleAutoRenew?: BooleanAction;
     trafficMode?: boolean;
     trialActivationError?: string;
-    trialActivationResult?: AnyRecord | null;
+    trialActivationResult?: TrialActivationResult | null;
     trialBusy?: boolean;
-    user?: AnyRecord;
+    user?: UserProfile;
     userAgreementUrl?: string;
     userLanguage?: string;
-    updateGuestLanguage: (language: string) => void;
+    updateGuestLanguage: StringAction;
   };
 
   let {
@@ -206,7 +237,7 @@
     closeActivationSuccessDialog = noopAction,
     closeDeviceTopupModal: closeDeviceTopupModalProp = noopAction,
     continueWithSelectedTariff: continueWithSelectedTariffProp = noopAction,
-    copyText: copyTextProp = noopAction,
+    copyText: copyTextProp = noopCopyText,
     currentLang: currentLangProp = "ru",
     currentLanguageOption: currentLanguageOptionProp = null,
     currentTariffName: currentTariffNameProp = "",
@@ -237,11 +268,11 @@
     methods: methodsProp = [],
     mode = "loading",
     openAdminPanel: openAdminPanelProp = noopAction,
-    openAppLaunchTarget: openAppLaunchTargetProp = noopAction,
-    openAppLink: openAppLinkProp = noopAction,
+    openAppLaunchTarget: openAppLaunchTargetProp = noopAppLaunchAction,
+    openAppLink: openAppLinkProp = noopOpenLink,
     openConnectLink: openConnectLinkProp = noopAction,
     openDeviceTopupModal: openDeviceTopupModalProp = noopAction,
-    openExternalLink: openExternalLinkProp = noopAction,
+    openExternalLink: openExternalLinkProp = noopOpenLink,
     openInstallOrConnect: openInstallOrConnectProp = noopAction,
     openLoginTelegram: openLoginTelegramProp = noopAction,
     openPaymentModal: openPaymentModalProp = noopAction,
@@ -267,7 +298,7 @@
     referralBonusDetails: referralBonusDetailsProp = [],
     referralOneBonusPerReferee: referralOneBonusPerRefereeProp = false,
     referralWelcomeBonusDays: referralWelcomeBonusDaysProp = 0,
-    refreshAppLaunchTarget: refreshAppLaunchTargetProp = noopAction,
+    refreshAppLaunchTarget: refreshAppLaunchTargetProp = noopRefreshAppLaunchTarget,
     regularTrafficTopupBarClickable: regularTrafficTopupBarClickableProp = false,
     regularTrafficTopupUnlocked: regularTrafficTopupUnlockedProp = false,
     screen = $bindable("home"),
@@ -277,12 +308,12 @@
     serverStatusUrl: serverStatusUrlProp = "",
     setLanguageMenuOpen,
     setPasswordLoginMode,
-    setPromoCode: setPromoCodeProp = noopAction,
+    setPromoCode: setPromoCodeProp = noopStringAction,
     shellStyle: shellStyleProp = "",
     shellThemeClass: shellThemeClassProp = "",
     shellToneClass: shellToneClassProp = "",
     singleTariffMode: singleTariffModeProp = false,
-    submitEmailOnEnter = noopAction,
+    submitEmailOnEnter = noopSubmitEmailOnEnter,
     subscription: subscriptionProp = {},
     subscriptionPurchaseDescription: subscriptionPurchaseDescriptionProp = "",
     supportEnabled: supportEnabledProp = false,
@@ -301,7 +332,7 @@
     telegramNotificationsStatus: telegramNotificationsStatusProp = "unknown",
     telegramPlatform = "",
     telegramProfileName: telegramProfileNameProp = "",
-    termUnitLabel = noopAction,
+    termUnitLabel = noopTermUnitLabel,
     toggleAutoRenew: toggleAutoRenewProp = noopAction,
     trafficMode: trafficModeProp = false,
     user: userProp = {},
