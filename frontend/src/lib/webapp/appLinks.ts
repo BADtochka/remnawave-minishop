@@ -1,11 +1,16 @@
-export function hasControlChars(value) {
+type LocationLike = {
+  hash?: string;
+  href?: string;
+};
+
+export function hasControlChars(value: unknown): boolean {
   return Array.from(String(value || "")).some((char) => {
     const code = char.charCodeAt(0);
     return code <= 31 || code === 127;
   });
 }
 
-export function isUnsafeAppUrl(value) {
+export function isUnsafeAppUrl(value: unknown): boolean {
   return (
     !String(value || "").trim() ||
     hasControlChars(value) ||
@@ -13,18 +18,18 @@ export function isUnsafeAppUrl(value) {
   );
 }
 
-export function isHttpUrl(value) {
+export function isHttpUrl(value: unknown): boolean {
   return /^https?:\/\//i.test(String(value || "").trim());
 }
 
-export function isExternalAppLaunchPath(pathname) {
+export function isExternalAppLaunchPath(pathname: unknown): boolean {
   const normalized = String(pathname || "")
     .trim()
     .replace(/\/+$/, "");
   return normalized === "/open-app";
 }
 
-export function readExternalAppLaunchTarget(locationRef = null) {
+export function readExternalAppLaunchTarget(locationRef: LocationLike | null = null): string {
   const ref = locationRef || (typeof window === "undefined" ? null : window.location);
   if (!ref?.hash) return "";
 
@@ -33,7 +38,11 @@ export function readExternalAppLaunchTarget(locationRef = null) {
   return target;
 }
 
-export function buildExternalAppLaunchUrl(value, locationRef = null, language = "") {
+export function buildExternalAppLaunchUrl(
+  value: unknown,
+  locationRef: LocationLike | null = null,
+  language: unknown = ""
+): string {
   const target = String(value || "").trim();
   if (isUnsafeAppUrl(target) || isHttpUrl(target)) return "";
 
@@ -51,7 +60,7 @@ export function buildExternalAppLaunchUrl(value, locationRef = null, language = 
   return url.href;
 }
 
-export function openUrlWithHiddenAnchor(url) {
+export function openUrlWithHiddenAnchor(url: unknown): void {
   const target = String(url || "").trim();
   // Guard the navigation sink itself: reject javascript:/data:/vbscript: and
   // control characters inline so the scheme check is a barrier for this href /

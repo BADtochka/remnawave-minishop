@@ -1,40 +1,61 @@
 import { rememberReferral, readReferral } from "./session.js";
 
-function readReferralParamFromLocation() {
+type TelegramWebAppLike = {
+  initDataUnsafe?: { start_param?: string | null } | null;
+} | null;
+
+type InviteOnlyConfig = {
+  registrationInviteOnlyEnabled?: unknown;
+} | null;
+
+export type TelegramLoginWidgetAuthData = Record<string, string>;
+
+type AuthErrorLike = {
+  error?: string;
+  retry_after?: number;
+} | null;
+
+function asTelegramWebApp(tg: unknown): TelegramWebAppLike {
+  return tg && typeof tg === "object" ? (tg as TelegramWebAppLike) : null;
+}
+
+type TranslateFn = (key: string, params?: Record<string, unknown>) => string;
+
+function readReferralParamFromLocation(): string {
   if (typeof window === "undefined") return "";
   const params = new URLSearchParams(window.location.search);
   return params.get("ref") || params.get("start") || params.get("start_param") || "";
 }
 
-export function readReferralParam(tg) {
+export function readReferralParam(tg: unknown): string {
   const fromQuery = readReferralParamFromLocation();
-  const fromTelegram = tg?.initDataUnsafe?.start_param || "";
+  const fromTelegram = asTelegramWebApp(tg)?.initDataUnsafe?.start_param || "";
   const value = String(fromTelegram || fromQuery || "").trim();
   return value ? rememberReferral(value) : readReferral();
 }
 
-export function hasReferralParam(tg = null) {
+export function hasReferralParam(tg: unknown = null): boolean {
   return Boolean(readReferralParam(tg));
 }
 
-export function shouldShowInviteOnlyHint(config, tg = null) {
+export function shouldShowInviteOnlyHint(config: InviteOnlyConfig, tg: unknown = null): boolean {
   return Boolean(config?.registrationInviteOnlyEnabled) && !hasReferralParam(tg);
 }
 
-export function readTelegramAuthStatus() {
+export function readTelegramAuthStatus(): string | null {
   const params = new URLSearchParams(window.location.search);
   return (params.get("telegram_auth") || "").trim().toLowerCase() || null;
 }
 
-export function readMagicLoginToken() {
+export function readMagicLoginToken(): string | null {
   const params = new URLSearchParams(window.location.search);
   return (params.get("login_token") || "").trim() || null;
 }
 
-export function readTelegramLoginWidgetAuthData() {
+export function readTelegramLoginWidgetAuthData(): TelegramLoginWidgetAuthData | null {
   const params = new URLSearchParams(window.location.search);
   const keys = ["id", "first_name", "last_name", "username", "photo_url", "auth_date", "hash"];
-  const authData = {};
+  const authData: TelegramLoginWidgetAuthData = {};
   let hasAuthValue = false;
   keys.forEach((key) => {
     if (!params.has(key)) return;
@@ -45,7 +66,7 @@ export function readTelegramLoginWidgetAuthData() {
   return authData;
 }
 
-export function clearAuthQuery() {
+export function clearAuthQuery(): void {
   const url = new URL(window.location.href);
   [
     "login_token",
@@ -62,7 +83,7 @@ export function clearAuthQuery() {
   window.history?.replaceState?.({}, document.title, url.pathname + url.search + url.hash);
 }
 
-export function buildTelegramOAuthStartUrl(purpose = "login", tg = null) {
+export function buildTelegramOAuthStartUrl(purpose = "login", tg: unknown = null): string {
   const url = new URL("/auth/telegram/start", window.location.origin);
   url.searchParams.set("purpose", purpose);
   const referralParam = readReferralParam(tg);
@@ -70,21 +91,22 @@ export function buildTelegramOAuthStartUrl(purpose = "login", tg = null) {
   return url.toString();
 }
 
-export function emailError(error, fallback, t) {
-  if (error?.error === "rate_limited")
-    return t("wa_auth_resend_wait", { seconds: error.retry_after || 60 });
-  if (error?.error === "invalid_email") return t("wa_auth_invalid_email");
-  if (error?.error === "expired_code") return t("wa_auth_code_expired");
-  if (error?.error === "invalid_code" || error?.error === "too_many_attempts")
+export function emailError(error: unknown, fallback: string, t: TranslateFn): string {
+  const err: AuthErrorLike = error && typeof error === "object" ? (error as AuthErrorLike) : null;
+  if (err?.error === "rate_limited")
+    return t("wa_auth_resend_wait", { seconds: err.retry_after || 60 });
+  if (err?.error === "invalid_email") return t("wa_auth_invalid_email");
+  if (err?.error === "expired_code") return t("wa_auth_code_expired");
+  if (err?.error === "invalid_code" || err?.error === "too_many_attempts")
     return t("wa_auth_invalid_code");
-  if (error?.error === "registration_invite_required") return t("wa_auth_invite_required");
+  if (err?.error === "registration_invite_required") return t("wa_auth_invite_required");
   return fallback;
 }
 
 export function createCooldownTimer() {
-  let timer = null;
+  let timer: number | null = null;
   let cooldown = 0;
-  const listeners = new Set();
+  const listeners = new Set<(value: number) => void>();
   function notify() {
     for (const fn of listeners) fn(cooldown);
   }
@@ -109,7 +131,7 @@ export function createCooldownTimer() {
       notify();
     }, 1000);
   }
-  function subscribe(listener) {
+  function subscribe(listener: (value: number) => void) {
     listeners.add(listener);
     listener(cooldown);
     return () => listeners.delete(listener);

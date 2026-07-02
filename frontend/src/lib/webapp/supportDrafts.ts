@@ -2,7 +2,15 @@ const SUPPORT_DRAFT_STORAGE_PREFIX = "rw_webapp_support_draft_v1";
 const SUPPORT_DRAFT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const DEFAULT_SCOPE = "anonymous";
 
-function safeStorage() {
+export type SupportDraft = Record<string, unknown>;
+
+type SupportDraftUserLike = {
+  user_id?: unknown;
+  id?: unknown;
+  telegram_id?: unknown;
+} | null;
+
+function safeStorage(): Storage | null {
   if (typeof window === "undefined") return null;
   try {
     return window.localStorage || null;
@@ -11,7 +19,7 @@ function safeStorage() {
   }
 }
 
-function draftKey(kind, scope, id = "new") {
+function draftKey(kind: unknown, scope: unknown, id: unknown = "new"): string {
   return [
     SUPPORT_DRAFT_STORAGE_PREFIX,
     encodeURIComponent(String(kind || "draft")),
@@ -20,19 +28,26 @@ function draftKey(kind, scope, id = "new") {
   ].join(":");
 }
 
-function normalizeDraftEnvelope(value) {
+function normalizeDraftEnvelope(value: unknown): SupportDraft | null {
   if (!value || typeof value !== "object") return null;
-  const updatedAt = Number(value.updatedAt || 0);
+  const envelope = value as { updatedAt?: unknown; draft?: unknown };
+  const updatedAt = Number(envelope.updatedAt || 0);
   if (!updatedAt || Date.now() - updatedAt > SUPPORT_DRAFT_TTL_MS) return null;
-  return value.draft && typeof value.draft === "object" ? value.draft : null;
+  return envelope.draft && typeof envelope.draft === "object"
+    ? (envelope.draft as SupportDraft)
+    : null;
 }
 
-export function supportDraftScope(user = {}) {
+export function supportDraftScope(user: SupportDraftUserLike = {}): string {
   const id = String(user?.user_id ?? user?.id ?? user?.telegram_id ?? "").trim();
   return id || DEFAULT_SCOPE;
 }
 
-export function readSupportDraft(kind, scope, id = "new") {
+export function readSupportDraft(
+  kind: unknown,
+  scope: unknown,
+  id: unknown = "new"
+): SupportDraft | null {
   const storage = safeStorage();
   if (!storage) return null;
   const key = draftKey(kind, scope, id);
@@ -54,7 +69,12 @@ export function readSupportDraft(kind, scope, id = "new") {
   }
 }
 
-export function writeSupportDraft(kind, scope, id = "new", draft = {}) {
+export function writeSupportDraft(
+  kind: unknown,
+  scope: unknown,
+  id: unknown = "new",
+  draft: SupportDraft = {}
+): void {
   const storage = safeStorage();
   if (!storage) return;
 
@@ -71,7 +91,7 @@ export function writeSupportDraft(kind, scope, id = "new", draft = {}) {
   }
 }
 
-export function clearSupportDraft(kind, scope, id = "new") {
+export function clearSupportDraft(kind: unknown, scope: unknown, id: unknown = "new"): void {
   const storage = safeStorage();
   if (!storage) return;
 

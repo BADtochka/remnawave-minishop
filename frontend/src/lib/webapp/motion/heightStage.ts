@@ -1,13 +1,26 @@
 import { tick } from "svelte";
 
+export type HeightStageState = {
+  instant: boolean;
+  locked: boolean;
+  style: string;
+};
+
+export type HeightStageOptions = {
+  durationMs?: number;
+  getElement?: () => HTMLElement | null;
+  settleDelayMs?: number;
+  setState?: (state: HeightStageState) => void;
+};
+
 export function createHeightStageAnimator({
   durationMs = 360,
   getElement = () => null,
   settleDelayMs = 80,
   setState = () => {},
-} = {}) {
-  let timer = null;
-  let frame = null;
+}: HeightStageOptions = {}) {
+  let timer: number | null = null;
+  let frame: number | null = null;
   let animationId = 0;
 
   function clearPending() {
@@ -22,7 +35,7 @@ export function createHeightStageAnimator({
     }
   }
 
-  async function animate(applyChange) {
+  async function animate(applyChange: () => void): Promise<void> {
     const element = getElement();
     if (typeof window === "undefined" || !element) {
       applyChange();

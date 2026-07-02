@@ -1,6 +1,12 @@
 export { structuredCloneSafe } from "../safeClone.js";
 
-export function readJsonScript(id) {
+type BrandInput = {
+  title?: unknown;
+  logoUrl?: unknown;
+  faviconUrl?: unknown;
+};
+
+export function readJsonScript(id: string): unknown {
   const node = document.getElementById(id);
   if (!node || !node.textContent) return null;
   try {
@@ -11,7 +17,7 @@ export function readJsonScript(id) {
   }
 }
 
-export function escapeHtml(value) {
+export function escapeHtml(value: unknown): string {
   return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -24,18 +30,18 @@ export function escapeHtml(value) {
 export const DEFAULT_BRAND_TITLE = "Subscription";
 export const DEFAULT_LOGO_URL = "/webapp-default-logo.webp";
 
-export function normalizeBrand(brand = {}) {
+export function normalizeBrand(brand: BrandInput = {}): { title: string; logoUrl: string } {
   return {
     title: String(brand.title || DEFAULT_BRAND_TITLE).trim() || DEFAULT_BRAND_TITLE,
     logoUrl: String(brand.logoUrl || "").trim() || DEFAULT_LOGO_URL,
   };
 }
 
-export function brandFaviconHref(brand = {}) {
+export function brandFaviconHref(brand: BrandInput = {}): string {
   return String(brand.faviconUrl || "").trim() || normalizeBrand(brand).logoUrl;
 }
 
-export function applyFavicon(brand = {}) {
+export function applyFavicon(brand: BrandInput = {}): void {
   if (typeof document === "undefined") return;
 
   const href = brandFaviconHref(brand);
@@ -45,7 +51,7 @@ export function applyFavicon(brand = {}) {
     ...document.querySelectorAll(
       'link[rel="icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]'
     ),
-  ].filter(Boolean);
+  ].filter((node): node is Element => Boolean(node));
 
   for (const favicon of new Set(links)) {
     favicon.setAttribute("href", href);
@@ -61,7 +67,7 @@ export function applyFavicon(brand = {}) {
   }
 }
 
-export function applyDocumentTitle(title) {
+export function applyDocumentTitle(title: unknown): void {
   if (typeof document === "undefined") return;
   const nextTitle = String(title || "").trim();
   if (!nextTitle || document.title === nextTitle) return;
