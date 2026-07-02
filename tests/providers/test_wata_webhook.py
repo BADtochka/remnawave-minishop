@@ -85,6 +85,13 @@ def _service(session, **config_overrides):
     )
 
 
+async def _run_and_close(service, awaitable):
+    try:
+        return await awaitable
+    finally:
+        await service.close()
+
+
 def test_wata_created_webhook_returns_ok_and_persists_transaction_id(monkeypatch):
     session = _FakeSession()
     payment = _payment()
@@ -484,11 +491,14 @@ def test_create_payment_link_uses_clean_iso_expiration_without_microseconds(monk
     service = _service(_FakeSession())
 
     success, _ = asyncio.run(
-        service.create_payment_link(
-            payment_db_id=465,
-            amount=199.5,
-            currency="RUB",
-            description="Оплата подписки на 1 мес.",
+        _run_and_close(
+            service,
+            service.create_payment_link(
+                payment_db_id=465,
+                amount=199.5,
+                currency="RUB",
+                description="Оплата подписки на 1 мес.",
+            ),
         )
     )
     assert success is True
@@ -524,12 +534,15 @@ def test_create_crypto_payment_link_uses_crypto_terminal_credentials(monkeypatch
     )
 
     success, _ = asyncio.run(
-        service.create_payment_link(
-            payment_db_id=465,
-            amount=199.5,
-            currency="RUB",
-            description="Crypto payment",
-            method="wata_crypto",
+        _run_and_close(
+            service,
+            service.create_payment_link(
+                payment_db_id=465,
+                amount=199.5,
+                currency="RUB",
+                description="Crypto payment",
+                method="wata_crypto",
+            ),
         )
     )
 

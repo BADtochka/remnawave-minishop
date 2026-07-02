@@ -264,7 +264,8 @@ def _check_module_size(cfg: dict, issues: list[str]) -> None:
     for scope in cfg["module_size"]["scopes"]:
         for file in _iter_text_files(scope, extensions):
             rel = _to_posix(file)
-            lines = sum(1 for _ in file.open(encoding="utf-8", errors="ignore"))
+            with file.open(encoding="utf-8", errors="ignore") as handle:
+                lines = sum(1 for _ in handle)
             if lines <= max_lines:
                 continue
             if _is_allowed(rel, allowlist):

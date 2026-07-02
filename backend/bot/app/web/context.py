@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import warnings
 from collections import deque
 from collections.abc import Mapping
 from typing import Any, Callable, Protocol, TypeAlias, TypeVar, cast
 
 from aiogram import Bot, Dispatcher
 from aiohttp import web
+from aiohttp.web_exceptions import NotAppKeyWarning
 from sqlalchemy.orm import sessionmaker
 
 from bot.middlewares.i18n import JsonI18n
@@ -118,9 +120,15 @@ def _optional_value(app: object, app_key: web.AppKey[T], string_key: str) -> T |
     return cast(T | None, storage.get(string_key))
 
 
+def _set_compat_string_value(app: web.Application, string_key: str, value: object) -> None:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", NotAppKeyWarning)
+        app[string_key] = cast(Any, value)
+
+
 def _set_both_values(app: web.Application, key: web.AppKey[T], string_key: str, value: T) -> None:
     app[key] = value
-    app[string_key] = cast(Any, value)
+    _set_compat_string_value(app, string_key, value)
 
 
 def _get_or_set_default(
@@ -454,7 +462,7 @@ def initialize_webapp_runtime_context(app: web.Application) -> None:
 
 
 def set_service_context(app: web.Application, key: str, value: object) -> None:
-    app[key] = value
+    _set_compat_string_value(app, key, value)
     if key == "panel_service":
         app[PANEL_SERVICE] = cast(PanelService, value)
     elif key == "subscription_service":
