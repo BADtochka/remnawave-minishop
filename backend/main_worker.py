@@ -15,6 +15,7 @@ from bot.app.factories.runtime import build_core_runtime, build_runtime_bootstra
 from bot.handlers.admin.sync_admin import perform_sync
 from bot.infra import events
 from bot.infra.event_payloads import PaymentCanceledPayload
+from bot.infra.observability import report_error
 from bot.infra.redis import close_redis, redis_lock
 from bot.infra.webhook_queue import pop_webhook_event, webhook_queue_depth
 from bot.middlewares.i18n import JsonI18n
@@ -161,8 +162,17 @@ async def _webhook_consumer(ctx: PluginContext, handlers: dict[str, QueueHandler
                 logger.warning("Unknown webhook event provider: %s", provider)
             else:
                 await handler(ctx, payload)
-        except Exception:
+        except Exception as exc:
             logger.exception("Webhook queue event failed: %s", event.get("event_id"))
+            await report_error(
+                ctx.error_reporter,
+                exc,
+                source="worker.webhook_consumer",
+                attributes={
+                    "event_id": event.get("event_id"),
+                    "provider": str(provider),
+                },
+            )
         finally:
             depth = await webhook_queue_depth(settings)
             logger.info(
@@ -225,8 +235,14 @@ async def _panel_sync_loop(ctx: PluginContext) -> None:
                         "metric worker_tick_duration_seconds=%.3f worker=panel_sync",
                         time.monotonic() - started,
                     )
-        except Exception:
+        except Exception as exc:
             logger.exception("Panel sync worker tick failed")
+            await report_error(
+                ctx.error_reporter,
+                exc,
+                source="worker.panel_sync",
+                attributes={"worker": "panel_sync"},
+            )
         await asyncio.sleep(settings.WORKER_PANEL_SYNC_INTERVAL_SECONDS)
 
 

@@ -17,6 +17,7 @@ from bot.app.web.context import (
     set_core_context,
     set_service_context,
 )
+from bot.infra.observability import observability_error_middleware
 from bot.services.email_auth_service import EmailAuthService
 from config.settings import Settings
 
@@ -41,6 +42,7 @@ def create_subscription_webapp_application(
 ) -> web.Application:
     app = web.Application(
         middlewares=[
+            observability_error_middleware,
             _security_headers_middleware,
             _csrf_protection_middleware,
             admin_auth_middleware,

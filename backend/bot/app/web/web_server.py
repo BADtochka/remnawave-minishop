@@ -17,6 +17,11 @@ from bot.app.web.context import (
     set_core_context,
     set_service_context,
 )
+from bot.infra.observability import (
+    ERROR_REPORTER_SERVICE_KEY,
+    METRICS_SERVICE_KEY,
+    observability_error_middleware,
+)
 from bot.payment_providers import iter_provider_specs, iter_service_keys
 from bot.plugins import (
     WEB_SCOPE_WEBAPP,
@@ -97,6 +102,11 @@ def _inject_shared_instances(
         set_service_context(app, key, service)
 
 
+def _inject_observability_instances(app: web.Application, ctx: PluginContext) -> None:
+    set_service_context(app, ERROR_REPORTER_SERVICE_KEY, ctx.error_reporter)
+    set_service_context(app, METRICS_SERVICE_KEY, ctx.metrics)
+
+
 async def build_and_start_web_app(
     dp: Dispatcher,
     bot: Bot,
@@ -106,8 +116,10 @@ async def build_and_start_web_app(
     after_webhooks_started: Callable[[], Awaitable[None]] | None = None,
     plugin_context: PluginContext | None = None,
 ) -> None:
-    app = web.Application()
+    app = web.Application(middlewares=[observability_error_middleware])
     _inject_shared_instances(app, dp, bot, settings, async_session_factory)
+    if plugin_context is not None:
+        _inject_observability_instances(app, plugin_context)
 
     async def _healthcheck(request: web.Request) -> web.Response:
         payload: dict[str, Any] = {"status": "ok"}
@@ -198,6 +210,7 @@ async def build_and_start_web_app(
             async_session_factory,
         )
         if plugin_context is not None:
+            _inject_observability_instances(subscription_app, plugin_context)
             setup_web_plugins(plugin_context, subscription_app, scope=WEB_SCOPE_WEBAPP)
         subscription_runner = web.AppRunner(
             subscription_app,

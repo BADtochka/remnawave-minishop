@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import sessionmaker
 
     from bot.app.factories.core_services import PanelService
+    from bot.infra.observability import ErrorReporter, Metrics
     from bot.middlewares.i18n import JsonI18n
     from bot.services.audience_segmentation import AudienceSegmentationService
     from bot.services.email_auth_service import EmailAuthService
@@ -184,6 +185,18 @@ class PluginContext:
             "OutboundMessagingService | None",
             self.services.get("outbound_messaging_service"),
         )
+
+    @property
+    def error_reporter(self) -> ErrorReporter:
+        from bot.infra.observability import get_error_reporter
+
+        return get_error_reporter(self.services)
+
+    @property
+    def metrics(self) -> Metrics:
+        from bot.infra.observability import get_metrics
+
+        return get_metrics(self.services)
 
     def _required_service(self, key: str) -> object:
         service = self.services.get(key)
