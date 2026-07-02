@@ -27,6 +27,7 @@ select = [
     "LOG", # flake8-logging
     "G", # flake8-logging-format
     "PLE", # Pylint errors
+    "T10", # flake8-debugger
 ]
 ignore = [
     "E731", # lambda assignment (common in handlers)
