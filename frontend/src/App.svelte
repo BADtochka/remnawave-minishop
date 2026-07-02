@@ -561,6 +561,40 @@
   const shellStyle = $derived(shellView.themeView.shellStyle);
   const shellThemeCssHref = $derived(shellView.themeView.shellThemeCssHref);
   const toastTheme = $derived(shellView.themeView.toastTheme);
+  const appModeStores = {
+    accountStore,
+    actionsStore,
+    authStore,
+    billingStore,
+    devicesStore,
+    supportStore,
+  };
+  const appModeViewState = $derived({
+    activationSuccessDialogOpen,
+    activationSuccessUseInstallGuides,
+    activeTab,
+    adminBundleApi,
+    adminBundleError,
+    appLaunchTarget,
+    autoRenewBusy,
+    cfg: CFG,
+    languageBusy,
+    languageClickGuard,
+    languageClickGuardArmed,
+    mode,
+    publicInstallSubscription,
+    publicInstallToken,
+    telegramPlatform: tg?.platform || "",
+  });
+  const appModeControls = {
+    closeActivationSuccessDialog,
+    setLanguageMenuOpen,
+    setPasswordLoginMode,
+    submitEmailOnEnter,
+    t,
+    termUnitLabel,
+    updateGuestLanguage,
+  };
 
   $effect(() => {
     shellState.demoAuthLogin = shellView.demoAuthLogin;
@@ -886,39 +920,14 @@
       <PreviewBoardComponent config={CFG} mockData={MOCK_DATA} />
     {:else}
       <AppModeContent
-        {accountStore}
+        stores={appModeStores}
         {shellView}
         {appActions}
-        {activationSuccessDialogOpen}
-        {activationSuccessUseInstallGuides}
-        {activeTab}
-        {adminBundleApi}
-        {adminBundleError}
+        viewState={appModeViewState}
+        controls={appModeControls}
         bind:adminMountTarget={shellState.adminMountTarget}
-        {appLaunchTarget}
-        {actionsStore}
-        {authStore}
-        {autoRenewBusy}
-        {billingStore}
-        cfg={CFG}
-        {closeActivationSuccessDialog}
-        {devicesStore}
-        {languageBusy}
-        {languageClickGuard}
-        {languageClickGuardArmed}
         bind:languageMenuOpen={shellState.languageMenuOpen}
-        {mode}
-        {publicInstallSubscription}
-        {publicInstallToken}
         bind:screen={shellState.screen}
-        {setLanguageMenuOpen}
-        {setPasswordLoginMode}
-        {submitEmailOnEnter}
-        {supportStore}
-        {t}
-        telegramPlatform={tg?.platform || ""}
-        {termUnitLabel}
-        {updateGuestLanguage}
       />
     {/if}
   {/key}
