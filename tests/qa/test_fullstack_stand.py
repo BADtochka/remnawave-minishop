@@ -15,7 +15,10 @@ from typing import Any
 import httpx
 import pytest
 
-asyncpg = pytest.importorskip("asyncpg")
+asyncpg = pytest.importorskip(
+    "asyncpg",
+    reason="full-stack QA database checks require asyncpg",
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_URL = os.getenv("QA_FRONTEND_URL", "http://127.0.0.1:8082").rstrip("/")

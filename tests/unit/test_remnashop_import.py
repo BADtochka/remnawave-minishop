@@ -433,7 +433,10 @@ def test_remnashop_encrypted_gateway_settings_need_app_crypt_key():
 
 
 def test_remnashop_encrypted_gateway_settings_decrypt_with_app_crypt_key():
-    cryptography = pytest.importorskip("cryptography.fernet")
+    cryptography = pytest.importorskip(
+        "cryptography.fernet",
+        reason="encrypted legacy gateway fixtures require cryptography",
+    )
     key = cryptography.Fernet.generate_key().decode()
     token = cryptography.Fernet(key.encode()).encrypt(b"wata-token").decode()
 
