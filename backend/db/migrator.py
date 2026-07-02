@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Connection
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from config.settings import Settings
 
@@ -1576,7 +1578,7 @@ def run_migration_chains(connection: Connection, chains: dict[str, list[Migratio
             if migration.id in applied_revisions:
                 continue
 
-            logging.info(
+            logger.info(
                 "Migrator: applying %s – %s (namespace %s)",
                 migration.id,
                 migration.description,
@@ -1590,7 +1592,7 @@ def run_migration_chains(connection: Connection, chains: dict[str, list[Migratio
                         {"revision": migration.id},
                     )
             except Exception as exc:
-                logging.error(
+                logger.error(
                     "Migrator: failed to apply %s (%s)",
                     migration.id,
                     migration.description,
@@ -1598,7 +1600,7 @@ def run_migration_chains(connection: Connection, chains: dict[str, list[Migratio
                 )
                 raise exc
             else:
-                logging.info("Migrator: migration %s applied successfully", migration.id)
+                logger.info("Migrator: migration %s applied successfully", migration.id)
 
 
 def run_database_migrations(connection: Connection) -> None:

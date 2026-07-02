@@ -13,6 +13,8 @@ from bot.utils.callback_answer import callback_data, callback_message, message_f
 from config.settings import Settings
 from db.dal import user_dal
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="user_referral_router")
 
 
@@ -30,7 +32,7 @@ async def referral_command_handler(
 
     target_message_obj = event.message if isinstance(event, types.CallbackQuery) else event
     if not target_message_obj:
-        logging.error(
+        logger.error(
             "Target message is None in referral_command_handler (possibly from callback without message)."  # noqa: E501
         )
         if isinstance(event, types.CallbackQuery):
@@ -38,7 +40,7 @@ async def referral_command_handler(
         return
 
     if not i18n or not referral_service:
-        logging.error("Dependencies (i18n or ReferralService) missing in referral_command_handler")
+        logger.error("Dependencies (i18n or ReferralService) missing in referral_command_handler")
         await target_message_obj.answer("Service error. Please try again later.")
         if isinstance(event, types.CallbackQuery):
             await event.answer()
@@ -50,14 +52,14 @@ async def referral_command_handler(
         bot_info = await bot.get_me()
         bot_username = bot_info.username
     except Exception as e_bot_info:
-        logging.error(f"Failed to get bot info for referral link: {e_bot_info}")
+        logger.error(f"Failed to get bot info for referral link: {e_bot_info}")
         await target_message_obj.answer(_("error_generating_referral_link"))
         if isinstance(event, types.CallbackQuery):
             await event.answer()
         return
 
     if not bot_username:
-        logging.error("Bot username is None, cannot generate referral link.")
+        logger.error("Bot username is None, cannot generate referral link.")
         await target_message_obj.answer(_("error_generating_referral_link"))
         if isinstance(event, types.CallbackQuery):
             await event.answer()
@@ -73,7 +75,7 @@ async def referral_command_handler(
     )
 
     if not referral_link:
-        logging.error(
+        logger.error(
             "Failed to generate referral link for user %s (probably missing DB record).",
             inviter_user_id,
         )
@@ -128,7 +130,7 @@ async def referral_command_handler(
                 text, reply_markup=reply_markup_val, disable_web_page_preview=True
             )
         except Exception as e_edit:
-            logging.warning(f"Failed to edit message for referral info: {e_edit}. Sending new one.")
+            logger.warning(f"Failed to edit message for referral info: {e_edit}. Sending new one.")
             await callback_message(event).answer(
                 text, reply_markup=reply_markup_val, disable_web_page_preview=True
             )
@@ -166,7 +168,7 @@ async def referral_action_handler(
             )
 
             if not referral_link:
-                logging.error(
+                logger.error(
                     "Failed to generate referral link for user %s via inline button.",
                     inviter_user_id,
                 )
@@ -190,7 +192,7 @@ async def referral_action_handler(
             await callback_message(callback).answer(friend_message, disable_web_page_preview=True)
 
         except Exception as e:
-            logging.error(f"Error in referral share message: {e}")
+            logger.error(f"Error in referral share message: {e}")
             await callback.answer(_("error_occurred_try_again"), show_alert=True)
 
     await callback.answer()

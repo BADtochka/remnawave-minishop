@@ -14,6 +14,8 @@ from db.models import Subscription
 
 from ._typing import SubscriptionServiceMixinContract
 
+logger = logging.getLogger(__name__)
+
 
 class HwidDeviceMixin(SubscriptionServiceMixinContract):
     @staticmethod
@@ -39,7 +41,7 @@ class HwidDeviceMixin(SubscriptionServiceMixinContract):
             )
             return int(active_devices)
         except Exception:
-            logging.exception(
+            logger.exception(
                 "Failed to recalculate active HWID devices for subscription %s",
                 getattr(sub, "subscription_id", None),
             )
@@ -85,7 +87,7 @@ class HwidDeviceMixin(SubscriptionServiceMixinContract):
                 db_user.panel_user_uuid, panel_payload
             )
         except Exception:
-            logging.exception("sync_hwid_device_limit_to_panel failed for user %s", user_id)
+            logger.exception("sync_hwid_device_limit_to_panel failed for user %s", user_id)
         return int(effective_hwid_limit)
 
     async def _hwid_topup_validity_window(
@@ -386,7 +388,7 @@ class HwidDeviceMixin(SubscriptionServiceMixinContract):
         except (TypeError, ValueError):
             purchased_devices = 0
         if purchased_devices <= 0:
-            logging.error("HWID device top-up requires positive device count for user %s", user_id)
+            logger.error("HWID device top-up requires positive device count for user %s", user_id)
             return None
 
         db_user = await user_dal.get_user_by_id(session, user_id)
@@ -402,7 +404,7 @@ class HwidDeviceMixin(SubscriptionServiceMixinContract):
         if self._tariffs_config():
             tariff = self._resolve_tariff(tariff_key or sub.tariff_key)
             if tariff.billing_model != "period":
-                logging.info(
+                logger.info(
                     "Skipping HWID top-up for user %s because tariff %s is %s",
                     user_id,
                     tariff.key,
@@ -419,7 +421,7 @@ class HwidDeviceMixin(SubscriptionServiceMixinContract):
                 else []
             )
             if packages and not any(pkg.count == purchased_devices for pkg in packages):
-                logging.error(
+                logger.error(
                     "HWID device package %s is not available for tariff %s",
                     purchased_devices,
                     tariff.key,
@@ -432,7 +434,7 @@ class HwidDeviceMixin(SubscriptionServiceMixinContract):
             else self._base_hwid_limit_for_tariff(tariff)
         )
         if base_hwid_limit in (None, 0):
-            logging.info(
+            logger.info(
                 "Skipping HWID top-up for user %s because current limit is unlimited", user_id
             )
             return {
@@ -457,7 +459,7 @@ class HwidDeviceMixin(SubscriptionServiceMixinContract):
         valid_until = self._as_aware_utc(getattr(payment, "hwid_valid_until", None))
         if valid_from and valid_until:
             if valid_until <= now or valid_from >= valid_until:
-                logging.error(
+                logger.error(
                     "Frozen HWID quote is no longer valid for user %s "
                     "(payment_id=%s, valid_from=%s, valid_until=%s)",
                     user_id,
@@ -476,7 +478,7 @@ class HwidDeviceMixin(SubscriptionServiceMixinContract):
             if window:
                 valid_from, valid_until, entitlement_summary = window
         if not valid_from or not valid_until:
-            logging.error(
+            logger.error(
                 "HWID top-up has no valid subscription window for user %s "
                 "(subscription_id=%s, renewal=%s)",
                 user_id,
@@ -525,7 +527,7 @@ class HwidDeviceMixin(SubscriptionServiceMixinContract):
             panel_payload,
         )
         if not updated_panel or updated_panel.get("error"):
-            logging.warning(
+            logger.warning(
                 "Panel user HWID limit update failed for user %s. Response: %s",
                 user_id,
                 updated_panel,

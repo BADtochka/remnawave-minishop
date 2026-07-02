@@ -17,6 +17,8 @@ from db.dal import user_dal
 
 from .i18n import JsonI18n
 
+logger = logging.getLogger(__name__)
+
 
 class BanCheckMiddleware(BaseMiddleware):
     def __init__(self, settings: Settings, i18n_instance: JsonI18n):
@@ -45,13 +47,13 @@ class BanCheckMiddleware(BaseMiddleware):
         try:
             db_user_model = await user_dal.get_user_by_id(session, event_user.id)
         except Exception as e_db:
-            logging.error(
+            logger.error(
                 f"BanCheckMiddleware: DB error fetching user {event_user.id}: {e_db}", exc_info=True
             )
             return await handler(event, data)
 
         if db_user_model and db_user_model.is_banned:
-            logging.info(
+            logger.info(
                 f"User {event_user.id} ({event_user.username or 'NoUsername'}) is banned. Blocking access."  # noqa: E501
             )
 
@@ -110,11 +112,11 @@ class BanCheckMiddleware(BaseMiddleware):
                     await bot_instance.send_message(
                         event_user.id, ban_message_text, reply_markup=keyboard
                     )
-                logging.info(f"Ban notification sent to user {event_user.id}.")
+                logger.info(f"Ban notification sent to user {event_user.id}.")
             except TelegramForbiddenError:
-                logging.warning(f"BanCheck: Bot is blocked by user {event_user.id}.")
+                logger.warning(f"BanCheck: Bot is blocked by user {event_user.id}.")
             except Exception as e_send:
-                logging.error(
+                logger.error(
                     f"BanCheck: Failed to notify banned user {event_user.id}: {type(e_send).__name__} - {e_send}",  # noqa: E501
                     exc_info=True,
                 )

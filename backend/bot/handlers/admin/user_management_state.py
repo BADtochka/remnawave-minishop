@@ -36,6 +36,8 @@ from .user_management_common import (
 )
 from .user_management_overrides import _admin_hwid_limit_state_text
 
+logger = logging.getLogger(__name__)
+
 
 @router.message(AdminStates.waiting_for_subscription_days_to_add, F.text)
 async def process_subscription_days_handler(
@@ -127,7 +129,7 @@ async def process_subscription_days_handler(
             await message.answer(_("admin_user_subscription_added_error"))
 
     except Exception as e:
-        logging.error(f"Error adding subscription days for user {target_user_id}: {e}")
+        logger.error(f"Error adding subscription days for user {target_user_id}: {e}")
         await session.rollback()
         await message.answer(_("admin_user_subscription_added_error"))
 
@@ -235,7 +237,7 @@ async def process_direct_message_handler(
             )
 
     except Exception as e:
-        logging.error(f"Error sending direct message to user {target_user_id}: {e}")
+        logger.error(f"Error sending direct message to user {target_user_id}: {e}")
         await message.answer(_("admin_user_message_sent_error"))
 
     await state.clear()
@@ -263,7 +265,7 @@ async def ban_user_prompt_handler(
             prompt_text, reply_markup=get_back_to_admin_panel_keyboard(current_lang, i18n)
         )
     except Exception as e:
-        logging.warning(f"Could not edit message for ban prompt: {e}. Sending new.")
+        logger.warning(f"Could not edit message for ban prompt: {e}. Sending new.")
         await callback_message(callback).answer(
             prompt_text, reply_markup=get_back_to_admin_panel_keyboard(current_lang, i18n)
         )
@@ -294,7 +296,7 @@ async def unban_user_prompt_handler(
             prompt_text, reply_markup=get_back_to_admin_panel_keyboard(current_lang, i18n)
         )
     except Exception as e:
-        logging.warning(f"Could not edit message for unban prompt: {e}. Sending new.")
+        logger.warning(f"Could not edit message for unban prompt: {e}. Sending new.")
         await callback_message(callback).answer(
             prompt_text, reply_markup=get_back_to_admin_panel_keyboard(current_lang, i18n)
         )
@@ -341,7 +343,7 @@ async def view_banned_users_handler(
         )
 
     except Exception as e:
-        logging.error(f"Error displaying banned users: {e}")
+        logger.error(f"Error displaying banned users: {e}")
         await callback.answer("Error loading banned users", show_alert=True)
 
 
@@ -388,7 +390,7 @@ async def process_ban_user_handler(
         await message.answer(_("admin_user_ban_success", input=hcode(input_text)))
 
     except Exception as e:
-        logging.error(f"Error banning user {user_model.user_id}: {e}")
+        logger.error(f"Error banning user {user_model.user_id}: {e}")
         await session.rollback()
         await message.answer(_("admin_user_ban_error"))
 
@@ -438,7 +440,7 @@ async def process_unban_user_handler(
         await message.answer(_("admin_user_unban_success", input=hcode(input_text)))
 
     except Exception as e:
-        logging.error(f"Error unbanning user {user_model.user_id}: {e}")
+        logger.error(f"Error unbanning user {user_model.user_id}: {e}")
         await session.rollback()
         await message.answer(_("admin_user_unban_error"))
 
@@ -542,7 +544,7 @@ async def process_premium_override_bonus_handler(
             parse_mode="HTML",
         )
     except Exception as exc:
-        logging.error(
+        logger.error(
             "Error setting premium override bonus for user %s: %s",
             target_user_id,
             exc,
@@ -652,7 +654,7 @@ async def process_hwid_device_limit_handler(
             parse_mode="HTML",
         )
     except Exception as exc:
-        logging.error(
+        logger.error(
             "Error setting HWID device limit for user %s: %s",
             target_user_id,
             exc,
@@ -762,7 +764,7 @@ async def process_traffic_grant_gb_handler(
             parse_mode="HTML",
         )
     except Exception as exc:
-        logging.error(
+        logger.error(
             "Error granting traffic for user %s (kind=%s, gb=%s): %s",
             target_user_id,
             kind,
@@ -845,5 +847,5 @@ async def user_card_from_list_handler(
         await callback.answer()
 
     except Exception as e:
-        logging.error(f"Error displaying user card: {e}")
+        logger.error(f"Error displaying user card: {e}")
         await callback.answer("Error displaying user card", show_alert=True)

@@ -30,6 +30,8 @@ from .common import (
     sale_mode_tariff_key,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class PaymentCallbackParts:
@@ -106,7 +108,7 @@ async def edit_or_answer(
         )
         return
     except Exception as exc:
-        logging.warning("%s: failed to edit message (%s), sending new one.", log_prefix, exc)
+        logger.warning("%s: failed to edit message (%s), sending new one.", log_prefix, exc)
     with contextlib.suppress(Exception):
         await message.answer(
             text,
@@ -312,7 +314,7 @@ async def safe_store_provider_payment_id(
         return True
     except Exception:
         await session.rollback()
-        logging.exception(
+        logger.exception(
             "%s: failed to store provider payment id for payment %s.",
             log_prefix,
             payment.payment_id,
@@ -331,7 +333,7 @@ async def safe_mark_failed_creation(
         await mark_payment_failed_creation(session, payment.payment_id)
     except Exception:
         await session.rollback()
-        logging.exception(
+        logger.exception(
             "%s: failed to mark payment %s as failed_creation.",
             log_prefix,
             payment.payment_id,
@@ -385,7 +387,7 @@ async def render_link_or_fail(
         )
         return
 
-    logging.error(
+    logger.error(
         "%s: payment creation failed for payment %s "
         "(user_id=%s, api_success=%s, has_payment_url=%s, "
         "has_provider_payment_id=%s, provider_response=%s).",

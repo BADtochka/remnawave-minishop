@@ -13,6 +13,8 @@ from db.models import Subscription, SubscriptionNotification, User
 
 from ._sqlalchemy import rowcount
 
+logger = logging.getLogger(__name__)
+
 INSTALL_SHARE_TOKEN_BYTES = 16
 
 
@@ -21,7 +23,7 @@ def _subscription_model_payload(sub_payload: dict[str, Any]) -> dict[str, Any]:
     filtered_payload = {key: value for key, value in sub_payload.items() if key in model_columns}
     ignored_keys = sorted(set(sub_payload) - set(filtered_payload))
     if ignored_keys:
-        logging.warning("Ignoring unsupported subscription payload keys: %s", ignored_keys)
+        logger.warning("Ignoring unsupported subscription payload keys: %s", ignored_keys)
     return filtered_payload
 
 
@@ -243,7 +245,7 @@ async def upsert_subscription(session: AsyncSession, sub_payload: dict[str, Any]
     existing_sub = await get_subscription_by_panel_subscription_uuid(session, panel_sub_uuid)
 
     if existing_sub:
-        logging.info(
+        logger.info(
             f"Updating existing subscription {existing_sub.subscription_id} by panel_sub_uuid {panel_sub_uuid}"  # noqa: E501
         )
         for key, value in _subscription_model_payload(sub_payload).items():
@@ -252,7 +254,7 @@ async def upsert_subscription(session: AsyncSession, sub_payload: dict[str, Any]
         await session.refresh(existing_sub)
         return existing_sub
     else:
-        logging.info(f"Creating new subscription with panel_sub_uuid {panel_sub_uuid}")
+        logger.info(f"Creating new subscription with panel_sub_uuid {panel_sub_uuid}")
 
         if sub_payload.get("user_id") is None and "panel_user_uuid" not in sub_payload:
             raise ValueError("For a new subscription without user_id, panel_user_uuid is required.")
@@ -291,7 +293,7 @@ async def deactivate_other_active_subscriptions(
     result = await session.execute(stmt)
     affected = rowcount(result)
     if affected > 0:
-        logging.info(
+        logger.info(
             f"Deactivated {affected} other active subscriptions for panel_user_uuid {panel_user_uuid}."  # noqa: E501
         )
 
@@ -305,7 +307,7 @@ async def deactivate_all_user_subscriptions(session: AsyncSession, user_id: int)
     result = await session.execute(stmt)
     affected = rowcount(result)
     if affected > 0:
-        logging.info(
+        logger.info(
             f"Deactivated {affected} subscriptions for user {user_id} due to missing panel user."
         )
     return affected
@@ -317,7 +319,7 @@ async def delete_all_user_subscriptions(session: AsyncSession, user_id: int) -> 
     result = await session.execute(stmt)
     affected = rowcount(result)
     if affected > 0:
-        logging.info(f"Deleted {affected} subscription records for user {user_id} for trial reset.")
+        logger.info(f"Deleted {affected} subscription records for user {user_id} for trial reset.")
     return affected
 
 

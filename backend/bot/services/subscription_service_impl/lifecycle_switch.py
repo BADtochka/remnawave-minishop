@@ -11,6 +11,8 @@ from db.models import Subscription, User
 
 from ._typing import SubscriptionServiceMixinContract
 
+logger = logging.getLogger(__name__)
+
 
 class SubscriptionLifecycleSwitchMixin(SubscriptionServiceMixinContract):
     async def _local_active_subscription_details_fallback(
@@ -171,7 +173,7 @@ class SubscriptionLifecycleSwitchMixin(SubscriptionServiceMixinContract):
                 at=now,
             )
         except Exception:
-            logging.exception(
+            logger.exception(
                 "Failed to recalculate HWID devices during tariff switch for user %s",
                 user_id,
             )
@@ -266,7 +268,7 @@ class SubscriptionLifecycleSwitchMixin(SubscriptionServiceMixinContract):
             # the squad/limit update the user sees the new tariff in the app
             # but stays on the old squads on Remnawave. Surface the failure
             # so the caller can roll back.
-            logging.warning(
+            logger.warning(
                 "Panel user details update FAILED for tariff switch user %s -> %s. Response: %s",
                 user_id,
                 target.key,

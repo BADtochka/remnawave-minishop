@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import PanelSyncStatus
 
+logger = logging.getLogger(__name__)
+
 SINGLETON_ID = 1
 
 
@@ -43,7 +45,7 @@ async def update_panel_sync_status(
 
     await session.flush()
     await session.refresh(sync_record)
-    logging.info(
+    logger.info(
         f"Panel sync status updated: {status}, Users: {users_processed}, Subs: {subs_synced}"
     )
     return sync_record

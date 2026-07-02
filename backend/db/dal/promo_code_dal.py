@@ -9,13 +9,15 @@ from sqlalchemy.orm import selectinload
 
 from db.models import Payment, PromoCode, PromoCodeActivation
 
+logger = logging.getLogger(__name__)
+
 
 async def create_promo_code(session: AsyncSession, promo_data: dict[str, Any]) -> PromoCode:
     new_promo = PromoCode(**promo_data)
     session.add(new_promo)
     await session.flush()
     await session.refresh(new_promo)
-    logging.info(f"Promo code '{new_promo.code}' created with ID {new_promo.promo_code_id}")
+    logger.info(f"Promo code '{new_promo.code}' created with ID {new_promo.promo_code_id}")
     return new_promo
 
 
@@ -189,7 +191,7 @@ async def increment_promo_code_usage(session: AsyncSession, promo_code_id: int) 
     result = await session.execute(stmt)
     updated_id = result.scalar_one_or_none()
     if updated_id is None:
-        logging.warning("Promo code ID %s already reached max activations.", promo_code_id)
+        logger.warning("Promo code ID %s already reached max activations.", promo_code_id)
         return None
     promo = await get_promo_code_by_id(session, int(updated_id))
     if promo:
@@ -233,7 +235,7 @@ async def record_promo_activation(
 ) -> PromoCodeActivation | None:
     existing_activation = await get_user_activation_for_promo(session, promo_code_id, user_id)
     if existing_activation:
-        logging.info(
+        logger.info(
             f"User {user_id} has already activated promo code {promo_code_id}. Activation ID: {existing_activation.activation_id}"  # noqa: E501
         )
         return existing_activation
@@ -243,7 +245,7 @@ async def record_promo_activation(
     user = await get_user_by_id(session, user_id)
     promo = await get_promo_code_by_id(session, promo_code_id)
     if not user or not promo:
-        logging.error(
+        logger.error(
             f"Cannot record promo activation: User {user_id} or Promo {promo_code_id} not found."
         )
         return None
@@ -253,7 +255,7 @@ async def record_promo_activation(
 
         payment = await get_payment_by_db_id(session, payment_id)
         if not payment:
-            logging.error(f"Cannot record promo activation: Payment {payment_id} not found.")
+            logger.error(f"Cannot record promo activation: Payment {payment_id} not found.")
             return None
 
     activation_data = {
@@ -278,7 +280,7 @@ async def record_promo_activation(
     session.add(new_activation)
     await session.flush()
     await session.refresh(new_activation)
-    logging.info(
+    logger.info(
         f"Promo code {promo_code_id} activated by user {user_id}. Activation ID: {new_activation.activation_id}"  # noqa: E501
     )
     return new_activation
@@ -315,7 +317,7 @@ async def consume_promo_activation(
         existing_payment_id = int(getattr(existing_activation, "payment_id", 0) or 0)
         if payment_id is not None and existing_payment_id == int(payment_id):
             return existing_activation
-        logging.info(
+        logger.info(
             "User %s has already activated promo code %s. Activation ID: %s",
             user_id,
             promo_code_id,
@@ -335,7 +337,7 @@ async def consume_promo_activation(
     result = await session.execute(stmt)
     updated_id = result.scalar_one_or_none()
     if updated_id is None:
-        logging.warning("Promo code ID %s cannot be consumed.", promo_code_id)
+        logger.warning("Promo code ID %s cannot be consumed.", promo_code_id)
         return None
 
     activation_data = {

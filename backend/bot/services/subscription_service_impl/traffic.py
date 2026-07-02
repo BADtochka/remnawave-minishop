@@ -13,6 +13,8 @@ from db.models import Subscription
 from ._typing import SubscriptionServiceMixinContract
 from .hwid_limits import HwidDeviceLimits
 
+logger = logging.getLogger(__name__)
+
 
 class TrafficMixin(SubscriptionServiceMixinContract):
     async def _resolve_hwid_device_limits(
@@ -89,7 +91,7 @@ class TrafficMixin(SubscriptionServiceMixinContract):
         )
         db_user = await user_dal.get_user_by_id(session, user_id)
         if not db_user:
-            logging.error("User %s not found for traffic package activation", user_id)
+            logger.error("User %s not found for traffic package activation", user_id)
             return None
 
         (
@@ -100,7 +102,7 @@ class TrafficMixin(SubscriptionServiceMixinContract):
         ) = await self._get_or_create_panel_user_link_details(session, user_id, db_user)
 
         if not panel_user_uuid or not panel_sub_link_id:
-            logging.error(
+            logger.error(
                 "Failed to ensure panel linkage for user %s during traffic activation", user_id
             )
             return None
@@ -170,7 +172,7 @@ class TrafficMixin(SubscriptionServiceMixinContract):
         try:
             new_or_updated_sub = await subscription_dal.upsert_subscription(session, sub_payload)
         except Exception as exc:
-            logging.error(
+            logger.error(
                 "Failed to upsert traffic subscription for user %s: %s", user_id, exc, exc_info=True
             )
             return None
@@ -192,7 +194,7 @@ class TrafficMixin(SubscriptionServiceMixinContract):
             panel_user_uuid, panel_update_payload
         )
         if not updated_panel_user or updated_panel_user.get("error"):
-            logging.warning(
+            logger.warning(
                 "Panel user details update FAILED for traffic package user %s. Response: %s",
                 panel_user_uuid,
                 updated_panel_user,
@@ -286,12 +288,12 @@ class TrafficMixin(SubscriptionServiceMixinContract):
                 source="admin_premium_override",
             )
             if not panel_updated:
-                logging.warning(
+                logger.warning(
                     "sync_premium_squad_access_to_panel: panel update failed for user %s",
                     user_id,
                 )
         except Exception:
-            logging.exception(
+            logger.exception(
                 "sync_premium_squad_access_to_panel: failed to push squads for user %s", user_id
             )
 
@@ -346,4 +348,4 @@ class TrafficMixin(SubscriptionServiceMixinContract):
                 db_user.panel_user_uuid, panel_payload
             )
         except Exception:
-            logging.exception("sync_main_traffic_limit_to_panel failed for user %s", user_id)
+            logger.exception("sync_main_traffic_limit_to_panel failed for user %s", user_id)

@@ -33,6 +33,8 @@ from .core_status import (
     my_subscription_command_handler,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @router.callback_query(F.data.startswith("disconnect_device:"))
 async def disconnect_device_handler(
@@ -267,7 +269,7 @@ async def connect_command_handler(
     session: AsyncSession,
     bot: Bot,
 ) -> None:
-    logging.info(f"User {message_from_user(message).id} used /connect command.")
+    logger.info(f"User {message_from_user(message).id} used /connect command.")
     await my_subscription_command_handler(
         message, i18n_data, settings, panel_service, subscription_service, session, bot
     )

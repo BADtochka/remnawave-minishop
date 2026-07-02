@@ -58,6 +58,8 @@ from .user_broadcast_dal import (  # noqa: F401
     get_user_ids_without_any_subscription,
 )
 
+logger = logging.getLogger(__name__)
+
 REFERRAL_CODE_ALPHABET = string.ascii_uppercase + string.digits
 REFERRAL_CODE_LENGTH = 9
 MAX_REFERRAL_CODE_ATTEMPTS = 25
@@ -273,7 +275,7 @@ async def create_user(
         raise RuntimeError(f"Failed to load user {user_id} after upsert.")
 
     if created:
-        logging.info(
+        logger.info(
             f"New user {user.user_id} created in DAL. Referred by: {user.referred_by_id or 'N/A'}."
         )
         if registered_via == "auto":
@@ -297,7 +299,7 @@ async def create_user(
                 )
             )
     else:
-        logging.info(f"User {user.user_id} already exists in DAL. Proceeding without creation.")
+        logger.info(f"User {user.user_id} already exists in DAL. Proceeding without creation.")
 
     return user, created
 

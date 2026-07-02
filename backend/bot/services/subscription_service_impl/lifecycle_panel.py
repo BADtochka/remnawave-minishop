@@ -4,6 +4,8 @@ from typing import Any
 
 from ._typing import SubscriptionServiceMixinContract
 
+logger = logging.getLogger(__name__)
+
 
 class SubscriptionLifecyclePanelMixin(SubscriptionServiceMixinContract):
     async def _lookup_panel_user_for_subscription_details(
@@ -18,13 +20,13 @@ class SubscriptionLifecyclePanelMixin(SubscriptionServiceMixinContract):
                 try:
                     lookup = await lookup_method(panel_user_uuid)
                 except Exception as exc:
-                    logging.exception(
+                    logger.exception(
                         "Failed to fetch panel user %s for subscription details",
                         panel_user_uuid,
                     )
                     return None, False, self._panel_lookup_exception_reason(exc)
             except Exception as exc:
-                logging.exception(
+                logger.exception(
                     "Failed to fetch panel user %s for subscription details",
                     panel_user_uuid,
                 )
@@ -40,7 +42,7 @@ class SubscriptionLifecyclePanelMixin(SubscriptionServiceMixinContract):
         try:
             panel_user = await self.panel_service.get_user_by_uuid(panel_user_uuid)
         except Exception as exc:
-            logging.exception(
+            logger.exception(
                 "Failed to fetch panel user %s for subscription details",
                 panel_user_uuid,
             )
@@ -73,7 +75,7 @@ class SubscriptionLifecyclePanelMixin(SubscriptionServiceMixinContract):
         try:
             panel_expire_at = datetime.fromisoformat(str(raw_expire_at).replace("Z", "+00:00"))
         except (TypeError, ValueError):
-            logging.warning(
+            logger.warning(
                 "Panel update returned unparsable expireAt=%r for expected expiry %s.",
                 raw_expire_at,
                 expected_expire_at.isoformat(),
@@ -103,7 +105,7 @@ class SubscriptionLifecyclePanelMixin(SubscriptionServiceMixinContract):
                 return True
 
             if raw_expire_at:
-                logging.warning(
+                logger.warning(
                     "Panel update response expiry mismatch for user %s: expireAt=%r "
                     "expected=%s. Fetching panel user to verify persisted state.",
                     panel_user_uuid,
@@ -111,13 +113,13 @@ class SubscriptionLifecyclePanelMixin(SubscriptionServiceMixinContract):
                     expected_expire_at.isoformat(),
                 )
             else:
-                logging.info(
+                logger.info(
                     "Panel update response for user %s did not include expireAt. "
                     "Fetching panel user to verify persisted state.",
                     panel_user_uuid,
                 )
         else:
-            logging.warning(
+            logger.warning(
                 "Panel update response for user %s had unexpected type %s. "
                 "Fetching panel user to verify persisted state.",
                 panel_user_uuid,
@@ -133,14 +135,14 @@ class SubscriptionLifecyclePanelMixin(SubscriptionServiceMixinContract):
             except TypeError:
                 panel_user = await self.panel_service.get_user_by_uuid(panel_user_uuid)
         except Exception:
-            logging.exception(
+            logger.exception(
                 "Failed to verify panel expiry for user %s after update.",
                 panel_user_uuid,
             )
             return False
 
         if not isinstance(panel_user, dict):
-            logging.warning(
+            logger.warning(
                 "Panel expiry verification for user %s returned unexpected payload: %r",
                 panel_user_uuid,
                 panel_user,

@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, RootModel, ValidationError, model_validator
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_TARIFF_CURRENCY = "rub"
 STARS_TARIFF_CURRENCY = "stars"
 
@@ -456,5 +458,5 @@ def load_tariffs_config(path: str | Path) -> TariffsConfig | None:
         data = json.loads(config_path.read_text(encoding="utf-8"))
         return TariffsConfig.model_validate(data)
     except (OSError, json.JSONDecodeError, ValidationError, ValueError) as exc:
-        logging.critical("Failed to load tariffs config from %s: %s", config_path, exc)
+        logger.critical("Failed to load tariffs config from %s: %s", config_path, exc)
         raise

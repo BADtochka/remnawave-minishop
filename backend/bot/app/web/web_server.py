@@ -27,6 +27,8 @@ from bot.plugins import (
 from bot.utils.request_security import request_client_ip
 from config.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 
 class SecureSimpleRequestHandler(SimpleRequestHandler):
     def verify_secret(self, telegram_secret_token: str, bot: Bot) -> bool:
@@ -121,7 +123,7 @@ async def build_and_start_web_app(
                     "overflow": pool.overflow(),
                 }
         except Exception:
-            logging.exception("Failed to collect DB pool health metrics")
+            logger.exception("Failed to collect DB pool health metrics")
         return web.json_response(payload)
 
     app.router.add_get("/healthz", _healthcheck)
@@ -138,7 +140,7 @@ async def build_and_start_web_app(
             bot=bot,
             secret_token=settings.WEBHOOK_SECRET_TOKEN,
         ).register(app, path=telegram_webhook_path)
-        logging.info(
+        logger.info(
             f"Telegram webhook route configured at: [POST] {telegram_webhook_path} (relative to base URL)"  # noqa: E501
         )
 
@@ -156,12 +158,12 @@ async def build_and_start_web_app(
             continue
         registered_webhook_paths.add(path)
         app.router.add_post(path, webhook_route)
-        logging.info("%s webhook route configured at: [POST] %s", spec.label, path)
+        logger.info("%s webhook route configured at: [POST] %s", spec.label, path)
 
     panel_path = settings.panel_webhook_path
     if panel_path.startswith("/"):
         app.router.add_post(panel_path, panel_webhook_route)
-        logging.info(f"Panel webhook route configured at: [POST] {panel_path}")
+        logger.info(f"Panel webhook route configured at: [POST] {panel_path}")
 
     if plugin_context is not None:
         setup_web_plugins(plugin_context, app, scope=WEB_SCOPE_WEBHOOKS)
@@ -178,7 +180,7 @@ async def build_and_start_web_app(
     )
 
     await site.start()
-    logging.info(
+    logger.info(
         f"AIOHTTP server started on http://{settings.WEB_SERVER_HOST}:{settings.WEB_SERVER_PORT}"
     )
     if after_webhooks_started is not None:
@@ -208,7 +210,7 @@ async def build_and_start_web_app(
             port=webapp_settings.server_port,
         )
         await subscription_site.start()
-        logging.info(
+        logger.info(
             "Subscription WebApp server started on http://%s:%s",
             webapp_settings.server_host,
             webapp_settings.server_port,
@@ -221,4 +223,4 @@ async def build_and_start_web_app(
             try:
                 await runner.cleanup()
             except Exception as cleanup_error:
-                logging.warning("Failed to cleanup aiohttp runner: %s", cleanup_error)
+                logger.warning("Failed to cleanup aiohttp runner: %s", cleanup_error)

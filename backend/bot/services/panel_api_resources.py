@@ -8,6 +8,8 @@ from config.settings import Settings
 from db.dal import panel_sync_dal
 from db.models import PanelSyncStatus
 
+logger = logging.getLogger(__name__)
+
 # Static endpoint prefixes used as log/metric labels instead of the raw request
 # path. Endpoints embed user identifiers (telegram id, username, email, uuids),
 # so logging the path verbatim would leak private data into log files; the
@@ -60,7 +62,7 @@ class PanelApiResourcesMixin:
     ) -> str | None:
         panel_api_url = self.settings.panel_settings.api_url
         if not panel_api_url:
-            logging.error("PANEL_API_URL not set, cannot generate subscription link.")
+            logger.error("PANEL_API_URL not set, cannot generate subscription link.")
             return None
         base_sub_url = f"{panel_api_url.rstrip('/')}/sub/{short_uuid_or_sub_uuid}"
         if client_type:
@@ -85,7 +87,7 @@ class PanelApiResourcesMixin:
         response = _panel_dict_response(response_data)
         if response is not None:
             return response
-        logging.error(
+        logger.error(
             f"Failed to get subscription page config for short UUID {short_uuid}. Response: {response_data}"  # noqa: E501
         )
         return None
@@ -96,7 +98,7 @@ class PanelApiResourcesMixin:
         response = _panel_dict_response(response_data)
         if response is not None:
             return response
-        logging.error(
+        logger.error(
             f"Failed to get subscription page config list from panel. Response: {response_data}"
         )
         return None
@@ -113,7 +115,7 @@ class PanelApiResourcesMixin:
         response = _panel_dict_response(response_data)
         if response is not None:
             return response
-        logging.error(
+        logger.error(
             f"Failed to get subscription page config {config_uuid} from panel. Response: {response_data}"  # noqa: E501
         )
         return None
@@ -140,7 +142,7 @@ class PanelApiResourcesMixin:
             response = response_data.get("response")
             if isinstance(response, dict):
                 return response
-        logging.error("Failed to get external squad %s. Response: %s", squad_uuid, response_data)
+        logger.error("Failed to get external squad %s. Response: %s", squad_uuid, response_data)
         return None
 
     async def get_user_devices(self, user_uuid: str) -> list[dict[str, Any]] | None:
@@ -162,9 +164,7 @@ class PanelApiResourcesMixin:
                 devices = _panel_devices_list(response_data.get(key))
                 if devices is not None:
                     return devices
-        logging.error(
-            "Failed to get user devices for user %s (panel response redacted).", user_uuid
-        )
+        logger.error("Failed to get user devices for user %s (panel response redacted).", user_uuid)
         return None
 
     async def disconnect_device(self, user_uuid: str, hwid: str) -> bool:
@@ -174,7 +174,7 @@ class PanelApiResourcesMixin:
         if response_data and not response_data.get("error") and "response" in response_data:
             await self._invalidate_devices_cache(user_uuid)
             return True
-        logging.error(
+        logger.error(
             "Failed to disconnect device for user %s (device id and panel response redacted).",
             user_uuid,
         )
@@ -186,7 +186,7 @@ class PanelApiResourcesMixin:
         response = _panel_dict_response(response_data)
         if response is not None:
             return response
-        logging.error("Failed to get HWID device stats. Response: %s", response_data)
+        logger.error("Failed to get HWID device stats. Response: %s", response_data)
         return None
 
     async def get_hwid_devices_top_users(
@@ -205,7 +205,7 @@ class PanelApiResourcesMixin:
         response = _panel_dict_response(response_data)
         if response is not None:
             return response
-        logging.error("Failed to get HWID top users. Response: %s", response_data)
+        logger.error("Failed to get HWID top users. Response: %s", response_data)
         return None
 
     async def restart_node(self, node_uuid: str, *, force_restart: bool = False) -> bool:
@@ -218,7 +218,7 @@ class PanelApiResourcesMixin:
         )
         if response_data and not response_data.get("error"):
             return True
-        logging.error("Failed to restart node %s. Response: %s", node_uuid, response_data)
+        logger.error("Failed to restart node %s. Response: %s", node_uuid, response_data)
         return False
 
     async def restart_all_nodes(self, *, force_restart: bool = False) -> bool:
@@ -230,7 +230,7 @@ class PanelApiResourcesMixin:
         )
         if response_data and not response_data.get("error"):
             return True
-        logging.error("Failed to restart all nodes. Response: %s", response_data)
+        logger.error("Failed to restart all nodes. Response: %s", response_data)
         return False
 
     async def update_bot_db_sync_status(
@@ -295,7 +295,7 @@ class PanelApiResourcesMixin:
         response_data = await self._request("GET", endpoint, log_full_response=False)
         if response_data and not response_data.get("error") and "response" in response_data:
             return _json_dict(response_data.get("response"))
-        logging.error(
+        logger.error(
             "Failed to get bandwidth stats for user %s. Response: %s", user_uuid, response_data
         )
         return None
@@ -321,7 +321,7 @@ class PanelApiResourcesMixin:
                 return response
             if isinstance(response, list):
                 return {"topUsers": response}
-        logging.error(
+        logger.error(
             "Failed to get node bandwidth stats for node %s. Response: %s",
             node_uuid,
             response_data,
@@ -352,7 +352,7 @@ class PanelApiResourcesMixin:
             return squads
         stale_squads = _json_dict_list(self._squads_cache.get_stale("list"))
         if stale_squads is not None:
-            logging.warning("Using stale internal squads cache after panel fetch failed.")
+            logger.warning("Using stale internal squads cache after panel fetch failed.")
             return stale_squads
         return None
 
@@ -367,7 +367,7 @@ class PanelApiResourcesMixin:
                     value = response.get(key)
                     if isinstance(value, list):
                         return _json_dict_list(value)
-        logging.error("Failed to get internal squads. Response: %s", response_data)
+        logger.error("Failed to get internal squads. Response: %s", response_data)
         return None
 
     async def get_internal_squad(self, squad_uuid: str) -> dict[str, Any] | None:
@@ -388,7 +388,7 @@ class PanelApiResourcesMixin:
                 if isinstance(inner, dict):
                     return inner
                 return response
-        logging.error(
+        logger.error(
             "Failed to get internal squad %s. Response: %s",
             squad_uuid,
             response_data,
@@ -426,7 +426,7 @@ class PanelApiResourcesMixin:
                         value = response.get(key)
                         if isinstance(value, list):
                             return _json_dict_list(value)
-        logging.error(
+        logger.error(
             "Failed to get accessible nodes for internal squad %s. Response: %s",
             squad_uuid,
             last_response,
@@ -448,7 +448,7 @@ class PanelApiResourcesMixin:
                     value = response.get(key)
                     if isinstance(value, list):
                         return _json_dict_list(value)
-        logging.error("Failed to get hosts. Response: %s", response_data)
+        logger.error("Failed to get hosts. Response: %s", response_data)
         return None
 
     async def reset_user_traffic(self, user_uuid: str) -> bool:
@@ -458,5 +458,5 @@ class PanelApiResourcesMixin:
             await self._invalidate_user_cache(user_uuid)
             await self._invalidate_all_users_cache()
             return True
-        logging.error("Failed to reset traffic for user %s. Response: %s", user_uuid, response_data)
+        logger.error("Failed to reset traffic for user %s. Response: %s", user_uuid, response_data)
         return False

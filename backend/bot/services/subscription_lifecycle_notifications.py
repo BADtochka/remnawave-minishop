@@ -26,6 +26,8 @@ from config.settings import Settings
 from db.dal import subscription_dal
 from db.models import Subscription, User
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class SubscriptionNotificationStage:
@@ -175,21 +177,21 @@ class SubscriptionLifecycleNotificationService:
                     delivery_status,
                 )
             if delivery_status:
-                logging.warning(
+                logger.warning(
                     "Skipping subscription notification %s for unreachable Telegram user %s: %s",
                     stage.key,
                     chat_id,
                     exc,
                 )
                 return False
-            logging.exception(
+            logger.exception(
                 "Failed to send subscription notification %s to Telegram user %s",
                 stage.key,
                 chat_id,
             )
             return False
         except Exception:
-            logging.exception(
+            logger.exception(
                 "Failed to send subscription notification %s to Telegram user %s",
                 stage.key,
                 chat_id,
@@ -267,7 +269,7 @@ class SubscriptionLifecycleNotificationService:
             email_service = self.email_service or EmailAuthService(self.settings, self.i18n)
             await email_service.send_rendered_email(email=recipient, content=content)
         except Exception:
-            logging.exception(
+            logger.exception(
                 "Failed to send subscription notification %s to email %s",
                 stage.key,
                 recipient,

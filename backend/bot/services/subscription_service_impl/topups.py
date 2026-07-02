@@ -10,6 +10,8 @@ from db.dal import payment_dal, subscription_dal, tariff_dal, user_dal
 
 from ._typing import SubscriptionServiceMixinContract
 
+logger = logging.getLogger(__name__)
+
 
 class TopupMixin(SubscriptionServiceMixinContract):
     async def activate_topup(
@@ -134,7 +136,7 @@ class TopupMixin(SubscriptionServiceMixinContract):
             db_user.panel_user_uuid, panel_payload
         )
         if not updated_panel or updated_panel.get("error"):
-            logging.warning(
+            logger.warning(
                 "Panel user details update FAILED for traffic top-up user %s. Response: %s",
                 user_id,
                 updated_panel,
@@ -177,7 +179,7 @@ class TopupMixin(SubscriptionServiceMixinContract):
     ) -> dict[str, Any] | None:
         tariff = self._resolve_tariff(tariff_key)
         if not tariff or not tariff.premium_squad_uuids:
-            logging.error(
+            logger.error(
                 "Premium top-up requires a tariff with premium squads for user %s", user_id
             )
             return None
@@ -285,7 +287,7 @@ class TopupMixin(SubscriptionServiceMixinContract):
             source="premium_topup",
         )
         if not panel_updated:
-            logging.warning(
+            logger.warning(
                 "Panel user details update FAILED for premium top-up user %s.",
                 user_id,
             )
@@ -326,7 +328,7 @@ class TopupMixin(SubscriptionServiceMixinContract):
         try:
             gb_value = float(traffic_gb)
         except (TypeError, ValueError):
-            logging.error("admin_grant_topup: invalid traffic_gb=%r", traffic_gb)
+            logger.error("admin_grant_topup: invalid traffic_gb=%r", traffic_gb)
             return None
         if gb_value <= 0:
             return None
@@ -389,7 +391,7 @@ class TopupMixin(SubscriptionServiceMixinContract):
                 db_user.panel_user_uuid, panel_payload
             )
         except Exception:
-            logging.exception("admin_grant_topup: failed to push panel update for user %s", user_id)
+            logger.exception("admin_grant_topup: failed to push panel update for user %s", user_id)
         await tariff_dal.create_traffic_topup(
             session,
             subscription_id=sub.subscription_id,
@@ -414,7 +416,7 @@ class TopupMixin(SubscriptionServiceMixinContract):
         try:
             gb_value = float(traffic_gb)
         except (TypeError, ValueError):
-            logging.error("admin_grant_premium_topup: invalid traffic_gb=%r", traffic_gb)
+            logger.error("admin_grant_premium_topup: invalid traffic_gb=%r", traffic_gb)
             return None
         if gb_value <= 0:
             return None
@@ -429,7 +431,7 @@ class TopupMixin(SubscriptionServiceMixinContract):
             return None
         tariff = self._resolve_tariff(sub.tariff_key) if sub.tariff_key else None
         if not tariff or not tariff.premium_squad_uuids:
-            logging.error(
+            logger.error(
                 "admin_grant_premium_topup: tariff %s has no premium squads (user %s)",
                 getattr(tariff, "key", None),
                 user_id,
@@ -486,12 +488,12 @@ class TopupMixin(SubscriptionServiceMixinContract):
                 source="admin_premium_topup",
             )
             if not panel_updated:
-                logging.warning(
+                logger.warning(
                     "admin_grant_premium_topup: panel update failed for user %s",
                     user_id,
                 )
         except Exception:
-            logging.exception(
+            logger.exception(
                 "admin_grant_premium_topup: failed to push panel update for user %s",
                 user_id,
             )
@@ -551,7 +553,7 @@ class TopupMixin(SubscriptionServiceMixinContract):
                 log_response=False,
             )
         except Exception:
-            logging.exception(
+            logger.exception(
                 "Failed to fetch panel user %s before premium squad update",
                 panel_user_uuid,
             )
@@ -609,7 +611,7 @@ class TopupMixin(SubscriptionServiceMixinContract):
         current_set: set[str] | None,
         desired_set: set[str],
     ) -> None:
-        logging.info(
+        logger.info(
             "Sync panel PATCH: source=%s user_id=%s telegram_id=%s panel_uuid=%s "
             "panel_view=full_fetch reasons=activeInternalSquads_mismatch "
             "fields=activeInternalSquads payload_fields=activeInternalSquads changes=%s",

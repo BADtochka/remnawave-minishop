@@ -2,6 +2,8 @@ import logging
 import re
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 _TELEGRAM_LINK_RE = re.compile(r"^(?:https?://|tg://)", re.IGNORECASE)
 _TELEGRAM_USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{5,64}$")
 
@@ -84,7 +86,7 @@ async def resolve_required_channel_link(
             if resolved_link:
                 return resolved_link
         except Exception as error:
-            logging.warning(
+            logger.warning(
                 "Failed to resolve required channel link from chat %s: %s",
                 required_channel_id,
                 error,

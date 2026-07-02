@@ -53,6 +53,8 @@ from .config import (
 from .service import WataService
 from .webhook import wata_webhook_route
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="user_subscription_payments_wata_router")
 _LOG = "wata"
 
@@ -92,13 +94,13 @@ async def pay_wata_callback_handler(
 
     profile = wata_service.profile_for_method(spec.id) if wata_service else None
     if not wata_service or not profile or not wata_service.profile_enabled(profile.provider):
-        logging.error("Wata service is not configured or unavailable.")
+        logger.error("Wata service is not configured or unavailable.")
         await notify_service_unavailable(callback, translator)
         return
 
     parts = parse_payment_callback(callback.data or "")
     if not parts:
-        logging.error("Invalid pay_wata data in callback: %s", callback.data)
+        logger.error("Invalid pay_wata data in callback: %s", callback.data)
         await notify_callback_parse_error(callback, translator)
         return
     parts, hwid_quote = await quote_hwid_callback_parts(
@@ -166,7 +168,7 @@ async def pay_wata_callback_handler(
         await session.commit()
     except Exception:
         await session.rollback()
-        logging.exception(
+        logger.exception(
             "Wata: failed to create payment record for user %s.", callback.from_user.id
         )
         await notify_payment_record_failure(callback, translator)
@@ -223,7 +225,7 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
         )
     except Exception:
         await ctx.session.rollback()
-        logging.exception("Wata WebApp payment failed")
+        logger.exception("Wata WebApp payment failed")
         return payment_failed()
 
     return await finalize_webapp_link_payment(

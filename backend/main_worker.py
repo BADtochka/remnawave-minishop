@@ -42,6 +42,8 @@ from bot.services.tariff_worker import TariffTrafficWorker
 from bot.utils.message_queue import init_queue_manager
 from config.settings import Settings, get_settings
 
+logger = logging.getLogger(__name__)
+
 
 async def _build_worker_context(settings: Settings) -> PluginContext:
     runtime = await build_runtime_bootstrap(settings)
@@ -51,7 +53,7 @@ async def _build_worker_context(settings: Settings) -> PluginContext:
         bot_info = await runtime.bot.get_me()
         bot_username = bot_info.username or bot_username
     except Exception:
-        logging.exception("Worker failed to resolve bot username")
+        logger.exception("Worker failed to resolve bot username")
     init_queue_manager(runtime.bot)
     ctx = build_core_runtime(runtime, bot_username=bot_username).plugin_context
     run_setup(ctx)
@@ -125,7 +127,7 @@ async def _handle_panel_sync_event(ctx: PluginContext, payload: dict[str, Any]) 
                     i18n_instance=i18n,
                 )
         else:
-            logging.info("Queued panel sync skipped because another sync holds the lock")
+            logger.info("Queued panel sync skipped because another sync holds the lock")
     if sync_result is not None:
         await _notify_queued_panel_sync_result(
             bot,
@@ -156,14 +158,14 @@ async def _webhook_consumer(ctx: PluginContext, handlers: dict[str, QueueHandler
         try:
             handler = handlers.get(str(provider))
             if handler is None:
-                logging.warning("Unknown webhook event provider: %s", provider)
+                logger.warning("Unknown webhook event provider: %s", provider)
             else:
                 await handler(ctx, payload)
         except Exception:
-            logging.exception("Webhook queue event failed: %s", event.get("event_id"))
+            logger.exception("Webhook queue event failed: %s", event.get("event_id"))
         finally:
             depth = await webhook_queue_depth(settings)
-            logging.info(
+            logger.info(
                 "metric webhook_event_duration_seconds=%.3f provider=%s queue_depth=%s",
                 time.monotonic() - started,
                 provider,
@@ -196,7 +198,7 @@ async def _notify_queued_panel_sync_result(
             else:
                 await bot.send_message(target_chat_id, _("sync_success_simple"))
         except Exception:
-            logging.exception("Failed to send queued panel sync result to admin")
+            logger.exception("Failed to send queued panel sync result to admin")
 
 
 async def _panel_sync_loop(ctx: PluginContext) -> None:
@@ -219,12 +221,12 @@ async def _panel_sync_loop(ctx: PluginContext) -> None:
                             settings=settings,
                             i18n_instance=i18n,
                         )
-                    logging.info(
+                    logger.info(
                         "metric worker_tick_duration_seconds=%.3f worker=panel_sync",
                         time.monotonic() - started,
                     )
         except Exception:
-            logging.exception("Panel sync worker tick failed")
+            logger.exception("Panel sync worker tick failed")
         await asyncio.sleep(settings.WORKER_PANEL_SYNC_INTERVAL_SECONDS)
 
 
@@ -314,7 +316,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        logging.info("Worker stopped")
+        logger.info("Worker stopped")
     except Exception as exc:
-        logging.critical("Worker failed: %s", exc, exc_info=True)
+        logger.critical("Worker failed: %s", exc, exc_info=True)
         sys.exit(1)

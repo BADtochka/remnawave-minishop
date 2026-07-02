@@ -9,6 +9,8 @@ from db.dal import subscription_dal, tariff_dal, user_dal
 
 from ._typing import SubscriptionServiceMixinContract
 
+logger = logging.getLogger(__name__)
+
 
 class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
     async def get_active_subscription_details(
@@ -16,7 +18,7 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
     ) -> dict[str, Any] | None:
         db_user = await user_dal.get_user_by_id(session, user_id)
         if not db_user or not db_user.panel_user_uuid:
-            logging.info(
+            logger.info(
                 f"User {user_id} not found in DB or no panel_user_uuid for 'my_subscription'."
             )
             return None
@@ -33,7 +35,7 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
 
         if not panel_user_data:
             if panel_user_confirmed_absent:
-                logging.warning(
+                logger.warning(
                     "Panel user %s confirmed absent on panel for user %s. "
                     "Clearing local linkage. reason=%s",
                     panel_user_uuid,
@@ -43,7 +45,7 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
                 await subscription_dal.deactivate_all_user_subscriptions(session, user_id)
                 await user_dal.update_user(session, user_id, {"panel_user_uuid": None})
                 return None
-            logging.warning(
+            logger.warning(
                 "Panel user %s lookup failed for user %s; treating it as a panel access/API "
                 "problem and preserving local linkage/subscription. reason=%s",
                 panel_user_uuid,
@@ -205,7 +207,7 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
                     )
                     local_active_sub.extra_hwid_devices = active_extra_hwid_devices
             except Exception:
-                logging.exception(
+                logger.exception(
                     "Failed to load HWID entitlement summary for subscription %s",
                     local_active_sub.subscription_id,
                 )

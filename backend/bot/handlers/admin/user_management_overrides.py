@@ -19,6 +19,8 @@ from db.models import User
 
 from .user_management_info import handle_refresh_user_card
 
+logger = logging.getLogger(__name__)
+
 
 async def handle_premium_override_menu(
     callback: types.CallbackQuery,
@@ -138,7 +140,7 @@ async def handle_premium_override_apply(
             callback, user, subscription_service, session, settings, i18n_instance, lang
         )
     except Exception as exc:
-        logging.error(
+        logger.error(
             "Failed to apply premium override for user %s: %s", user.user_id, exc, exc_info=True
         )
         await session.rollback()
@@ -295,7 +297,7 @@ async def handle_hwid_limit_apply(
             callback, user, subscription_service, session, settings, i18n_instance, lang
         )
     except Exception as exc:
-        logging.error(
+        logger.error(
             "Failed to apply HWID device limit for user %s: %s",
             user.user_id,
             exc,

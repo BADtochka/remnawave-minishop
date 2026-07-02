@@ -14,6 +14,8 @@ from bot.utils.telegram_markup import (
     remove_profile_link_buttons,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class QueuedMessage:
@@ -80,7 +82,7 @@ class MessageQueue:
                 except TelegramBadRequest as exc:
                     fallback_message = self._build_profile_link_fallback(message, exc)
                     if fallback_message:
-                        logging.warning(
+                        logger.warning(
                             "Telegram rejected profile buttons for chat %s: %s. "
                             "Retrying without tg:// links.",
                             message.chat_id,
@@ -92,17 +94,17 @@ class MessageQueue:
                             continue
                         except Exception as retry_exc:
                             self.total_failed += 1
-                            logging.error(
+                            logger.error(
                                 f"Failed to send fallback message to {message.chat_id}: {retry_exc}"
                             )
                             continue
 
                     self.total_failed += 1
-                    logging.error(f"Failed to send queued message to {message.chat_id}: {exc}")
+                    logger.error(f"Failed to send queued message to {message.chat_id}: {exc}")
 
                 except Exception:
                     self.total_failed += 1
-                    logging.exception("Failed to send queued message to %s.", message.chat_id)
+                    logger.exception("Failed to send queued message to %s.", message.chat_id)
 
         finally:
             self.is_processing = False

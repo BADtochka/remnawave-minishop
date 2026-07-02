@@ -12,6 +12,8 @@ from bot.utils.callback_answer import callback_data, callback_message
 from config.settings import Settings
 from db.dal import ad_dal
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="admin_ads_router")
 
 
@@ -93,7 +95,7 @@ async def ads_list_pagination(
         await callback_message(callback).edit_text(text, reply_markup=reply_markup)
         await callback.answer()
     except Exception as e:
-        logging.error(f"Failed to paginate ads list: {e}")
+        logger.error(f"Failed to paginate ads list: {e}")
         await callback.answer()
 
 
@@ -143,7 +145,7 @@ async def show_ad_card(
         )
         await callback.answer()
     except Exception as e:
-        logging.error(f"Failed to show ad card: {e}")
+        logger.error(f"Failed to show ad card: {e}")
         await callback.answer()
 
 
@@ -378,7 +380,7 @@ async def ads_create_flow(
             return
         except Exception as e:
             await session.rollback()
-            logging.error(f"Failed to create ad campaign: {e}", exc_info=True)
+            logger.error(f"Failed to create ad campaign: {e}", exc_info=True)
             await message.answer(_("error_occurred_try_again"))
             return
 

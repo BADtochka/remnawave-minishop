@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import json
@@ -17,15 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from bot.middlewares.i18n import JsonI18n
-
-if TYPE_CHECKING:
-    from bot.services.referral_service import ReferralService
-    from bot.services.subscription_service_impl.core import SubscriptionService
-else:
-    ReferralService = object
-    SubscriptionService = object
-import contextlib
-
 from config.settings import Settings
 from config.tariffs_config import (
     default_currency_key_for_settings,
@@ -71,6 +63,15 @@ from ..shared import (
 )
 from ..shared.app_context import app_optional, app_required
 from .manifest import _CONFIG_MANIFEST, _PRESENTATION_MANIFEST
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
+
+logger = logging.getLogger(__name__)
 
 _LOG = "pally"
 PALLY_SUPPORTED_CURRENCIES = ("RUB", "USD", "EUR")
@@ -250,7 +251,7 @@ class PallyService(HttpClientMixin):
 
         self._init_http_client(total_timeout=lambda: self.settings.PAYMENT_REQUEST_TIMEOUT_SECONDS)
         if not self.configured:
-            logging.warning("PallyService initialized but not fully configured. Payments disabled.")
+            logger.warning("PallyService initialized but not fully configured. Payments disabled.")
 
     @property
     def configured(self) -> bool:
@@ -290,7 +291,7 @@ class PallyService(HttpClientMixin):
 
     async def _post_form(self, path: str, body: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
         if not self.configured:
-            logging.error("PallyService is not configured. Cannot call %s.", path)
+            logger.error("PallyService is not configured. Cannot call %s.", path)
             return False, {"message": "service_not_configured"}
 
         session = await self._get_session()
@@ -301,7 +302,7 @@ class PallyService(HttpClientMixin):
                 try:
                     response_data = json.loads(response_text) if response_text else {}
                 except json.JSONDecodeError:
-                    logging.error("Pally %s: invalid JSON response: %s", path, response_text[:500])
+                    logger.error("Pally %s: invalid JSON response: %s", path, response_text[:500])
                     return False, {
                         "status": response.status,
                         "message": "invalid_json",
@@ -310,7 +311,7 @@ class PallyService(HttpClientMixin):
                 if not isinstance(response_data, dict):
                     response_data = {"data": response_data}
                 if not _payload_success(response.status, response_data):
-                    logging.error(
+                    logger.error(
                         "Pally %s: API error (http=%s, body=%s)",
                         path,
                         response.status,
@@ -322,7 +323,7 @@ class PallyService(HttpClientMixin):
                     }
                 return True, response_data
         except Exception as exc:
-            logging.exception("Pally %s: request failed.", path)
+            logger.exception("Pally %s: request failed.", path)
             return False, {"message": str(exc)}
 
     async def _get_json(
@@ -346,7 +347,7 @@ class PallyService(HttpClientMixin):
                 try:
                     response_data = json.loads(response_text) if response_text else {}
                 except json.JSONDecodeError:
-                    logging.error("Pally %s: invalid JSON response: %s", path, response_text[:500])
+                    logger.error("Pally %s: invalid JSON response: %s", path, response_text[:500])
                     return False, {
                         "status": response.status,
                         "message": "invalid_json",
@@ -355,7 +356,7 @@ class PallyService(HttpClientMixin):
                 if not isinstance(response_data, dict):
                     response_data = {"data": response_data}
                 if not _payload_success(response.status, response_data):
-                    logging.error(
+                    logger.error(
                         "Pally %s: API error (http=%s, body=%s)",
                         path,
                         response.status,
@@ -367,7 +368,7 @@ class PallyService(HttpClientMixin):
                     }
                 return True, response_data
         except Exception as exc:
-            logging.exception("Pally %s: request failed.", path)
+            logger.exception("Pally %s: request failed.", path)
             return False, {"message": str(exc)}
 
     async def create_bill(
@@ -380,7 +381,7 @@ class PallyService(HttpClientMixin):
         language: str | None = None,
     ) -> tuple[bool, dict[str, Any]]:
         if not self.configured:
-            logging.error("PallyService is not configured. Cannot create bill.")
+            logger.error("PallyService is not configured. Cannot create bill.")
             return False, {"message": "service_not_configured"}
 
         currency_code = normalize_payment_currency_code(
@@ -467,11 +468,11 @@ class PallyService(HttpClientMixin):
     def verify_signature(self, out_sum: Any, inv_id: Any, received_signature: Any) -> bool:
         received = str(received_signature or "").strip().upper()
         if not received:
-            logging.warning("Pally webhook: missing signature.")
+            logger.warning("Pally webhook: missing signature.")
             return False
         expected = self.calculate_signature(out_sum, inv_id)
         if not expected:
-            logging.error("Pally webhook: no signature token configured.")
+            logger.error("Pally webhook: no signature token configured.")
             return False
         return hmac.compare_digest(expected, received)
 
@@ -535,10 +536,10 @@ class PallyService(HttpClientMixin):
         provider_payment_id = first_value(payload, "TrsId", "TrsID", "bill_id", "BillId", "id")
 
         if not inv_id or out_sum is None or not status or not signature:
-            logging.error("Pally webhook: missing required fields: %s", payload)
+            logger.error("Pally webhook: missing required fields: %s", payload)
             return web.Response(status=400, text="missing_fields")
         if not self.verify_signature(out_sum, inv_id, signature):
-            logging.error("Pally webhook: invalid signature.")
+            logger.error("Pally webhook: invalid signature.")
             return web.Response(status=403, text="invalid_signature")
 
         async with self.async_session_factory() as session:
@@ -548,7 +549,7 @@ class PallyService(HttpClientMixin):
                 provider_payment_id=provider_payment_id,
             )
             if not payment:
-                logging.error(
+                logger.error(
                     "Pally webhook: payment not found (inv_id=%s, provider_id=%s)",
                     inv_id,
                     provider_payment_id,
@@ -563,11 +564,11 @@ class PallyService(HttpClientMixin):
 
             if status in _SUCCESS_STATUSES:
                 if payment.status == "succeeded":
-                    logging.info("Pally webhook: payment %s already succeeded.", payment.payment_id)
+                    logger.info("Pally webhook: payment %s already succeeded.", payment.payment_id)
                     return web.Response(text="OK")
 
                 if not self._amount_matches_payment(payload, payment, status):
-                    logging.error(
+                    logger.error(
                         "Pally webhook: amount mismatch for payment %s (expected=%s, payload=%s)",
                         payment.payment_id,
                         payment.amount,
@@ -585,7 +586,7 @@ class PallyService(HttpClientMixin):
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception(
+                    logger.exception(
                         "Pally webhook: failed to mark payment %s as succeeded.",
                         resolved_provider_id,
                     )
@@ -627,7 +628,7 @@ class PallyService(HttpClientMixin):
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception(
+                    logger.exception(
                         "Pally webhook: failed to mark payment %s as failed.",
                         resolved_provider_id,
                     )
@@ -652,13 +653,13 @@ class PallyService(HttpClientMixin):
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception(
+                    logger.exception(
                         "Pally webhook: failed to update pending status for %s.",
                         resolved_provider_id,
                     )
                 return web.Response(text="OK")
 
-            logging.warning(
+            logger.warning(
                 "Pally webhook: unhandled status '%s' for payment %s",
                 status,
                 resolved_provider_id,
@@ -699,13 +700,13 @@ async def pay_pally_callback_handler(
         return
 
     if not pally_service or not pally_service.configured:
-        logging.error("Pally service is not configured or unavailable.")
+        logger.error("Pally service is not configured or unavailable.")
         await notify_service_unavailable(callback, translator)
         return
 
     parts = parse_payment_callback(callback.data or "")
     if not parts:
-        logging.error("Invalid pay_pally data in callback: %s", callback.data)
+        logger.error("Invalid pay_pally data in callback: %s", callback.data)
         await notify_callback_parse_error(callback, translator)
         return
     parts, hwid_quote = await quote_hwid_callback_parts(
@@ -771,7 +772,7 @@ async def pay_pally_callback_handler(
         await session.commit()
     except Exception:
         await session.rollback()
-        logging.exception(
+        logger.exception(
             "Pally: failed to create payment record for user %s.", callback.from_user.id
         )
         await notify_payment_record_failure(callback, translator)
@@ -840,7 +841,7 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
         )
     except Exception:
         await ctx.session.rollback()
-        logging.exception("Pally WebApp payment failed")
+        logger.exception("Pally WebApp payment failed")
         return payment_failed()
 
     return await finalize_webapp_link_payment(

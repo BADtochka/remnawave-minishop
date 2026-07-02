@@ -24,6 +24,8 @@ from .user_management_common import (
 )
 from .user_management_info import handle_refresh_user_card
 
+logger = logging.getLogger(__name__)
+
 
 async def handle_traffic_grant_menu(
     callback: types.CallbackQuery,
@@ -122,7 +124,7 @@ async def handle_reset_trial(
         )
 
     except Exception as e:
-        logging.error(f"Error resetting trial for user {user.user_id}: {e}")
+        logger.error(f"Error resetting trial for user {user.user_id}: {e}")
         await session.rollback()
         await callback.answer(_("admin_user_trial_reset_error"), show_alert=True)
 
@@ -330,7 +332,7 @@ async def handle_change_tariff_apply(
             lang,
         )
     except Exception as exc:
-        logging.error(
+        logger.error(
             "Error changing tariff for user %s to %s: %s",
             user.user_id,
             resolved_tariff_key,
@@ -384,7 +386,7 @@ async def handle_toggle_ban(
         )
 
     except Exception as e:
-        logging.error(f"Error toggling ban for user {user.user_id}: {e}")
+        logger.error(f"Error toggling ban for user {user.user_id}: {e}")
         await session.rollback()
         await callback.answer(_("admin_user_ban_toggle_error"), show_alert=True)
 

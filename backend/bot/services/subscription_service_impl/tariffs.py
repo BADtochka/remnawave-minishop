@@ -17,6 +17,8 @@ from db.models import Subscription
 
 from ._typing import SubscriptionServiceMixinContract
 
+logger = logging.getLogger(__name__)
+
 
 class TariffMixin(SubscriptionServiceMixinContract):
     @staticmethod
@@ -241,7 +243,7 @@ class TariffMixin(SubscriptionServiceMixinContract):
                 )
                 squad_inbound_map[squad_uuid] = _extract_inbound_uuids(squad)
         except Exception:
-            logging.debug("Failed to load internal squad names for premium display", exc_info=True)
+            logger.debug("Failed to load internal squad names for premium display", exc_info=True)
 
         for squad_uuid in tariff.premium_squad_uuids:
             squad_uuid_str = str(squad_uuid)
@@ -250,7 +252,7 @@ class TariffMixin(SubscriptionServiceMixinContract):
             try:
                 detail = await self.panel_service.get_internal_squad(squad_uuid_str)
             except Exception:
-                logging.debug(
+                logger.debug(
                     "Failed to load internal squad detail for %s", squad_uuid_str, exc_info=True
                 )
                 detail = None
@@ -294,14 +296,14 @@ class TariffMixin(SubscriptionServiceMixinContract):
                 if not inbound_uuid:
                     continue
                 hosts_by_inbound.setdefault(inbound_uuid, []).append(host)
-            logging.debug(
+            logger.debug(
                 "Premium label resolution: %d hosts grouped across %d inbounds; squad inbound map: %s",  # noqa: E501
                 len(hosts),
                 len(hosts_by_inbound),
                 {k: len(v) for k, v in squad_inbound_map.items()},
             )
         except Exception:
-            logging.debug("Failed to load hosts for premium display", exc_info=True)
+            logger.debug("Failed to load hosts for premium display", exc_info=True)
 
         def _host_remark(host: dict[str, Any]) -> str:
             for key in ("remark", "name", "label", "title"):
@@ -333,7 +335,7 @@ class TariffMixin(SubscriptionServiceMixinContract):
                     await self.panel_service.get_internal_squad_accessible_nodes(squad_uuid) or []
                 )
             except Exception:
-                logging.debug(
+                logger.debug(
                     "Failed to load accessible nodes for premium squad %s",
                     squad_uuid,
                     exc_info=True,

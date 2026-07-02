@@ -25,6 +25,8 @@ from bot.utils.message_queue import get_queue_manager
 from config.settings import Settings
 from db.dal import message_log_dal, user_dal
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="admin_broadcast_router")
 _BROADCAST_STATUS_TASKS: set[asyncio.Task[None]] = set()
 
@@ -39,7 +41,7 @@ async def broadcast_message_prompt_handler(
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: JsonI18n | None = i18n_data.get("i18n_instance")
     if not i18n:
-        logging.error("i18n missing in broadcast_message_prompt_handler")
+        logger.error("i18n missing in broadcast_message_prompt_handler")
         await callback.answer("Language service error.", show_alert=True)
         return
 
@@ -53,7 +55,7 @@ async def broadcast_message_prompt_handler(
                 reply_markup=get_back_to_admin_panel_keyboard(current_lang, i18n),
             )
         except Exception as e:
-            logging.warning(f"Could not edit message for broadcast prompt: {e}. Sending new.")
+            logger.warning(f"Could not edit message for broadcast prompt: {e}. Sending new.")
             await callback_message(callback).answer(
                 prompt_text,
                 reply_markup=get_back_to_admin_panel_keyboard(current_lang, i18n),
@@ -74,7 +76,7 @@ async def process_broadcast_message_handler(
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: JsonI18n | None = i18n_data.get("i18n_instance")
     if not i18n:
-        logging.error("i18n missing in process_broadcast_message_handler")
+        logger.error("i18n missing in process_broadcast_message_handler")
         await message.reply("Language service error.")
         return
 
@@ -259,7 +261,7 @@ async def confirm_broadcast_callback_handler(
         sent_count = 0
         failed_count = 0
         admin_user = callback.from_user
-        logging.info(
+        logger.info(
             f"Admin {admin_user.id} broadcasting '{(content.text or '')[:50]}...' to {len(user_ids)} users."  # noqa: E501
         )
 
@@ -310,7 +312,7 @@ async def confirm_broadcast_callback_handler(
                 )
             except Exception as e:
                 failed_count += 1
-                logging.warning(f"Failed to queue broadcast to {uid}: {type(e).__name__} – {e}")
+                logger.warning(f"Failed to queue broadcast to {uid}: {type(e).__name__} – {e}")
                 await message_log_dal.create_message_log(
                     session,
                     {
@@ -328,7 +330,7 @@ async def confirm_broadcast_callback_handler(
             await session.commit()
         except Exception as e_commit:
             await session.rollback()
-            logging.error(f"Error committing broadcast logs: {e_commit}")
+            logger.error(f"Error committing broadcast logs: {e_commit}")
 
         # Prepare queue stats presentation
         queue_stats = queue_manager.get_queue_stats()
@@ -386,17 +388,17 @@ async def confirm_broadcast_callback_handler(
                         if "message is not modified" in str(e):
                             last_text = new_text
                         else:
-                            logging.debug("Broadcast queue auto-update stopped: %s", e)
+                            logger.debug("Broadcast queue auto-update stopped: %s", e)
                             break
                     except Exception as e:
-                        logging.debug("Broadcast queue auto-update unexpected error: %s", e)
+                        logger.debug("Broadcast queue auto-update unexpected error: %s", e)
                         break
 
                 if queues_drained:
                     # Final refresh already attempted; exit loop.
                     break
             else:
-                logging.debug("Broadcast queue auto-update reached time limit.")
+                logger.debug("Broadcast queue auto-update reached time limit.")
 
         task = asyncio.create_task(auto_update_queue_status())
         _BROADCAST_STATUS_TASKS.add(task)

@@ -36,6 +36,8 @@ from db.advisory_locks import acquire_subscription_background_sync_lock
 from db.dal import subscription_dal
 from db.models import Subscription
 
+logger = logging.getLogger(__name__)
+
 SUBSCRIPTION_NOTIFICATION_LOCK = "subscription-notification-worker"
 DEFAULT_SUBSCRIPTION_NOTIFICATION_TICK_SECONDS = 300
 EXPIRED_NOTIFICATION_WINDOW = timedelta(hours=24)
@@ -74,7 +76,7 @@ class SubscriptionNotificationWorker:
                     ttl_seconds=max(60, self._tick_seconds() - 10),
                 ) as acquired:
                     if not acquired:
-                        logging.info(
+                        logger.info(
                             "SubscriptionNotificationWorker tick skipped: Redis lock is held"
                         )
                     else:
@@ -84,13 +86,13 @@ class SubscriptionNotificationWorker:
                             await self.expiry_tick(session)
                             await self.trial_traffic_tick(session)
                             await session.commit()
-                        logging.info(
+                        logger.info(
                             "metric worker_tick_duration_seconds=%.3f "
                             "worker=subscription_notification",
                             time.monotonic() - started,
                         )
             except Exception:
-                logging.exception("SubscriptionNotificationWorker tick failed")
+                logger.exception("SubscriptionNotificationWorker tick failed")
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._stopped.wait(), timeout=self._tick_seconds())
 
@@ -138,7 +140,7 @@ class SubscriptionNotificationWorker:
             # expired row would otherwise keep nagging the user with
             # expired/expiring notices even though they are already covered.
             if self._superseded_by_active_subscription(sub, latest_active, now):
-                logging.info(
+                logger.info(
                     "Skipping %s notification for subscription %s: user %s is already "
                     "covered by a newer active subscription.",
                     stage.key,
@@ -345,7 +347,7 @@ class SubscriptionNotificationWorker:
         try:
             data = await self.panel_service.get_user_by_uuid(panel_uuid, log_response=False)
         except Exception:
-            logging.exception(
+            logger.exception(
                 "SubscriptionNotificationWorker: failed to fetch panel user %s",
                 panel_uuid,
             )
@@ -407,7 +409,7 @@ class SubscriptionNotificationWorker:
                 status = telegram_notification_status_from_error(exc)
                 if status and user and user_id:
                     await mark_telegram_notifications_status(session, user_id, status)
-                logging.exception(
+                logger.exception(
                     "Failed to send trial traffic depleted warning to user %s",
                     telegram_chat_id,
                 )

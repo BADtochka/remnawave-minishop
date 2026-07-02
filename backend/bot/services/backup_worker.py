@@ -27,6 +27,8 @@ from bot.services.backup_archive import (
 )
 from config.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 COMPOSE_MARKER_FILES = {
     "compose.yaml",
     "compose.yml",
@@ -126,17 +128,17 @@ class BackupWorker:
                     if acquired:
                         started = time.monotonic()
                         result = await self.create_and_send_backup()
-                        logging.info(
+                        logger.info(
                             "metric worker_tick_duration_seconds=%.3f worker=backup size_bytes=%s",
                             time.monotonic() - started,
                             result.size_bytes,
                         )
                     else:
-                        logging.info(
+                        logger.info(
                             "Backup worker tick skipped because another worker holds the lock"
                         )
             except Exception as exc:
-                logging.exception("Backup worker tick failed")
+                logger.exception("Backup worker tick failed")
                 await self._notify_failure(exc)
 
     async def create_and_send_backup(self, *, backup_type: str = "scheduled") -> BackupResult:
@@ -333,7 +335,7 @@ class BackupWorker:
     async def send_backup(self, result: BackupResult) -> None:
         chat_id = self._target_chat_id()
         if chat_id is None:
-            logging.warning(
+            logger.warning(
                 "Backup archive created at %s but BACKUP_CHAT_ID/LOG_CHAT_ID is not configured",
                 result.archive_path,
             )
@@ -361,7 +363,7 @@ class BackupWorker:
             try:
                 archive.unlink()
             except OSError:
-                logging.exception("Failed to delete old backup archive %s", archive)
+                logger.exception("Failed to delete old backup archive %s", archive)
 
     def _target_chat_id(self) -> int | None:
         value = self.settings.BACKUP_CHAT_ID or self.settings.LOG_CHAT_ID
@@ -435,7 +437,7 @@ class BackupWorker:
                 keys=BACKUP_RUNTIME_SETTING_KEYS,
             )
         except Exception:
-            logging.exception("Failed to refresh backup settings from DB")
+            logger.exception("Failed to refresh backup settings from DB")
 
     def _interval_seconds(self) -> int:
         try:
@@ -484,4 +486,4 @@ class BackupWorker:
                 message_thread_id=self._target_thread_id(),
             )
         except Exception:
-            logging.exception("Failed to send backup failure notification")
+            logger.exception("Failed to send backup failure notification")

@@ -39,6 +39,8 @@ from .sync_admin_identity import (
     _prefetch_sync_indexes,
 )
 
+logger = logging.getLogger(__name__)
+
 
 async def perform_sync(
     panel_service: PanelApiService,
@@ -48,7 +50,7 @@ async def perform_sync(
 ) -> dict:
     """Single-flight entry point — skips when another sync is already running."""
     if _sync_lock.locked():
-        logging.info("perform_sync: skipped because another sync is already in progress")
+        logger.info("perform_sync: skipped because another sync is already in progress")
         return {
             "status": "skipped",
             "details": "Another sync run is already in progress.",
@@ -115,7 +117,7 @@ async def _perform_sync_impl(
             }
 
         total_panel_users = len(panel_users_data)
-        logging.info(f"Starting sync for {total_panel_users} panel users.")
+        logger.info(f"Starting sync for {total_panel_users} panel users.")
         await acquire_subscription_background_sync_lock(session)
         sync_indexes = await _prefetch_sync_indexes(session, panel_users_data)
         users_by_telegram_id = cast(dict[int, User], sync_indexes["users_by_telegram_id"])
@@ -152,7 +154,7 @@ async def _perform_sync_impl(
 
                 if not panel_uuid:
                     sync_errors.append(f"Panel user missing UUID: {panel_user_dict}")
-                    logging.warning(f"Skipping panel user without UUID: {panel_user_dict}")
+                    logger.warning(f"Skipping panel user without UUID: {panel_user_dict}")
                     continue
 
                 # Track users without telegram ID
@@ -168,14 +170,14 @@ async def _perform_sync_impl(
                         telegram_id_from_panel
                     ) or users_by_user_id.get(telegram_id_from_panel)
                     if existing_user:
-                        logging.debug(f"Found user by telegramId {telegram_id_from_panel}")
+                        logger.debug(f"Found user by telegramId {telegram_id_from_panel}")
 
                 # If not found by telegram ID, try to find by panel UUID.
                 # The panel UUID is the strongest local link for subscription sync.
                 if not existing_user:
                     existing_user = users_by_panel_uuid.get(panel_uuid)
                     if existing_user:
-                        logging.debug(
+                        logger.debug(
                             f"Found user by panel UUID {panel_uuid}, telegramId: {existing_user.user_id}"  # noqa: E501
                         )
                         # Update telegram ID if it was missing in panel data but we have local user
@@ -183,7 +185,7 @@ async def _perform_sync_impl(
                             telegram_id_from_panel
                             and existing_user.user_id != telegram_id_from_panel
                         ):
-                            logging.warning(
+                            logger.warning(
                                 f"TelegramId mismatch: panel={telegram_id_from_panel}, local={existing_user.user_id}"  # noqa: E501
                             )
 
@@ -192,7 +194,7 @@ async def _perform_sync_impl(
                 if not existing_user and email_from_panel:
                     existing_user = users_by_email.get(email_from_panel)
                     if existing_user:
-                        logging.debug(f"Found user by email {email_from_panel}")
+                        logger.debug(f"Found user by email {email_from_panel}")
 
                 if not existing_user:
                     users_not_found_in_db += 1
@@ -220,7 +222,7 @@ async def _perform_sync_impl(
                             )
                             if was_created:
                                 users_created += 1
-                                logging.info(
+                                logger.info(
                                     f"Created new user {telegram_id_from_panel} from panel sync with UUID {panel_uuid}"  # noqa: E501
                                 )
 
@@ -236,7 +238,7 @@ async def _perform_sync_impl(
                             sync_errors.append(
                                 f"Error creating user {telegram_id_from_panel}: {e_create!s}"
                             )
-                            logging.error(
+                            logger.error(
                                 f"Error creating user {telegram_id_from_panel}: {e_create}"
                             )
                             continue
@@ -251,7 +253,7 @@ async def _perform_sync_impl(
                             new_user.panel_user_uuid = panel_uuid
                             if was_created:
                                 users_created += 1
-                                logging.info(
+                                logger.info(
                                     f"Created new email user {new_user.user_id} from panel sync with UUID {panel_uuid}"  # noqa: E501
                                 )
                             existing_user = new_user
@@ -262,12 +264,12 @@ async def _perform_sync_impl(
                             sync_errors.append(
                                 f"Error creating email user {email_from_panel}: {e_create_email!s}"
                             )
-                            logging.error(
+                            logger.error(
                                 f"Error creating email user {email_from_panel}: {e_create_email}"
                             )
                             continue
                     else:
-                        logging.debug(
+                        logger.debug(
                             f"Panel user with UUID {panel_uuid} (no telegramId) not found in local DB - skipping"  # noqa: E501
                         )
                         continue
@@ -306,7 +308,7 @@ async def _perform_sync_impl(
                                 f"local panel UUID {linked_uuid} still exists on panel."
                             )
                             sync_errors.append(msg)
-                            logging.warning("Sync: %s", msg)
+                            logger.warning("Sync: %s", msg)
                             continue
 
                         previous_panel_uuid = existing_user.panel_user_uuid
@@ -322,7 +324,7 @@ async def _perform_sync_impl(
                             duplicate_panel_uuid=panel_uuid,
                         )
                         if not can_merge_panel_uuid_owner:
-                            logging.warning(
+                            logger.warning(
                                 "Sync: panel UUID %s is already linked to local user %s; "
                                 "skipping reassignment to user %s because local merge failed.",
                                 panel_uuid,
@@ -352,7 +354,7 @@ async def _perform_sync_impl(
                             users_by_email.pop(previous_owner_email.strip().lower(), None)
                         if existing_user.email:
                             users_by_email[existing_user.email.strip().lower()] = existing_user
-                        logging.info(
+                        logger.info(
                             "Sync: merged local user %s owning panel UUID %s into user %s "
                             "and reassigned stale local panel UUID %s.",
                             previous_owner_user_id,
@@ -371,7 +373,7 @@ async def _perform_sync_impl(
                             duplicate_panel_uuid=panel_uuid,
                         )
                         if not can_absorb_duplicate_panel_user:
-                            logging.warning(
+                            logger.warning(
                                 "Sync: duplicate panel users share telegramId %s; keeping local panel UUID %s and skipping duplicate panel UUID %s because local duplicate merge failed.",  # noqa: E501
                                 telegram_id_from_panel,
                                 linked_uuid,
@@ -417,7 +419,7 @@ async def _perform_sync_impl(
                                     set(),
                                 ).discard(str(panel_uuid))
                             users_by_panel_uuid.pop(str(panel_uuid), None)
-                            logging.info(
+                            logger.info(
                                 "Sync local update: user_id=%s telegram_id=%s panel_uuid=%s "
                                 "reasons=%s",
                                 actual_user_id,
@@ -425,7 +427,7 @@ async def _perform_sync_impl(
                                 linked_uuid,
                                 "duplicate_panel_identity_resolved",
                             )
-                        logging.warning(
+                        logger.warning(
                             "Sync: duplicate panel users share telegramId %s; kept local panel UUID %s and processed duplicate panel UUID %s.",  # noqa: E501
                             telegram_id_from_panel,
                             linked_uuid,
@@ -438,7 +440,7 @@ async def _perform_sync_impl(
                         _append_unique(user_update_reasons, "panel_uuid_synced")
                         users_uuid_updated += 1
                         users_by_panel_uuid[panel_uuid] = existing_user
-                        logging.info(f"Updated panel UUID for user {actual_user_id}: {panel_uuid}")
+                        logger.info(f"Updated panel UUID for user {actual_user_id}: {panel_uuid}")
                 if not is_duplicate_panel_identity:
                     existing_user, email_was_bound = await _bind_panel_email_to_user(
                         session,
@@ -534,7 +536,7 @@ async def _perform_sync_impl(
                                 panel_payload,
                             )
                 except Exception as e_desc:
-                    logging.warning(
+                    logger.warning(
                         f"Sync: Failed to update panel identity for panel user {panel_uuid} (tg {actual_user_id}): {e_desc}"  # noqa: E501
                     )
 
@@ -600,7 +602,7 @@ async def _perform_sync_impl(
                                     user_was_updated = True
                                     _append_unique(user_update_reasons, "subscription_updated")
                                 subscriptions_synced_count += 1
-                                logging.debug(
+                                logger.debug(
                                     f"Synced existing subscription {existing_sub_by_uuid.subscription_id} "  # noqa: E501
                                     f"for user {actual_user_id}: expires {panel_expire_at}, status {panel_status}"  # noqa: E501
                                 )
@@ -635,7 +637,7 @@ async def _perform_sync_impl(
                                 subscriptions_created += 1
                                 user_was_updated = True
                                 _append_unique(user_update_reasons, "subscription_created")
-                                logging.debug(
+                                logger.debug(
                                     f"Created subscription {created_sub.subscription_id} "
                                     f"for user {actual_user_id} by panel_sub_uuid {subscription_uuid_from_panel}"  # noqa: E501
                                 )
@@ -663,13 +665,13 @@ async def _perform_sync_impl(
                                     user_was_updated = True
                                     _append_unique(user_update_reasons, "subscription_updated")
                                 subscriptions_synced_count += 1
-                                logging.debug(
+                                logger.debug(
                                     f"Updated active subscription {active_sub.subscription_id} "
                                     f"for user {actual_user_id}: expires {panel_expire_at}, status {panel_status}"  # noqa: E501
                                 )
                             else:
                                 # Without a concrete subscription UUID we avoid creating new records to keep sync idempotent  # noqa: E501
-                                logging.debug(
+                                logger.debug(
                                     f"No subscriptionUuid for panel user {panel_uuid}; skipped creation for user {actual_user_id}"  # noqa: E501
                                 )
 
@@ -677,14 +679,14 @@ async def _perform_sync_impl(
                         sync_errors.append(
                             f"Error syncing subscription for user {actual_user_id}: {e!s}"
                         )
-                        logging.error(f"Error syncing subscription for user {actual_user_id}: {e}")
+                        logger.error(f"Error syncing subscription for user {actual_user_id}: {e}")
 
                 if user_was_updated:
                     users_updated += 1
                     if not user_update_reasons:
                         user_update_reasons.append("unspecified")
                     local_update_reason_counts.update(user_update_reasons)
-                    logging.info(
+                    logger.info(
                         "Sync local update: user_id=%s telegram_id=%s panel_uuid=%s reasons=%s",
                         actual_user_id,
                         existing_user.telegram_id,
@@ -695,7 +697,7 @@ async def _perform_sync_impl(
             except Exception as e_user:
                 panel_user_uuid = panel_user_dict.get("uuid", "unknown")
                 sync_errors.append(f"Error processing panel user {panel_user_uuid}: {e_user!s}")
-                logging.error(f"Error syncing user: {e_user}")
+                logger.error(f"Error syncing user: {e_user}")
 
         # Update sync status
         status = "completed_with_errors" if sync_errors else "completed"
@@ -743,22 +745,22 @@ async def _perform_sync_impl(
         await session.commit()
 
         # Detailed logging summary
-        logging.info("Sync completed - Summary:")
-        logging.info(f"  Panel records checked: {panel_records_checked}")
-        logging.info(f"  Users without telegramId: {users_without_telegram_id}")
-        logging.info(f"  Users not found in local DB: {users_not_found_in_db}")
-        logging.info(f"  Users found in local DB: {users_found_in_db}")
-        logging.info(f"  Users created: {users_created}")
-        logging.info(f"  Users with UUID updated: {users_uuid_updated}")
-        logging.info(f"  Users updated overall: {users_updated}")
-        logging.info("  Local update reasons: %s", _format_counter(local_update_reason_counts))
-        logging.info(f"  Panel PATCHes from sync: {panel_patch_count}")
-        logging.info("  Panel PATCH reasons: %s", _format_counter(panel_patch_reason_counts))
-        logging.info("  Panel PATCH fields: %s", _format_counter(panel_patch_field_counts))
-        logging.info(f"  Subscriptions total synced: {subscriptions_synced_count}")
-        logging.info(f"  Subscriptions created: {subscriptions_created}")
-        logging.info(f"  Subscriptions updated: {subscriptions_updated}")
-        logging.info(f"  Sync errors: {len(sync_errors)}")
+        logger.info("Sync completed - Summary:")
+        logger.info(f"  Panel records checked: {panel_records_checked}")
+        logger.info(f"  Users without telegramId: {users_without_telegram_id}")
+        logger.info(f"  Users not found in local DB: {users_not_found_in_db}")
+        logger.info(f"  Users found in local DB: {users_found_in_db}")
+        logger.info(f"  Users created: {users_created}")
+        logger.info(f"  Users with UUID updated: {users_uuid_updated}")
+        logger.info(f"  Users updated overall: {users_updated}")
+        logger.info("  Local update reasons: %s", _format_counter(local_update_reason_counts))
+        logger.info(f"  Panel PATCHes from sync: {panel_patch_count}")
+        logger.info("  Panel PATCH reasons: %s", _format_counter(panel_patch_reason_counts))
+        logger.info("  Panel PATCH fields: %s", _format_counter(panel_patch_field_counts))
+        logger.info(f"  Subscriptions total synced: {subscriptions_synced_count}")
+        logger.info(f"  Subscriptions created: {subscriptions_created}")
+        logger.info(f"  Subscriptions updated: {subscriptions_updated}")
+        logger.info(f"  Sync errors: {len(sync_errors)}")
 
         return {
             "status": status,
@@ -772,7 +774,7 @@ async def _perform_sync_impl(
 
     except Exception as e_sync_global:
         await session.rollback()
-        logging.error(f"Global error during sync: {e_sync_global}", exc_info=True)
+        logger.error(f"Global error during sync: {e_sync_global}", exc_info=True)
         error_detail = f"Unexpected error during sync: {e_sync_global!s}"
 
         await panel_sync_dal.update_panel_sync_status(

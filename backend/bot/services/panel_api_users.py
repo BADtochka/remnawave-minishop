@@ -8,6 +8,8 @@ from bot.utils.ttl_cache import AsyncTTLCache
 from config.settings import Settings
 from config.traffic_strategy import normalize_traffic_limit_strategy
 
+logger = logging.getLogger(__name__)
+
 # Static endpoint prefixes used as log/metric labels instead of the raw request
 # path. Endpoints embed user identifiers (telegram id, username, email, uuids),
 # so logging the path verbatim would leak private data into log files; the
@@ -115,7 +117,7 @@ class PanelApiUsersMixin:
                 log_responses=log_responses,
             )
         if users is None and resolved_page_size != 100:
-            logging.warning(
+            logger.warning(
                 "Panel API users fetch failed with page size %s; retrying with page size 100.",
                 resolved_page_size,
             )
@@ -146,7 +148,7 @@ class PanelApiUsersMixin:
             )
 
             if not response_data or response_data.get("error"):
-                logging.info(
+                logger.info(
                     "Panel API users stream fetch is unavailable; falling back to legacy "
                     "/users pagination. Response: %s",
                     response_data,
@@ -155,7 +157,7 @@ class PanelApiUsersMixin:
             response = response_data.get("response")
             users_batch = _panel_users_batch(response)
             if users_batch is None:
-                logging.warning(
+                logger.warning(
                     "Panel API users stream returned an unsupported response shape: %s",
                     response_data,
                 )
@@ -167,13 +169,13 @@ class PanelApiUsersMixin:
             if not next_cursor:
                 break
             if next_cursor in seen_cursors:
-                logging.warning("Panel API users stream returned a repeated cursor; stopping.")
+                logger.warning("Panel API users stream returned a repeated cursor; stopping.")
                 break
             seen_cursors.add(next_cursor)
             cursor = next_cursor
             if page_delay:
                 await asyncio.sleep(page_delay)
-        logging.info("Fetched %s users from panel API stream.", len(all_users))
+        logger.info("Fetched %s users from panel API stream.", len(all_users))
         return all_users
 
     async def _fetch_all_panel_users_pages(
@@ -189,7 +191,7 @@ class PanelApiUsersMixin:
             )
 
             if not response_data or response_data.get("error"):
-                logging.error(
+                logger.error(
                     f"Failed to fetch panel users batch (start: {start_offset}). Response: {response_data}"  # noqa: E501
                 )
                 return None
@@ -203,7 +205,7 @@ class PanelApiUsersMixin:
             start_offset += page_size
             if page_delay:
                 await asyncio.sleep(page_delay)
-        logging.info(f"Fetched {len(all_users)} users from panel API.")
+        logger.info(f"Fetched {len(all_users)} users from panel API.")
         return all_users
 
     async def get_user_by_uuid(
@@ -374,7 +376,7 @@ class PanelApiUsersMixin:
             ):
                 return response_data["response"]
             elif response_data and response_data.get("errorCode") == "A062":
-                logging.info(f"Panel API: Users not found for {filter_used_log}")
+                logger.info(f"Panel API: Users not found for {filter_used_log}")
                 return []
 
         elif username is not None:
@@ -390,7 +392,7 @@ class PanelApiUsersMixin:
             ):
                 return [response_data["response"]]
             elif response_data and response_data.get("errorCode") == "A062":
-                logging.info(f"Panel API: User not found for {filter_used_log}")
+                logger.info(f"Panel API: User not found for {filter_used_log}")
                 return []
 
         elif email is not None:
@@ -406,14 +408,14 @@ class PanelApiUsersMixin:
             ):
                 return response_data["response"]
             elif response_data and response_data.get("errorCode") == "A062":
-                logging.info(f"Panel API: Users not found for {filter_used_log}")
+                logger.info(f"Panel API: Users not found for {filter_used_log}")
                 return []
 
         if not telegram_id and not username and not email:
-            logging.warning("get_users_by_filter called without any specific filter criteria.")
+            logger.warning("get_users_by_filter called without any specific filter criteria.")
             return []
 
-        logging.error(
+        logger.error(
             "Failed to fetch panel users with filter (%s); panel response redacted.",
             filter_used_log,
         )
@@ -442,7 +444,7 @@ class PanelApiUsersMixin:
         )
         if not username_is_valid:
             msg = f"Panel username '{username_on_panel}' does not meet panel requirements."
-            logging.error(msg)
+            logger.error(msg)
             return {
                 "error": True,
                 "status_code": 400,
@@ -472,7 +474,7 @@ class PanelApiUsersMixin:
                 if hwid_limit_int >= 0:
                     payload["hwidDeviceLimit"] = hwid_limit_int
             except (TypeError, ValueError):
-                logging.warning(
+                logger.warning(
                     f"Ignoring invalid HWID device limit '{hwid_limit_value}' while creating panel user '{username_on_panel}'."  # noqa: E501
                 )
         if specific_squad_uuids:
@@ -493,12 +495,12 @@ class PanelApiUsersMixin:
         )
         if response and not response.get("error") and "response" in response:
             await self._invalidate_all_users_cache()
-            logging.info(
+            logger.info(
                 f"Panel user '{username_on_panel}' created successfully (UUID: {response.get('response', {}).get('uuid')})."  # noqa: E501
             )
             return response
 
-        logging.error(
+        logger.error(
             f"Failed to create panel user '{username_on_panel}'. Payload: {payload}, Response: {response if not log_response else '(full response logged above)'}"  # noqa: E501
         )
         return response
@@ -517,12 +519,12 @@ class PanelApiUsersMixin:
             "PATCH", "/users", json=update_payload, log_full_response=log_response
         )
         if full_response and not full_response.get("error") and "response" in full_response:
-            logging.debug("User %s details updated on panel.", user_uuid)
+            logger.debug("User %s details updated on panel.", user_uuid)
             await self._invalidate_user_cache(user_uuid)
             await self._invalidate_all_users_cache()
             return _json_dict(full_response.get("response"))
 
-        logging.error(
+        logger.error(
             f"Failed to update user {user_uuid} details on panel. Payload: {update_payload}, Response: {full_response if not log_response else '(logged above)'}"  # noqa: E501
         )
         return None
@@ -540,17 +542,17 @@ class PanelApiUsersMixin:
             actual_status = response_data.get("response", {}).get("status")
             expected_status = "ACTIVE" if enable else "DISABLED"
             if actual_status == expected_status:
-                logging.info(
+                logger.info(
                     f"User {user_uuid} status on panel successfully set to {action} (Actual: {actual_status})."  # noqa: E501
                 )
                 return True
             else:
-                logging.warning(
+                logger.warning(
                     f"User {user_uuid} status on panel action '{action}' called, but final status is '{actual_status}'."  # noqa: E501
                 )
                 return False
 
-        logging.error(
+        logger.error(
             f"Failed to {action} user {user_uuid} on panel. Response: {response_data if not log_response else '(logged above)'}"  # noqa: E501
         )
         return False
@@ -561,26 +563,24 @@ class PanelApiUsersMixin:
         response_data = await self._request("DELETE", endpoint, log_full_response=log_response)
 
         if not response_data:
-            logging.error(
-                f"Panel API delete_user_from_panel returned no data for user {user_uuid}."
-            )
+            logger.error(f"Panel API delete_user_from_panel returned no data for user {user_uuid}.")
             return False
 
         if response_data.get("error"):
             details = response_data.get("details") or {}
             error_code = details.get("errorCode") or response_data.get("errorCode")
             if error_code in {"A062", "A040"}:
-                logging.info(
+                logger.info(
                     f"Panel user {user_uuid} already absent (errorCode {error_code}). Treating as deleted."  # noqa: E501
                 )
                 await self._invalidate_user_cache(user_uuid)
                 await self._invalidate_devices_cache(user_uuid)
                 await self._invalidate_all_users_cache()
                 return True
-            logging.error(f"Failed to delete user {user_uuid} on panel. Response: {response_data}")
+            logger.error(f"Failed to delete user {user_uuid} on panel. Response: {response_data}")
             return False
 
-        logging.info(f"Panel user {user_uuid} deleted successfully.")
+        logger.info(f"Panel user {user_uuid} deleted successfully.")
         await self._invalidate_user_cache(user_uuid)
         await self._invalidate_devices_cache(user_uuid)
         await self._invalidate_all_users_cache()

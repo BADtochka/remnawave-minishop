@@ -18,6 +18,8 @@ from config.settings import Settings
 from db.dal import tariff_dal
 from db.models import Subscription
 
+logger = logging.getLogger(__name__)
+
 PREMIUM_WARNING_LEVEL_OFFSET = 1000
 # Single warning per premium billing period when usage reached or exceeded the quota.
 PREMIUM_WARNING_DEPLETED_LEVEL = PREMIUM_WARNING_LEVEL_OFFSET + 100
@@ -175,7 +177,7 @@ class TariffWorkerPremiumMixin:
 
         node_uuids = await self._premium_node_uuids_for_tariff(tariff)
         if not node_uuids:
-            logging.warning("Premium squads for tariff %s have no accessible nodes", tariff.key)
+            logger.warning("Premium squads for tariff %s have no accessible nodes", tariff.key)
             return
 
         start_date = premium_period_start.date().isoformat()
@@ -315,7 +317,7 @@ class TariffWorkerPremiumMixin:
                     period_start_at=premium_period_start,
                     previous_period_start=previous_premium_period_start,
                 )
-        logging.info(
+        logger.info(
             "Premium squad access %s for user %s tariff %s: %s/%s bytes",
             "limited" if should_limit else "restored",
             sub.user_id,
@@ -431,7 +433,7 @@ class TariffWorkerPremiumMixin:
             )
             return panel_user if isinstance(panel_user, dict) else None
         except Exception:
-            logging.exception(
+            logger.exception(
                 "TariffTrafficWorker: failed to confirm panel squads for user %s",
                 panel_user_uuid,
             )
@@ -472,7 +474,7 @@ class TariffWorkerPremiumMixin:
             return premium_topup_balance
 
         repaired_bytes = ledger_total - tracked_total
-        logging.warning(
+        logger.warning(
             "Premium top-up balance repaired from ledger for user %s subscription %s: "
             "tracked=%s ledger=%s repaired=%s",
             getattr(sub, "user_id", None),
@@ -500,7 +502,7 @@ class TariffWorkerPremiumMixin:
             )
             return int(total) if total is not None else None
         except Exception:
-            logging.exception(
+            logger.exception(
                 "TariffTrafficWorker: failed to read premium top-up ledger for subscription %s",
                 subscription_id,
             )
@@ -559,7 +561,7 @@ class TariffWorkerPremiumMixin:
         current_known, current_set = self._panel_active_squad_uuid_set(current_panel_user)
         desired_set = self._internal_squad_uuid_set(update_payload.get("activeInternalSquads"))
         fields = "none" if current_known and current_set == desired_set else "activeInternalSquads"
-        logging.info(
+        logger.info(
             "Sync panel PATCH: source=%s user_id=%s telegram_id=%s panel_uuid=%s "
             "panel_view=%s reasons=%s fields=%s payload_fields=%s changes=%s",
             "premium_squad_limit",
@@ -720,7 +722,7 @@ class TariffWorkerPremiumMixin:
                         content=audit_content,
                     )
                 except Exception:
-                    logging.exception(
+                    logger.exception(
                         "Failed to send premium traffic depleted warning to user %s", sub.user_id
                     )
             await self._send_traffic_warning_email(
@@ -813,7 +815,7 @@ class TariffWorkerPremiumMixin:
                         content=audit_content,
                     )
                 except Exception:
-                    logging.exception(
+                    logger.exception(
                         "Failed to send premium traffic warning to user %s", sub.user_id
                     )
             await self._send_traffic_warning_email(

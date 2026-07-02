@@ -6,6 +6,8 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 from sqlalchemy.orm import sessionmaker
 
+logger = logging.getLogger(__name__)
+
 
 class DBSessionMiddleware(BaseMiddleware):
     def __init__(self, async_session_factory: sessionmaker):
@@ -19,7 +21,7 @@ class DBSessionMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         if self.async_session_factory is None:
-            logging.critical("DBSessionMiddleware: async_session_factory is None!")
+            logger.critical("DBSessionMiddleware: async_session_factory is None!")
             raise RuntimeError("async_session_factory not provided to DBSessionMiddleware")
 
         async with self.async_session_factory() as session:
@@ -31,5 +33,5 @@ class DBSessionMiddleware(BaseMiddleware):
                 return result
             except Exception:
                 await session.rollback()
-                logging.error("DBSessionMiddleware: Exception caused rollback.", exc_info=True)
+                logger.error("DBSessionMiddleware: Exception caused rollback.", exc_info=True)
                 raise

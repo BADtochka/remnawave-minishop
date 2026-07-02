@@ -11,13 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from bot.middlewares.i18n import JsonI18n
-
-if TYPE_CHECKING:
-    from bot.services.referral_service import ReferralService
-    from bot.services.subscription_service_impl.core import SubscriptionService
-else:
-    ReferralService = object
-    SubscriptionService = object
 from config.settings import Settings
 from config.tariffs_config import (
     default_currency_key_for_settings,
@@ -65,6 +58,15 @@ from ..shared import (
     safe_callback_answer,
 )
 from ..shared.app_context import app_optional, app_required
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
+
+logger = logging.getLogger(__name__)
 
 _LOG = "platega"
 
@@ -167,11 +169,11 @@ class PlategaService(HttpClientMixin):
 
         self._init_http_client(total_timeout=lambda: self.settings.PAYMENT_REQUEST_TIMEOUT_SECONDS)
         if not self.configured:
-            logging.warning(
+            logger.warning(
                 "PlategaService initialized but not fully configured. Payments disabled."
             )
         else:
-            logging.info(
+            logger.info(
                 "PlategaService configured. SBP button: %s (method=%s), Crypto button: %s (method=%s)",  # noqa: E501
                 "ON" if config.SBP_ENABLED else "OFF",
                 self.sbp_method,
@@ -241,7 +243,7 @@ class PlategaService(HttpClientMixin):
         payment_method: int | None = None,
     ) -> tuple[bool, dict[str, Any]]:
         if not self.configured:
-            logging.error("PlategaService is not configured. Cannot create transaction.")
+            logger.error("PlategaService is not configured. Cannot create transaction.")
             return False, {"message": "service_not_configured"}
 
         currency_code = normalize_payment_currency_code(
@@ -275,7 +277,7 @@ class PlategaService(HttpClientMixin):
             "X-Secret": "***" if self._auth_headers.get("X-Secret") else "",
             "Content-Type": self._auth_headers.get("Content-Type"),
         }
-        logging.info(
+        logger.info(
             "Platega create_transaction request: url=%s headers=%s body=%s",
             url,
             safe_headers,
@@ -306,7 +308,7 @@ class PlategaService(HttpClientMixin):
             ) as response:
                 data = await response.json(content_type=None)
                 if response.status != 200 or not isinstance(data, dict):
-                    logging.warning(
+                    logger.warning(
                         "Platega get_transaction failed: id=%s status=%s body=%s",
                         transaction_id,
                         response.status,
@@ -315,7 +317,7 @@ class PlategaService(HttpClientMixin):
                     return False, {"status": response.status, "message": data}
                 return True, data
         except Exception as exc:
-            logging.exception("Platega get_transaction request failed: id=%s", transaction_id)
+            logger.exception("Platega get_transaction request failed: id=%s", transaction_id)
             return False, {"message": str(exc)}
 
     async def try_reuse_pending_transaction(
@@ -360,7 +362,7 @@ class PlategaService(HttpClientMixin):
         try:
             data = await request.json()
         except Exception:
-            logging.exception("Platega webhook: failed to parse JSON.")
+            logger.exception("Platega webhook: failed to parse JSON.")
             return web.Response(status=400, text="bad_request")
 
         header_merchant = request.headers.get("X-MerchantId")
@@ -369,7 +371,7 @@ class PlategaService(HttpClientMixin):
             hmac.compare_digest(str(header_merchant or ""), str(self.merchant_id or ""))
             and hmac.compare_digest(str(header_secret or ""), str(self.secret or ""))
         ):
-            logging.error("Platega webhook: invalid auth headers")
+            logger.error("Platega webhook: invalid auth headers")
             return web.Response(status=403, text="forbidden")
 
         transaction_id = str(data.get("id") or data.get("transactionId") or "").strip()
@@ -378,13 +380,13 @@ class PlategaService(HttpClientMixin):
         currency = data.get("currency") or self.settings.DEFAULT_CURRENCY_SYMBOL or "RUB"
 
         if not transaction_id or not status:
-            logging.error("Platega webhook: missing transaction id or status in payload: %s", data)
+            logger.error("Platega webhook: missing transaction id or status in payload: %s", data)
             return web.Response(status=400, text="missing_fields")
 
         async with self.async_session_factory() as session:
             payment = await payment_dal.get_payment_by_provider_payment_id(session, transaction_id)
             if not payment:
-                logging.error(
+                logger.error(
                     "Platega webhook: payment not found for transaction %s", transaction_id
                 )
                 return web.Response(status=404, text="payment_not_found")
@@ -401,14 +403,14 @@ class PlategaService(HttpClientMixin):
                 if amount_raw is not None:
                     try:
                         if not decimal_amounts_equal(amount_raw, payment.amount):
-                            logging.warning(
+                            logger.warning(
                                 "Platega webhook: amount mismatch for payment %s (expected %s, got %s)",  # noqa: E501
                                 payment.payment_id,
                                 format_decimal_amount(payment.amount),
                                 format_decimal_amount(amount_raw),
                             )
                     except Exception as exc:
-                        logging.warning(
+                        logger.warning(
                             "Platega webhook: failed to compare amounts for %s: %s",
                             payment.payment_id,
                             exc,
@@ -424,7 +426,7 @@ class PlategaService(HttpClientMixin):
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception(
+                    logger.exception(
                         "Platega webhook: failed to mark payment %s as succeeded.", transaction_id
                     )
                     return web.Response(status=500, text="processing_error")
@@ -464,7 +466,7 @@ class PlategaService(HttpClientMixin):
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception(
+                    logger.exception(
                         "Platega webhook: failed to cancel payment %s.", transaction_id
                     )
                     return web.Response(status=500, text="processing_error")
@@ -477,7 +479,7 @@ class PlategaService(HttpClientMixin):
                 )
                 return web.Response(text="ok_canceled")
 
-            logging.warning(
+            logger.warning(
                 "Platega webhook: unhandled status '%s' for transaction %s", status, transaction_id
             )
             return web.Response(status=202, text="status_ignored")
@@ -554,13 +556,13 @@ async def pay_platega_callback_handler(
     platega_variant, platega_method_id = variant
 
     if not platega_service or not platega_service.configured:
-        logging.error("Platega service is not configured or unavailable.")
+        logger.error("Platega service is not configured or unavailable.")
         await notify_service_unavailable(callback, translator)
         return
 
     parts = parse_payment_callback(callback.data or "")
     if not parts:
-        logging.error("Invalid pay_platega data in callback: %s", callback.data)
+        logger.error("Invalid pay_platega data in callback: %s", callback.data)
         await notify_callback_parse_error(callback, translator)
         return
     parts, hwid_quote = await quote_hwid_callback_parts(
@@ -630,7 +632,7 @@ async def pay_platega_callback_handler(
         await session.commit()
     except Exception:
         await session.rollback()
-        logging.exception(
+        logger.exception(
             "Platega: failed to create payment record for user %s.", callback.from_user.id
         )
         await notify_payment_record_failure(callback, translator)
@@ -746,7 +748,7 @@ async def _create_webapp_payment(ctx: WebAppPaymentContext, variant: str) -> web
         )
     except Exception:
         await ctx.session.rollback()
-        logging.exception("Platega WebApp payment failed")
+        logger.exception("Platega WebApp payment failed")
         return payment_failed()
 
     return await finalize_webapp_link_payment(

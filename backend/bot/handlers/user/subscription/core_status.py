@@ -37,6 +37,8 @@ from .core_common import (
     router,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _devices_list_from_panel_response(devices: Any) -> list[dict[str, Any]]:
     if isinstance(devices, dict):
@@ -272,7 +274,7 @@ async def my_subscription_command_handler(
                 text = append_install_share_link_text(text, get_text, install_share_url)
             except Exception:
                 await session.rollback()
-                logging.exception(
+                logger.exception(
                     "Failed to persist install guide share token for user %s.",
                     _event_user_id(event),
                 )
@@ -337,7 +339,7 @@ async def my_subscription_command_handler(
                 try:
                     devices_response = await panel_service.get_user_devices(user_uuid)
                 except Exception:
-                    logging.exception("Failed to load devices for user %s", user_uuid)
+                    logger.exception("Failed to load devices for user %s", user_uuid)
             if devices_response is not None:
                 devices_count = _devices_count_from_panel_response(devices_response)
                 if devices_count is not None:

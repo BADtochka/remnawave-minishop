@@ -9,6 +9,8 @@ from bot.services.email_templates import render_user_notification
 from bot.services.message_audit import log_user_message_delivery
 from config.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 
 def _translate(
     i18n: JsonI18n | None,
@@ -93,5 +95,5 @@ async def send_user_notification_email(
             )
         return True
     except Exception:
-        logging.exception("Failed to send user notification email to %s.", recipient)
+        logger.exception("Failed to send user notification email to %s.", recipient)
         return False

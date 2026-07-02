@@ -22,6 +22,8 @@ from ..shared import (
 from ..shared.app_context import app_optional, app_required
 from .service import StripeService
 
+logger = logging.getLogger(__name__)
+
 
 async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
     settings: Settings = app_required(ctx.request, "settings", Settings)
@@ -64,7 +66,7 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
         )
     except Exception:
         await ctx.session.rollback()
-        logging.exception("Stripe WebApp payment failed")
+        logger.exception("Stripe WebApp payment failed")
         return payment_failed()
 
     return await finalize_webapp_link_payment(

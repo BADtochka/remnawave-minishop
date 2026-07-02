@@ -21,6 +21,8 @@ from .sync_admin_common import (
     _subscription_update_delta,
 )
 
+logger = logging.getLogger(__name__)
+
 
 async def _prefetch_sync_indexes(
     session: AsyncSession, panel_users_data: list[dict[str, Any]]
@@ -168,7 +170,7 @@ async def _bind_panel_email_to_user(
                     merged_user.email = email_from_panel
                 if not merged_user.email_verified_at:
                     merged_user.email_verified_at = datetime.now(UTC)
-                logging.info(
+                logger.info(
                     "Merged email-only user %s into user %s while binding panel email %s for panel UUID %s.",  # noqa: E501
                     user_with_email.user_id,
                     merged_user.user_id,
@@ -177,7 +179,7 @@ async def _bind_panel_email_to_user(
                 )
                 return merged_user, True
             except Exception as merge_error:
-                logging.warning(
+                logger.warning(
                     "Could not merge email-only user %s into user %s for panel email %s: %s",
                     user_with_email.user_id,
                     existing_user.user_id,
@@ -186,7 +188,7 @@ async def _bind_panel_email_to_user(
                 )
                 return existing_user, False
 
-        logging.warning(
+        logger.warning(
             "Panel email %s for panel UUID %s is already linked to local user %s; "
             "skipping email binding for user %s.",
             email_from_panel,
@@ -198,7 +200,7 @@ async def _bind_panel_email_to_user(
 
     existing_user.email = email_from_panel
     existing_user.email_verified_at = datetime.now(UTC)
-    logging.info(
+    logger.info(
         "Bound panel email %s to local user %s for panel UUID %s.",
         email_from_panel,
         existing_user.user_id,
@@ -224,7 +226,7 @@ async def _merge_local_duplicate_panel_user_if_needed(
             target_user_id=existing_user.user_id,
             reason="panel_sync",
         )
-        logging.info(
+        logger.info(
             "Sync: merged local duplicate user %s into %s for duplicate panel UUID %s.",
             duplicate_local_user.user_id,
             merged_user.user_id,
@@ -232,7 +234,7 @@ async def _merge_local_duplicate_panel_user_if_needed(
         )
         return merged_user, True
     except Exception as exc:
-        logging.warning(
+        logger.warning(
             "Sync: could not merge local duplicate user %s into %s for panel UUID %s: %s",
             duplicate_local_user.user_id,
             existing_user.user_id,
@@ -395,14 +397,14 @@ async def _absorb_duplicate_panel_identity(
         log_response=False,
     )
     if deleted:
-        logging.info(
+        logger.info(
             "Sync: absorbed duplicate panel UUID %s into kept panel UUID %s for user %s.",
             duplicate_panel_uuid,
             keep_panel_uuid,
             existing_user.user_id,
         )
     else:
-        logging.warning(
+        logger.warning(
             "Sync: failed to delete duplicate panel UUID %s after absorbing it into %s.",
             duplicate_panel_uuid,
             keep_panel_uuid,

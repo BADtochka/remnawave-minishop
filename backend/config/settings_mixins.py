@@ -29,6 +29,8 @@ from config.tariffs_config import TariffsConfig, load_tariffs_config
 from config.traffic_strategy import normalize_traffic_limit_strategy
 from config.webapp_themes_config import WebappThemesConfig, resolved_webapp_themes_catalog
 
+logger = logging.getLogger(__name__)
+
 _T = TypeVar("_T")
 _Owner = TypeVar("_Owner")
 
@@ -318,7 +320,7 @@ class SettingsComputedMixin(_SettingsComputedMixinBase):
                     if admin_id.strip().isdigit()
                 ]
             except ValueError:
-                logging.error(
+                logger.error(
                     f"Invalid ADMIN_IDS_STR format: '{self.ADMIN_IDS_STR}'. Expected comma-separated integers."  # noqa: E501
                 )
                 return []
@@ -474,7 +476,7 @@ class SettingsComputedMixin(_SettingsComputedMixinBase):
                 if size_gb > 0 and price_val >= 0:
                     packages[size_gb] = price_val
             except ValueError:
-                logging.warning("Invalid TRAFFIC_PACKAGES entry skipped: %s", chunk)
+                logger.warning("Invalid TRAFFIC_PACKAGES entry skipped: %s", chunk)
                 continue
         return packages
 
@@ -498,7 +500,7 @@ class SettingsComputedMixin(_SettingsComputedMixinBase):
                 if size_gb > 0 and price_val >= 0:
                     packages[size_gb] = price_val
             except ValueError:
-                logging.warning("Invalid STARS_TRAFFIC_PACKAGES entry skipped: %s", chunk)
+                logger.warning("Invalid STARS_TRAFFIC_PACKAGES entry skipped: %s", chunk)
                 continue
         return packages
 
@@ -519,7 +521,7 @@ class SettingsComputedMixin(_SettingsComputedMixinBase):
             try:
                 level = int(float(chunk))
             except ValueError:
-                logging.warning("Invalid TARIFF_TRAFFIC_WARNING_LEVELS entry skipped: %s", chunk)
+                logger.warning("Invalid TARIFF_TRAFFIC_WARNING_LEVELS entry skipped: %s", chunk)
                 continue
             if 0 < level < 100 and level not in levels:
                 levels.append(level)

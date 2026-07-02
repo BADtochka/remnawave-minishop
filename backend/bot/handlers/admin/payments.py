@@ -15,6 +15,8 @@ from config.settings import Settings
 from db.dal import payment_dal
 from db.models import Payment
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="admin_payments_router")
 
 
@@ -281,7 +283,7 @@ async def export_payments_csv_handler(
         await callback.answer(_("admin_export_sent"), show_alert=False)
 
     except Exception as e:
-        logging.error(f"Failed to export payments CSV: {e}", exc_info=True)
+        logger.error(f"Failed to export payments CSV: {e}", exc_info=True)
         await callback.answer(f"❌ Ошибка экспорта: {e!s}", show_alert=True)
 
 

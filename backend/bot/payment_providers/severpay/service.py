@@ -13,13 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from bot.middlewares.i18n import JsonI18n
-
-if TYPE_CHECKING:
-    from bot.services.referral_service import ReferralService
-    from bot.services.subscription_service_impl.core import SubscriptionService
-else:
-    ReferralService = object
-    SubscriptionService = object
 from config.settings import Settings
 from db.dal import payment_dal
 
@@ -53,6 +46,15 @@ from ..shared import (
     run_webapp_payment,
 )
 from ..shared.app_context import app_required
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
+
+logger = logging.getLogger(__name__)
 
 _LOG = "severpay"
 
@@ -135,7 +137,7 @@ class SeverPayService(HttpClientMixin):
         self._init_http_client(total_timeout=lambda: self.settings.PAYMENT_REQUEST_TIMEOUT_SECONDS)
 
         if not self.configured:
-            logging.warning(
+            logger.warning(
                 "SeverPayService initialized but not fully configured. Payments disabled."
             )
 
@@ -201,7 +203,7 @@ class SeverPayService(HttpClientMixin):
         currency: str | None,
     ) -> tuple[bool, dict[str, Any]]:
         if not self.configured:
-            logging.error("SeverPayService is not configured. Cannot create payment.")
+            logger.error("SeverPayService is not configured. Cannot create payment.")
             return False, {"message": "service_not_configured"}
 
         currency_code = normalize_payment_currency_code(
@@ -293,18 +295,18 @@ class SeverPayService(HttpClientMixin):
         try:
             payload = await request.json()
         except Exception:
-            logging.exception("SeverPay webhook: failed to parse JSON.")
+            logger.exception("SeverPay webhook: failed to parse JSON.")
             return web.json_response({"status": False, "msg": "bad_request"}, status=400)
 
         if not isinstance(payload, dict) or not self._validate_signature(payload):
-            logging.error("SeverPay webhook: invalid signature or payload.")
+            logger.error("SeverPay webhook: invalid signature or payload.")
             return web.json_response({"status": False, "msg": "invalid_signature"}, status=403)
 
         event_type = str(payload.get("type") or "").lower()
         data = payload.get("data") or {}
 
         if event_type != "payin" or not isinstance(data, dict):
-            logging.warning("SeverPay webhook: unsupported event type '%s'", event_type)
+            logger.warning("SeverPay webhook: unsupported event type '%s'", event_type)
             return web.json_response({"status": True})
 
         provider_payment_id = str(data.get("id") or data.get("uid") or "")
@@ -318,7 +320,7 @@ class SeverPayService(HttpClientMixin):
                 provider_payment_id=provider_payment_id or None,
             )
             if not payment:
-                logging.error(
+                logger.error(
                     "SeverPay webhook: payment not found (order_id=%s, provider_id=%s)",
                     order_id_raw,
                     provider_payment_id,
@@ -333,7 +335,7 @@ class SeverPayService(HttpClientMixin):
 
             if status == "success":
                 if payment.status == "succeeded":
-                    logging.info(
+                    logger.info(
                         "SeverPay webhook: payment %s already succeeded.",
                         payment.payment_id,
                     )
@@ -349,7 +351,7 @@ class SeverPayService(HttpClientMixin):
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception(
+                    logger.exception(
                         "SeverPay webhook: failed to mark payment %s as succeeded.",
                         resolved_provider_id,
                     )
@@ -395,7 +397,7 @@ class SeverPayService(HttpClientMixin):
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception(
+                    logger.exception(
                         "SeverPay webhook: failed to mark payment %s as failed.",
                         resolved_provider_id,
                     )
@@ -422,13 +424,13 @@ class SeverPayService(HttpClientMixin):
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception(
+                    logger.exception(
                         "SeverPay webhook: failed to update pending status for %s.",
                         resolved_provider_id,
                     )
                 return web.json_response({"status": True})
 
-            logging.warning(
+            logger.warning(
                 "SeverPay webhook: unhandled status '%s' for payment %s",
                 status,
                 resolved_provider_id,

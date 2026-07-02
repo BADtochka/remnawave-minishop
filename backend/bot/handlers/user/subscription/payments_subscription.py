@@ -13,6 +13,8 @@ from bot.middlewares.i18n import JsonI18n
 from bot.utils.callback_answer import callback_data, callback_message
 from config.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="user_subscription_payments_selection_router")
 
 
@@ -40,7 +42,7 @@ async def select_subscription_period_callback_handler(
     try:
         months = float(parts[1])
     except (ValueError, IndexError):
-        logging.error(f"Invalid subscription period in callback_data: {callback.data}")
+        logger.error(f"Invalid subscription period in callback_data: {callback.data}")
         with contextlib.suppress(Exception):
             await callback.answer(get_text("error_try_again"), show_alert=True)
         return
@@ -68,7 +70,7 @@ async def select_subscription_period_callback_handler(
                 for spec in iter_provider_specs()
             )
             if currency_methods_enabled:
-                logging.error(
+                logger.error(
                     "Currency price missing for traffic option %s while fiat providers are enabled.",  # noqa: E501
                     months,
                 )
@@ -78,7 +80,7 @@ async def select_subscription_period_callback_handler(
             price_rub = 0.0
             currency_symbol_val = "⭐"
         else:
-            logging.error(
+            logger.error(
                 f"Price not found for option {months} using {'traffic_packages' if traffic_mode else 'subscription_options'}."  # noqa: E501
             )
             with contextlib.suppress(Exception):
@@ -108,7 +110,7 @@ async def select_subscription_period_callback_handler(
     try:
         await callback_message(callback).edit_text(text_content, reply_markup=reply_markup)
     except Exception as e_edit:
-        logging.warning(
+        logger.warning(
             f"Edit message for payment method selection failed: {e_edit}. Sending new one."
         )
         await callback_message(callback).answer(text_content, reply_markup=reply_markup)

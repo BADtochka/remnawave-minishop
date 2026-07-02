@@ -15,13 +15,6 @@ from bot.infra.webhook_queue import enqueue_webhook_event
 from bot.middlewares.i18n import JsonI18n
 from bot.services.lknpd_service import LknpdService
 from bot.services.panel_api_service import PanelApiService
-
-if TYPE_CHECKING:
-    from bot.services.referral_service import ReferralService
-    from bot.services.subscription_service_impl.core import SubscriptionService
-else:
-    ReferralService = object
-    SubscriptionService = object
 from bot.services.user_email_notifications import send_user_notification_email
 from bot.utils.request_security import ip_in_allowlist, request_client_ip
 from config.settings import Settings
@@ -39,6 +32,15 @@ from .success import (
     process_cancelled_payment,
     process_successful_payment,
 )
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
+
+logger = logging.getLogger(__name__)
 
 
 async def yookassa_webhook_route(request: web.Request) -> web.Response:
@@ -59,12 +61,12 @@ async def yookassa_webhook_route(request: web.Request) -> web.Response:
             request, "async_session_factory", sessionmaker
         )
     except KeyError:
-        logging.exception("KeyError accessing app context in yookassa_webhook_route.")
+        logger.exception("KeyError accessing app context in yookassa_webhook_route.")
         return web.Response(status=500, text="Internal Server Error: Missing app context component")
 
     client_ip = request_client_ip(request, trusted_proxies=settings.trusted_proxies)
     if not ip_in_allowlist(client_ip, YOOKASSA_WEBHOOK_ALLOWED_IPS):
-        logging.warning(
+        logger.warning(
             "YooKassa webhook denied from unauthorized IP source "
             "(client_ip=%s remote=%s x_forwarded_for=%s).",
             client_ip,
@@ -79,7 +81,7 @@ async def yookassa_webhook_route(request: web.Request) -> web.Response:
         notification_object = WebhookNotification(event_json)
         payment_data_from_notification = notification_object.object
 
-        logging.info(
+        logger.info(
             f"YooKassa Webhook Parsed: Event='{notification_object.event}', "
             f"PaymentId='{payment_data_from_notification.id}', Status='{payment_data_from_notification.status}'"  # noqa: E501
         )
@@ -89,7 +91,7 @@ async def yookassa_webhook_route(request: web.Request) -> web.Response:
             or not hasattr(payment_data_from_notification, "metadata")
             or payment_data_from_notification.metadata is None
         ):
-            logging.error(
+            logger.error(
                 f"YooKassa webhook payment {payment_data_from_notification.id} lacks metadata. Cannot process."  # noqa: E501
             )
             return web.Response(status=200, text="ok_error_no_metadata")
@@ -125,7 +127,7 @@ async def yookassa_webhook_route(request: web.Request) -> web.Response:
                     ),
                 }
             except Exception:
-                logging.exception("Failed to serialize YooKassa payment_method from webhook")
+                logger.exception("Failed to serialize YooKassa payment_method from webhook")
                 pm_dict = None
 
         payment_dict_for_processing: dict[str, Any] = {
@@ -184,7 +186,7 @@ async def yookassa_webhook_route(request: web.Request) -> web.Response:
                             if event_payload:
                                 await emit_yookassa_success_events(event_payload)
                         else:
-                            logging.warning(
+                            logger.warning(
                                 f"Payment Succeeded event for {payment_dict_for_processing.get('id')} "  # noqa: E501
                                 f"but data not as expected: status='{payment_dict_for_processing.get('status')}', "  # noqa: E501
                                 f"paid='{payment_dict_for_processing.get('paid')}'"
@@ -307,7 +309,7 @@ async def yookassa_webhook_route(request: web.Request) -> web.Response:
                                                     ),
                                                 )
                                             except Exception:
-                                                logging.exception(
+                                                logger.exception(
                                                     "Failed to notify user %s "
                                                     "about payment method binding.",
                                                     user_id,
@@ -336,16 +338,16 @@ async def yookassa_webhook_route(request: web.Request) -> web.Response:
                                             if yk and payment_id_to_cancel:
                                                 await yk.cancel_payment(payment_id_to_cancel)
                                         except Exception:
-                                            logging.exception(
+                                            logger.exception(
                                                 "Failed to cancel bind-only payment auth"
                                             )
                             except Exception:
-                                logging.exception(
+                                logger.exception(
                                     "Failed to handle bind-only waiting_for_capture webhook"
                                 )
                 except Exception:
                     await session.rollback()
-                    logging.exception(
+                    logger.exception(
                         "Error processing YooKassa webhook event '%s' for YK Payment ID %s in DB transaction.",  # noqa: E501
                         notification_object.event,
                         payment_dict_for_processing.get("id"),
@@ -355,8 +357,8 @@ async def yookassa_webhook_route(request: web.Request) -> web.Response:
         return web.Response(status=200, text="ok")
 
     except json.JSONDecodeError:
-        logging.error("YooKassa Webhook: Invalid JSON received.")
+        logger.error("YooKassa Webhook: Invalid JSON received.")
         return web.Response(status=400, text="bad_request_invalid_json")
     except Exception:
-        logging.exception("YooKassa Webhook general processing error.")
+        logger.exception("YooKassa Webhook general processing error.")
         return web.Response(status=500, text="internal_error")

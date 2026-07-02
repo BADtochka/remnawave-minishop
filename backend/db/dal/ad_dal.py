@@ -8,6 +8,8 @@ from sqlalchemy.future import select
 from ..models import AdAttribution, AdCampaign, Payment
 from ._sqlalchemy import rowcount
 
+logger = logging.getLogger(__name__)
+
 
 async def create_campaign(
     session: AsyncSession, *, source: str, start_param: str, cost: float
@@ -20,7 +22,7 @@ async def create_campaign(
     session.add(campaign)
     await session.flush()
     await session.refresh(campaign)
-    logging.info(
+    logger.info(
         f"AdCampaign created id={campaign.ad_campaign_id}, source={source}, start={start_param}, cost={cost}"  # noqa: E501
     )
     return campaign
@@ -67,7 +69,7 @@ async def ensure_attribution(
     session.add(attrib)
     await session.flush()
     await session.refresh(attrib)
-    logging.info(f"AdAttribution created for user {user_id} -> campaign {campaign_id}")
+    logger.info(f"AdAttribution created for user {user_id} -> campaign {campaign_id}")
     return attrib
 
 
@@ -202,8 +204,8 @@ async def delete_campaign(session: AsyncSession, campaign_id: int) -> bool:
             return False
         await session.delete(campaign)
         await session.flush()
-        logging.info(f"AdCampaign deleted id={campaign_id}")
+        logger.info(f"AdCampaign deleted id={campaign_id}")
         return True
     except Exception as e:
-        logging.error(f"Failed to delete AdCampaign id={campaign_id}: {e}", exc_info=True)
+        logger.error(f"Failed to delete AdCampaign id={campaign_id}: {e}", exc_info=True)
         raise

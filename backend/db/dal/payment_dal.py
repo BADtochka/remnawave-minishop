@@ -9,6 +9,8 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from db.models import Payment, User
 
+logger = logging.getLogger(__name__)
+
 _PAYMENT_STATUS_SUCCEEDED = "succeeded"
 
 
@@ -42,7 +44,7 @@ async def create_payment_record(session: AsyncSession, payment_data: dict[str, A
     session.add(new_payment)
     await session.flush()
     await session.refresh(new_payment)
-    logging.info(f"Payment record {new_payment.payment_id} created for user {new_payment.user_id}")
+    logger.info(f"Payment record {new_payment.payment_id} created for user {new_payment.user_id}")
     return new_payment
 
 
@@ -208,7 +210,7 @@ async def update_payment_status_by_db_id(
     if payment:
         preserve_succeeded = _would_overwrite_succeeded_payment(payment.status, new_status)
         if preserve_succeeded:
-            logging.info(
+            logger.info(
                 "Payment record %s already succeeded; ignoring status update to %s.",
                 payment.payment_id,
                 new_status,
@@ -221,9 +223,9 @@ async def update_payment_status_by_db_id(
         await session.flush()
         await session.refresh(payment)
         if not preserve_succeeded:
-            logging.info(f"Payment record {payment.payment_id} status updated to {new_status}.")
+            logger.info(f"Payment record {payment.payment_id} status updated to {new_status}.")
     else:
-        logging.warning(f"Payment record with DB ID {payment_db_id} not found for status update.")
+        logger.warning(f"Payment record with DB ID {payment_db_id} not found for status update.")
     return payment
 
 
@@ -316,7 +318,7 @@ async def update_provider_payment_and_status(
     if payment:
         preserve_succeeded = _would_overwrite_succeeded_payment(payment.status, new_status)
         if preserve_succeeded:
-            logging.info(
+            logger.info(
                 "Payment record %s already succeeded; ignoring provider status update to %s.",
                 payment.payment_id,
                 new_status,
@@ -330,11 +332,11 @@ async def update_provider_payment_and_status(
         await session.flush()
         await session.refresh(payment)
         if not preserve_succeeded:
-            logging.info(
+            logger.info(
                 f"Payment record {payment.payment_id} updated with provider id {provider_payment_id} and status {new_status}."  # noqa: E501
             )
     else:
-        logging.warning(f"Payment record with DB ID {payment_db_id} not found for provider update.")
+        logger.warning(f"Payment record with DB ID {payment_db_id} not found for provider update.")
     return payment
 
 

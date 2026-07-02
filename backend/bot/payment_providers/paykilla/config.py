@@ -22,6 +22,8 @@ from ..shared import (
     format_decimal_amount,
 )
 
+logger = logging.getLogger(__name__)
+
 PAYKILLA_DEFAULT_PAYMENT_CURRENCIES = "USDTTRC,BTC,ETH,USDTBSC,USDTTON"
 PAYKILLA_DEFAULT_INVOICE_CURRENCIES = "USD,EUR"
 PAYKILLA_DEFAULT_EXCHANGE_RATE_URL = "https://open.er-api.com/v6/latest/{source}"
@@ -411,7 +413,7 @@ def _exchange_rate_sync(
         with urlopen(url, timeout=5) as response:
             response_data = json.loads(response.read().decode("utf-8"))
     except Exception:
-        logging.exception(
+        logger.exception(
             "Paykilla exchange rate sync lookup failed (source=%s target=%s).",
             source_currency,
             target_currency,
@@ -419,7 +421,7 @@ def _exchange_rate_sync(
         return None
 
     if not isinstance(response_data, dict) or response_data.get("result") != "success":
-        logging.warning(
+        logger.warning(
             "Paykilla exchange rate sync lookup returned unexpected body: %s",
             response_data,
         )

@@ -25,6 +25,8 @@ from db.dal import user_dal
 
 from .start import send_main_menu
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="user_promo_router")
 
 SUSPICIOUS_SQL_KEYWORDS_REGEX = re.compile(
@@ -52,7 +54,7 @@ async def prompt_promo_code_input(
     _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs)
 
     if not callback.message:
-        logging.error("CallbackQuery has no message in prompt_promo_code_input")
+        logger.error("CallbackQuery has no message in prompt_promo_code_input")
         await safe_answer_callback(
             callback,
             _("error_occurred_processing_request"),
@@ -70,7 +72,7 @@ async def prompt_promo_code_input(
             ),
         )
     except Exception as e_edit:
-        logging.warning(f"Failed to edit message for promo prompt: {e_edit}. Sending new one.")
+        logger.warning(f"Failed to edit message for promo prompt: {e_edit}. Sending new one.")
         await callback_message(callback).answer(
             text=_(key="promo_code_prompt"),
             reply_markup=get_back_to_main_menu_markup(
@@ -82,7 +84,7 @@ async def prompt_promo_code_input(
 
     await safe_answer_callback(callback)
     await state.set_state(UserPromoStates.waiting_for_promo_code)
-    logging.info(
+    logger.info(
         f"User {callback.from_user.id} entered state UserPromoStates.waiting_for_promo_code. "
         f"FSM state: {await state.get_state()}"
     )
@@ -99,7 +101,7 @@ async def process_promo_code_input(
     bot: Bot,
     session: AsyncSession,
 ) -> None:
-    logging.info(
+    logger.info(
         f"Processing promo code input from user {message_from_user(message).id} in state {await state.get_state()}: '{message.text}'"  # noqa: E501
     )
 
@@ -107,7 +109,7 @@ async def process_promo_code_input(
     i18n: JsonI18n | None = i18n_data.get("i18n_instance")
 
     if not i18n or not promo_code_service:
-        logging.error("Dependencies (i18n or PromoCodeService) missing in process_promo_code_input")
+        logger.error("Dependencies (i18n or PromoCodeService) missing in process_promo_code_input")
         await message.reply("Service error. Please try again later.")
         await state.clear()
         return
@@ -119,14 +121,14 @@ async def process_promo_code_input(
     is_suspicious = False
     if not code_input:
         is_suspicious = True
-        logging.warning(f"Empty promo code input by user {user.id}.")
+        logger.warning(f"Empty promo code input by user {user.id}.")
     elif (
         len(code_input) > MAX_PROMO_CODE_INPUT_LENGTH
         or SUSPICIOUS_SQL_KEYWORDS_REGEX.search(code_input)
         or SUSPICIOUS_CHARS_REGEX.search(code_input)
     ):
         is_suspicious = True
-        logging.warning(
+        logger.warning(
             f"Suspicious input for promo code by user {user.id} (len: {len(code_input)}): '{code_input}'"  # noqa: E501
         )
 
@@ -146,14 +148,14 @@ async def process_promo_code_input(
                 suspicious_input=code_input,
             )
         except Exception as e:
-            logging.error(f"Failed to send suspicious promo notification: {e}")
+            logger.error(f"Failed to send suspicious promo notification: {e}")
 
     success, result = await promo_code_service.apply_promo_code(
         session, user.id, code_input, current_lang
     )
     if success and isinstance(result, PromoCheckoutRequired):
         await session.commit()
-        logging.info(
+        logger.info(
             "Code '%s' requires checkout for user %s; sending Mini App handoff.",
             code_input,
             user.id,
@@ -178,14 +180,14 @@ async def process_promo_code_input(
             parse_mode="HTML",
         )
         await state.clear()
-        logging.info(
+        logger.info(
             f"Promo code input '{code_input}' processing finished for user {user.id}. State cleared."  # noqa: E501
         )
         return
 
     if success:
         await session.commit()
-        logging.info(f"Promo code '{code_input}' successfully applied for user {user.id}.")
+        logger.info(f"Promo code '{code_input}' successfully applied for user {user.id}.")
 
         new_end_date = result if isinstance(result, datetime) else None
         active = await subscription_service.get_active_subscription_details(session, user.id)
@@ -210,7 +212,7 @@ async def process_promo_code_input(
                 )
             except Exception:
                 await session.rollback()
-                logging.exception(
+                logger.exception(
                     "Failed to persist install guide share token for promo user %s.",
                     user.id,
                 )
@@ -225,7 +227,7 @@ async def process_promo_code_input(
         )
     else:
         await session.commit()
-        logging.info(
+        logger.info(
             f"Promo code '{code_input}' application failed for user {user.id}. Reason: {result}"
         )
         response_to_user_text = result
@@ -237,7 +239,7 @@ async def process_promo_code_input(
         parse_mode="HTML",
     )
     await state.clear()
-    logging.info(
+    logger.info(
         f"Promo code input '{code_input}' processing finished for user {message_from_user(message).id}. State cleared."  # noqa: E501
     )
 
@@ -254,11 +256,11 @@ async def cancel_promo_input_via_button(
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: JsonI18n | None = i18n_data.get("i18n_instance")
     if not i18n:
-        logging.error("i18n missing in cancel_promo_input_via_button")
+        logger.error("i18n missing in cancel_promo_input_via_button")
         await safe_answer_callback(callback, "Language error", show_alert=True)
         return
 
-    logging.info(
+    logger.info(
         f"User {callback.from_user.id} cancelled promo code input via button from state {await state.get_state()}. Clearing state."  # noqa: E501
     )
     await state.clear()

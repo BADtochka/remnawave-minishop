@@ -160,7 +160,7 @@ class CryptoPayService(BaseProviderService):
         self._client_token: str | None = None
         self._client_network: str | None = None
         if not self.config.TOKEN:
-            logging.warning("CryptoPay token not provided. CryptoPay disabled")
+            logger.warning("CryptoPay token not provided. CryptoPay disabled")
 
     @property
     def token(self) -> str | None:
@@ -195,9 +195,9 @@ class CryptoPayService(BaseProviderService):
         if self._client:
             try:
                 await self._client.close()
-                logging.info("CryptoPay client session closed.")
+                logger.info("CryptoPay client session closed.")
             except Exception as e:
-                logging.warning("Failed to close CryptoPay client: %s", e)
+                logger.warning("Failed to close CryptoPay client: %s", e)
 
     async def create_invoice(
         self,
@@ -213,14 +213,14 @@ class CryptoPayService(BaseProviderService):
         currency: str | None = None,
     ) -> str | None:
         if not self.configured or not self.client:
-            logging.error("CryptoPayService not configured")
+            logger.error("CryptoPayService not configured")
             return None
 
         currency_code = normalize_payment_currency_code(currency or self.config.ASSET)
         currency_type = str(self.config.CURRENCY_TYPE or "fiat").strip().lower()
         supported = _cryptopay_supported_currencies(self.config)
         if currency_code not in supported:
-            logging.error(
+            logger.error(
                 "CryptoPay currency %s is not supported for currency_type=%s",
                 currency_code,
                 currency_type,
@@ -266,7 +266,7 @@ class CryptoPayService(BaseProviderService):
             await session.commit()
         except Exception:
             await session.rollback()
-            logging.exception("Failed to create cryptopay payment record for user %s.", user_id)
+            logger.exception("Failed to create cryptopay payment record for user %s.", user_id)
             return None
 
         payload = json.dumps(
@@ -298,7 +298,7 @@ class CryptoPayService(BaseProviderService):
                 await session.commit()
             except Exception:
                 await session.rollback()
-                logging.exception(
+                logger.exception(
                     "Failed to update cryptopay payment record %s.",
                     payment_record.payment_id,
                 )
@@ -312,7 +312,7 @@ class CryptoPayService(BaseProviderService):
                 return str(invoice_url)
             return str(invoice.bot_invoice_url)
         except Exception:
-            logging.exception("CryptoPay invoice creation failed.")
+            logger.exception("CryptoPay invoice creation failed.")
             return None
 
     async def _invoice_paid_handler(self, update: Update, app: web.Application) -> None:
@@ -327,7 +327,7 @@ class CryptoPayService(BaseProviderService):
 
         invoice = update.payload
         if not invoice.payload:
-            logging.warning("CryptoPay webhook without payload")
+            logger.warning("CryptoPay webhook without payload")
             return
         try:
             meta = json.loads(invoice.payload)
@@ -339,7 +339,7 @@ class CryptoPayService(BaseProviderService):
             )
             traffic_gb = float(meta.get("traffic_gb")) if meta.get("traffic_gb") else months
         except Exception:
-            logging.exception("Failed to parse CryptoPay payload.")
+            logger.exception("Failed to parse CryptoPay payload.")
             return
 
         async_session_factory: sessionmaker = get_app_session_factory(app)
@@ -352,10 +352,10 @@ class CryptoPayService(BaseProviderService):
         async with async_session_factory() as session:
             payment = await payment_dal.get_payment_by_db_id(session, payment_db_id)
             if not payment:
-                logging.error("CryptoPay webhook: payment %s not found.", payment_db_id)
+                logger.error("CryptoPay webhook: payment %s not found.", payment_db_id)
                 return
             if payment.status == "succeeded":
-                logging.info("CryptoPay webhook: payment %s already succeeded.", payment_db_id)
+                logger.info("CryptoPay webhook: payment %s already succeeded.", payment_db_id)
                 return
 
             try:
@@ -368,7 +368,7 @@ class CryptoPayService(BaseProviderService):
                 await session.commit()
             except Exception:
                 await session.rollback()
-                logging.exception(
+                logger.exception(
                     "Failed to mark CryptoPay invoice %s as succeeded.",
                     payment_db_id,
                 )
@@ -376,7 +376,7 @@ class CryptoPayService(BaseProviderService):
 
             payment = await payment_dal.get_payment_by_db_id(session, payment_db_id)
             if not payment:
-                logging.error(
+                logger.error(
                     "CryptoPay webhook: payment %s vanished after status update.",
                     payment_db_id,
                 )

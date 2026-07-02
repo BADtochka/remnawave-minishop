@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config.settings import Settings
 from db.dal import user_dal
 
+logger = logging.getLogger(__name__)
+
 LocaleOverrides = dict[str, dict[str, str]]
 
 _LOCALE_LANGUAGE_CODE_RE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
@@ -314,13 +316,13 @@ class JsonI18n:
         if overrides_path:
             self.configure_overrides_file(overrides_path)
             self.reload_overrides_from_file(force=True)
-        logging.info(
+        logger.info(
             f"JsonI18n initialized. Loaded languages: {list(self.locales_data.keys())}. Default: {self.default_lang}"  # noqa: E501
         )
 
     def _load_locales(self) -> None:
         if not os.path.isdir(self.path):
-            logging.error(f"Locales path not found or not a directory: {self.path}")
+            logger.error(f"Locales path not found or not a directory: {self.path}")
             return
         loaded: dict[str, dict[str, str]] = {}
         for item in os.listdir(self.path):
@@ -337,17 +339,17 @@ class JsonI18n:
                             if isinstance(value, str)
                         }
                     else:
-                        logging.error(
+                        logger.error(
                             "Locale %s from %s is not a JSON object",
                             lang_code,
                             file_path,
                         )
                 except json.JSONDecodeError as e_json_load:
-                    logging.error(
+                    logger.error(
                         f"Error loading locale {lang_code} from {file_path} (JSON Decode Error): {e_json_load}"  # noqa: E501
                     )
                 except Exception as e_load:
-                    logging.error(
+                    logger.error(
                         f"Error loading locale {lang_code} from {file_path}: {e_load}",
                         exc_info=True,
                     )
@@ -399,7 +401,7 @@ class JsonI18n:
                 continue
             lang_code = normalize_locale_language_code(lang, prefer_known_base=False)
             if not lang_code or not is_valid_locale_language_code(lang_code):
-                logging.warning("Locale language %r from %s is invalid; skipped", lang, source)
+                logger.warning("Locale language %r from %s is invalid; skipped", lang, source)
                 continue
             bucket = self.base_locales_data.setdefault(lang_code, {})
             for key, value in messages.items():
@@ -411,7 +413,7 @@ class JsonI18n:
                 bucket[key] = value
                 added += 1
         if skipped:
-            logging.warning(
+            logger.warning(
                 "Locale keys from %s already defined by the core and were skipped: %s",
                 source,
                 ", ".join(sorted(skipped)),
@@ -428,7 +430,7 @@ class JsonI18n:
             allow_extra_languages=True,
         )
         if errors:
-            logging.warning("Some locale overrides were skipped: %s", errors)
+            logger.warning("Some locale overrides were skipped: %s", errors)
         self.locale_overrides = normalized
         self._rebuild_effective_locales()
         return errors
@@ -440,7 +442,7 @@ class JsonI18n:
         except FileNotFoundError:
             self._overrides_file_mtime_ns = None
         except OSError as exc:
-            logging.warning("Failed to stat locale overrides file %s: %s", path, exc)
+            logger.warning("Failed to stat locale overrides file %s: %s", path, exc)
             self._overrides_file_mtime_ns = None
 
     def reload_overrides_from_file(self, *, force: bool = False) -> bool:
@@ -458,13 +460,13 @@ class JsonI18n:
                 return False
             self._overrides_file_mtime_ns = None
             self._overrides_file_content = None
-            logging.info(
+            logger.info(
                 "Locale overrides file removed; keeping current in-memory overrides until "
                 "the DB fallback is reloaded"
             )
             return False
         except OSError as exc:
-            logging.warning(
+            logger.warning(
                 "Failed to stat locale overrides file %s: %s",
                 self._overrides_path,
                 exc,
@@ -474,7 +476,7 @@ class JsonI18n:
         try:
             content = self._overrides_path.read_text(encoding="utf-8")
         except OSError as exc:
-            logging.warning(
+            logger.warning(
                 "Failed to read locale overrides file %s: %s",
                 self._overrides_path,
                 exc,
@@ -491,7 +493,7 @@ class JsonI18n:
         try:
             payload = json.loads(content)
         except json.JSONDecodeError as exc:
-            logging.warning(
+            logger.warning(
                 "Failed to parse locale overrides file %s: %s",
                 self._overrides_path,
                 exc,
@@ -503,7 +505,7 @@ class JsonI18n:
         self._overrides_file_mtime_ns = stat.st_mtime_ns
         self._overrides_file_content = content
         self.set_locale_overrides(payload)
-        logging.info("Locale overrides reloaded from %s", self._overrides_path)
+        logger.info("Locale overrides reloaded from %s", self._overrides_path)
         return True
 
     def gettext(self, lang_code: str | None, key: str, **kwargs: object) -> str:
@@ -540,7 +542,7 @@ class JsonI18n:
                         return text.format(**kwargs) if kwargs else text
                     except Exception:
                         return text
-            logging.warning(
+            logger.warning(
                 f"No language data for '{effective_lang_code}' (default '{self.default_lang}' also missing). Key '{key}' will be returned as is."  # noqa: E501
             )
             return key.format(**kwargs) if kwargs else key
@@ -552,19 +554,19 @@ class JsonI18n:
                 text = default_lang_data.get(lookup_key)
 
             if text is None:
-                logging.warning(
+                logger.warning(
                     f"Translation key '{key}' not found for lang '{effective_lang_code}' or default '{self.default_lang}'. Returning key."  # noqa: E501
                 )
                 return key.format(**kwargs) if kwargs else key
         try:
             return text.format(**kwargs) if kwargs else text
         except KeyError as e_format:
-            logging.warning(
+            logger.warning(
                 f"Missing format key '{e_format}' for i18n key '{key}' (lang: {effective_lang_code}). Original text: '{text}'"  # noqa: E501
             )
             return text
         except Exception as e_general_format:
-            logging.error(
+            logger.error(
                 f"General error formatting i18n key '{key}' (lang: {effective_lang_code}): {e_general_format}. Original text: '{text}'",  # noqa: E501
                 exc_info=True,
             )
@@ -578,7 +580,7 @@ def get_i18n_instance(path: str = "locales", default: str = "en", domain: str = 
     global _i18n_instance_singleton
     if _i18n_instance_singleton is None:
         if not os.path.exists(path) or not os.path.isdir(path):
-            logging.error(
+            logger.error(
                 f"CRITICAL: Locales directory '{path}' not found. i18n will not work correctly."
             )
 
@@ -621,7 +623,7 @@ class I18nMiddleware(BaseMiddleware):
                     elif event_user.language_code.lower() in self.i18n.locales_data:
                         current_language = event_user.language_code.lower()
             except Exception as e_db_lang:
-                logging.error(
+                logger.error(
                     f"I18nMiddleware: Error fetching user lang from DB for {event_user.id}: {e_db_lang}. Falling back.",  # noqa: E501
                     exc_info=True,
                 )

@@ -20,6 +20,8 @@ from config.traffic_strategy import canonical_traffic_limit_strategy
 from db.dal import tariff_dal, user_dal
 from db.models import Subscription
 
+logger = logging.getLogger(__name__)
+
 PREMIUM_WARNING_LEVEL_OFFSET = 1000
 # Single warning per premium billing period when usage reached or exceeded the quota.
 PREMIUM_WARNING_DEPLETED_LEVEL = PREMIUM_WARNING_LEVEL_OFFSET + 100
@@ -171,7 +173,7 @@ class TariffWorkerRegularMixin:
                         sub.panel_user_uuid, log_response=False
                     )
                 except Exception:
-                    logging.exception(
+                    logger.exception(
                         "TariffTrafficWorker: failed to fetch panel user %s",
                         sub.panel_user_uuid,
                     )
@@ -275,7 +277,7 @@ class TariffWorkerRegularMixin:
         try:
             panel_users = await self.panel_service.get_all_panel_users(log_responses=False)
         except Exception:
-            logging.exception("TariffTrafficWorker: failed to bulk-prefetch panel users")
+            logger.exception("TariffTrafficWorker: failed to bulk-prefetch panel users")
             return None
         if not panel_users:
             return None
@@ -290,7 +292,7 @@ class TariffWorkerRegularMixin:
         if not by_uuid:
             return None
         matched = sum(1 for sub in subs if str(sub.panel_user_uuid) in by_uuid)
-        logging.info(
+        logger.info(
             "metric panel_bulk_user_prefetch users=%s matched=%s active_subscriptions=%s",
             len(by_uuid),
             matched,
@@ -327,13 +329,13 @@ class TariffWorkerRegularMixin:
                             log_response=False,
                         )
                     except Exception:
-                        logging.exception(
+                        logger.exception(
                             "TariffTrafficWorker: failed to fetch canonical panel user %s",
                             canonical_uuid,
                         )
                         panel_user = None
             if panel_user:
-                logging.warning(
+                logger.warning(
                     "TariffTrafficWorker: repaired subscription %s panel UUID %s -> %s",
                     sub.subscription_id,
                     current_uuid,
@@ -346,13 +348,13 @@ class TariffWorkerRegularMixin:
             sub.is_active = False
             sub.skip_notifications = True
             sub.status_from_panel = "PANEL_USER_NOT_FOUND"
-            logging.warning(
+            logger.warning(
                 "TariffTrafficWorker: deactivated subscription %s because panel user %s is missing",
                 sub.subscription_id,
                 current_uuid,
             )
         else:
-            logging.warning(
+            logger.warning(
                 "TariffTrafficWorker: skipping subscription %s because panel user %s "
                 "could not be fetched",
                 sub.subscription_id,
@@ -461,7 +463,7 @@ class TariffWorkerRegularMixin:
             log_response=False,
         )
         if not updated_panel or updated_panel.get("error"):
-            logging.warning(
+            logger.warning(
                 "TariffTrafficWorker: failed to sync HWID limit for subscription %s: %s",
                 sub.subscription_id,
                 updated_panel,
@@ -658,7 +660,7 @@ class TariffWorkerRegularMixin:
                         content=audit_content,
                     )
                 except Exception:
-                    logging.exception("Failed to send traffic warning to user %s", sub.user_id)
+                    logger.exception("Failed to send traffic warning to user %s", sub.user_id)
             await self._send_traffic_warning_email(
                 session,
                 user_id=sub.user_id,
@@ -669,7 +671,7 @@ class TariffWorkerRegularMixin:
                 audit_content=audit_content,
             )
         if ratio >= 1.0 and not sub.is_throttled:
-            logging.info(
+            logger.info(
                 "Tariff traffic limit reached for user %s subscription %s. "
                 "Leaving access control to Remnawave status handling.",
                 sub.user_id,

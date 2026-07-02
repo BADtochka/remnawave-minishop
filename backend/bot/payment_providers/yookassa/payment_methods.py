@@ -25,6 +25,8 @@ from .router import router
 from .service import YooKassaService
 from .shared import _format_saved_payment_method_title
 
+logger = logging.getLogger(__name__)
+
 
 @router.callback_query(F.data == "pm:manage")
 async def payment_methods_manage(
@@ -106,7 +108,7 @@ async def payment_method_bind(
         bind_only=True,
     )
     if not resp or not resp.get("confirmation_url"):
-        logging.error(
+        logger.error(
             "YooKassa bind-card payment creation failed for user %s. Response: %s",
             callback.from_user.id,
             resp,

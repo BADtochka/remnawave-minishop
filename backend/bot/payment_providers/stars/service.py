@@ -10,13 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.inline.user_keyboards import payment_methods_back_callback
 from bot.middlewares.i18n import JsonI18n
-
-if TYPE_CHECKING:
-    from bot.services.referral_service import ReferralService
-    from bot.services.subscription_service_impl.core import SubscriptionService
-else:
-    ReferralService = object
-    SubscriptionService = object
 from bot.utils.callback_answer import callback_message_or_none
 from config.settings import Settings
 from db.dal import payment_dal
@@ -49,6 +42,15 @@ from ..shared import (
     sale_mode_tariff_key,
 )
 from ..shared.app_context import app_required
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
+
+logger = logging.getLogger(__name__)
 
 
 class StarsPresentation(ProviderEnvConfig):
@@ -125,7 +127,7 @@ class StarsService:
             await session.commit()
         except Exception:
             await session.rollback()
-            logging.exception("Failed to create stars payment record")
+            logger.exception("Failed to create stars payment record")
             return None
 
         payload = f"{db_payment_record.payment_id}:{months}:{sale_mode}"
@@ -143,7 +145,7 @@ class StarsService:
             )
             return int(db_payment_record.payment_id)
         except Exception:
-            logging.exception("Failed to send Telegram Stars invoice")
+            logger.exception("Failed to send Telegram Stars invoice")
             return None
 
     async def process_successful_payment(
@@ -158,14 +160,14 @@ class StarsService:
     ) -> None:
         payment = await payment_dal.get_payment_by_db_id(session, payment_db_id)
         if not payment:
-            logging.error("Stars: payment %s not found.", payment_db_id)
+            logger.error("Stars: payment %s not found.", payment_db_id)
             return
         if payment.status == "succeeded":
-            logging.info("Stars: payment %s already succeeded.", payment_db_id)
+            logger.info("Stars: payment %s already succeeded.", payment_db_id)
             return
         successful_payment = message.successful_payment
         if successful_payment is None:
-            logging.error(
+            logger.error(
                 "Stars: successful payment payload is missing for payment %s.",
                 payment_db_id,
             )
@@ -181,7 +183,7 @@ class StarsService:
             await session.commit()
         except Exception:
             await session.rollback()
-            logging.exception("Failed to update stars payment record %s", payment_db_id)
+            logger.exception("Failed to update stars payment record %s", payment_db_id)
             return
 
         target_user_id = (
@@ -302,7 +304,7 @@ async def pay_stars_callback_handler(
                 reply_markup=markup,
             )
         except Exception:
-            logging.warning("Stars payment: failed to show invoice info message")
+            logger.warning("Stars payment: failed to show invoice info message")
         await safe_callback_answer(callback)
         return
 
@@ -416,7 +418,7 @@ async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
         )
     except Exception:
         await ctx.session.rollback()
-        logging.exception("Stars WebApp payment failed")
+        logger.exception("Stars WebApp payment failed")
         return payment_failed("Failed to create invoice")
 
 

@@ -20,6 +20,8 @@ from bot.utils.message_queue import get_queue_manager
 from db.dal import app_settings_dal, user_dal
 from db.models import SupportTicket, SupportTicketMessage, User
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from bot.middlewares.i18n import JsonI18n
     from bot.services.email_auth_service import EmailAuthService
@@ -147,7 +149,7 @@ class NotificationSupportMixin:
                     SUPPORT_ADMIN_EMAIL_NOTIFICATIONS_KEY,
                 )
         except Exception:
-            logging.exception("Failed to read support admin email notification override.")
+            logger.exception("Failed to read support admin email notification override.")
             return enabled
         if not found:
             return enabled
@@ -263,7 +265,7 @@ class NotificationSupportMixin:
                     content=content,
                 )
             except Exception:
-                logging.exception("Failed to send support email to admin %s.", admin.user_id)
+                logger.exception("Failed to send support email to admin %s.", admin.user_id)
 
     async def notify_new_support_ticket(
         self,

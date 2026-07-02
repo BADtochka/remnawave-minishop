@@ -5,6 +5,8 @@ from bot.services.panel_api_service import PanelApiService
 from bot.utils.ttl_cache import AsyncTTLCache
 from config.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 _CRYPT4_LINK_CACHES: dict[tuple[int, int], AsyncTTLCache] = {}
 
 
@@ -68,9 +70,7 @@ async def prepare_config_links(
             display_link = encrypted_payload
             button_link = display_link
         else:
-            logging.error(
-                "CRYPT4_ENABLED is set but encryption failed; using raw link as fallback."
-            )
+            logger.error("CRYPT4_ENABLED is set but encryption failed; using raw link as fallback.")
 
     redirect_base = (settings.CRYPT4_REDIRECT_URL or "").strip()
     if redirect_base and settings.CRYPT4_ENABLED and display_link:

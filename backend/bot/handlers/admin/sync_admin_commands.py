@@ -15,6 +15,8 @@ from .sync_admin_common import (
 )
 from .sync_admin_runner import perform_sync
 
+logger = logging.getLogger(__name__)
+
 
 async def sync_command_handler(
     message_event: types.Message | types.CallbackQuery,
@@ -27,7 +29,7 @@ async def sync_command_handler(
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: JsonI18n | None = i18n_data.get("i18n_instance")
     if not i18n:
-        logging.error("i18n missing in sync_command_handler")
+        logger.error("i18n missing in sync_command_handler")
 
         if isinstance(message_event, types.Message):
             await message_event.answer("Language error.")
@@ -38,7 +40,7 @@ async def sync_command_handler(
 
     target_chat_id = _sync_request_target_chat_id(message_event)
     if not target_chat_id:
-        logging.error("Sync handler: could not determine target_chat_id.")
+        logger.error("Sync handler: could not determine target_chat_id.")
         if isinstance(message_event, types.CallbackQuery):
             await message_event.answer("Error initiating sync.", show_alert=True)
         return
@@ -51,7 +53,7 @@ async def sync_command_handler(
         language=current_lang,
     )
     if not queued:
-        logging.warning("Admin (%s) failed to enqueue manual panel sync.", requested_by)
+        logger.warning("Admin (%s) failed to enqueue manual panel sync.", requested_by)
         await _answer_sync_request(message_event, _("sync_failed_simple"), show_alert=True)
         return
 
@@ -61,7 +63,7 @@ async def sync_command_handler(
         if isinstance(message_event, types.CallbackQuery)
         else _("sync_started_simple"),
     )
-    logging.info("Admin (%s) queued panel sync from bot.", requested_by)
+    logger.info("Admin (%s) queued panel sync from bot.", requested_by)
 
 
 def _sync_request_target_chat_id(

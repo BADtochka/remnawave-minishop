@@ -32,6 +32,8 @@ from .start_common import (
 )
 from .start_menus import send_bot_interface_menu, send_main_menu
 
+logger = logging.getLogger(__name__)
+
 
 @router.message(Command("tg"))
 async def tg_interface_command_handler(
@@ -199,7 +201,7 @@ async def select_language_callback_handler(
             i18n_data["current_language"] = lang_code
             _ = lambda key, **kwargs: i18n.gettext(lang_code, key, **kwargs)
             await safe_answer_callback(callback, _(key="language_set_alert"))
-            logging.info(f"User {user_id} language updated to {lang_code} in session.")
+            logger.info(f"User {user_id} language updated to {lang_code} in session.")
         else:
             await safe_answer_callback(
                 callback,
@@ -208,7 +210,7 @@ async def select_language_callback_handler(
             )
             return
     except Exception as e_lang_update:
-        logging.error(f"Error updating lang for user {user_id}: {e_lang_update}", exc_info=True)
+        logger.error(f"Error updating lang for user {user_id}: {e_lang_update}", exc_info=True)
         await safe_answer_callback(callback, "Error setting language.", show_alert=True)
         return
     if return_target == "bot" and telegram_bot_menu_enabled_for_user(

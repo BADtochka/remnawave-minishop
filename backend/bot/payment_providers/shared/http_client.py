@@ -8,6 +8,8 @@ from typing import Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout, TraceConfig
 
+logger = logging.getLogger(__name__)
+
 SuccessCheck = Callable[[int, Any], bool]
 TimeoutSource = float | Callable[[], float]
 _TRANSPORT_ATTEMPTS = 2
@@ -72,14 +74,14 @@ async def post_json_request(
                 try:
                     response_data = json.loads(response_text) if response_text else {}
                 except json.JSONDecodeError:
-                    logging.error("%s: invalid JSON response: %s", log_prefix, response_text)
+                    logger.error("%s: invalid JSON response: %s", log_prefix, response_text)
                     return False, {
                         "status": response.status,
                         "message": "invalid_json",
                         "raw": response_text,
                     }
                 if not is_success(response.status, response_data):
-                    logging.error(
+                    logger.error(
                         "%s: API returned error (status=%s, body=%s)",
                         log_prefix,
                         response.status,
@@ -89,7 +91,7 @@ async def post_json_request(
                 return True, response_data
         except Exception as exc:
             if attempt < _TRANSPORT_ATTEMPTS and _should_retry_transport_error(exc, trace_ctx):
-                logging.warning(
+                logger.warning(
                     "%s: transport failed before request headers were sent; retrying (%s/%s): %s",
                     log_prefix,
                     attempt + 1,
@@ -97,7 +99,7 @@ async def post_json_request(
                     exc,
                 )
                 continue
-            logging.exception("%s: request failed.", log_prefix)
+            logger.exception("%s: request failed.", log_prefix)
             return False, {"message": str(exc)}
     return False, {"message": "request_failed"}
 

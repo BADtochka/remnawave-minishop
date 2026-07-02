@@ -16,6 +16,8 @@ from config.settings import Settings
 from config.subscription_guides_config import subscription_guides_available
 from db.dal import subscription_dal
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class InstallGuideLinks:
@@ -69,7 +71,7 @@ async def ensure_user_install_guide_share_url(
         share_token = await subscription_dal.ensure_install_share_token(session, local_sub)
         return subscription_public_install_url(settings, share_token)
     except Exception:
-        logging.exception("Failed to resolve install guide share link for user %s.", user_id)
+        logger.exception("Failed to resolve install guide share link for user %s.", user_id)
         return None
 
 

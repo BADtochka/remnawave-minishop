@@ -13,13 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from bot.middlewares.i18n import JsonI18n
-
-if TYPE_CHECKING:
-    from bot.services.referral_service import ReferralService
-    from bot.services.subscription_service_impl.core import SubscriptionService
-else:
-    ReferralService = object
-    SubscriptionService = object
 from config.settings import Settings
 from db.dal import payment_dal, user_billing_dal
 
@@ -53,6 +46,15 @@ from .config import (
     _stripe_json_success,
 )
 
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
+
+logger = logging.getLogger(__name__)
+
 
 class StripeService(HttpClientMixin):
     def __init__(
@@ -78,9 +80,7 @@ class StripeService(HttpClientMixin):
         self._init_http_client(total_timeout=lambda: self.settings.PAYMENT_REQUEST_TIMEOUT_SECONDS)
 
         if not self.configured:
-            logging.warning(
-                "StripeService initialized but not fully configured. Payments disabled."
-            )
+            logger.warning("StripeService initialized but not fully configured. Payments disabled.")
 
     @property
     def configured(self) -> bool:
@@ -142,14 +142,14 @@ class StripeService(HttpClientMixin):
                 try:
                     response_data = json.loads(response_text) if response_text else {}
                 except json.JSONDecodeError:
-                    logging.error("%s: invalid JSON response: %s", log_prefix, response_text)
+                    logger.error("%s: invalid JSON response: %s", log_prefix, response_text)
                     return False, {
                         "status": response.status,
                         "message": "invalid_json",
                         "raw": response_text,
                     }
                 if not _stripe_json_success(response.status, response_data):
-                    logging.error(
+                    logger.error(
                         "%s: Stripe API returned error (status=%s, body=%s)",
                         log_prefix,
                         response.status,
@@ -158,7 +158,7 @@ class StripeService(HttpClientMixin):
                     return False, {"status": response.status, "message": response_data}
                 return True, response_data
         except (ClientError, TimeoutError, OSError) as exc:
-            logging.exception("%s: Stripe request failed.", log_prefix)
+            logger.exception("%s: Stripe request failed.", log_prefix)
             return False, {"message": str(exc)}
 
     async def _get_json(self, endpoint: str, *, log_prefix: str) -> tuple[bool, dict[str, Any]]:
@@ -172,14 +172,14 @@ class StripeService(HttpClientMixin):
                 try:
                     response_data = json.loads(response_text) if response_text else {}
                 except json.JSONDecodeError:
-                    logging.error("%s: invalid JSON response: %s", log_prefix, response_text)
+                    logger.error("%s: invalid JSON response: %s", log_prefix, response_text)
                     return False, {
                         "status": response.status,
                         "message": "invalid_json",
                         "raw": response_text,
                     }
                 if not _stripe_json_success(response.status, response_data):
-                    logging.error(
+                    logger.error(
                         "%s: Stripe API returned error (status=%s, body=%s)",
                         log_prefix,
                         response.status,
@@ -188,7 +188,7 @@ class StripeService(HttpClientMixin):
                     return False, {"status": response.status, "message": response_data}
                 return True, response_data
         except (ClientError, TimeoutError, OSError) as exc:
-            logging.exception("%s: Stripe request failed.", log_prefix)
+            logger.exception("%s: Stripe request failed.", log_prefix)
             return False, {"message": str(exc)}
 
     async def create_checkout_session(
@@ -331,7 +331,7 @@ class StripeService(HttpClientMixin):
         try:
             payment = await payment_dal.create_payment_record(context.session, payment_payload)
         except Exception as exc:
-            logging.exception("Stripe auto-renew failed to create local payment record")
+            logger.exception("Stripe auto-renew failed to create local payment record")
             return RecurringChargeResult.failed(str(exc))
 
         success, response_data = await self.create_off_session_payment_intent(
@@ -359,7 +359,7 @@ class StripeService(HttpClientMixin):
                     "pending_stripe",
                 )
             except Exception:
-                logging.exception(
+                logger.exception(
                     "Stripe auto-renew failed to store provider payment id %s",
                     provider_payment_id,
                 )
@@ -372,7 +372,7 @@ class StripeService(HttpClientMixin):
                     "failed_creation",
                 )
             except Exception:
-                logging.exception(
+                logger.exception(
                     "Stripe auto-renew failed to mark payment %s as failed_creation",
                     payment.payment_id,
                 )
@@ -389,7 +389,7 @@ class StripeService(HttpClientMixin):
     def verify_signature(self, raw_body: bytes, header_value: str) -> bool:
         secret = self.webhook_secret
         if not secret:
-            logging.error("Stripe webhook: no webhook secret configured.")
+            logger.error("Stripe webhook: no webhook secret configured.")
             return False
         timestamp: int | None = None
         signatures: list[str] = []
@@ -470,7 +470,7 @@ class StripeService(HttpClientMixin):
         obj: Mapping[str, Any],
     ) -> web.Response:
         if event_type == "checkout.session.completed" and obj.get("payment_status") != "paid":
-            logging.info(
+            logger.info(
                 "Stripe webhook: checkout session completed but payment_status is not paid."
             )
             return web.json_response({"received": True})
@@ -492,7 +492,7 @@ class StripeService(HttpClientMixin):
                 provider_payment_id=provider_payment_id,
             )
             if not payment:
-                logging.error(
+                logger.error(
                     "Stripe webhook: payment not found (payment_db_id=%s provider_id=%s)",
                     payment_db_id,
                     provider_payment_id,
@@ -513,7 +513,7 @@ class StripeService(HttpClientMixin):
             if amount_minor is not None:
                 expected_minor = _stripe_amount_to_minor_units(payment.amount, payment.currency)
                 if int(amount_minor) != expected_minor:
-                    logging.error(
+                    logger.error(
                         "Stripe webhook: amount mismatch for payment %s (expected=%s got=%s)",
                         payment.payment_id,
                         expected_minor,
@@ -523,7 +523,7 @@ class StripeService(HttpClientMixin):
             if currency and normalize_payment_currency_code(
                 currency
             ) != normalize_payment_currency_code(payment.currency):
-                logging.error(
+                logger.error(
                     "Stripe webhook: currency mismatch for payment %s (expected=%s got=%s)",
                     payment.payment_id,
                     payment.currency,
@@ -548,7 +548,7 @@ class StripeService(HttpClientMixin):
                 await session.commit()
             except Exception:
                 await session.rollback()
-                logging.exception(
+                logger.exception(
                     "Stripe webhook: failed to mark payment %s as succeeded.",
                     payment.payment_id,
                 )
@@ -602,7 +602,7 @@ class StripeService(HttpClientMixin):
                 provider_payment_id=provider_payment_id,
             )
             if not payment:
-                logging.warning(
+                logger.warning(
                     "Stripe webhook: failed event for unknown payment "
                     "(payment_db_id=%s provider_id=%s)",
                     payment_db_id,
@@ -621,7 +621,7 @@ class StripeService(HttpClientMixin):
                 await session.commit()
             except Exception:
                 await session.rollback()
-                logging.exception(
+                logger.exception(
                     "Stripe webhook: failed to mark payment %s as failed.",
                     payment.payment_id,
                 )
@@ -642,7 +642,7 @@ class StripeService(HttpClientMixin):
         if self.config.VERIFY_WEBHOOK_SIGNATURE:
             signature_header = request.headers.get("Stripe-Signature", "")
             if not self.verify_signature(raw_body, signature_header):
-                logging.error("Stripe webhook: invalid signature.")
+                logger.error("Stripe webhook: invalid signature.")
                 return web.json_response({"error": "invalid_signature"}, status=403)
 
         try:

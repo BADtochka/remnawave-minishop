@@ -12,6 +12,8 @@ from db.models import User
 
 from ._typing import SubscriptionServiceMixinContract
 
+logger = logging.getLogger(__name__)
+
 
 class PaymentContextMixin(SubscriptionServiceMixinContract):
     # Human-readable provider names rendered in payment-success emails.
@@ -154,7 +156,7 @@ class PaymentContextMixin(SubscriptionServiceMixinContract):
             email_service = EmailAuthService(self.settings, i18n)
             await email_service.send_rendered_email(email=recipient, content=content)
         except Exception:
-            logging.exception("Failed to send payment success email to user %s", db_user.user_id)
+            logger.exception("Failed to send payment success email to user %s", db_user.user_id)
 
     async def update_last_notification_sent(
         self, session: AsyncSession, user_id: int, subscription_end_date: datetime
@@ -166,10 +168,10 @@ class PaymentContextMixin(SubscriptionServiceMixinContract):
             await subscription_dal.update_subscription_notification_time(
                 session, sub_to_update.subscription_id, datetime.now(UTC)
             )
-            logging.info(
+            logger.info(
                 f"Updated last_notification_sent for user {user_id}, sub_id {sub_to_update.subscription_id}"  # noqa: E501
             )
         else:
-            logging.warning(
+            logger.warning(
                 f"Could not find subscription for user {user_id} ending at {subscription_end_date.isoformat()} to update notification time."  # noqa: E501
             )

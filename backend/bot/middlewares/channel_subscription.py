@@ -22,6 +22,8 @@ from bot.utils.channel_subscription import (
 from config.settings import Settings
 from db.dal import user_dal
 
+logger = logging.getLogger(__name__)
+
 
 class ChannelSubscriptionMiddleware(BaseMiddleware):
     """
@@ -69,7 +71,7 @@ class ChannelSubscriptionMiddleware(BaseMiddleware):
         try:
             db_user = await user_dal.get_user_by_id(session, event_user.id)
         except Exception as db_error:
-            logging.error(
+            logger.error(
                 "ChannelSubscriptionMiddleware: failed to fetch user %s: %s",
                 event_user.id,
                 db_error,
@@ -140,7 +142,7 @@ class ChannelSubscriptionMiddleware(BaseMiddleware):
             try:
                 await callback.message.answer(prompt_text, reply_markup=keyboard)
             except Exception as send_error:
-                logging.error(
+                logger.error(
                     "ChannelSubscriptionMiddleware: failed to send prompt for callback in chat %s: %s",  # noqa: E501
                     callback.message.chat.id,
                     send_error,

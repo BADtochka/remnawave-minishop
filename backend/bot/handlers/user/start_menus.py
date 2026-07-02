@@ -18,6 +18,8 @@ from bot.utils.callback_answer import (
 )
 from config.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 
 async def should_show_trial_button(
     settings: Settings,
@@ -33,7 +35,7 @@ async def should_show_trial_button(
     ):
         return not await subscription_service.has_trial_blocking_subscription(session, user_id)
 
-    logging.error("Method has_trial_blocking_subscription is missing in SubscriptionService!")
+    logger.error("Method has_trial_blocking_subscription is missing in SubscriptionService!")
     return False
 
 
@@ -57,7 +59,7 @@ async def send_main_menu(
     user_full_name = hd.quote(event_user.full_name)
 
     if not i18n:
-        logging.error(f"i18n_instance missing in send_main_menu for user {user_id}")
+        logger.error(f"i18n_instance missing in send_main_menu for user {user_id}")
         err_msg_fallback = "Error: Language service unavailable. Please try again later."
         if isinstance(target_event, types.CallbackQuery):
             with contextlib.suppress(Exception):
@@ -89,7 +91,7 @@ async def send_main_menu(
         target_message_obj = callback_message(target_event)
 
     if not target_message_obj:
-        logging.error(f"send_main_menu: target_message_obj is None for event from user {user_id}.")
+        logger.error(f"send_main_menu: target_message_obj is None for event from user {user_id}.")
         if isinstance(target_event, types.CallbackQuery):
             await safe_answer_callback(
                 target_event,
@@ -107,14 +109,14 @@ async def send_main_menu(
         if isinstance(target_event, types.CallbackQuery):
             await safe_answer_callback(target_event)
     except Exception as e_send_edit:
-        logging.warning(
+        logger.warning(
             f"Failed to send/edit main menu (user: {user_id}, is_edit: {is_edit}): {type(e_send_edit).__name__} - {e_send_edit}."  # noqa: E501
         )
         if is_edit and target_message_obj:
             try:
                 await target_message_obj.answer(text, reply_markup=reply_markup)
             except Exception as e_send_new:
-                logging.error(
+                logger.error(
                     f"Also failed to send new main menu message for user {user_id}: {e_send_new}"
                 )
         if isinstance(target_event, types.CallbackQuery):
@@ -136,7 +138,7 @@ async def send_bot_interface_menu(
     i18n: JsonI18n | None = i18n_data.get("i18n_instance")
 
     if not i18n:
-        logging.error("i18n_instance missing in send_bot_interface_menu.")
+        logger.error("i18n_instance missing in send_bot_interface_menu.")
         return
 
     event_user = (
@@ -163,7 +165,7 @@ async def send_bot_interface_menu(
         target_message_obj = callback_message(target_event)
 
     if not target_message_obj:
-        logging.error(
+        logger.error(
             "send_bot_interface_menu: target_message_obj is None for user %s.",
             user_id,
         )
@@ -178,7 +180,7 @@ async def send_bot_interface_menu(
         if isinstance(target_event, types.CallbackQuery):
             await safe_answer_callback(target_event)
     except Exception as e_send_edit:
-        logging.warning(
+        logger.warning(
             "Failed to send/edit bot interface menu (user: %s, is_edit: %s): %s - %s.",
             user_id,
             is_edit,
@@ -189,7 +191,7 @@ async def send_bot_interface_menu(
             try:
                 await target_message_obj.answer(text, reply_markup=reply_markup)
             except Exception as e_send_new:
-                logging.error(
+                logger.error(
                     "Also failed to send new bot interface menu for user %s: %s",
                     user_id,
                     e_send_new,

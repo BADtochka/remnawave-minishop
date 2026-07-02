@@ -18,6 +18,8 @@ from db.models import PromoCode
 
 from .subscription_service import SubscriptionService
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class PromoCheckoutRequired:
@@ -209,7 +211,7 @@ class PromoCodeService:
             granted_days=bonus_days,
         )
         if activation is None:
-            logging.warning(
+            logger.warning(
                 "Failed to consume code %s for standalone activation by user %s",
                 promo_data.code,
                 user_id,

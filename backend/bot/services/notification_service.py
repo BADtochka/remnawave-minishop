@@ -24,6 +24,8 @@ from bot.utils.text_sanitizer import (
 )
 from config.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 
 class NotificationService(NotificationSupportMixin):
     """Enhanced notification service for sending messages to admins and log channels"""
@@ -107,7 +109,7 @@ class NotificationService(NotificationSupportMixin):
 
         queue_manager = get_queue_manager()
         if not queue_manager:
-            logging.warning("Message queue manager not available, falling back to direct send")
+            logger.warning("Message queue manager not available, falling back to direct send")
             final_thread_id = thread_id or self.settings.LOG_THREAD_ID
 
             def _build_kwargs(markup: InlineKeyboardMarkup | None) -> dict[str, Any]:
@@ -128,7 +130,7 @@ class NotificationService(NotificationSupportMixin):
             except TelegramBadRequest as exc:
                 if is_profile_link_error(exc):
                     fallback_markup = remove_profile_link_buttons(reply_markup)
-                    logging.warning(
+                    logger.warning(
                         "Telegram rejected profile buttons for log chat %s: %s. "
                         "Retrying without tg:// links.",
                         self.settings.LOG_CHAT_ID,
@@ -137,16 +139,16 @@ class NotificationService(NotificationSupportMixin):
                     try:
                         await self.bot.send_message(**_build_kwargs(fallback_markup))
                     except Exception as retry_exc:
-                        logging.error(
+                        logger.error(
                             "Failed to send notification without profile buttons to log "
                             f"channel {self.settings.LOG_CHAT_ID}: {retry_exc}"
                         )
                     return
-                logging.error(
+                logger.error(
                     f"Failed to send notification to log channel {self.settings.LOG_CHAT_ID}: {exc}"
                 )
             except Exception:
-                logging.exception(
+                logger.exception(
                     "Failed to send notification to log channel %s.", self.settings.LOG_CHAT_ID
                 )
             return
@@ -167,7 +169,7 @@ class NotificationService(NotificationSupportMixin):
             await queue_manager.send_message(self.settings.LOG_CHAT_ID, **kwargs)
 
         except Exception:
-            logging.exception(
+            logger.exception(
                 "Failed to queue notification to log channel %s.", self.settings.LOG_CHAT_ID
             )
 
@@ -182,7 +184,7 @@ class NotificationService(NotificationSupportMixin):
 
         queue_manager = get_queue_manager()
         if not queue_manager:
-            logging.warning("Message queue manager not available, falling back to direct send")
+            logger.warning("Message queue manager not available, falling back to direct send")
             for admin_id in self.settings.ADMIN_IDS:
                 try:
                     await self.bot.send_message(
@@ -193,7 +195,7 @@ class NotificationService(NotificationSupportMixin):
                         reply_markup=reply_markup,
                     )
                 except Exception:
-                    logging.exception("Failed to send notification to admin %s.", admin_id)
+                    logger.exception("Failed to send notification to admin %s.", admin_id)
             return
 
         for admin_id in self.settings.ADMIN_IDS:
@@ -206,7 +208,7 @@ class NotificationService(NotificationSupportMixin):
                     reply_markup=reply_markup,
                 )
             except Exception:
-                logging.exception("Failed to queue notification to admin %s.", admin_id)
+                logger.exception("Failed to queue notification to admin %s.", admin_id)
 
     async def notify_new_user_registration(
         self,

@@ -25,6 +25,8 @@ from config.settings import Settings
 from db.dal import user_dal
 from db.models import User
 
+logger = logging.getLogger(__name__)
+
 
 async def ensure_required_channel_subscription(
     event: types.Message | types.CallbackQuery,
@@ -54,7 +56,7 @@ async def ensure_required_channel_subscription(
         message_obj = event
 
     if bot_instance is None:
-        logging.error("Channel subscription check: bot instance missing for user %s.", user_id)
+        logger.error("Channel subscription check: bot instance missing for user %s.", user_id)
         return False
 
     if user_id in settings.ADMIN_IDS:
@@ -64,7 +66,7 @@ async def ensure_required_channel_subscription(
         try:
             db_user = await user_dal.get_user_by_id(session, user_id)
         except Exception as fetch_error:
-            logging.error(
+            logger.error(
                 "Channel subscription check: failed to fetch user %s: %s",
                 user_id,
                 fetch_error,
@@ -73,7 +75,7 @@ async def ensure_required_channel_subscription(
             return False
 
     if not db_user:
-        logging.warning(
+        logger.warning(
             "Required channel check skipped because user %s is not persisted yet.",
             user_id,
         )
@@ -103,7 +105,7 @@ async def ensure_required_channel_subscription(
             is_member = True
     except TelegramBadRequest as bad_request:
         if is_required_channel_access_error(bad_request):
-            logging.error(
+            logger.error(
                 "Required channel check failed due to channel access/configuration error "
                 "(configured=%s, normalized=%s): %s",
                 settings.REQUIRED_CHANNEL_ID,
@@ -121,13 +123,13 @@ async def ensure_required_channel_subscription(
                 await event.answer(error_text)
             return False
 
-        logging.info(
+        logger.info(
             "Required channel check: user %s not subscribed (details: %s)",
             user_id,
             bad_request,
         )
     except TelegramForbiddenError as forbidden_error:
-        logging.error(
+        logger.error(
             "Required channel check failed due to insufficient permissions: %s",
             forbidden_error,
         )
@@ -142,7 +144,7 @@ async def ensure_required_channel_subscription(
             await event.answer(error_text)
         return False
     except TelegramAPIError as api_error:
-        logging.error(
+        logger.error(
             "Required channel check failed for user %s: %s",
             user_id,
             api_error,
@@ -167,7 +169,7 @@ async def ensure_required_channel_subscription(
     try:
         await user_dal.update_user(session, user_id, update_payload)
     except Exception as update_error:
-        logging.error(
+        logger.error(
             "Failed to persist channel verification result for user %s: %s",
             user_id,
             update_error,
@@ -175,7 +177,7 @@ async def ensure_required_channel_subscription(
         )
 
     if is_member:
-        logging.info(
+        logger.info(
             "User %s confirmed as member of required channel %s (status=%s).",
             user_id,
             required_channel_id,
@@ -197,7 +199,7 @@ async def ensure_required_channel_subscription(
             try:
                 await callback_message(event).edit_text(prompt_text, reply_markup=keyboard)
             except Exception as edit_error:
-                logging.debug(
+                logger.debug(
                     "Failed to edit prompt message for user %s: %s",
                     user_id,
                     edit_error,

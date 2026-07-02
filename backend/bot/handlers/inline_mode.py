@@ -13,6 +13,8 @@ from bot.middlewares.i18n import JsonI18n
 from bot.services.referral_service import ReferralService
 from config.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="inline_mode_router")
 
 
@@ -72,7 +74,7 @@ async def inline_query_handler(
         )
 
     except Exception as e:
-        logging.error(f"Error handling inline query from user {user_id}: {e}")
+        logger.error(f"Error handling inline query from user {user_id}: {e}")
         # Send empty results in case of error
         await inline_query.answer(results=[], cache_time=10)
 
@@ -101,7 +103,7 @@ async def create_referral_result(
         )
 
         if not referral_link:
-            logging.warning("Could not produce referral link for inline user %s", user_id)
+            logger.warning("Could not produce referral link for inline user %s", user_id)
             return None
 
         # Create message content (use same text as friend message)
@@ -118,7 +120,7 @@ async def create_referral_result(
         )
 
     except Exception as e:
-        logging.error(f"Error creating referral result: {e}")
+        logger.error(f"Error creating referral result: {e}")
         return None
 
 
@@ -150,7 +152,7 @@ async def create_admin_stats_results(
             results.append(system_stats_result)
 
     except Exception as e:
-        logging.error(f"Error creating admin stats results: {e}")
+        logger.error(f"Error creating admin stats results: {e}")
 
     return results
 
@@ -194,7 +196,7 @@ async def create_user_stats_result(
         )
 
     except Exception as e:
-        logging.error(f"Error creating user stats result: {e}")
+        logger.error(f"Error creating user stats result: {e}")
         return None
 
 
@@ -231,7 +233,7 @@ async def create_financial_stats_result(
         )
 
     except Exception as e:
-        logging.error(f"Error creating financial stats result: {e}")
+        logger.error(f"Error creating financial stats result: {e}")
         return None
 
 
@@ -323,7 +325,7 @@ async def create_system_stats_result(
         )
 
     except Exception as e:
-        logging.error(f"Error creating system stats result: {e}")
+        logger.error(f"Error creating system stats result: {e}")
         # Fallback error message
         error_text = _("inline_panel_stats_error")
 

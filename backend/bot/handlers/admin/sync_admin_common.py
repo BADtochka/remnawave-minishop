@@ -11,6 +11,8 @@ from bot.utils.text_sanitizer import panel_description_from_profile
 from config.settings import Settings
 from db.models import Subscription, User
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="admin_sync_router")
 
 # Single-flight guard: panel sync runs concurrently with the bot, but only one
@@ -30,7 +32,7 @@ def _coerce_panel_telegram_id(value: Any) -> int | None:
     try:
         return int(value)
     except (TypeError, ValueError):
-        logging.warning("Panel user has non-numeric telegramId: %r", value)
+        logger.warning("Panel user has non-numeric telegramId: %r", value)
         return None
 
 
@@ -237,7 +239,7 @@ def _log_sync_panel_patch(
     changes = _panel_update_changes(current_panel_user, update_payload)
     changed_fields = [field for field, _old, _new in changes]
     payload_fields = [field for field in update_payload if field != "uuid"]
-    logging.info(
+    logger.info(
         "Sync panel PATCH: source=%s user_id=%s telegram_id=%s panel_uuid=%s "
         "panel_view=%s reasons=%s fields=%s payload_fields=%s changes=%s",
         source,
@@ -339,7 +341,7 @@ async def _panel_identity_view_for_comparison(
     try:
         full_panel_user = await panel_service.get_user_by_uuid(panel_uuid)
     except Exception:
-        logging.exception(
+        logger.exception(
             "Sync: failed to fetch full panel user %s for identity comparison",
             panel_uuid,
         )

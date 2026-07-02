@@ -31,6 +31,8 @@ from db.models import Subscription, User
 
 from .panel_api_service import PanelApiService
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from bot.services.subscription_service_impl.core import SubscriptionService
 
@@ -97,9 +99,7 @@ class PanelWebhookService:
         self._event_semaphore = asyncio.Semaphore(self._MAX_CONCURRENT_EVENTS)
         self._background_tasks: set[asyncio.Task[None]] = set()
         if not self.settings.PANEL_WEBHOOK_SECRET:
-            logging.error(
-                "PANEL_WEBHOOK_SECRET is not configured. Panel webhooks will be rejected."
-            )
+            logger.error("PANEL_WEBHOOK_SECRET is not configured. Panel webhooks will be rejected.")
 
     async def _send_message(
         self,
@@ -117,7 +117,7 @@ class PanelWebhookService:
                 text = f"{text}\n\n{extra_text}"
             await self.bot.send_message(user_id, text, reply_markup=reply_markup)
         except Exception:
-            logging.exception("Failed to send notification to %s", user_id)
+            logger.exception("Failed to send notification to %s", user_id)
 
     async def _hwid_renewal_note(self, internal_user_id: int, lang: str) -> str:
         try:
@@ -139,7 +139,7 @@ class PanelWebhookService:
                 active_until = summary.get("active_until") or sub.end_date
                 date_text = active_until.strftime("%Y-%m-%d") if active_until else ""
         except Exception:
-            logging.exception("Failed to build HWID renewal note for user %s", internal_user_id)
+            logger.exception("Failed to build HWID renewal note for user %s", internal_user_id)
             return ""
         return str(
             self.i18n.gettext(
@@ -168,7 +168,7 @@ class PanelWebhookService:
             return
 
         if event_name not in ACTIONABLE_EVENTS:
-            logging.info(
+            logger.info(
                 "Panel webhook event %s ignored: event is not used for subscription "
                 "notifications; %s",
                 event_name,
@@ -178,7 +178,7 @@ class PanelWebhookService:
 
         stage = self._stage_for_event(event_name, user_payload, meta)
         if stage is None:
-            logging.warning(
+            logger.warning(
                 "Panel webhook event %s ignored: expiration metadata is missing or invalid; %s",
                 event_name,
                 self._payload_log_context(user_payload),
@@ -202,7 +202,7 @@ class PanelWebhookService:
             if not sub:
                 if not telegram_id:
                     local_user_id = getattr(db_user, "user_id", None) if db_user else None
-                    logging.warning(
+                    logger.warning(
                         "Panel webhook event %s cannot be matched to a local subscription; "
                         "notification skipped. %s local_user_id=%s. Possible causes: "
                         "panel user was created outside the bot, subscription was deleted "
@@ -236,7 +236,7 @@ class PanelWebhookService:
             # expiry/expiring notices in that case is wrong (e.g. "your sub ended
             # yesterday" right after a successful renewal), so skip them.
             if await self._superseded_by_newer_subscription(session, sub):
-                logging.info(
+                logger.info(
                     "Panel webhook event %s skipped: subscription %s is superseded by a "
                     "newer active subscription for user %s.",
                     event_name,
@@ -260,7 +260,7 @@ class PanelWebhookService:
                             session,
                             internal_user_id,
                         )
-                        logging.info(
+                        logger.info(
                             "48h webhook check: user_id=%s sub_found=%s auto_renew=%s provider=%s",
                             internal_user_id,
                             bool(active_sub),
@@ -473,9 +473,9 @@ class PanelWebhookService:
                     await renewal_session.rollback()
                 except Exception:
                     await renewal_session.rollback()
-                    logging.exception("Auto-renew attempt (%s) failed", stage_key)
+                    logger.exception("Auto-renew attempt (%s) failed", stage_key)
         except Exception:
-            logging.exception("Auto-renew trigger (%s) failed pre-check", stage_key)
+            logger.exception("Auto-renew trigger (%s) failed pre-check", stage_key)
         return False
 
     @classmethod
@@ -705,7 +705,7 @@ class PanelWebhookService:
         if not event_name:
             return web.Response(status=200, text="ok_no_event")
 
-        logging.info(
+        logger.info(
             "Panel webhook event received: %s; telegramId=%s",
             event_name,
             telegram_id if telegram_id is not None else "N/A",
@@ -774,9 +774,7 @@ class PanelWebhookService:
             try:
                 await self.handle_event(event_name, user_payload, meta=meta)
             except Exception:
-                logging.exception(
-                    "Panel webhook background handler failed for event %s", event_name
-                )
+                logger.exception("Panel webhook background handler failed for event %s", event_name)
 
 
 async def panel_webhook_route(request: web.Request) -> web.Response:

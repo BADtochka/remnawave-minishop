@@ -14,6 +14,8 @@ from bot.utils.text_sanitizer import sanitize_display_name, sanitize_username
 from config.settings import Settings
 from db.dal import user_dal
 
+logger = logging.getLogger(__name__)
+
 _LOCAL_PROFILE_SYNC_CHECKS: dict[int, float] = {}
 
 
@@ -53,7 +55,7 @@ class ProfileSyncMiddleware(BaseMiddleware):
 
                     if update_payload:
                         await user_dal.update_user(session, db_user.user_id, update_payload)
-                        logging.info(
+                        logger.info(
                             f"ProfileSyncMiddleware: Updated user {tg_user.id} profile fields: {list(update_payload.keys())}"  # noqa: E501
                         )
 
@@ -73,11 +75,11 @@ class ProfileSyncMiddleware(BaseMiddleware):
                                     panel_payload,
                                 )
                         except Exception as e_upd_desc:
-                            logging.warning(
+                            logger.warning(
                                 f"ProfileSyncMiddleware: Failed to update panel identity for user {tg_user.id}: {e_upd_desc}"  # noqa: E501
                             )
             except Exception as e:
-                logging.error(
+                logger.error(
                     f"ProfileSyncMiddleware: Failed to sync profile for user {getattr(tg_user, 'id', 'N/A')}: {e}",  # noqa: E501
                     exc_info=True,
                 )

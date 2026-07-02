@@ -16,13 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from bot.middlewares.i18n import JsonI18n
-
-if TYPE_CHECKING:
-    from bot.services.referral_service import ReferralService
-    from bot.services.subscription_service_impl.core import SubscriptionService
-else:
-    ReferralService = object
-    SubscriptionService = object
 from bot.utils.request_security import ip_in_allowlist, request_client_ip
 from config.settings import Settings
 from config.tariffs_config import default_payment_currency_code_for_settings
@@ -57,6 +50,15 @@ from ..shared import (
     run_webapp_payment,
 )
 from ..shared.app_context import app_required
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
+
+logger = logging.getLogger(__name__)
 
 _LOG = "freekassa"
 FREEKASSA_SUPPORTED_CURRENCIES = ("RUB", "USD", "EUR", "UAH", "KZT")
@@ -156,11 +158,11 @@ class FreeKassaService(HttpClientMixin):
         self._last_nonce = int(time.time() * 1000)
 
         if not self.configured:
-            logging.warning(
+            logger.warning(
                 "FreeKassaService initialized but not fully configured. Payments disabled."
             )
         if provider_runtime_enabled(config) and not self.server_ip:
-            logging.warning(
+            logger.warning(
                 "FreeKassaService: FREEKASSA_PAYMENT_IP is not set. Requests may be rejected by the provider."  # noqa: E501
             )
 
@@ -202,12 +204,12 @@ class FreeKassaService(HttpClientMixin):
         extra_params: dict[str, Any] | None = None,
     ) -> tuple[bool, dict[str, Any]]:
         if not self.configured:
-            logging.error("FreeKassaService is not configured. Cannot create order.")
+            logger.error("FreeKassaService is not configured. Cannot create order.")
             return False, {"message": "service_not_configured"}
 
         ip_address = ip_address or self.server_ip
         if not ip_address:
-            logging.error("FreeKassaService: payment IP is required but not configured.")
+            logger.error("FreeKassaService: payment IP is required but not configured.")
             return False, {"message": "missing_ip"}
 
         email = email or f"{user_id}@telegram.org"
@@ -219,7 +221,7 @@ class FreeKassaService(HttpClientMixin):
                 "supported_currencies": list(FREEKASSA_SUPPORTED_CURRENCIES),
             }
         if payment_method_id is None:
-            logging.error("FreeKassaService: payment method id is required but not configured.")
+            logger.error("FreeKassaService: payment method id is required but not configured.")
             return False, {"message": "missing_payment_method_id"}
         shop_id = self.shop_id
         if shop_id is None:
@@ -356,7 +358,7 @@ class FreeKassaService(HttpClientMixin):
             client_ip = request_client_ip(request, trusted_proxies=self.settings.trusted_proxies)
             trusted = self.config.trusted_ips_list
             if not ip_in_allowlist(client_ip, trusted):
-                logging.warning(
+                logger.warning(
                     "FreeKassa webhook denied from unauthorized IP source "
                     "(client_ip=%s remote=%s x_forwarded_for=%s).",
                     client_ip,
@@ -367,7 +369,7 @@ class FreeKassaService(HttpClientMixin):
 
             raw_body = await request.read()
         except Exception:
-            logging.exception("FreeKassa webhook: failed to read request body.")
+            logger.exception("FreeKassa webhook: failed to read request body.")
             return web.Response(status=400, text="bad_request")
 
         payload_dict: dict[str, Any] = {}
@@ -411,29 +413,29 @@ class FreeKassaService(HttpClientMixin):
         try:
             payment_db_id = int(order_id_str)
         except (TypeError, ValueError):
-            logging.error("FreeKassa webhook: invalid order_id value %r", order_id_str)
+            logger.error("FreeKassa webhook: invalid order_id value %r", order_id_str)
             return web.Response(status=400, text="invalid_order_id")
 
         async with self.async_session_factory() as session:
             payment = await payment_dal.get_payment_by_db_id(session, payment_db_id)
             if not payment:
-                logging.error("FreeKassa webhook: payment %s not found", payment_db_id)
+                logger.error("FreeKassa webhook: payment %s not found", payment_db_id)
                 return web.Response(status=404, text="payment_not_found")
 
             if payment.status == "succeeded":
-                logging.info("FreeKassa webhook: payment %s already succeeded", payment_db_id)
+                logger.info("FreeKassa webhook: payment %s already succeeded", payment_db_id)
                 return web.Response(text="YES")
 
             try:
                 if not decimal_amounts_equal(amount_str, payment.amount):
-                    logging.warning(
+                    logger.warning(
                         "FreeKassa webhook: amount mismatch for payment %s (expected %s, got %s)",
                         payment_db_id,
                         format_decimal_amount(payment.amount),
                         format_decimal_amount(amount_str),
                     )
             except Exception as exc:
-                logging.warning(
+                logger.warning(
                     "FreeKassa webhook: failed to compare amount for payment %s: %s",
                     payment_db_id,
                     exc,
@@ -450,7 +452,7 @@ class FreeKassaService(HttpClientMixin):
                 await session.commit()
             except Exception:
                 await session.rollback()
-                logging.exception(
+                logger.exception(
                     "FreeKassa webhook: failed to mark payment %s as succeeded.", payment_db_id
                 )
                 return web.Response(status=500, text="processing_error")

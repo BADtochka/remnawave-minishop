@@ -7,6 +7,8 @@ from sqlalchemy.orm import selectinload
 
 from ..models import MessageLog
 
+logger = logging.getLogger(__name__)
+
 
 async def create_message_log(session: AsyncSession, log_data: dict) -> MessageLog | None:
 
@@ -17,7 +19,7 @@ async def create_message_log(session: AsyncSession, log_data: dict) -> MessageLo
         return log_entry
     except Exception as e:
         await session.rollback()
-        logging.error(f"Failed to create and commit message log: {e}", exc_info=True)
+        logger.error(f"Failed to create and commit message log: {e}", exc_info=True)
         return None
 
 
@@ -81,7 +83,7 @@ async def create_message_log_no_commit(session: AsyncSession, log_data: dict) ->
 
         target_user = await get_user_by_id(session, log_data["target_user_id"])
         if not target_user:
-            logging.warning(
+            logger.warning(
                 f"Target user {log_data['target_user_id']} not found for message log. Setting to NULL."  # noqa: E501
             )
             log_data["target_user_id"] = None
@@ -89,7 +91,7 @@ async def create_message_log_no_commit(session: AsyncSession, log_data: dict) ->
     new_log = MessageLog(**log_data)
     session.add(new_log)
 
-    logging.debug(
+    logger.debug(
         f"Message log added to session: user {log_data.get('user_id')}, event {log_data.get('event_type')}"  # noqa: E501
     )
     return new_log

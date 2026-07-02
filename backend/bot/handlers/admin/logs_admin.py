@@ -24,6 +24,8 @@ from config.settings import Settings
 from db.dal import message_log_dal, user_dal
 from db.models import MessageLog, User
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="admin_logs_router")
 USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9_]{5,32}$")
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -84,7 +86,7 @@ async def display_logs_menu(
             reply_markup=get_logs_menu_keyboard(i18n, current_lang),
         )
     except Exception as e:
-        logging.warning(f"Failed to edit message for logs menu: {e}. Sending new.")
+        logger.warning(f"Failed to edit message for logs menu: {e}. Sending new.")
         await callback_message(callback).answer(
             text=_(key="admin_logs_menu_title"),
             reply_markup=get_logs_menu_keyboard(i18n, current_lang),
@@ -177,7 +179,7 @@ async def _display_formatted_logs(
             text, reply_markup=reply_markup, parse_mode="HTML", disable_web_page_preview=True
         )
     except Exception as e:
-        logging.warning(
+        logger.warning(
             f"Failed to edit message for logs display (len: {len(text)}): {e}. Sending new message(s)."  # noqa: E501
         )
 
@@ -193,7 +195,7 @@ async def _display_formatted_logs(
                     disable_web_page_preview=True,
                 )
             except Exception as e_chunk:
-                logging.error(f"Failed to send log chunk: {e_chunk}")
+                logger.error(f"Failed to send log chunk: {e_chunk}")
 
                 if i == 0:
                     await target_message.answer(
@@ -481,5 +483,5 @@ async def export_logs_csv_handler(
         )
 
     except Exception as e:
-        logging.error(f"Error exporting logs to CSV: {e}", exc_info=True)
+        logger.error(f"Error exporting logs to CSV: {e}", exc_info=True)
         await callback_message(callback).answer(_("admin_logs_csv_export_failed", error=str(e)))

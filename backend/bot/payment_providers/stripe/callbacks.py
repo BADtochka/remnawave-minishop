@@ -32,6 +32,8 @@ from ..shared import (
 from .router import router
 from .service import StripeService
 
+logger = logging.getLogger(__name__)
+
 _LOG = "stripe"
 
 
@@ -129,7 +131,7 @@ async def pay_stripe_callback_handler(
         await session.commit()
     except Exception:
         await session.rollback()
-        logging.exception(
+        logger.exception(
             "Stripe: failed to create payment record for user %s.",
             callback.from_user.id,
         )

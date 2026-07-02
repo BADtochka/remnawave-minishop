@@ -11,6 +11,8 @@ from bot.services.message_log_notifier import notify_message_log
 from config.settings import Settings
 from db.dal import message_log_dal, user_dal
 
+logger = logging.getLogger(__name__)
+
 
 def _source_chat_id(update: Update) -> int | None:
     if update.message:
@@ -92,7 +94,7 @@ class ActionLoggerMiddleware(BaseMiddleware):
             if user_id:
                 user_exists = await user_dal.get_user_by_id(session, user_id)
                 if not user_exists:
-                    logging.warning(
+                    logger.warning(
                         f"ActionLoggerMiddleware: User {user_id} not found in DB. Logging action with user_id=NULL."  # noqa: E501
                     )
                     log_user_id_for_db = None
@@ -115,7 +117,7 @@ class ActionLoggerMiddleware(BaseMiddleware):
                     bot = bot_candidate if isinstance(bot_candidate, Bot) else None
                     await notify_message_log(log_payload, settings=self.settings, bot=bot)
             except Exception as e_log:
-                logging.error(
+                logger.error(
                     f"ActionLoggerMiddleware: Failed to add log to session for user {user_id}, type {current_event_type}: {e_log}",  # noqa: E501
                     exc_info=True,
                 )

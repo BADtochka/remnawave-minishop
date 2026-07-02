@@ -40,6 +40,8 @@ from .config import (
 from .service import PaykillaService
 from .webhook import paykilla_webhook_route
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="user_subscription_payments_paykilla_router")
 _LOG = "paykilla"
 
@@ -412,7 +414,7 @@ def _callback_payment_allowed(
 ) -> bool:
     allowed = SPEC.is_usable_for_payment_amount(settings, currency, amount)
     if not allowed:
-        logging.warning(
+        logger.warning(
             "Paykilla callback rejected below-minimum payment (amount=%s currency=%s user=%s).",
             amount,
             currency,

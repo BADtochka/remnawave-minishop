@@ -29,6 +29,8 @@ from .promo import bulk as admin_promo_bulk_handlers
 from .promo import create as admin_promo_create_handlers
 from .promo import manage as admin_promo_manage_handlers
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="admin_common_router")
 
 
@@ -42,7 +44,7 @@ async def admin_panel_command_handler(
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: JsonI18n | None = i18n_data.get("i18n_instance")
     if not i18n:
-        logging.error("i18n missing in admin_panel_command_handler")
+        logger.error("i18n missing in admin_panel_command_handler")
         await message.answer("Language service error.")
         return
 
@@ -71,13 +73,13 @@ async def admin_panel_actions_callback_handler(
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: JsonI18n | None = i18n_data.get("i18n_instance")
     if not i18n:
-        logging.error("i18n missing in admin_panel_actions_callback_handler")
+        logger.error("i18n missing in admin_panel_actions_callback_handler")
         await callback.answer("Language error.", show_alert=True)
         return
     _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs)
 
     if not callback.message:
-        logging.error(
+        logger.error(
             f"CallbackQuery {callback.id} from {callback.from_user.id} has no message for admin_action {action}"  # noqa: E501
         )
         await callback.answer("Error processing action: message context lost.", show_alert=True)
@@ -178,7 +180,7 @@ async def admin_panel_actions_callback_handler(
             )
         await callback.answer()
     else:
-        logging.warning(f"Unknown admin_action received: {action} from callback {callback.data}")
+        logger.warning(f"Unknown admin_action received: {action} from callback {callback.data}")
         await callback.answer(_("admin_unknown_action"), show_alert=True)
 
 
@@ -234,7 +236,7 @@ async def admin_section_handler(
 
         await callback.answer()
     except Exception as e:
-        logging.error(f"Error handling admin section {section}: {e}")
+        logger.error(f"Error handling admin section {section}: {e}")
         await callback_message(callback).answer(
             _("error_occurred_try_again"),
             reply_markup=get_admin_panel_keyboard(i18n, current_lang, settings),
@@ -287,5 +289,5 @@ async def show_queue_status_handler(callback: types.CallbackQuery, i18n_data: di
         await callback.answer()
 
     except Exception as e:
-        logging.error(f"Error getting queue status: {e}")
+        logger.error(f"Error getting queue status: {e}")
         await callback.answer("❌ Ошибка получения статуса очередей", show_alert=True)

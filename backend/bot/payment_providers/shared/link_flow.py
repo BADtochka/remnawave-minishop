@@ -55,6 +55,8 @@ from .common import (
 )
 from .webapp import finalize_webapp_link_payment
 
+logger = logging.getLogger(__name__)
+
 
 class LinkFlowService(Protocol):
     """Structural contract the engine needs from a provider service."""
@@ -183,13 +185,13 @@ async def run_callback_payment[ServiceT: LinkFlowService](
         return
 
     if not service or not service.configured:
-        logging.error("%s service is not configured or unavailable.", descriptor.display_name)
+        logger.error("%s service is not configured or unavailable.", descriptor.display_name)
         await notify_service_unavailable(callback, translator)
         return
 
     parts = parse_payment_callback(callback.data or "")
     if not parts:
-        logging.error(
+        logger.error(
             "Invalid %s data in callback: %s", descriptor.spec.callback_prefix, callback.data
         )
         await notify_callback_parse_error(callback, translator)
@@ -269,7 +271,7 @@ async def run_callback_payment[ServiceT: LinkFlowService](
         await session.commit()
     except Exception:
         await session.rollback()
-        logging.exception(
+        logger.exception(
             "%s: failed to create payment record for user %s.",
             descriptor.display_name,
             callback.from_user.id,
@@ -342,7 +344,7 @@ async def run_webapp_payment[ServiceT: LinkFlowService](
         )
     except Exception:
         await ctx.session.rollback()
-        logging.exception("%s WebApp payment failed", descriptor.display_name)
+        logger.exception("%s WebApp payment failed", descriptor.display_name)
         return payment_failed()
 
     return await finalize_webapp_link_payment(

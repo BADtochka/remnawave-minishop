@@ -55,6 +55,8 @@ from .user_management_subscription import (
     handle_traffic_grant_prompt,
 )
 
+logger = logging.getLogger(__name__)
+
 
 async def users_list_handler(
     callback: types.CallbackQuery,
@@ -95,7 +97,7 @@ async def users_list_handler(
         await callback.answer()
 
     except Exception as e:
-        logging.error(f"Error displaying user list: {e}")
+        logger.error(f"Error displaying user list: {e}")
         await callback.answer("Ошибка отображения списка пользователей", show_alert=True)
 
 
@@ -121,7 +123,7 @@ async def user_search_prompt_handler(
             prompt_text, reply_markup=get_back_to_admin_panel_keyboard(current_lang, i18n)
         )
     except Exception as e:
-        logging.warning(f"Could not edit message for user management: {e}. Sending new.")
+        logger.warning(f"Could not edit message for user management: {e}. Sending new.")
         await callback_message(callback).answer(
             prompt_text, reply_markup=get_back_to_admin_panel_keyboard(current_lang, i18n)
         )
@@ -186,7 +188,7 @@ async def process_user_search_handler(
             parse_mode="HTML",
         )
     except Exception as e:
-        logging.error(f"Error displaying user card for {user_model.user_id}: {e}")
+        logger.error(f"Error displaying user card for {user_model.user_id}: {e}")
         await message.answer(_("admin_user_card_error"))
 
 

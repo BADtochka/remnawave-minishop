@@ -15,13 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from bot.middlewares.i18n import JsonI18n
-
-if TYPE_CHECKING:
-    from bot.services.referral_service import ReferralService
-    from bot.services.subscription_service_impl.core import SubscriptionService
-else:
-    ReferralService = object
-    SubscriptionService = object
 from bot.utils.request_security import ip_in_allowlist, request_client_ip
 from config.settings import Settings
 from config.tariffs_config import (
@@ -60,6 +53,15 @@ from ..shared import (
 from ..shared.app_context import app_required
 from .constants import HELEKET_DEFAULT_SUPPORTED_CURRENCIES
 from .manifest import _CONFIG_MANIFEST, _PRESENTATION_MANIFEST
+
+if TYPE_CHECKING:
+    from bot.services.referral_service import ReferralService
+    from bot.services.subscription_service_impl.core import SubscriptionService
+else:
+    ReferralService = object
+    SubscriptionService = object
+
+logger = logging.getLogger(__name__)
 
 router = Router(name="user_subscription_payments_heleket_router")
 _LOG = "heleket"
@@ -242,7 +244,7 @@ class HeleketService(HttpClientMixin):
 
         self._init_http_client(total_timeout=lambda: self.settings.PAYMENT_REQUEST_TIMEOUT_SECONDS)
         if not self.configured:
-            logging.warning(
+            logger.warning(
                 "HeleketService initialized but not fully configured. Payments disabled."
             )
 
@@ -304,7 +306,7 @@ class HeleketService(HttpClientMixin):
         url_callback: str | None,
     ) -> tuple[bool, dict[str, Any]]:
         if not self.configured:
-            logging.error("HeleketService is not configured. Cannot create payment link.")
+            logger.error("HeleketService is not configured. Cannot create payment link.")
             return False, {"message": "service_not_configured"}
 
         currency_code = normalize_payment_currency_code(currency or self.currency)
@@ -350,7 +352,7 @@ class HeleketService(HttpClientMixin):
                 try:
                     response_data = json.loads(response_text) if response_text else {}
                 except json.JSONDecodeError:
-                    logging.error("Heleket create_payment_link: invalid JSON: %s", response_text)
+                    logger.error("Heleket create_payment_link: invalid JSON: %s", response_text)
                     return False, {
                         "status": response.status,
                         "message": "invalid_json",
@@ -358,7 +360,7 @@ class HeleketService(HttpClientMixin):
                     }
                 state = response_data.get("state") if isinstance(response_data, dict) else None
                 if response.status != 200 or state != 0:
-                    logging.error(
+                    logger.error(
                         "Heleket create_payment_link: API error (status=%s, body=%s)",
                         response.status,
                         response_data,
@@ -366,7 +368,7 @@ class HeleketService(HttpClientMixin):
                     return False, {"status": response.status, "message": response_data}
                 return True, response_data
         except Exception as exc:
-            logging.exception("Heleket create_payment_link: request failed.")
+            logger.exception("Heleket create_payment_link: request failed.")
             return False, {"message": str(exc)}
 
     async def get_payment_info(self, payment_uuid: str) -> tuple[bool, dict[str, Any]]:
@@ -393,7 +395,7 @@ class HeleketService(HttpClientMixin):
                 response_data = await response.json(content_type=None)
                 state = response_data.get("state") if isinstance(response_data, dict) else None
                 if response.status != 200 or state != 0:
-                    logging.warning(
+                    logger.warning(
                         "Heleket get_payment_info failed: uuid=%s status=%s body=%s",
                         payment_uuid,
                         response.status,
@@ -403,7 +405,7 @@ class HeleketService(HttpClientMixin):
                 result = response_data.get("result") or {}
                 return isinstance(result, dict), result
         except Exception as exc:
-            logging.exception("Heleket get_payment_info request failed: uuid=%s", payment_uuid)
+            logger.exception("Heleket get_payment_info request failed: uuid=%s", payment_uuid)
             return False, {"message": str(exc)}
 
     async def try_reuse_pending_payment(self, payment: Any) -> str | None:
@@ -442,9 +444,9 @@ class HeleketService(HttpClientMixin):
         for name, expected, _canonical in candidates:
             if hmac.compare_digest(expected, received):
                 if name != "php_unicode_slash":
-                    logging.info("Heleket webhook: signature matched variant %s.", name)
+                    logger.info("Heleket webhook: signature matched variant %s.", name)
                 return True
-        logging.warning(
+        logger.warning(
             "Heleket webhook: invalid signature "
             "(received=%s expected=%s canonical_json_sha256=%s api_key_len=%s).",
             _signature_preview(received),
@@ -464,7 +466,7 @@ class HeleketService(HttpClientMixin):
         client_ip = request_client_ip(request, trusted_proxies=self.settings.trusted_proxies)
         trusted = self.config.trusted_ips_list
         if trusted and not ip_in_allowlist(client_ip, trusted):
-            logging.warning(
+            logger.warning(
                 "Heleket webhook denied from unauthorized IP source "
                 "(client_ip=%s remote=%s x_forwarded_for=%s).",
                 client_ip,
@@ -477,7 +479,7 @@ class HeleketService(HttpClientMixin):
         try:
             payload = json.loads(raw_body.decode("utf-8"))
         except Exception:
-            logging.exception("Heleket webhook: failed to parse JSON.")
+            logger.exception("Heleket webhook: failed to parse JSON.")
             return web.Response(status=400, text="bad_request")
 
         if not isinstance(payload, dict):
@@ -493,7 +495,7 @@ class HeleketService(HttpClientMixin):
         currency = payload.get("currency") or self.currency
 
         if not status or not (uuid_value or order_id_raw):
-            logging.error("Heleket webhook: missing status or ids: %s", payload)
+            logger.error("Heleket webhook: missing status or ids: %s", payload)
             return web.Response(status=400, text="missing_fields")
 
         async with self.async_session_factory() as session:
@@ -503,7 +505,7 @@ class HeleketService(HttpClientMixin):
                 provider_payment_id=uuid_value or None,
             )
             if not payment:
-                logging.error(
+                logger.error(
                     "Heleket webhook: payment not found (order_id=%s, uuid=%s)",
                     order_id_raw,
                     uuid_value,
@@ -519,7 +521,7 @@ class HeleketService(HttpClientMixin):
                 if amount_raw is not None:
                     try:
                         if not decimal_amounts_equal(amount_raw, payment.amount):
-                            logging.warning(
+                            logger.warning(
                                 "Heleket webhook: amount mismatch for payment %s "
                                 "(expected %s, got %s)",
                                 payment.payment_id,
@@ -527,7 +529,7 @@ class HeleketService(HttpClientMixin):
                                 format_decimal_amount(amount_raw),
                             )
                     except Exception as exc:
-                        logging.warning(
+                        logger.warning(
                             "Heleket webhook: failed to compare amounts for %s: %s",
                             payment.payment_id,
                             exc,
@@ -543,7 +545,7 @@ class HeleketService(HttpClientMixin):
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception(
+                    logger.exception(
                         "Heleket webhook: failed to mark payment %s as succeeded.",
                         resolved_id,
                     )
@@ -590,7 +592,7 @@ class HeleketService(HttpClientMixin):
                     await session.commit()
                 except Exception:
                     await session.rollback()
-                    logging.exception(
+                    logger.exception(
                         "Heleket webhook: failed to mark payment %s as failed.",
                         resolved_id,
                     )
@@ -604,7 +606,7 @@ class HeleketService(HttpClientMixin):
                 )
                 return web.Response(text="ok")
 
-            logging.info(
+            logger.info(
                 "Heleket webhook: intermediate status '%s' for payment %s",
                 status,
                 resolved_id,

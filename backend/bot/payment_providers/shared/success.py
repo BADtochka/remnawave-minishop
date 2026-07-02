@@ -31,6 +31,8 @@ from .common import (
     sale_mode_tariff_key,
 )
 
+logger = logging.getLogger(__name__)
+
 _TRAFFIC_MODES = {"traffic", "traffic_package", "topup", "premium_topup"}
 _HWID_DEVICE_MODES = {"hwid_device", "hwid_devices", "hwid_devices_renewal"}
 PAYMENT_STATUS_PENDING_FINALIZATION = "succeeded_pending_finalization"
@@ -221,7 +223,7 @@ async def send_success_message_to_user(
             disable_web_page_preview=True,
         )
     except Exception:
-        logging.exception("%s: failed to notify user %s.", log_prefix, user_id)
+        logger.exception("%s: failed to notify user %s.", log_prefix, user_id)
 
 
 @dataclass
@@ -322,7 +324,7 @@ async def finalize_successful_payment(
         await req.session.commit()
     except Exception:
         await req.session.rollback()
-        logging.exception(
+        logger.exception(
             "%s: failed to activate subscription for payment %s.",
             req.log_prefix,
             req.payment.payment_id,
@@ -336,7 +338,7 @@ async def finalize_successful_payment(
             await req.session.commit()
         except Exception:
             await req.session.rollback()
-            logging.exception(
+            logger.exception(
                 "%s: failed to mark payment %s activation_failed.",
                 req.log_prefix,
                 req.payment.payment_id,
@@ -462,7 +464,7 @@ async def finalize_successful_payment(
                 await req.session.commit()
             except Exception:
                 await req.session.rollback()
-                logging.exception(
+                logger.exception(
                     "%s: failed to persist install guide share token for user %s.",
                     req.log_prefix,
                     req.user_id,

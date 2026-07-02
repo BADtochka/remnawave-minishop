@@ -26,6 +26,8 @@ from db.advisory_locks import acquire_subscription_background_sync_lock
 from db.dal import user_dal
 from db.models import Subscription
 
+logger = logging.getLogger(__name__)
+
 PREMIUM_WARNING_LEVEL_OFFSET = 1000
 # Single warning per premium billing period when usage reached or exceeded the quota.
 PREMIUM_WARNING_DEPLETED_LEVEL = PREMIUM_WARNING_LEVEL_OFFSET + 100
@@ -114,7 +116,7 @@ class TariffWorkerCoreMixin:
                 if code:
                     return code
         except Exception:
-            logging.exception("TariffTrafficWorker: failed to load user language for %s", user_id)
+            logger.exception("TariffTrafficWorker: failed to load user language for %s", user_id)
         return str(self.settings.DEFAULT_LANGUAGE)
 
     def _period_tariff_traffic_strategy(self) -> str:
@@ -284,7 +286,7 @@ class TariffWorkerCoreMixin:
             if candidate > current:
                 return candidate
             candidate = self._advance_traffic_reset(candidate, normalized_strategy)
-        logging.warning(
+        logger.warning(
             "TariffTrafficWorker: failed to derive next traffic reset from anchor=%s strategy=%s",
             anchor.isoformat(),
             normalized_strategy,
@@ -363,7 +365,7 @@ class TariffWorkerCoreMixin:
                     content=audit_content,
                 )
             except Exception:
-                logging.exception(
+                logger.exception(
                     "Failed to send %s traffic reset notice to user %s",
                     kind,
                     user_id,
@@ -374,7 +376,7 @@ class TariffWorkerCoreMixin:
         try:
             user = await user_dal.get_user_by_id(session, user_id)
         except Exception:
-            logging.exception(
+            logger.exception(
                 "TariffTrafficWorker: failed to load user %s for reset email",
                 user_id,
             )
@@ -435,7 +437,7 @@ class TariffWorkerCoreMixin:
         try:
             user = await user_dal.get_user_by_id(session, user_id)
         except Exception:
-            logging.exception("TariffTrafficWorker: failed to load user %s for email", user_id)
+            logger.exception("TariffTrafficWorker: failed to load user %s for email", user_id)
             return
         if not user:
             return
@@ -467,7 +469,7 @@ class TariffWorkerCoreMixin:
                     ttl_seconds=self.settings.TARIFF_WORKER_LOCK_TTL_SECONDS,
                 ) as acquired:
                     if not acquired:
-                        logging.info("TariffTrafficWorker tick skipped: Redis lock is held")
+                        logger.info("TariffTrafficWorker tick skipped: Redis lock is held")
                     else:
                         started = time.monotonic()
                         await self._run_db_tick_with_retry(
@@ -478,12 +480,12 @@ class TariffWorkerCoreMixin:
                             "legacy_throttle_recovery",
                             self.legacy_throttle_recovery_tick,
                         )
-                        logging.info(
+                        logger.info(
                             "metric worker_tick_duration_seconds=%.3f worker=tariff",
                             time.monotonic() - started,
                         )
             except Exception:
-                logging.exception("TariffTrafficWorker tick failed")
+                logger.exception("TariffTrafficWorker tick failed")
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(
                     self._stopped.wait(),
@@ -512,7 +514,7 @@ class TariffWorkerCoreMixin:
                         and self._is_retryable_db_exception(exc)
                     ):
                         delay = TARIFF_WORKER_DB_RETRY_BASE_SLEEP_SECONDS * attempt
-                        logging.warning(
+                        logger.warning(
                             "TariffTrafficWorker %s retrying after database concurrency "
                             "error, attempt %s/%s: %s",
                             tick_name,

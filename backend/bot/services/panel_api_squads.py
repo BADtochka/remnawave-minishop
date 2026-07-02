@@ -2,6 +2,8 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
+logger = logging.getLogger(__name__)
+
 # Static endpoint prefixes used as log/metric labels instead of the raw request
 # path. Endpoints embed user identifiers (telegram id, username, email, uuids),
 # so logging the path verbatim would leak private data into log files; the
@@ -39,7 +41,7 @@ class PanelApiSquadMutationMixin:
                 await self._invalidate_user_cache(user_uuid)
             await self._invalidate_all_users_cache()
             return True
-        logging.error("Failed to add users to squad %s. Response: %s", squad_uuid, response_data)
+        logger.error("Failed to add users to squad %s. Response: %s", squad_uuid, response_data)
         return False
 
     async def remove_users_from_internal_squad(
@@ -58,7 +60,7 @@ class PanelApiSquadMutationMixin:
                 await self._invalidate_user_cache(user_uuid)
             await self._invalidate_all_users_cache()
             return True
-        logging.error(
+        logger.error(
             "Failed to remove users from squad %s. Response: %s", squad_uuid, response_data
         )
         return False
@@ -133,7 +135,7 @@ class PanelApiSquadMutationMixin:
         global _HAPP_ENCRYPT_UNAVAILABLE
 
         if _HAPP_ENCRYPT_UNAVAILABLE:
-            logging.info("Skipping happ crypt4 encryption: panel endpoint is unavailable.")
+            logger.info("Skipping happ crypt4 encryption: panel endpoint is unavailable.")
             return None
         payload = {"linkToEncrypt": link_to_encrypt}
         response_data = await self._request(
@@ -146,10 +148,10 @@ class PanelApiSquadMutationMixin:
         status_code = response_data.get("status_code") if isinstance(response_data, dict) else None
         if status_code in {404, 410}:
             _HAPP_ENCRYPT_UNAVAILABLE = True
-            logging.warning(
+            logger.warning(
                 "Panel happ crypt4 encryption endpoint is unavailable; raw subscription "
                 "links will be used as fallback."
             )
             return None
-        logging.error(f"Failed to encrypt happ link. Response: {response_data}")
+        logger.error(f"Failed to encrypt happ link. Response: {response_data}")
         return None

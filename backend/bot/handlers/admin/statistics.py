@@ -17,6 +17,8 @@ from config.tariffs_config import default_payment_currency_code_for_settings
 from db.dal import panel_sync_dal, payment_dal, user_dal
 from db.models import PanelSyncStatus, Payment
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="admin_statistics_router")
 
 
@@ -102,7 +104,7 @@ async def show_statistics_handler(
             bandwidth_stats = await panel_service.get_bandwidth_stats()
             nodes_stats = await panel_service.get_nodes_statistics()
 
-            logging.info(
+            logger.info(
                 f"Panel stats response: system={system_stats}, bandwidth={bandwidth_stats}, nodes={nodes_stats}"  # noqa: E501
             )
 
@@ -188,7 +190,7 @@ async def show_statistics_handler(
                 stats_text_parts.append(f"🔗 {_('admin_panel_nodes_label')}: <b>{total_online}</b>")
 
     except Exception as e:
-        logging.error(f"Failed to fetch panel statistics: {e}", exc_info=True)
+        logger.error(f"Failed to fetch panel statistics: {e}", exc_info=True)
         stats_text_parts.append(f"❌ {_('admin_panel_stats_fetch_error')}")
         stats_text_parts.append(f"⚠️ {_('admin_panel_stats_error_details')}: {e!s}")
 
@@ -279,7 +281,7 @@ async def show_statistics_handler(
             parse_mode="HTML",
         )
     except Exception as e_edit:
-        logging.error(f"Error editing message for statistics: {e_edit}", exc_info=True)
+        logger.error(f"Error editing message for statistics: {e_edit}", exc_info=True)
 
         max_chunk_size = 4000
         for i in range(0, len(final_text), max_chunk_size):
@@ -294,7 +296,7 @@ async def show_statistics_handler(
                     parse_mode="HTML",
                 )
             except Exception as e_chunk:
-                logging.error(f"Failed to send statistics chunk: {e_chunk}")
+                logger.error(f"Failed to send statistics chunk: {e_chunk}")
                 if i == 0:
                     await callback_message(callback).answer(
                         _("error_displaying_statistics"),
@@ -324,7 +326,7 @@ async def show_user_ratings_handler(
         me = await callback_bot(callback).get_me()
         bot_username = me.username
     except Exception as e_get_me:
-        logging.warning("Failed to resolve bot username for ratings links: %s", e_get_me)
+        logger.warning("Failed to resolve bot username for ratings links: %s", e_get_me)
 
     traffic_top = await user_dal.get_top_users_by_traffic_used(session, limit=top_limit)
     lifetime_traffic_top = await user_dal.get_top_users_by_lifetime_traffic_used(

@@ -11,6 +11,8 @@ from db.models import Payment
 
 from .common import mark_payment_failed_creation, payment_failed, payment_link_response
 
+logger = logging.getLogger(__name__)
+
 
 def _short_repr(value: Any, *, max_length: int = 2000) -> str:
     text = repr(value)
@@ -61,14 +63,14 @@ async def finalize_webapp_link_payment(
             await session.commit()
         except Exception:
             await session.rollback()
-            logging.exception(
+            logger.exception(
                 "%s: failed to persist provider payment id for payment %s.",
                 log_prefix,
                 payment.payment_id,
             )
 
     if not payment_url:
-        logging.error(
+        logger.error(
             "%s: WebApp payment creation failed for payment %s "
             "(user_id=%s, api_success=%s, has_payment_url=%s, "
             "has_provider_payment_id=%s, provider_response=%s).",
@@ -84,7 +86,7 @@ async def finalize_webapp_link_payment(
             await mark_payment_failed_creation(session, payment.payment_id)
         except Exception:
             await session.rollback()
-            logging.exception(
+            logger.exception(
                 "%s: failed to mark payment %s as failed_creation.",
                 log_prefix,
                 payment.payment_id,

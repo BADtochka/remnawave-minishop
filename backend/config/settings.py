@@ -18,6 +18,8 @@ from config.settings_models import (
     WebAppSettings,
 )
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_SUBSCRIPTION_PURCHASE_DESCRIPTION_RU = (
     "Покупая или продлевая подписку, вы получаете доступ к VPN/прокси-сервису, "
     "который помогает защищать ваше соединение и поддерживать стабильный доступ к сети."
@@ -772,37 +774,37 @@ def get_settings() -> Settings:
         try:
             _settings_instance = Settings()  # type: ignore[call-arg]
             if not _settings_instance.ADMIN_IDS:
-                logging.warning(
+                logger.warning(
                     "CRITICAL: ADMIN_IDS not set or contains no valid integer IDs in .env. "
                     "Admin functionality will be restricted."
                 )
 
             if not _settings_instance.PANEL_API_URL:
-                logging.warning(
+                logger.warning(
                     "CRITICAL: PANEL_API_URL is not set. Panel integration will not work."
                 )
             if _settings_instance.panel_dry_run_enabled:
-                logging.warning(
+                logger.warning(
                     "PANEL_WRITE_MODE dry-run is enabled: Remnawave write requests will be "
                     "validated and logged without changing panel users."
                 )
             if not os.getenv("WEBAPP_SESSION_SECRET"):
-                logging.warning(
+                logger.warning(
                     "WEBAPP_SESSION_SECRET is not set. A generated secret will be used for this process only."  # noqa: E501
                 )
             if not os.getenv("WEBHOOK_SECRET_TOKEN"):
-                logging.warning(
+                logger.warning(
                     "WEBHOOK_SECRET_TOKEN is not set. A generated secret will be used for this process only."  # noqa: E501
                 )
             if (_settings_instance.LKNPD_INN or _settings_instance.LKNPD_PASSWORD) and not (
                 _settings_instance.LKNPD_INN and _settings_instance.LKNPD_PASSWORD
             ):
-                logging.warning(
+                logger.warning(
                     "WARNING: LKNPD credentials are incomplete. Receipt sending will be disabled."
                 )
 
         except ValidationError as e:
-            logging.critical(f"Pydantic validation error while loading settings: {e}")
+            logger.critical(f"Pydantic validation error while loading settings: {e}")
 
             raise SystemExit(
                 f"CRITICAL SETTINGS ERROR: {e}. Please check your .env file and Settings model."

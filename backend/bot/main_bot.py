@@ -37,6 +37,8 @@ from bot.services.message_log_notifier import configure_message_log_notifier
 from bot.utils.message_queue import init_queue_manager
 from config.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 TELEGRAM_STARTUP_RETRY_DELAY_SECONDS = 2.0
 
 
@@ -79,7 +81,7 @@ async def _run_telegram_startup_step(
         try:
             await step()
             if attempt > 1:
-                logging.info(
+                logger.info(
                     "STARTUP: Telegram step succeeded while %s on attempt %s%s.",
                     action,
                     attempt,
@@ -92,14 +94,14 @@ async def _run_telegram_startup_step(
                 f"{attempt}/{max_attempts}" if max_attempts is not None else str(attempt)
             )
             if max_attempts is not None and attempt >= max_attempts:
-                logging.warning(
+                logger.warning(
                     "STARTUP: Telegram network error while %s after %s attempts: %s.",
                     action,
                     max_attempts,
                     detail,
                 )
                 return False
-            logging.warning(
+            logger.warning(
                 "STARTUP: Telegram network error while %s on attempt %s: %s. "
                 "Retrying in %.1fs and will keep trying until Telegram is reachable.",
                 action,
@@ -111,7 +113,7 @@ async def _run_telegram_startup_step(
             await asyncio.sleep(retry_delay_seconds)
             continue
         except Exception:
-            logging.exception(unexpected_log_message)
+            logger.exception(unexpected_log_message)
             return False
 
 
@@ -121,7 +123,7 @@ async def register_all_routers(
     plugin_context: PluginContext | None = None,
 ):
     dp.include_router(build_root_router(settings, plugin_context))
-    logging.info("All application routers registered.")
+    logger.info("All application routers registered.")
 
 
 async def configure_telegram_webhook(dispatcher: Dispatcher) -> None:
@@ -134,14 +136,14 @@ async def configure_telegram_webhook(dispatcher: Dispatcher) -> None:
             f"{str(telegram_webhook_url_to_set).rstrip('/')}{settings.telegram_webhook_path}"
         )
 
-        logging.info(
+        logger.info(
             "STARTUP: Attempting to set Telegram webhook to: %s",
             redact_token(full_telegram_webhook_url, settings.BOT_TOKEN),
         )
 
         async def _configure_webhook() -> None:
             current_webhook_info = await bot.get_webhook_info()
-            logging.info(
+            logger.info(
                 f"STARTUP: Current Telegram webhook info BEFORE setting: {current_webhook_info.model_dump_json(exclude_none=True, indent=2)}"  # noqa: E501
             )
 
@@ -152,22 +154,22 @@ async def configure_telegram_webhook(dispatcher: Dispatcher) -> None:
                 allowed_updates=dispatcher.resolve_used_update_types(),
             )
             if set_success:
-                logging.info(
+                logger.info(
                     "STARTUP: bot.set_webhook to %s returned SUCCESS (True).",
                     redact_token(full_telegram_webhook_url, settings.BOT_TOKEN),
                 )
             else:
-                logging.error(
+                logger.error(
                     "STARTUP: bot.set_webhook to %s returned FAILURE (False).",
                     redact_token(full_telegram_webhook_url, settings.BOT_TOKEN),
                 )
 
             new_webhook_info = await bot.get_webhook_info()
-            logging.info(
+            logger.info(
                 f"STARTUP: Telegram Webhook info AFTER setting: {new_webhook_info.model_dump_json(exclude_none=True, indent=2)}"  # noqa: E501
             )
             if not new_webhook_info.url:
-                logging.error(
+                logger.error(
                     "STARTUP: CRITICAL - Telegram Webhook URL is EMPTY after set attempt. Check bot token and URL validity."  # noqa: E501
                 )
 
@@ -177,7 +179,7 @@ async def configure_telegram_webhook(dispatcher: Dispatcher) -> None:
             "STARTUP: EXCEPTION during set/get Telegram webhook.",
         )
     else:
-        logging.error(
+        logger.error(
             "STARTUP: WEBHOOK_BASE_URL not set in environment. Webhook mode is required. Exiting."
         )
         raise SystemExit("WEBHOOK_BASE_URL is required. Polling mode is disabled.")
@@ -188,7 +190,7 @@ async def on_startup_configured(dispatcher: Dispatcher):
     settings = get_dispatcher_settings(dispatcher)
     i18n_instance = get_dispatcher_i18n(dispatcher)
 
-    logging.info("STARTUP: on_startup_configured executing...")
+    logger.info("STARTUP: on_startup_configured executing...")
 
     if settings.SUBSCRIPTION_MINI_APP_URL:
 
@@ -204,7 +206,7 @@ async def on_startup_configured(dispatcher: Dispatcher):
                 )
             )
             await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
-            logging.info("STARTUP: Mini app domain registered and default menu button restored.")
+            logger.info("STARTUP: Mini app domain registered and default menu button restored.")
 
         await _run_telegram_startup_step(
             "registering mini app menu button",
@@ -238,14 +240,14 @@ async def on_startup_configured(dispatcher: Dispatcher):
                             language_code=language_code,
                         )
                     except TelegramBadRequest as exc:
-                        logging.warning(
+                        logger.warning(
                             "STARTUP: Could not clear chat-specific bot commands for chat %s: %s",
                             admin_id,
                             exc,
                         )
         await bot.set_my_commands(public_bot_commands, scope=BotCommandScopeDefault())
         await bot.set_my_commands(public_bot_commands, scope=BotCommandScopeAllPrivateChats())
-        logging.info("STARTUP: bot command descriptions set.")
+        logger.info("STARTUP: bot command descriptions set.")
 
     await _run_telegram_startup_step(
         "setting bot commands",
@@ -257,15 +259,15 @@ async def on_startup_configured(dispatcher: Dispatcher):
     try:
         queue_manager = init_queue_manager(bot)
         set_dispatcher_queue_manager(dispatcher, queue_manager)
-        logging.info("STARTUP: Message queue manager initialized")
+        logger.info("STARTUP: Message queue manager initialized")
     except Exception:
-        logging.exception("STARTUP: Failed to initialize message queue manager.")
+        logger.exception("STARTUP: Failed to initialize message queue manager.")
 
-    logging.info("STARTUP: Bot on_startup_configured completed.")
+    logger.info("STARTUP: Bot on_startup_configured completed.")
 
 
 async def on_shutdown_configured(dispatcher: Dispatcher):
-    logging.warning("SHUTDOWN: on_shutdown_configured executing...")
+    logger.warning("SHUTDOWN: on_shutdown_configured executing...")
 
     async def close_service(key: str) -> None:
         service = get_dispatcher_service(dispatcher, key)
@@ -275,17 +277,17 @@ async def on_shutdown_configured(dispatcher: Dispatcher):
         if callable(close_coro):
             try:
                 await close_coro()
-                logging.info(f"{key} closed on shutdown.")
+                logger.info(f"{key} closed on shutdown.")
             except Exception as e:
-                logging.warning(f"Failed to close {key}: {e}")
+                logger.warning(f"Failed to close {key}: {e}")
         else:
             close_session = getattr(service, "close_session", None)
             if callable(close_session):
                 try:
                     await close_session()
-                    logging.info(f"{key} session closed on shutdown.")
+                    logger.info(f"{key} session closed on shutdown.")
                 except Exception as e:
-                    logging.warning(f"Failed to close session for {key}: {e}")
+                    logger.warning(f"Failed to close session for {key}: {e}")
 
     from bot.payment_providers import iter_service_keys
 
@@ -307,19 +309,19 @@ async def on_shutdown_configured(dispatcher: Dispatcher):
     if bot and bot.session:
         try:
             await bot.session.close()
-            logging.info("SHUTDOWN: Aiogram Bot session closed.")
+            logger.info("SHUTDOWN: Aiogram Bot session closed.")
         except Exception as e:
-            logging.warning(f"SHUTDOWN: Failed to close bot session: {e}")
+            logger.warning(f"SHUTDOWN: Failed to close bot session: {e}")
 
     from db.database_setup import async_engine as global_async_engine
 
     if global_async_engine:
-        logging.info("SHUTDOWN: Disposing SQLAlchemy engine...")
+        logger.info("SHUTDOWN: Disposing SQLAlchemy engine...")
         await global_async_engine.dispose()
-        logging.info("SHUTDOWN: SQLAlchemy engine disposed.")
+        logger.info("SHUTDOWN: SQLAlchemy engine disposed.")
     await close_redis()
 
-    logging.info("SHUTDOWN: Bot on_shutdown_configured completed.")
+    logger.info("SHUTDOWN: Bot on_shutdown_configured completed.")
 
 
 async def run_bot(settings_param: Settings):
@@ -344,9 +346,9 @@ async def run_bot(settings_param: Settings):
         if bot_info.username:
             actual_bot_username = bot_info.username
             set_dispatcher_bot_username(dp, actual_bot_username)
-            logging.info(f"Bot username resolved: @{actual_bot_username}")
+            logger.info(f"Bot username resolved: @{actual_bot_username}")
         else:
-            logging.warning("Bot username is empty; Telegram Login Widget will be unavailable.")
+            logger.warning("Bot username is empty; Telegram Login Widget will be unavailable.")
 
     bot_username_resolved = await _run_telegram_startup_step(
         "getting bot info from Telegram",
@@ -354,7 +356,7 @@ async def run_bot(settings_param: Settings):
         f"Failed to get bot info (e.g., for YooKassa default URL). Using fallback: {actual_bot_username}",  # noqa: E501
     )
     if not bot_username_resolved:
-        logging.warning("Using fallback bot username: %s", actual_bot_username)
+        logger.warning("Using fallback bot username: %s", actual_bot_username)
 
     core_runtime = build_core_runtime(runtime, bot_username=actual_bot_username, dispatcher=dp)
     plugin_context = core_runtime.plugin_context
@@ -378,7 +380,7 @@ async def run_bot(settings_param: Settings):
     await register_all_routers(dp, settings_param, plugin_context)
 
     if not settings_param.WEBHOOK_BASE_URL:
-        logging.error("WEBHOOK_BASE_URL is required. Polling mode is disabled. Exiting.")
+        logger.error("WEBHOOK_BASE_URL is required. Polling mode is disabled. Exiting.")
         await dp.emit_shutdown()
         raise SystemExit("WEBHOOK_BASE_URL is required. Polling mode is disabled.")
 
@@ -386,7 +388,7 @@ async def run_bot(settings_param: Settings):
 
     _yk_spec = get_provider_spec("yookassa")
     _yk_path = _yk_spec.webhook_path(settings_param) if _yk_spec and _yk_spec.webhook_path else "-"
-    logging.info(
+    logger.info(
         "Starting AIOHTTP server: webhook_base=%s yookassa_path=%s",
         settings_param.WEBHOOK_BASE_URL,
         _yk_path,
@@ -410,23 +412,23 @@ async def run_bot(settings_param: Settings):
     try:
         await asyncio.gather(*main_tasks)
     except (KeyboardInterrupt, SystemExit, asyncio.CancelledError) as e:
-        logging.info(f"Main bot loop interrupted/cancelled: {type(e).__name__} - {e}")
+        logger.info(f"Main bot loop interrupted/cancelled: {type(e).__name__} - {e}")
     finally:
-        logging.info("Initiating final bot shutdown sequence...")
+        logger.info("Initiating final bot shutdown sequence...")
         for task in main_tasks:
             if task and not task.done():
                 task.cancel()
                 try:
                     await task
                 except asyncio.CancelledError:
-                    logging.info(f"Task '{task.get_name()}' was cancelled successfully.")
+                    logger.info(f"Task '{task.get_name()}' was cancelled successfully.")
                 except Exception as e_task_cancel:
-                    logging.error(
+                    logger.error(
                         f"Error during cancellation of task '{task.get_name()}': {e_task_cancel}",
                         exc_info=True,
                     )
 
         await dp.emit_shutdown()
-        logging.info("Dispatcher shutdown sequence emitted.")
+        logger.info("Dispatcher shutdown sequence emitted.")
 
-        logging.info("Bot run_bot function finished.")
+        logger.info("Bot run_bot function finished.")
