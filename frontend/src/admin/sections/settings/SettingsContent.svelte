@@ -118,7 +118,7 @@
     choiceItems: (field: AdminSettingField) => Array<{ value: string; label: string }>;
     setBoolField: (field: AdminSettingField, checked: boolean) => void;
     fieldInputHandler: (field: AdminSettingField) => (event: Event) => void;
-    fieldSelectHandler: (field: AdminSettingField) => (...args: never[]) => void;
+    fieldSelectHandler: (field: AdminSettingField) => (value: string) => void;
     jsonFileHandler: (field: AdminSettingField) => (event: Event) => void;
     markFieldDirty: (key: string, value: unknown) => void;
     resetField: (field: AdminSettingField) => void;

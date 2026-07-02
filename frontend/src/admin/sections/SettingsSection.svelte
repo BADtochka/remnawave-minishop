@@ -584,10 +584,8 @@
     };
   }
 
-  function fieldSelectHandler(field: AdminSettingField): (...args: never[]) => void {
-    return ((value: string) => settingsStore.markDirty(field.key, value)) as (
-      ...args: never[]
-    ) => void;
+  function fieldSelectHandler(field: AdminSettingField): (value: string) => void {
+    return (value: string) => settingsStore.markDirty(field.key, value);
   }
 
   function jsonFileHandler(field: AdminSettingField): (event: Event) => void {

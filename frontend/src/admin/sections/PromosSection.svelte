@@ -15,6 +15,7 @@
   import PromoCreateDialog from "./promos/PromoCreateDialog.svelte";
   import PromoEditDialog from "./promos/PromoEditDialog.svelte";
   import type { components } from "../../lib/api/openapi.generated";
+  import type { AdminBadgeVariant } from "$components/patterns/admin/types";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type Promo = components["schemas"]["PromoOut"];
@@ -86,7 +87,7 @@
     fmtDateShort: (value: string) => string;
     fmtDate?: (value: string | null | undefined) => string;
     fmtMoney?: (value: number, currency?: string | null) => string;
-    paymentStatusVariant?: (status: string | null | undefined) => string;
+    paymentStatusVariant?: (status: string | null | undefined) => AdminBadgeVariant;
     onOpenUserCard?: (userId: number) => void;
   } = $props();
 

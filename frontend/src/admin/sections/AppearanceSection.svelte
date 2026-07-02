@@ -325,8 +325,8 @@
     return Number(themesStore.resolveThemeHomeLogoScale(theme, mode)) || 0;
   }
 
-  function defaultFontSelectHandler(tokenKey: string): SelectCallback {
-    return ((value: string) => setDefaultFont(tokenKey, value)) as SelectCallback;
+  function defaultFontSelectHandler(tokenKey: string): (value: string) => void {
+    return (value: string) => setDefaultFont(tokenKey, value);
   }
 
   function defaultLogoScaleSelectHandler(mode: LogoMode): SelectCallback {

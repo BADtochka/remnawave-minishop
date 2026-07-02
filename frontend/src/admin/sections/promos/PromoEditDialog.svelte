@@ -11,6 +11,7 @@
   import PromoActivationsPanel from "./PromoActivationsPanel.svelte";
   import PromoEffectSelector from "./PromoEffectSelector.svelte";
   import type { components } from "$lib/api/openapi.generated";
+  import type { AdminBadgeVariant } from "$components/patterns/admin/types";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type Promo = components["schemas"]["PromoOut"];
@@ -88,7 +89,7 @@
     inputValue: (event: Event) => string;
     onOpenUserCard: (userId: number) => void;
     openPromoLink: (link: string | null | undefined) => void;
-    paymentStatusVariant: (status: string | null | undefined) => string;
+    paymentStatusVariant: (status: string | null | undefined) => AdminBadgeVariant;
     promoBasicsDirtyCount: number;
     promoEditDraft: PromoPatch;
     promoEditEffectKind: PromoEffectKind;

@@ -22,6 +22,7 @@
     VirtualTableRows,
   } from "$components/patterns/admin/index.js";
   import type { AdminUser } from "$lib/admin/stores/usersStore";
+  import type { AdminBadgeVariant } from "$components/patterns/admin/types";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type SelectOption = { value: string; label: string };
@@ -131,11 +132,11 @@
     sortTitle: (column: SortColumn) => string;
     toggleUsersSortForColumn: (column: UserTableColumn) => void;
     resolvedAvatarUrl: (user: AdminUser) => string;
-    panelStatusBadge: (user: AdminUser) => Record<string, string>;
+    panelStatusBadge: (user: AdminUser) => { label?: string; variant?: AdminBadgeVariant };
     userInitials: (user: AdminUser) => string;
     userDisplayName: (user: AdminUser) => string;
     userSecondaryName: (user: AdminUser) => string;
-    premiumTrafficBadgeVariant: (pt: TrafficBadge) => string;
+    premiumTrafficBadgeVariant: (pt: TrafficBadge) => AdminBadgeVariant;
     premiumTrafficBadgeText: (pt: TrafficBadge) => string;
     rowPaymentsTotal: (user: AdminUser) => string;
     fmtDateShort: (value: string | null | undefined) => string;

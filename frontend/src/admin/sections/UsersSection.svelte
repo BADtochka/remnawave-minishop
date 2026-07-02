@@ -5,6 +5,7 @@
   import { TableHandler } from "@vincjo/datatables";
   import UsersView from "./users/UsersView.svelte";
   import type { AdminUser } from "../../lib/admin/stores/usersStore";
+  import type { AdminBadgeVariant } from "$components/patterns/admin/types";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type SelectOption = { value: string; label: string };
@@ -26,7 +27,7 @@
     at?: TranslateFn;
     fmtDateShort?: (value: string | null | undefined) => string;
     fmtMoney?: (value: number, currency?: string | null) => string;
-    panelStatusBadge?: (user: AdminUser) => Record<string, string>;
+    panelStatusBadge?: (user: AdminUser) => { label?: string; variant?: AdminBadgeVariant };
     resolvedAvatarUrl?: (user: AdminUser) => string;
     userDisplayName?: (user: AdminUser) => string;
     userInitials?: (user: AdminUser) => string;
@@ -177,7 +178,7 @@
     return Boolean(value);
   }
 
-  function premiumTrafficBadgeVariant(pt: TrafficBadge): string {
+  function premiumTrafficBadgeVariant(pt: TrafficBadge): AdminBadgeVariant {
     if (!pt || pt.state === "none") return "muted";
     if (pt.state === "unlimited" || pt.state === "good") return "success";
     if (pt.state === "warn") return "warning";

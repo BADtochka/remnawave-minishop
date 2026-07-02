@@ -12,7 +12,6 @@
   type MoneyFormatter = (value: unknown, currency?: string | null) => string;
   type DateFormatter = (value: unknown) => string;
   type BadgeVariant = "success" | "danger" | "warning" | "muted";
-  type ComponentCallback = (...args: never[]) => void;
   type SelectOption = { value: string; label: string };
   type UserLogRow = Record<string, unknown> & { log_id?: number | string };
   type UsersStoreBridge = {
@@ -126,12 +125,12 @@
     userExtendDaysValid: boolean;
     userExtendTariffValid: boolean;
     extendTariffRequired: boolean;
-    selectExtendTariff: ComponentCallback;
+    selectExtendTariff: (value: string) => void;
     periodTariffItems: SelectOption[];
     tariffActionDirty: boolean;
     currentSubscriptionTariffLabel: string;
     userTariffActionKey: string;
-    selectTariffAction: ComponentCallback;
+    selectTariffAction: (value: string) => void;
     premiumOverrideDirty: boolean;
     premiumOverrideDraftValid: boolean;
     premiumUnlimitedDraft: boolean;
@@ -141,7 +140,7 @@
     hwidLimitDirty: boolean;
     hwidLimitDraftValid: boolean;
     hwidUnlimitedDraft: boolean;
-    selectGrantTrafficKind: ComponentCallback;
+    selectGrantTrafficKind: (value: string) => void;
     grantTrafficGbValid: boolean;
   } = $props();
 </script>

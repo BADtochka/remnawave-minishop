@@ -12,7 +12,6 @@
   type MoneyFormatter = (value: unknown, currency?: string | null) => string;
   type DateFormatter = (value: unknown) => string;
   type BadgeVariant = "success" | "danger" | "warning" | "muted";
-  type ComponentCallback = (...args: never[]) => void;
   type SelectOption = { value: string; label: string };
   type HwidDraftState = { key: string; valid: boolean };
   type UserLogRow = Record<string, unknown> & { log_id?: number | string };
@@ -119,14 +118,14 @@
     return "—";
   }
 
-  const selectExtendTariff = ((value: string) =>
-    usersStore.updateState({ userExtendTariffKey: value })) as ComponentCallback;
-  const selectTariffAction = ((value: string) =>
-    usersStore.updateState({ userTariffActionKey: value })) as ComponentCallback;
-  const selectGrantTrafficKind = ((value: string) =>
+  const selectExtendTariff = (value: string) =>
+    usersStore.updateState({ userExtendTariffKey: value });
+  const selectTariffAction = (value: string) =>
+    usersStore.updateState({ userTariffActionKey: value });
+  const selectGrantTrafficKind = (value: string) =>
     usersStore.updateState({
       grantTrafficKindDraft: value === "premium" ? "premium" : "regular",
-    })) as ComponentCallback;
+    });
 
   function tariffLabel(tariff: Tariff | Record<string, unknown> | null | undefined): string {
     const raw = (tariff || {}) as Record<string, unknown>;
