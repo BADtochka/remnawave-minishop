@@ -196,9 +196,11 @@ async def build_and_start_web_app(
     logger.info(
         "AIOHTTP server started on http://%s:%s", settings.WEB_SERVER_HOST, settings.WEB_SERVER_PORT
     )
-    if after_webhooks_started is not None:
-        await after_webhooks_started()
 
+    # The webapp listener must open before after_webhooks_started: webhook
+    # configuration talks to the Telegram API with unbounded retries, and while
+    # it runs the container already reports healthy (the /healthz port is up),
+    # so a late webapp port shows up as "bot works, webapp is down".
     webapp_settings = settings.webapp_settings
     if webapp_settings.enabled:
         from bot.app.web.webapp.application import create_subscription_webapp_application
@@ -229,6 +231,9 @@ async def build_and_start_web_app(
             webapp_settings.server_host,
             webapp_settings.server_port,
         )
+
+    if after_webhooks_started is not None:
+        await after_webhooks_started()
 
     try:
         await asyncio.Event().wait()
