@@ -1,6 +1,41 @@
 /** Maps JSON theme token keys to CSS custom properties used by the Mini App shell. */
 
-const TOKEN_TO_CSS_VAR = {
+type ThemeTokens = Record<string, unknown>;
+
+export interface ThemeEntry extends Record<string, unknown> {
+  key?: string;
+  tokens?: ThemeTokens | null;
+  variants?: Record<string, ThemeTokens | null> | null;
+  active_variant?: string | null;
+  css_file?: string | null;
+  names?: Record<string, string> | null;
+  assets_version?: unknown;
+}
+
+export interface ThemesCatalog extends Record<string, unknown> {
+  default_theme?: string;
+  themes?: ThemeEntry[];
+}
+
+interface ThemePreviewDraft extends Record<string, unknown> {
+  preview_key?: unknown;
+  catalog?: unknown;
+  expires_at?: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
+function asThemeEntries(value: unknown): ThemeEntry[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+const TOKEN_TO_CSS_VAR: Record<string, string> = {
   accent: "--accent",
   bg: "--bg",
   panel: "--panel",
@@ -62,7 +97,7 @@ const TOKEN_TO_CSS_VAR = {
   admin_chart_fill: "--admin-chart-fill",
 };
 
-const ADMIN_TOKEN_FALLBACKS = {
+const ADMIN_TOKEN_FALLBACKS: Record<string, string> = {
   admin_bg: "bg",
   admin_surface: "panel",
   admin_surface_2: "panel_2",
@@ -104,9 +139,13 @@ const GOOGLE_FONT_SINGLE_WEIGHT_FAMILIES = new Set(["press start 2p"]);
 export const THEME_PREVIEW_STORAGE_KEY = "rw_webapp_theme_preview_v1";
 export const THEME_PREVIEW_TTL_MS = 10 * 60 * 1000;
 
-export function themeTokensToInlineStyle(tokens, primaryFallback = "#00fe7a", options = {}) {
-  const t = tokens && typeof tokens === "object" ? tokens : {};
-  const parts = [];
+export function themeTokensToInlineStyle(
+  tokens: ThemeTokens | null | undefined,
+  primaryFallback: string | undefined = "#00fe7a",
+  options: { fallbackAccent?: boolean } = {}
+): string {
+  const t = asRecord(tokens);
+  const parts: string[] = [];
   const useFallbackAccent = options.fallbackAccent !== false;
   const accent = t.accent || (useFallbackAccent ? primaryFallback || "#00fe7a" : "");
   if (accent) parts.push(`--accent:${accent}`);
@@ -128,35 +167,42 @@ export function themeTokensToInlineStyle(tokens, primaryFallback = "#00fe7a", op
   return parts.join(";");
 }
 
-export function findThemeEntry(themesCatalog, key) {
-  const themes = themesCatalog?.themes || [];
-  return themes.find((entry) => entry && entry.key === key) || null;
+export function findThemeEntry(
+  themesCatalog: ThemesCatalog | null | undefined,
+  key: unknown
+): ThemeEntry | null {
+  const themes = asThemeEntries(themesCatalog?.themes);
+  const normalizedKey = String(key || "");
+  return themes.find((entry) => entry && entry.key === normalizedKey) || null;
 }
 
-function normalizeThemeVariant(variant) {
+function normalizeThemeVariant(variant: unknown): string {
   const value = String(variant || "")
     .trim()
     .toLowerCase();
   return THEME_VARIANTS.has(value) ? value : "";
 }
 
-export function resolveThemeEntryTokens(theme, variant = null) {
-  const base = theme?.tokens && typeof theme.tokens === "object" ? theme.tokens : {};
+export function resolveThemeEntryTokens(
+  theme: ThemeEntry | null | undefined,
+  variant: string | null = null
+): ThemeTokens {
+  const base = asRecord(theme?.tokens);
   const activeVariant =
     normalizeThemeVariant(variant) ||
     normalizeThemeVariant(theme?.active_variant) ||
     normalizeThemeVariant(base.color_scheme);
+  const variants = asRecord(theme?.variants);
   const variantTokens =
-    activeVariant &&
-    theme?.variants?.[activeVariant] &&
-    typeof theme.variants[activeVariant] === "object"
-      ? theme.variants[activeVariant]
-      : {};
+    activeVariant && isRecord(variants[activeVariant]) ? variants[activeVariant] : {};
   return { ...base, ...variantTokens };
 }
 
-export function materializeThemeEntry(theme, variant = null) {
-  if (!theme || typeof theme !== "object") return theme;
+export function materializeThemeEntry(
+  theme: unknown,
+  variant: string | null = null
+): ThemeEntry | null {
+  if (!isRecord(theme)) return null;
   const tokens = resolveThemeEntryTokens(theme, variant);
   const activeVariant =
     normalizeThemeVariant(variant) ||
@@ -165,28 +211,30 @@ export function materializeThemeEntry(theme, variant = null) {
     "";
   return {
     ...theme,
-    active_variant: activeVariant || theme.active_variant,
+    active_variant: String(activeVariant || theme.active_variant || ""),
     tokens,
   };
 }
 
-export function materializeThemesCatalog(catalog) {
-  const source = catalog && typeof catalog === "object" ? catalog : {};
+export function materializeThemesCatalog(catalog: unknown): ThemesCatalog {
+  const source = asRecord(catalog);
   return {
     ...source,
-    default_theme: source.default_theme || "dark",
-    themes: (source.themes || []).map((theme) => materializeThemeEntry(theme)),
+    default_theme: String(source.default_theme || "dark"),
+    themes: asThemeEntries(source.themes)
+      .map((theme) => materializeThemeEntry(theme))
+      .filter((theme): theme is ThemeEntry => Boolean(theme)),
   };
 }
 
-export function resolveEffectiveThemeKey(themesCatalog) {
-  const themes = themesCatalog?.themes || [];
-  const byKey = (k) => themes.find((entry) => entry.key === k);
+export function resolveEffectiveThemeKey(themesCatalog: ThemesCatalog | null | undefined): string {
+  const themes = asThemeEntries(themesCatalog?.themes);
+  const byKey = (k: string) => themes.find((entry) => entry.key === k);
   const def = themesCatalog?.default_theme || themes[0]?.key || "dark";
   return byKey(def) ? def : themes[0]?.key || "dark";
 }
 
-export function themePresetClass(tokens) {
+export function themePresetClass(tokens: ThemeTokens | null | undefined): string {
   const preset = String(tokens?.style_preset || "")
     .trim()
     .toLowerCase();
@@ -195,14 +243,14 @@ export function themePresetClass(tokens) {
   return "";
 }
 
-export function themeVariantClass(theme) {
+export function themeVariantClass(theme: ThemeEntry | null | undefined): string {
   const variant = String(theme?.active_variant || theme?.tokens?.color_scheme || "")
     .trim()
     .toLowerCase();
   return variant === "light" || variant === "dark" ? `theme-variant-${variant}` : "";
 }
 
-export function themeKeyClass(key) {
+export function themeKeyClass(key: unknown): string {
   const safe = String(key || "")
     .trim()
     .toLowerCase()
@@ -211,7 +259,7 @@ export function themeKeyClass(key) {
   return safe ? `theme-key-${safe}` : "";
 }
 
-export function themeCssClass(cssFile) {
+export function themeCssClass(cssFile: unknown): string {
   const filename = String(cssFile || "")
     .replace(/\\/g, "/")
     .split("/")
@@ -226,7 +274,7 @@ export function themeCssClass(cssFile) {
   return slug ? `theme-css-${slug}` : "";
 }
 
-export function themeRootClass(theme) {
+export function themeRootClass(theme: ThemeEntry | null | undefined): string {
   return [
     themeKeyClass(theme?.key),
     themeVariantClass(theme),
@@ -237,21 +285,24 @@ export function themeRootClass(theme) {
     .join(" ");
 }
 
-export function themeEntryToInlineStyle(theme, primaryFallback = "#00fe7a") {
+export function themeEntryToInlineStyle(
+  theme: ThemeEntry | null | undefined,
+  primaryFallback: string | undefined = "#00fe7a"
+): string {
   const materialized = materializeThemeEntry(theme);
   return themeTokensToInlineStyle(materialized?.tokens, primaryFallback, {
     fallbackAccent: !materialized?.css_file,
   });
 }
 
-function stripQuotes(value) {
+function stripQuotes(value: unknown): string {
   return String(value || "")
     .trim()
     .replace(/^["']|["']$/g, "")
     .trim();
 }
 
-export function firstFontFamily(fontStack) {
+export function firstFontFamily(fontStack: unknown): string {
   const first = String(fontStack || "")
     .split(",")
     .map(stripQuotes)
@@ -259,11 +310,11 @@ export function firstFontFamily(fontStack) {
   return first || "";
 }
 
-function shouldLoadGoogleFont(family) {
+function shouldLoadGoogleFont(family: unknown): boolean {
   const normalized = String(family || "")
     .trim()
     .toLowerCase();
-  return (
+  return Boolean(
     normalized &&
     !normalized.startsWith("var(") &&
     !normalized.startsWith("ui-") &&
@@ -271,7 +322,7 @@ function shouldLoadGoogleFont(family) {
   );
 }
 
-export function googleFontFamiliesFromTokens(tokens) {
+export function googleFontFamiliesFromTokens(tokens: ThemeTokens | null | undefined): string[] {
   const families = [
     firstFontFamily(tokens?.font_sans),
     firstFontFamily(tokens?.font_logo),
@@ -280,7 +331,7 @@ export function googleFontFamiliesFromTokens(tokens) {
   return Array.from(new Set(families));
 }
 
-export function googleFontsHrefForTheme(theme) {
+export function googleFontsHrefForTheme(theme: ThemeEntry | null | undefined): string {
   const materialized = materializeThemeEntry(theme);
   const families = googleFontFamiliesFromTokens(materialized?.tokens);
   if (!families.length) return "";
@@ -299,7 +350,7 @@ export function googleFontsHrefForTheme(theme) {
   return `https://fonts.googleapis.com/css2?${query}&display=swap`;
 }
 
-export function syncThemeGoogleFonts(theme) {
+export function syncThemeGoogleFonts(theme: ThemeEntry | null | undefined): void {
   if (typeof document === "undefined") return;
   const href = googleFontsHrefForTheme(theme);
   let link = document.getElementById(GOOGLE_FONT_LINK_ID);
@@ -310,7 +361,7 @@ export function syncThemeGoogleFonts(theme) {
   if (!link) {
     link = document.createElement("link");
     link.id = GOOGLE_FONT_LINK_ID;
-    link.rel = "stylesheet";
+    link.setAttribute("rel", "stylesheet");
     document.head.appendChild(link);
   }
   if (link.getAttribute("href") !== href) {
@@ -318,14 +369,14 @@ export function syncThemeGoogleFonts(theme) {
   }
 }
 
-export function readThemePreviewDraft(previewKey = "") {
+export function readThemePreviewDraft(previewKey = ""): ThemePreviewDraft | null {
   if (typeof window === "undefined" || !previewKey) return null;
   try {
     const requestedKey = String(previewKey || "").trim();
     const raw = window.localStorage?.getItem(THEME_PREVIEW_STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
+    const parsed = asRecord(JSON.parse(raw));
+    if (!Object.keys(parsed).length) return null;
     const storedKey = String(parsed.preview_key || "").trim();
     if (storedKey && requestedKey && storedKey !== requestedKey) return null;
     if (Number(parsed.expires_at || 0) < Date.now()) {
@@ -339,7 +390,7 @@ export function readThemePreviewDraft(previewKey = "") {
   }
 }
 
-export function writeThemePreviewDraft(catalog, previewKey = "") {
+export function writeThemePreviewDraft(catalog: unknown, previewKey = ""): void {
   if (typeof window === "undefined" || !catalog) return;
   try {
     window.localStorage?.setItem(
@@ -355,7 +406,7 @@ export function writeThemePreviewDraft(catalog, previewKey = "") {
   }
 }
 
-function encodeThemeCssPath(path) {
+function encodeThemeCssPath(path: unknown): string {
   return String(path || "")
     .replace(/\\/g, "/")
     .split("/")
@@ -364,12 +415,12 @@ function encodeThemeCssPath(path) {
     .join("/");
 }
 
-function themeAssetsVersion(theme) {
+function themeAssetsVersion(theme: ThemeEntry | null | undefined): string {
   const version = Number(theme?.assets_version || 0);
   return Number.isFinite(version) && version > 0 ? String(Math.floor(version)) : "";
 }
 
-export function themeCssHref(theme) {
+export function themeCssHref(theme: ThemeEntry | null | undefined): string {
   const cssFile = String(theme?.css_file || "").trim();
   if (!cssFile) return "";
   if (/^(?:https?:)?\/\//i.test(cssFile) || cssFile.startsWith("data:")) return "";
@@ -393,7 +444,7 @@ export function themeCssHref(theme) {
   return version ? `${href}?v=${encodeURIComponent(version)}` : href;
 }
 
-export function localizedThemeName(theme, lang = "en") {
+export function localizedThemeName(theme: ThemeEntry | null | undefined, lang = "en"): string {
   const names = theme?.names || {};
   const key = String(lang || "")
     .trim()

@@ -807,7 +807,7 @@ def get_settings() -> Settings:
 
             raise SystemExit(
                 f"CRITICAL SETTINGS ERROR: {e}. Please check your .env file and Settings model."
-            )
+            ) from e
     return _settings_instance
 
 

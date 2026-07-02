@@ -1,6 +1,74 @@
 import { structuredCloneSafe } from "./format.js";
 
-export function emptyTariffDraft() {
+type UnknownRecord = Record<string, unknown>;
+type DraftRow = UnknownRecord;
+type PackageSet = Record<string, DraftRow[]>;
+
+export interface TariffCatalogDraft extends UnknownRecord {
+  default_tariff: string;
+  default_currency: string;
+  topup_packages_default: unknown;
+  tariffs: unknown[];
+}
+
+export interface TariffDraft extends UnknownRecord {
+  defaultCurrency: string;
+  key: string;
+  nameRu: string;
+  nameEn: string;
+  descriptionRu: string;
+  descriptionEn: string;
+  premiumNameRu: string;
+  premiumNameEn: string;
+  squadUuids: unknown;
+  premiumSquadUuids: unknown;
+  billing_model: string;
+  enabled: boolean;
+  monthly_gb: string | number;
+  premium_monthly_gb: string | number;
+  hwid_device_limit: string | number;
+  conversion_rate_rub_per_gb: string | number;
+  periodRows: DraftRow[];
+  topupRows: DraftRow[];
+  premiumTopupRows: DraftRow[];
+  trafficRows: DraftRow[];
+  hwidRows: DraftRow[];
+}
+
+type ParsedPeriodRow = {
+  months: number | null;
+  rub: number | null;
+  stars: number | null;
+  referral_inviter: number | null;
+  referral_referee: number | null;
+};
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function asRecord(value: unknown): UnknownRecord {
+  return isRecord(value) ? value : {};
+}
+
+function asStringRecord(value: unknown): Record<string, string> {
+  const record = asRecord(value);
+  return Object.fromEntries(Object.entries(record).map(([key, item]) => [key, String(item ?? "")]));
+}
+
+function cloneValue<T>(value: T): T {
+  return structuredCloneSafe(value) as T;
+}
+
+function hasPositiveMonths(row: ParsedPeriodRow): row is ParsedPeriodRow & { months: number } {
+  return row.months !== null && row.months > 0;
+}
+
+function scalarDraftValue(value: unknown): string | number {
+  return typeof value === "string" || typeof value === "number" ? value : "";
+}
+
+export function emptyTariffDraft(): TariffDraft {
   return {
     defaultCurrency: "rub",
     key: "",
@@ -34,16 +102,18 @@ export function emptyTariffDraft() {
   };
 }
 
-export function cloneCatalog(catalog) {
-  return structuredCloneSafe({
-    default_tariff: catalog?.default_tariff || "",
-    default_currency: normalizeCurrencyKey(catalog?.default_currency || "rub"),
-    topup_packages_default: catalog?.topup_packages_default || { rub: [], stars: [] },
-    tariffs: catalog?.tariffs || [],
-  });
+export function cloneCatalog<T>(catalog: T | null | undefined): T & TariffCatalogDraft {
+  const source = asRecord(catalog);
+  return cloneValue({
+    ...source,
+    default_tariff: String(source.default_tariff || ""),
+    default_currency: normalizeCurrencyKey(source.default_currency || "rub"),
+    topup_packages_default: source.topup_packages_default || { rub: [], stars: [] },
+    tariffs: Array.isArray(source.tariffs) ? source.tariffs : [],
+  }) as T & TariffCatalogDraft;
 }
 
-export function normalizeCurrencyKey(value, fallback = "rub") {
+export function normalizeCurrencyKey(value: unknown, fallback = "rub"): string {
   const text = String(value || "")
     .trim()
     .toLowerCase();
@@ -53,26 +123,34 @@ export function normalizeCurrencyKey(value, fallback = "rub") {
   return text.replace(/[^a-z0-9_-]/g, "") || fallback;
 }
 
-export function rowsFromPackages(packageSet, currency, valueKey) {
+export function rowsFromPackages(
+  packageSet: PackageSet | null | undefined,
+  currency: string,
+  valueKey: string
+): DraftRow[] {
   return (packageSet?.[currency] || []).map((pkg) => ({
     [valueKey]: pkg[valueKey],
     price: pkg.price,
-    prices: pkg.prices ? structuredCloneSafe(pkg.prices) : undefined,
+    prices: pkg.prices ? cloneValue(pkg.prices) : undefined,
     min_price: pkg.min_price ?? "",
   }));
 }
 
-function packageValueSignature(value) {
+function packageValueSignature(value: unknown): string {
   const num = Number(value);
   return Number.isFinite(num) ? String(num) : String(value || "");
 }
 
-export function packageRowsFromPackageSet(packageSet, currency, valueKey) {
+export function packageRowsFromPackageSet(
+  packageSet: PackageSet | null | undefined,
+  currency: string,
+  valueKey: string
+): DraftRow[] {
   const currencyRows = rowsFromPackages(packageSet, currency, valueKey);
   const starsRows = rowsFromPackages(packageSet, "stars", valueKey);
   const usedStars = new Set();
 
-  const rows = currencyRows.map((row) => {
+  const rows: DraftRow[] = currencyRows.map((row) => {
     const rowSignature = packageValueSignature(row[valueKey]);
     const starsIndex = starsRows.findIndex(
       (starsRow, index) =>
@@ -106,82 +184,95 @@ export function packageRowsFromPackageSet(packageSet, currency, valueKey) {
   return rows;
 }
 
-export function draftFromTariff(tariff, defaultCurrency = "rub") {
+export function draftFromTariff(tariff: UnknownRecord, defaultCurrency = "rub"): TariffDraft {
   const currency = normalizeCurrencyKey(defaultCurrency);
-  const defaultPrices = tariff.prices?.[currency] || {};
+  const prices = asRecord(tariff.prices);
+  const defaultPrices = asRecord(prices[currency]);
+  const rubPrices = asRecord(tariff.prices_rub);
   // enabled_periods comes first so its order (the configured purchase order)
   // is preserved; any extra price-only months are appended afterwards.
   const months = new Set([
-    ...(tariff.enabled_periods || []),
+    ...(Array.isArray(tariff.enabled_periods) ? tariff.enabled_periods : []),
     ...Object.keys(defaultPrices).map(Number),
-    ...(currency === "rub" ? Object.keys(tariff.prices_rub || {}).map(Number) : []),
-    ...Object.keys(tariff.prices_stars || {}).map(Number),
+    ...(currency === "rub" ? Object.keys(asRecord(tariff.prices_rub)).map(Number) : []),
+    ...Object.keys(asRecord(tariff.prices_stars)).map(Number),
   ]);
   const periodRows = [...months]
     .filter((month) => Number.isFinite(month) && month > 0)
     .map((month) => ({
       months: month,
       rub:
-        (currency === "rub" ? tariff.prices_rub?.[String(month)] : undefined) ??
+        (currency === "rub" ? rubPrices[String(month)] : undefined) ??
         defaultPrices?.[String(month)] ??
         "",
-      stars: tariff.prices_stars?.[String(month)] ?? "",
-      referral_inviter: tariff.referral_bonus_days_inviter?.[String(month)] ?? "",
-      referral_referee: tariff.referral_bonus_days_referee?.[String(month)] ?? "",
+      stars: asRecord(tariff.prices_stars)[String(month)] ?? "",
+      referral_inviter: asRecord(tariff.referral_bonus_days_inviter)[String(month)] ?? "",
+      referral_referee: asRecord(tariff.referral_bonus_days_referee)[String(month)] ?? "",
     }));
+  const names = asStringRecord(tariff.names);
+  const descriptions = asStringRecord(tariff.descriptions);
+  const premiumNames = asStringRecord(tariff.premium_names);
 
   return {
     ...emptyTariffDraft(),
     defaultCurrency: currency,
-    key: tariff.key || "",
-    nameRu: tariff.names?.ru || "",
-    nameEn: tariff.names?.en || "",
-    descriptionRu: tariff.descriptions?.ru || "",
-    descriptionEn: tariff.descriptions?.en || "",
-    premiumNameRu: tariff.premium_names?.ru || "",
-    premiumNameEn: tariff.premium_names?.en || "",
+    key: String(tariff.key || ""),
+    nameRu: names.ru || "",
+    nameEn: names.en || "",
+    descriptionRu: descriptions.ru || "",
+    descriptionEn: descriptions.en || "",
+    premiumNameRu: premiumNames.ru || "",
+    premiumNameEn: premiumNames.en || "",
     squadUuids: tariff.squad_uuids || [],
     premiumSquadUuids: tariff.premium_squad_uuids || [],
-    billing_model: tariff.billing_model || "period",
+    billing_model: String(tariff.billing_model || "period"),
     enabled: tariff.enabled !== false,
-    monthly_gb: tariff.monthly_gb ?? "",
-    premium_monthly_gb: tariff.premium_monthly_gb ?? "",
-    hwid_device_limit: tariff.hwid_device_limit ?? "",
-    conversion_rate_rub_per_gb: tariff.conversion_rate_rub_per_gb ?? "",
+    monthly_gb: scalarDraftValue(tariff.monthly_gb),
+    premium_monthly_gb: scalarDraftValue(tariff.premium_monthly_gb),
+    hwid_device_limit: scalarDraftValue(tariff.hwid_device_limit),
+    conversion_rate_rub_per_gb: scalarDraftValue(tariff.conversion_rate_rub_per_gb),
     periodRows: periodRows.length ? periodRows : emptyTariffDraft().periodRows,
-    topupRows: packageRowsFromPackageSet(tariff.topup_packages, currency, "gb"),
-    premiumTopupRows: packageRowsFromPackageSet(tariff.premium_topup_packages, currency, "gb"),
-    trafficRows: packageRowsFromPackageSet(tariff.traffic_packages, currency, "gb"),
-    hwidRows: packageRowsFromPackageSet(tariff.hwid_device_packages, currency, "count"),
+    topupRows: packageRowsFromPackageSet(tariff.topup_packages as PackageSet, currency, "gb"),
+    premiumTopupRows: packageRowsFromPackageSet(
+      tariff.premium_topup_packages as PackageSet,
+      currency,
+      "gb"
+    ),
+    trafficRows: packageRowsFromPackageSet(tariff.traffic_packages as PackageSet, currency, "gb"),
+    hwidRows: packageRowsFromPackageSet(
+      tariff.hwid_device_packages as PackageSet,
+      currency,
+      "count"
+    ),
   };
 }
 
-export function parseNumber(value, fallback = null) {
+export function parseNumber(value: unknown, fallback: number | null = null): number | null {
   if (value === "" || value === null || value === undefined) return fallback;
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 }
 
-export function parseIntNumber(value, fallback = null) {
+export function parseIntNumber(value: unknown, fallback: number | null = null): number | null {
   const num = parseNumber(value, fallback);
   return num === null ? fallback : Math.trunc(num);
 }
 
-export function compactMap(obj) {
+export function compactMap(obj: UnknownRecord): UnknownRecord {
   return Object.fromEntries(
     Object.entries(obj).filter(([, value]) => value !== "" && value !== null && value !== undefined)
   );
 }
 
-export function packagesFromRows(rows, valueKey) {
+export function packagesFromRows(rows: DraftRow[], valueKey: string): DraftRow[] {
   return (rows || [])
     .map((row) => {
-      const pkg = {
+      const pkg: DraftRow = {
         [valueKey]: parseNumber(row[valueKey]),
         price: parseNumber(row.price),
       };
       if (row.prices && typeof row.prices === "object") {
-        pkg.prices = structuredCloneSafe(row.prices);
+        pkg.prices = cloneValue(row.prices);
       }
       const minPrice = parseNumber(row.min_price);
       if (minPrice !== null) {
@@ -189,20 +280,27 @@ export function packagesFromRows(rows, valueKey) {
       }
       return pkg;
     })
-    .filter((row) => row[valueKey] > 0 && row.price !== null && row.price >= 0);
+    .filter(
+      (row) => Number(row[valueKey] || 0) > 0 && row.price !== null && Number(row.price) >= 0
+    );
 }
 
-export function packagesFromPackageRows(rows, valueKey, priceKey, options = {}) {
+export function packagesFromPackageRows(
+  rows: DraftRow[],
+  valueKey: string,
+  priceKey: string,
+  options: { pricesKey?: string; minPriceKey?: string } = {}
+): DraftRow[] {
   const pricesKey = options.pricesKey || "prices";
   const minPriceKey = options.minPriceKey || "min_price";
   return (rows || [])
     .map((row) => {
-      const pkg = {
+      const pkg: DraftRow = {
         [valueKey]: parseNumber(row[valueKey]),
         price: parseNumber(row[priceKey]),
       };
       if (row[pricesKey] && typeof row[pricesKey] === "object") {
-        pkg.prices = structuredCloneSafe(row[pricesKey]);
+        pkg.prices = cloneValue(row[pricesKey]);
       }
       const minPrice = parseNumber(row[minPriceKey]);
       if (minPrice !== null) {
@@ -210,10 +308,16 @@ export function packagesFromPackageRows(rows, valueKey, priceKey, options = {}) 
       }
       return pkg;
     })
-    .filter((row) => row[valueKey] > 0 && row.price !== null && row.price >= 0);
+    .filter(
+      (row) => Number(row[valueKey] || 0) > 0 && row.price !== null && Number(row.price) >= 0
+    );
 }
 
-export function packageSetFromRows(rows, valueKey, defaultCurrency = "rub") {
+export function packageSetFromRows(
+  rows: DraftRow[],
+  valueKey: string,
+  defaultCurrency = "rub"
+): PackageSet | null {
   const currency = normalizeCurrencyKey(defaultCurrency);
   const defaultCurrencyPackages = packagesFromPackageRows(rows, valueKey, "price");
   const stars = packagesFromPackageRows(rows, valueKey, "stars", {
@@ -227,7 +331,7 @@ export function packageSetFromRows(rows, valueKey, defaultCurrency = "rub") {
   };
 }
 
-export function normalizeUuidList(value) {
+export function normalizeUuidList(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
   return String(value || "")
     .split(/[\n,]+/)
@@ -235,7 +339,7 @@ export function normalizeUuidList(value) {
     .filter(Boolean);
 }
 
-export function tariffFromDraft(draft, fallbackCurrency = "rub") {
+export function tariffFromDraft(draft: TariffDraft, fallbackCurrency = "rub"): UnknownRecord {
   const defaultCurrency = normalizeCurrencyKey(draft.defaultCurrency || fallbackCurrency);
   const key = draft.key.trim();
   const names = compactMap({ ru: draft.nameRu.trim(), en: draft.nameEn.trim() });
@@ -247,7 +351,7 @@ export function tariffFromDraft(draft, fallbackCurrency = "rub") {
     ru: draft.premiumNameRu.trim(),
     en: draft.premiumNameEn.trim(),
   });
-  const tariff = {
+  const tariff: UnknownRecord = {
     key,
     names,
     descriptions,
@@ -277,7 +381,7 @@ export function tariffFromDraft(draft, fallbackCurrency = "rub") {
         referral_inviter: parseIntNumber(row.referral_inviter),
         referral_referee: parseIntNumber(row.referral_referee),
       }))
-      .filter((row) => row.months > 0)
+      .filter(hasPositiveMonths)
       .filter((row) => {
         if (seenMonths.has(row.months)) return false;
         seenMonths.add(row.months);

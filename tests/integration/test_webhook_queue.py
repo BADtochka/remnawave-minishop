@@ -58,7 +58,8 @@ class FakeRedis:
             bucket.insert(0, value)
         return len(bucket)
 
-    async def brpop(self, key: str, timeout: int = 0) -> Optional[Tuple[str, str]]:
+    # Keep `timeout` to mirror redis.asyncio.Redis.brpop used by the queue code.
+    async def brpop(self, key: str, timeout: int = 0) -> Optional[Tuple[str, str]]:  # noqa: ASYNC109
         bucket = self._lists.get(key)
         if bucket:
             return key, bucket.pop()

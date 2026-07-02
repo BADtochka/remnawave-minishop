@@ -16,6 +16,7 @@ unless it truly cannot, and the reason should name the divergence.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 
 import pytest
 
@@ -37,10 +38,12 @@ PROVIDER_NAMES = sorted({s.service_key.removesuffix("_service") for s in SPECS i
 LINKFLOW_BESPOKE = {
     "cloudpayments": "answers the callback query mid-flow (safe_callback_answer)",
     "cryptopay": "aiocryptopay invoice flow, not a hosted-link redirect",
-    "freekassa": "callback builds a localized order-info lead_text",
     "pally": "answers the callback query mid-flow + per-flow create_bill args",
-    "paykilla": "bespoke invoice flow not unified with the shared engine",
-    "platega": "sbp/crypto sub-variants, each with its own SPEC and variant routing",
+    "platega": (
+        "callback/webapp variant routing is part of provider payload validation: "
+        "legacy pay_platega maps to SBP, crypto/SBP use distinct method ids, "
+        "and reuse must validate the stored platega_variant in provider payload"
+    ),
     "qa": "local signed webhook fixture for full-stack QA, not a real hosted provider",
     "stars": "Telegram Stars in-app invoice; no external payment link or webhook",
     "stripe": "card PaymentIntent / saved-card recurring, not a hosted-link redirect",
@@ -134,6 +137,16 @@ def _service_module(name: str):
     return importlib.import_module(f"bot.payment_providers.{name}.service")
 
 
+def _descriptor_module(name: str):
+    service_module = _service_module(name)
+    if getattr(service_module, "_DESCRIPTOR", None) is not None:
+        return service_module
+    provider_module_name = f"bot.payment_providers.{name}.provider"
+    if importlib.util.find_spec(provider_module_name) is not None:
+        return importlib.import_module(provider_module_name)
+    return service_module
+
+
 def _service_class(name: str) -> type:
     """Return the single ``*Service`` class defined in a provider's service module."""
     module = _service_module(name)
@@ -213,7 +226,7 @@ def test_webhook_paths_unique_where_declared():
 
 @pytest.mark.parametrize("name", PROVIDER_NAMES)
 def test_provider_uses_engine_or_is_allowlisted(name):
-    descriptor = getattr(_service_module(name), "_DESCRIPTOR", None)
+    descriptor = getattr(_descriptor_module(name), "_DESCRIPTOR", None)
     if descriptor is not None:
         assert isinstance(descriptor, LinkPaymentDescriptor)
         assert name not in LINKFLOW_BESPOKE, (
@@ -235,7 +248,7 @@ def test_bespoke_allowlist_has_no_stale_entries():
 
 @pytest.mark.parametrize("name", [n for n in PROVIDER_NAMES if n not in LINKFLOW_BESPOKE])
 def test_descriptor_is_consistent_with_spec(name):
-    descriptor = getattr(_service_module(name), "_DESCRIPTOR")
+    descriptor = _descriptor_module(name)._DESCRIPTOR
     assert descriptor.provider_key == descriptor.spec.provider_key, (
         f"{name}: descriptor.provider_key ({descriptor.provider_key}) != "
         f"spec.provider_key ({descriptor.spec.provider_key})"

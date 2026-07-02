@@ -145,7 +145,7 @@ class LknpdClient:
 
         except httpx.RequestError as e:
             logger.exception("Network error during authentication")
-            raise LknpdApiError(f"Network error: {e}")
+            raise LknpdApiError(f"Network error: {e}") from e
 
     async def _refresh_token(self) -> bool:
         """Refresh access token using refresh token."""
@@ -323,4 +323,4 @@ class LknpdClient:
 
         except httpx.RequestError as e:
             logger.exception("Network error creating income")
-            raise LknpdApiError(f"Network error: {e}")
+            raise LknpdApiError(f"Network error: {e}") from e

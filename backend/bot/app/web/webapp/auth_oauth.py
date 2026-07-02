@@ -299,14 +299,14 @@ async def telegram_oauth_callback_route(request: web.Request) -> web.Response:
             raise
         except RegistrationInviteRequiredError:
             await session.rollback()
-            raise redirect("/", "invite_required")
+            raise redirect("/", "invite_required") from None
         except UserMergeConflictError:
             await session.rollback()
-            raise redirect(redirect_path, "merge_conflict")
+            raise redirect(redirect_path, "merge_conflict") from None
         except Exception:
             await session.rollback()
             logger.exception("Telegram OAuth callback failed")
-            raise redirect(redirect_path, "failed")
+            raise redirect(redirect_path, "failed") from None
 
     await _invalidate_webapp_user_caches(settings, final_user_id, include_devices=True)
     if source_user_id_for_cache and source_user_id_for_cache != final_user_id:

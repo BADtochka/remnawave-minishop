@@ -311,8 +311,8 @@ class Tariff(BaseModel):
             try:
                 months = int(float(str(period).strip()))
                 bonus_days = int(float(days))
-            except (TypeError, ValueError):
-                raise ValueError(f"tariff {self.key}: {field_name} contains invalid entry")
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"tariff {self.key}: {field_name} contains invalid entry") from exc
             if months <= 0:
                 raise ValueError(f"tariff {self.key}: {field_name} periods must be positive")
             if bonus_days < 0:

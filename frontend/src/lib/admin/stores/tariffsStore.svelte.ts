@@ -13,7 +13,7 @@ import {
   tariffFromDraft as tariffFromDraftFn,
   normalizeCurrencyKey,
   normalizeUuidList,
-} from "../tariffDraft.js";
+} from "../tariffDraft";
 import { snapshotForPayload } from "./snapshotForPayload.svelte";
 
 type AdminErrorResponse = { ok?: false; error?: string; message?: string; detail?: string };

@@ -2,6 +2,7 @@ import asyncio
 import hmac
 import html
 import json
+import logging
 import re
 import secrets
 import subprocess
@@ -33,26 +34,10 @@ from config.webapp_themes_config import (
 )
 from db.dal import subscription_dal
 
-from ._runtime import (
-    _APP_VERSION_CACHE,
+from .asset_paths import (
     APP_DEEPLINK_TEMPLATE_PATH,
-    APP_REPOSITORY_URL,
     APP_ROOT,
-    DEV_MOCK_END_MARKER,
-    DEV_MOCK_START_MARKER,
     TEMPLATE_PATH,
-    WEBAPP_CONFIG_PLACEHOLDER,
-    WEBAPP_CSRF_COOKIE_NAME,
-    WEBAPP_CSRF_EXEMPT_PATHS,
-    WEBAPP_CSRF_HEADER_NAME,
-    WEBAPP_I18N_PLACEHOLDER,
-    WEBAPP_JS_PLACEHOLDER,
-    WEBAPP_RATE_LIMIT_MAX_REQUESTS,
-    WEBAPP_RATE_LIMIT_WINDOW_SECONDS,
-    WEBAPP_SESSION_COOKIE_NAME,
-    WEBAPP_STATE_CHANGING_METHODS,
-    json_response,
-    logger,
 )
 from .assets_branding import (
     _close_shared_http_session,
@@ -141,12 +126,30 @@ from .common import (
     _resolve_telegram_oauth_client_id,
     _resolve_telegram_oauth_request_access,
 )
+from .constants import (
+    APP_REPOSITORY_URL,
+    DEV_MOCK_END_MARKER,
+    DEV_MOCK_START_MARKER,
+    WEBAPP_CONFIG_PLACEHOLDER,
+    WEBAPP_CSRF_COOKIE_NAME,
+    WEBAPP_CSRF_EXEMPT_PATHS,
+    WEBAPP_CSRF_HEADER_NAME,
+    WEBAPP_I18N_PLACEHOLDER,
+    WEBAPP_JS_PLACEHOLDER,
+    WEBAPP_RATE_LIMIT_MAX_REQUESTS,
+    WEBAPP_RATE_LIMIT_WINDOW_SECONDS,
+    WEBAPP_SESSION_COOKIE_NAME,
+    WEBAPP_STATE_CHANGING_METHODS,
+)
+from .response_helpers import json_response
 
 _TEXT_FILE_CACHE: Dict[tuple[str, bool], tuple[int, int, str]] = {}
 _I18N_PAYLOAD_CACHE: Dict[tuple[int, str, tuple[tuple[str, int, int], ...]], Dict[str, Any]] = {}
 _ASSET_NAME_CACHE_TTL_SECONDS = 30.0
 WEBAPP_HTML_CACHE_CONTROL = "no-store, no-cache, must-revalidate, max-age=0"
 WEBAPP_LEGACY_ASSET_CACHE_CONTROL = "no-store, no-cache, must-revalidate, max-age=0"
+_APP_VERSION_CACHE: Optional[str] = None
+logger = logging.getLogger(__name__)
 
 
 @web.middleware

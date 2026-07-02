@@ -3,7 +3,7 @@ import io
 import logging
 import math
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, cast
 
 from aiogram import F, Router, types
@@ -462,7 +462,7 @@ async def export_logs_csv_handler(
         csv_buffer.close()
 
         # Generate filename with current timestamp
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         filename = f"message_logs_{now.strftime('%Y%m%d_%H%M%S')}.csv"
 
         # Send as document

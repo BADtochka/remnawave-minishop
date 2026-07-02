@@ -723,7 +723,7 @@ async def promo_export_all_handler(
         output.seek(0)
 
         # Создаем файл для отправки
-        filename = f"promo_codes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        filename = f"promo_codes_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
         file = types.BufferedInputFile(
             output.getvalue().encode("utf-8-sig"),  # BOM для корректного отображения в Excel
             filename=filename,

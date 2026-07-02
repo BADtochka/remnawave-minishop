@@ -1,4 +1,4 @@
-import { ADMIN_SECTIONS, APP_SECTION_PATHS } from "./constants.js";
+import { ADMIN_SECTIONS, APP_SECTION_PATHS } from "./constants";
 
 export type WebappSection =
   "home" | "invite" | "install" | "trial" | "devices" | "support" | "settings" | "admin";

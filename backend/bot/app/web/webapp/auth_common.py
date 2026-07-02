@@ -26,12 +26,12 @@ from bot.utils.text_sanitizer import panel_description_from_profile
 from config.settings import Settings
 from db.models import User
 
-from ._runtime import (
+from .constants import (
     WEBAPP_CSRF_COOKIE_NAME,
     WEBAPP_SESSION_COOKIE_NAME,
     WEBAPP_TELEGRAM_OAUTH_STATE_COOKIE_NAME,
-    json_response,
 )
+from .response_helpers import json_response
 
 
 def _public_webapp_base_url(settings: Settings, request: web.Request) -> str:

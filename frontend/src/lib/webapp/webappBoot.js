@@ -4,7 +4,7 @@ import {
   readTelegramLoginWidgetAuthData,
   clearAuthQuery,
 } from "./authHelpers.js";
-import { TELEGRAM_SDK_BOOT_TIMEOUT_MS } from "./constants.js";
+import { TELEGRAM_SDK_BOOT_TIMEOUT_MS } from "./constants";
 
 /**
  * Initial auth / session bootstrap for the subscription webapp (non-preview).

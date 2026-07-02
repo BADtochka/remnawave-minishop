@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import io
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, TypeVar, cast
 
@@ -25,15 +26,15 @@ from config.settings import Settings
 from db.dal import user_dal
 from db.models import User, UserTelegramAvatar
 
-from ._runtime import (
+from .constants import (
     WEBAPP_TELEGRAM_AVATAR_FETCH_TIMEOUT_SECONDS,
     WEBAPP_TELEGRAM_AVATAR_MAX_BYTES,
     WEBAPP_TELEGRAM_AVATAR_REFRESH_SECONDS,
-    json_response,
-    logger,
 )
+from .response_helpers import json_response
 
 BodyModelT = TypeVar("BodyModelT", bound=BaseModel)
+logger = logging.getLogger(__name__)
 
 
 def _json_error(status: int, code: str, message: str) -> web.Response:

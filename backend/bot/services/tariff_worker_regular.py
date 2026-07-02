@@ -188,7 +188,7 @@ class TariffWorkerRegularMixin:
         for chunk_start in range(0, len(subs), TARIFF_WORKER_BATCH_SIZE):
             chunk = subs[chunk_start : chunk_start + TARIFF_WORKER_BATCH_SIZE]
             panel_payloads = await asyncio.gather(*(_fetch_panel(s) for s in chunk))
-            for sub, panel_data in zip(chunk, panel_payloads):
+            for sub, panel_data in zip(chunk, panel_payloads, strict=True):
                 if not panel_data:
                     continue
                 trial_premium_subscription = bool(
@@ -598,7 +598,7 @@ class TariffWorkerRegularMixin:
             )
             user_lang = await self._user_lang(session, sub.user_id)
             _ = (
-                (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
+                (lambda k, _user_lang=user_lang, **kw: self.i18n.gettext(_user_lang, k, **kw))
                 if self.i18n
                 else (lambda k, **kw: k)
             )

@@ -242,7 +242,7 @@ class NotificationService(NotificationSupportMixin):
             user_id=user_id,
             user_display=user_display,
             referral_text=referral_text,
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         # Send to log channel
@@ -275,7 +275,7 @@ class NotificationService(NotificationSupportMixin):
             user_id=user_id,
             email=hd.quote(email),
             referral_text=referral_text,
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         # Email users have a synthetic (negative) user_id with no Telegram profile,
@@ -323,7 +323,7 @@ class NotificationService(NotificationSupportMixin):
             telegram_id=telegram_id or user_id,
             user_display=user_display,
             email=hd.quote(email),
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         reply_markup: Optional[InlineKeyboardMarkup] = None
@@ -360,7 +360,7 @@ class NotificationService(NotificationSupportMixin):
             telegram_id=telegram_id,
             user_display=user_display,
             email=hd.quote(email or ""),
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         profile_keyboard = self._build_profile_keyboard(_, telegram_id)
@@ -404,7 +404,7 @@ class NotificationService(NotificationSupportMixin):
             final_end_date=hd.quote(final_end_date_text or ""),
             primary_panel_user_uuid=hd.quote(primary_panel_user_uuid or ""),
             removed_panel_user_uuid=hd.quote(removed_panel_user_uuid or ""),
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         profile_keyboard = (
@@ -509,7 +509,7 @@ class NotificationService(NotificationSupportMixin):
                 traffic_summary=purchase_summary,
                 tariff_line=tariff_line,
                 payment_provider=payment_provider,
-                timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             )
         elif effective_purchases:
             tariff_name = self._tariff_display_for_log(tariff_key)
@@ -531,7 +531,7 @@ class NotificationService(NotificationSupportMixin):
                 purchase_summary_line=purchase_summary_line,
                 tariff_line=tariff_line,
                 payment_provider=payment_provider,
-                timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             )
         else:
             message = _(
@@ -542,7 +542,7 @@ class NotificationService(NotificationSupportMixin):
                 currency=currency,
                 months=months,
                 payment_provider=payment_provider,
-                timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             )
 
         # Send to log channel
@@ -608,7 +608,7 @@ class NotificationService(NotificationSupportMixin):
             user_display=user_display,
             promo_code=promo_code,
             bonus_days=bonus_days,
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         # Send to log channel
@@ -639,7 +639,7 @@ class NotificationService(NotificationSupportMixin):
             "log_trial_activation",
             user_display=user_display,
             end_date=end_date.strftime("%Y-%m-%d %H:%M"),
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         # Send to log channel

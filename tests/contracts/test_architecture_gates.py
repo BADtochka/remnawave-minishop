@@ -224,6 +224,44 @@ def test_frontend_weak_typing_guard_enforces_baseline_counts(
     assert "allowed 1" in output
 
 
+def test_svelte_lang_ts_guard_rejects_new_untyped_svelte(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    config = _base_config()
+    config["svelte_lang_ts"] = {
+        "scopes": ["frontend/src"],
+        "allowlist": [],
+    }
+    _write(tmp_path, "frontend/src/new-widget.svelte", "<script>let value = 1;</script>\n")
+
+    result, output = _run_check(tmp_path, monkeypatch, capsys, config)
+
+    assert result == 1
+    assert "[svelte-lang-ts]" in output
+    assert "frontend/src/new-widget.svelte" in output
+
+
+def test_svelte_lang_ts_guard_rejects_stale_allowlist_entries(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    config = _base_config()
+    config["svelte_lang_ts"] = {
+        "scopes": ["frontend/src"],
+        "allowlist": ["frontend/src/legacy.svelte"],
+    }
+    _write(tmp_path, "frontend/src/legacy.svelte", '<script lang="ts">let value = 1;</script>\n')
+
+    result, output = _run_check(tmp_path, monkeypatch, capsys, config)
+
+    assert result == 1
+    assert "[svelte-lang-ts]" in output
+    assert "allowlist entry is stale" in output
+
+
 def test_frontend_api_guard_rejects_untyped_api_paths(
     tmp_path,
     monkeypatch,

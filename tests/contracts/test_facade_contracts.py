@@ -208,20 +208,21 @@ def test_monkeypatch_targets_avoid_facade_imports() -> None:
         import_aliases = _module_import_aliases(tree)
 
         for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
             is_patch_call = False
-            if isinstance(node, ast.Call):
-                func = node.func
-                if isinstance(func, ast.Name) and func.id == "patch":
-                    is_patch_call = True
-                elif isinstance(func, ast.Attribute) and func.attr == "patch":
-                    is_patch_call = True
-                elif (
-                    isinstance(func, ast.Attribute)
-                    and func.attr == "setattr"
-                    and isinstance(func.value, ast.Name)
-                    and func.value.id == "monkeypatch"
-                ):
-                    is_patch_call = True
+            if isinstance(func, ast.Name) and func.id == "patch":
+                is_patch_call = True
+            elif isinstance(func, ast.Attribute) and func.attr == "patch":
+                is_patch_call = True
+            elif (
+                isinstance(func, ast.Attribute)
+                and func.attr == "setattr"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "monkeypatch"
+            ):
+                is_patch_call = True
 
             if not is_patch_call:
                 continue

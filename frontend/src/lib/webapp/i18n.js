@@ -1,4 +1,4 @@
-import { LANGUAGE_LABELS, normalizeLanguageCode, resolveLocaleKey } from "./constants.js";
+import { LANGUAGE_LABELS, normalizeLanguageCode, resolveLocaleKey } from "./constants";
 import { formatTemplate, formatFraction, roundToHalf } from "./formatters.js";
 import { unitPluralBucket } from "./plurals.js";
 

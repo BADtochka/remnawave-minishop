@@ -414,6 +414,31 @@ def _check_frontend_weak_typing(cfg: dict, issues: list[str]) -> None:
             )
 
 
+def _check_svelte_lang_ts(cfg: dict, issues: list[str]) -> None:
+    checks = cfg.get("svelte_lang_ts")
+    if not checks:
+        return
+
+    allowlist = set(checks.get("allowlist", []))
+    script_lang_ts = re.compile(r"<script\b[^>]*\blang\s*=\s*([\"'])ts\1")
+    actual_untyped: set[str] = set()
+
+    for scope in checks.get("scopes", []):
+        for file in _iter_text_files(scope, {".svelte"}):
+            rel = _to_posix(file)
+            content = file.read_text(encoding="utf-8", errors="ignore")
+            if script_lang_ts.search(content):
+                continue
+
+            actual_untyped.add(rel)
+            if rel not in allowlist:
+                issues.append(f'[svelte-lang-ts] {rel}: missing <script lang="ts">')
+
+    for rel in sorted(allowlist):
+        if rel not in actual_untyped:
+            issues.append(f"[svelte-lang-ts] {rel}: allowlist entry is stale")
+
+
 def _check_frontend_api_calls(cfg: dict, issues: list[str]) -> None:
     checks = cfg.get("frontend_api_calls")
     if not checks:
@@ -637,6 +662,7 @@ def main() -> int:
     _check_raw_json_response(config, issues)
     _check_loose_schemas(config, issues)
     _check_frontend_weak_typing(config, issues)
+    _check_svelte_lang_ts(config, issues)
     _check_frontend_api_calls(config, issues)
     _check_runtime_all_exports(config, issues)
     _check_runtime_import_contract(config, issues)

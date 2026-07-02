@@ -361,7 +361,7 @@ async def _subscription_guides_status_from_panel_short_uuid(
                 if not panel_default.get("enabled"):
                     raise SubscriptionGuidesConfigError(
                         str(panel_default.get("error") or "Panel default config is unavailable")
-                    )
+                    ) from None
                 config = panel_default["config"]
     except Exception as exc:
         logger.warning(
@@ -574,7 +574,7 @@ async def _warm_panel_subscription_page_configs(app: web.Application) -> None:
         tasks.append(_panel_subscription_page_config_by_uuid_cached(app, settings, config_uuid))
     if tasks:
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        for config_uuid, result in zip(warmed_uuids, results):
+        for config_uuid, result in zip(warmed_uuids, results, strict=True):
             if isinstance(result, Exception):
                 logger.debug(
                     "Failed to warm panel subscription page config %s: %s",

@@ -1,3 +1,31 @@
+interface TelegramWebApp {
+  initData?: string;
+}
+
+interface TelegramSdkOptions {
+  scriptUrl?: string;
+  bootTimeoutMs?: number;
+  actionTimeoutMs?: number;
+  miniAppAuthTimeoutMs?: number;
+  onStatusChange?: (status: "loading" | "ready" | "unavailable") => void;
+  onInitDataChange?: (initData: string) => void;
+}
+
+interface MiniAppAuthTimeout {
+  promise: Promise<never>;
+  readonly signal: AbortSignal | undefined;
+  readonly timedOut: boolean;
+  clear: () => void;
+}
+
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp?: TelegramWebApp;
+    };
+  }
+}
+
 export function readTelegramMiniAppInitDataFromLocation() {
   if (typeof window === "undefined") return "";
   const queryText = window.location.search.replace(/^\?/, "");
@@ -12,24 +40,24 @@ export function readTelegramMiniAppInitDataFromLocation() {
 }
 
 export function createTelegramSdk({
-  scriptUrl,
-  bootTimeoutMs,
-  actionTimeoutMs,
-  miniAppAuthTimeoutMs,
+  scriptUrl = "",
+  bootTimeoutMs = 0,
+  actionTimeoutMs = 0,
+  miniAppAuthTimeoutMs = 0,
   onStatusChange = () => {},
   onInitDataChange = () => {},
-} = {}) {
+}: TelegramSdkOptions = {}) {
   let tg = resolve();
-  let sdkPromise = null;
+  let sdkPromise: Promise<TelegramWebApp | null> | null = null;
   let launchParamsDetected = false;
   let initData = tg?.initData || readTelegramMiniAppInitDataFromLocation();
   if (initData) launchParamsDetected = true;
 
-  function resolve() {
+  function resolve(): TelegramWebApp | null {
     return window.Telegram?.WebApp || null;
   }
 
-  function setStatus(status) {
+  function setStatus(status: "loading" | "ready" | "unavailable") {
     onStatusChange(status);
   }
 
@@ -61,19 +89,21 @@ export function createTelegramSdk({
     return detected;
   }
 
-  function load(timeoutMs = bootTimeoutMs) {
+  function load(timeoutMs = bootTimeoutMs): Promise<TelegramWebApp | null> {
     if (refresh()) return Promise.resolve(tg);
     if (sdkPromise) return sdkPromise;
     if (typeof document === "undefined") return Promise.resolve(null);
 
     setStatus("loading");
-    sdkPromise = new Promise((resolvePromise) => {
-      const existingScript = document.querySelector("script[data-rw-telegram-web-app-sdk]");
+    const promise = new Promise<TelegramWebApp | null>((resolvePromise) => {
+      const existingScript = document.querySelector<HTMLScriptElement>(
+        "script[data-rw-telegram-web-app-sdk]"
+      );
       const script = existingScript || document.createElement("script");
       let resolved = false;
-      let timeoutId = null;
+      let timeoutId: number | null = null;
 
-      const resolveOnce = (value) => {
+      const resolveOnce = (value: TelegramWebApp | null) => {
         if (resolved) return;
         resolved = true;
         if (timeoutId) window.clearTimeout(timeoutId);
@@ -111,19 +141,20 @@ export function createTelegramSdk({
     }).finally(() => {
       sdkPromise = null;
     });
-    return sdkPromise;
+    sdkPromise = promise;
+    return promise;
   }
 
-  async function ensureForAction() {
+  async function ensureForAction(): Promise<TelegramWebApp | null> {
     if (refresh()) return tg;
     return await load(actionTimeoutMs);
   }
 
-  function createMiniAppAuthTimeout() {
+  function createMiniAppAuthTimeout(): MiniAppAuthTimeout {
     const controller = typeof AbortController === "undefined" ? null : new AbortController();
     let timedOut = false;
-    let timeoutId = null;
-    let timeoutPromise = new Promise(() => {});
+    let timeoutId: number | null = null;
+    let timeoutPromise: Promise<never> = new Promise(() => {});
 
     if (typeof window !== "undefined") {
       timeoutPromise = new Promise((_, reject) => {

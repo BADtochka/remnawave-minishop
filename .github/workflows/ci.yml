@@ -192,10 +192,10 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install backend deps + pytest
-        run: pip install -r backend/requirements.txt pytest
+        run: pip install -r backend/requirements.txt pytest pytest-cov
 
       - name: Run full pytest suite
-        run: python -m pytest -q
+        run: python -m pytest -q --cov --cov-report=xml --cov-fail-under=55
 
   typecheck:
     name: Python typecheck
@@ -230,6 +230,9 @@ jobs:
           backend/bot/app/factories
           backend/bot/app/controllers
           backend/bot/app/web
+          backend/main_backend.py
+          backend/main_worker.py
+          tests/contracts
 
   build:
     name: Docker build

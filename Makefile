@@ -14,7 +14,10 @@ MYPY_PATHS := \
 	backend/bot/handlers \
 	backend/bot/app/factories \
 	backend/bot/app/controllers \
-	backend/bot/app/web
+	backend/bot/app/web \
+	backend/main_backend.py \
+	backend/main_worker.py \
+	tests/contracts
 
 .PHONY: test lint types front check cov
 

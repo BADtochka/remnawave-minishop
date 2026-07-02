@@ -97,29 +97,37 @@ export const LOCALE_KEY_ALIASES = {
   wa_link_email_modal_title: "wa_settings_link_email_action",
 };
 
-export function resolveLocaleKey(key) {
+type LocaleAliasKey = keyof typeof LOCALE_KEY_ALIASES;
+
+function languageCodeFromItem(item: unknown): string {
+  if (typeof item === "string") return item;
+  if (!item || typeof item !== "object" || !("code" in item)) return "";
+  return String(item.code || "");
+}
+
+export function resolveLocaleKey(key: unknown): string {
   let value = String(key || "").trim();
-  const seen = new Set();
-  while (LOCALE_KEY_ALIASES[value] && !seen.has(value)) {
+  const seen = new Set<string>();
+  while (value in LOCALE_KEY_ALIASES && !seen.has(value)) {
     seen.add(value);
-    value = LOCALE_KEY_ALIASES[value];
+    value = LOCALE_KEY_ALIASES[value as LocaleAliasKey];
   }
   return value;
 }
 
-export function normalizeLanguageCode(value) {
+export function normalizeLanguageCode(value: unknown): string {
   return String(value || "")
     .trim()
     .toLowerCase()
     .replace(/_/g, "-");
 }
 
-export function uniqueLanguageCodes(...sources) {
-  const seen = new Set();
-  const result = [];
+export function uniqueLanguageCodes(...sources: Array<unknown[] | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
   for (const source of sources) {
     for (const item of source || []) {
-      const code = normalizeLanguageCode(typeof item === "string" ? item : item?.code);
+      const code = normalizeLanguageCode(languageCodeFromItem(item));
       if (!code || seen.has(code)) continue;
       seen.add(code);
       result.push(code);

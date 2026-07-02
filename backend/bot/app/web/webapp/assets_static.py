@@ -12,11 +12,9 @@ from bot.app.web.context import (
 )
 from config.settings import Settings
 
-from ._runtime import (
-    ASSET_DIR,
-    ROBOTS_TX,
-    json_response,
-)
+from .asset_paths import ASSET_DIR
+from .constants import ROBOTS_TX
+from .response_helpers import json_response
 
 _TEXT_FILE_CACHE: Dict[tuple[str, bool], tuple[int, int, str]] = {}
 _BINARY_FILE_CACHE: Dict[str, tuple[int, int, bytes]] = {}

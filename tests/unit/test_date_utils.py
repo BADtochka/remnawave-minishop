@@ -13,7 +13,8 @@ class DateUtilsTests(unittest.TestCase):
         self.assertEqual(result, datetime(2026, 4, 1, 0, 0, tzinfo=timezone.utc))
 
     def test_month_start_normalizes_naive_datetime_as_utc(self):
-        dt = datetime(2026, 12, 31, 23, 59)
+        # This test pins the helper's naive-as-UTC compatibility behavior.
+        dt = datetime(2026, 12, 31, 23, 59)  # noqa: DTZ001
 
         result = month_start(dt)
 

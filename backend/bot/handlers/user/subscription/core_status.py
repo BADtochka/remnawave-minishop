@@ -1,6 +1,6 @@
 import html
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional, Union
 
 from aiogram import Bot, F, types
@@ -129,7 +129,7 @@ async def my_subscription_command_handler(
         return
 
     end_date = active.get("end_date")
-    days_left = (end_date.date() - datetime.now().date()).days if end_date else 0
+    days_left = (end_date.date() - datetime.now(timezone.utc).date()).days if end_date else 0
     traffic_mode = bool(settings.traffic_sale_mode)
     config_link_display = active.get("config_link")
     connect_button_url = active.get("connect_button_url")
@@ -497,7 +497,6 @@ async def my_devices_command_handler(
             await target.answer(get_text("my_devices_feature_disabled"))
         return
 
-    # TODO: context?
     active = await subscription_service.get_active_subscription_details(
         session, _event_user_id(event)
     )

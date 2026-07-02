@@ -670,7 +670,7 @@ class TariffWorkerPremiumMixin:
             )
             user_lang = await self._user_lang(session, sub.user_id)
             _ = (
-                (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
+                (lambda k, _user_lang=user_lang, **kw: self.i18n.gettext(_user_lang, k, **kw))
                 if self.i18n
                 else (lambda k, **kw: k)
             )
@@ -761,7 +761,7 @@ class TariffWorkerPremiumMixin:
             )
             user_lang = await self._user_lang(session, sub.user_id)
             _ = (
-                (lambda k, **kw: self.i18n.gettext(user_lang, k, **kw))
+                (lambda k, _user_lang=user_lang, **kw: self.i18n.gettext(_user_lang, k, **kw))
                 if self.i18n
                 else (lambda k, **kw: k)
             )

@@ -58,11 +58,13 @@ class _I18n:
 
 
 def _route_map(app: web.Application) -> dict[tuple[str, str], str]:
-    return {
-        (route.method, route.resource.canonical): route.handler.__name__
-        for route in app.router.routes()
-        if route.method != "HEAD"
-    }
+    routes: dict[tuple[str, str], str] = {}
+    for route in app.router.routes():
+        resource = route.resource
+        if route.method == "HEAD" or resource is None:
+            continue
+        routes[(route.method, resource.canonical)] = route.handler.__name__
+    return routes
 
 
 class WebAppRouteContractTests(unittest.TestCase):

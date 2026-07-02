@@ -29,7 +29,7 @@ async def should_show_trial_button(
         return False
 
     if hasattr(subscription_service, "has_trial_blocking_subscription") and callable(
-        getattr(subscription_service, "has_trial_blocking_subscription")
+        subscription_service.has_trial_blocking_subscription
     ):
         return not await subscription_service.has_trial_blocking_subscription(session, user_id)
 

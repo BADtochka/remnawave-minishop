@@ -273,7 +273,7 @@ async def _ensure_user_from_telegram(
                 "registration_date": datetime.now(timezone.utc),
             },
         )
-        setattr(db_user, "_webapp_created", bool(created))
+        db_user._webapp_created = bool(created)
         return db_user
 
     update_data = {

@@ -452,7 +452,9 @@ async def create_bulk_promo_codes_final(
             output.seek(0)
 
             # Create file for sending
-            filename = f"bulk_promo_codes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            filename = (
+                f"bulk_promo_codes_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+            )
             csv_file = types.BufferedInputFile(
                 output.getvalue().encode("utf-8-sig"),  # BOM for correct Excel display
                 filename=filename,

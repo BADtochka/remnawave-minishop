@@ -285,7 +285,7 @@ class YooKassaService:
                     card_obj = getattr(pm, "card", None)
                     last4_val = None
                     if card_obj and hasattr(card_obj, "last4"):
-                        last4_val = getattr(card_obj, "last4")
+                        last4_val = card_obj.last4
                     elif isinstance(account_number, str) and len(account_number) >= 4:
                         last4_val = account_number[-4:]
                     pm_payload = {

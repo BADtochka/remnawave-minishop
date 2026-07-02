@@ -1,5 +1,35 @@
-export function activationPaymentFailed(status) {
-  const normalized = String(status?.status || "").toLowerCase();
+type ActivationRecord = Record<string, unknown>;
+type ActivationPendingState = ActivationRecord;
+type ActivationAcknowledgedState = ActivationRecord;
+
+interface ActivationState {
+  pending?: ActivationPendingState | null;
+  acknowledged?: ActivationAcknowledgedState | null;
+}
+
+interface ActivationHandoffOptions {
+  storageKey?: string;
+  ttlMs?: number;
+  now?: () => number;
+}
+
+interface ActivationContext extends ActivationRecord {
+  initialSubscriptionPayment?: boolean;
+  source?: unknown;
+  paymentId?: unknown;
+}
+
+function recordOrEmpty(value: unknown): ActivationRecord {
+  return value && typeof value === "object" ? (value as ActivationRecord) : {};
+}
+
+function stateEntry(value: unknown): ActivationRecord | null {
+  return value && typeof value === "object" ? (value as ActivationRecord) : null;
+}
+
+export function activationPaymentFailed(status: unknown): boolean {
+  const statusRecord = recordOrEmpty(status);
+  const normalized = String(statusRecord.status || "").toLowerCase();
   return (
     normalized === "failed" ||
     normalized === "canceled" ||
@@ -8,27 +38,31 @@ export function activationPaymentFailed(status) {
   );
 }
 
-export function createActivationHandoff({ storageKey, ttlMs, now = () => Date.now() } = {}) {
-  let fallbackState = null;
+export function createActivationHandoff({
+  storageKey,
+  ttlMs,
+  now = () => Date.now(),
+}: ActivationHandoffOptions = {}) {
+  let fallbackState: ActivationState | null = null;
+  const ttl = Number(ttlMs || 0);
 
-  function normalizeState(value) {
+  function normalizeState(value: unknown): ActivationState {
+    const state = recordOrEmpty(value);
     return value && typeof value === "object"
       ? {
-          pending: value.pending && typeof value.pending === "object" ? value.pending : null,
+          pending: stateEntry(state.pending) as ActivationPendingState | null,
           acknowledged:
-            value.acknowledged && typeof value.acknowledged === "object"
-              ? value.acknowledged
-              : null,
+            (stateEntry(state.acknowledged) as ActivationAcknowledgedState | null) || null,
         }
       : { pending: null, acknowledged: null };
   }
 
-  function isPendingFresh(pending) {
+  function isPendingFresh(pending: ActivationPendingState | null | undefined): boolean {
     const startedAt = Number(pending?.startedAt || 0);
-    return Boolean(startedAt && now() - startedAt <= ttlMs);
+    return Boolean(startedAt && now() - startedAt <= ttl);
   }
 
-  function write(state) {
+  function write(state: ActivationState): void {
     const normalized = normalizeState(state);
     fallbackState = normalized;
     if (!storageKey) return;
@@ -39,12 +73,12 @@ export function createActivationHandoff({ storageKey, ttlMs, now = () => Date.no
     }
   }
 
-  function read() {
+  function read(): ActivationState {
     let state = fallbackState || { pending: null, acknowledged: null };
     if (storageKey) {
       try {
         const raw = localStorage.getItem(storageKey);
-        if (raw) state = JSON.parse(raw);
+        if (raw) state = normalizeState(JSON.parse(raw));
       } catch (_error) {
         void _error;
       }
@@ -57,13 +91,13 @@ export function createActivationHandoff({ storageKey, ttlMs, now = () => Date.no
     return state;
   }
 
-  function userKey(payload = {}) {
-    const payloadUser = payload?.user || {};
+  function userKey(payload: ActivationRecord = {}): string {
+    const payloadUser = recordOrEmpty(payload.user);
     return String(payloadUser.user_id ?? payloadUser.id ?? payloadUser.telegram_id ?? "").trim();
   }
 
-  function subscriptionKey(payload = {}) {
-    const payloadSubscription = payload?.subscription || {};
+  function subscriptionKey(payload: ActivationRecord = {}): string {
+    const payloadSubscription = recordOrEmpty(payload.subscription);
     if (!payloadSubscription?.active) return "";
     return [
       userKey(payload) || "anonymous",
@@ -82,19 +116,22 @@ export function createActivationHandoff({ storageKey, ttlMs, now = () => Date.no
       .join("|");
   }
 
-  function pendingMatchesUser(pending, payload = {}) {
+  function pendingMatchesUser(
+    pending: ActivationPendingState | null | undefined,
+    payload: ActivationRecord = {}
+  ): boolean {
     if (!pending) return false;
     const pendingUserKey = String(pending.userKey || "").trim();
     const currentUserKey = userKey(payload);
     return !pendingUserKey || !currentUserKey || pendingUserKey === currentUserKey;
   }
 
-  function hasPending(payload = {}) {
+  function hasPending(payload: ActivationRecord = {}): boolean {
     const pending = read().pending;
     return Boolean(pending && pendingMatchesUser(pending, payload));
   }
 
-  function rememberPending(context = {}, payload = {}) {
+  function rememberPending(context: ActivationContext = {}, payload: ActivationRecord = {}): void {
     if (context.initialSubscriptionPayment === false) return;
     const state = read();
     write({
@@ -109,19 +146,24 @@ export function createActivationHandoff({ storageKey, ttlMs, now = () => Date.no
     });
   }
 
-  function clearPending() {
+  function clearPending(): void {
     const state = read();
     if (!state.pending) return;
     write({ ...state, pending: null });
   }
 
-  function isAcknowledged(nextSubscriptionKey, state = read()) {
+  function isAcknowledged(nextSubscriptionKey: string, state: ActivationState = read()): boolean {
     return Boolean(
       nextSubscriptionKey && state.acknowledged?.subscriptionKey === nextSubscriptionKey
     );
   }
 
-  function acknowledge(nextSubscriptionKey, context = {}, payload = {}, state = read()) {
+  function acknowledge(
+    nextSubscriptionKey: string,
+    context: ActivationContext = {},
+    payload: ActivationRecord = {},
+    state: ActivationState = read()
+  ): void {
     const pending = state.pending || {};
     write({
       ...state,

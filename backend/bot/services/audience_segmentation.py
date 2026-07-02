@@ -145,6 +145,7 @@ class AudienceSegmentationService:
             zip(
                 panel_uuids,
                 await asyncio.gather(*(lookup(uuid) for uuid in panel_uuids)),
+                strict=True,
             )
         )
         user_ids: list[int] = []

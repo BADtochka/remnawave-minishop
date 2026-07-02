@@ -4,6 +4,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 USER_DETAIL = REPO_ROOT / "frontend/src/admin/sections/UserDetailModal.svelte"
+USER_DETAIL_VIEW = REPO_ROOT / "frontend/src/admin/sections/user-detail/UserDetailView.svelte"
 USER_DETAIL_CSS = REPO_ROOT / "frontend/src/admin/sections/UserDetailModal.css"
 USER_ACTIONS = REPO_ROOT / "frontend/src/admin/sections/user-detail/UserActionsTab.svelte"
 STATS_SECTION = REPO_ROOT / "frontend/src/admin/sections/StatsSection.svelte"
@@ -14,6 +15,10 @@ USERS_STORE = REPO_ROOT / "frontend/src/lib/admin/stores/usersStore.svelte.ts"
 
 def _source() -> str:
     return USER_DETAIL.read_text(encoding="utf-8")
+
+
+def _view_source() -> str:
+    return USER_DETAIL_VIEW.read_text(encoding="utf-8")
 
 
 def _actions_source() -> str:
@@ -104,7 +109,7 @@ def test_extend_tariff_current_badge_is_localized():
 
 
 def test_user_detail_links_include_install_share_link():
-    source = _source()
+    source = _view_source()
 
     assert "openedUserDetail.install_share_url" in source
     assert "user_label_install_share" in source

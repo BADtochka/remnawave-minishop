@@ -436,7 +436,7 @@ class StripeService(HttpClientMixin):
         )
         await user_billing_dal.upsert_user_payment_method(
             session,
-            user_id=int(getattr(payment, "user_id")),
+            user_id=int(payment.user_id),
             provider_payment_method_id=_encode_saved_method(customer_id, payment_method_id),
             provider="stripe",
             card_last4=card_last4,

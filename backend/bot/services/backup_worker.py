@@ -151,9 +151,10 @@ class BackupWorker:
         started_at = datetime.now(timezone.utc)
         stamp = backup_filename_timestamp()
         archive_name = f"{BACKUP_FILENAME_PREFIX}{stamp}.zip"
-        backup_dir = Path(self.settings.BACKUP_DIR).expanduser()
-        backup_dir.mkdir(parents=True, exist_ok=True)
-        archive_path = self._unique_archive_path(backup_dir / archive_name)
+        backup_dir, archive_path = await asyncio.to_thread(
+            self._prepare_backup_paths,
+            archive_name,
+        )
 
         with tempfile.TemporaryDirectory(
             prefix=f"{BACKUP_FILENAME_PREFIX}{stamp}-",
@@ -224,6 +225,12 @@ class BackupWorker:
             if not candidate.exists():
                 return candidate
         raise RuntimeError("Could not allocate a unique backup archive filename")
+
+    def _prepare_backup_paths(self, archive_name: str) -> tuple[Path, Path]:
+        backup_dir = Path(self.settings.BACKUP_DIR).expanduser()
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        archive_path = self._unique_archive_path(backup_dir / archive_name)
+        return backup_dir, archive_path
 
     async def _dump_database(self, dump_path: Path) -> None:
         await asyncio.to_thread(self._run_pg_dump, dump_path)

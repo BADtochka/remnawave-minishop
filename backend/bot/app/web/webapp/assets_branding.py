@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import ipaddress
 import json
+import logging
 import re
 import socket
 from datetime import datetime, timezone
@@ -20,9 +21,7 @@ from bot.app.web.context import (
 )
 from config.settings import Settings
 
-from ._runtime import (
-    _SHARED_HTTP_SESSION,
-    _SHARED_HTTP_SESSION_LOCK,
+from .asset_paths import (
     WEBAPP_DEFAULT_FAVICON_DIGEST,
     WEBAPP_DEFAULT_FAVICON_DIR,
     WEBAPP_DEFAULT_FAVICON_URL,
@@ -31,14 +30,15 @@ from ._runtime import (
     WEBAPP_FAVICON_DIR,
     WEBAPP_FAVICON_PATH,
     WEBAPP_LOGO_CACHE_DIR,
-    WEBAPP_LOGO_MAX_BYTES,
     WEBAPP_LOGO_PROXY_PATH,
-    WEBAPP_THEME_ASSET_CONTENT_TYPES,
     WEBAPP_UPLOADED_LOGO_DIR,
     WEBAPP_UPLOADED_LOGO_PATH,
-    logger,
 )
 from .assets_static import _read_template_binary_cached
+from .constants import (
+    WEBAPP_LOGO_MAX_BYTES,
+    WEBAPP_THEME_ASSET_CONTENT_TYPES,
+)
 
 _TEXT_FILE_CACHE: Dict[tuple[str, bool], tuple[int, int, str]] = {}
 _BINARY_FILE_CACHE: Dict[str, tuple[int, int, bytes]] = {}
@@ -48,6 +48,9 @@ _I18N_PAYLOAD_CACHE: Dict[tuple[int, str, tuple[tuple[str, int, int], ...]], Dic
 _ASSET_NAME_CACHE_TTL_SECONDS = 30.0
 WEBAPP_HTML_CACHE_CONTROL = "no-store, no-cache, must-revalidate, max-age=0"
 WEBAPP_LEGACY_ASSET_CACHE_CONTROL = "no-store, no-cache, must-revalidate, max-age=0"
+_SHARED_HTTP_SESSION: Optional[ClientSession] = None
+_SHARED_HTTP_SESSION_LOCK = asyncio.Lock()
+logger = logging.getLogger(__name__)
 
 
 def _resolve_webapp_logo_url(settings: Settings) -> str:

@@ -32,8 +32,8 @@ npm run check
 npm run check:quick
 ```
 
-Current documented mypy frontier outside the CI scope: `backend/scripts`, `scripts`, and `tests`.
-Add those only after separate type-hardening work keeps the full command green.
+Current documented mypy frontier outside the CI scope: `backend/scripts`, `scripts`, and tests
+outside `tests/contracts`. Add those only after separate type-hardening work keeps the full command green.
 (`backend/config`, `backend/main_backend.py`, and `backend/main_worker.py` graduated into the
 enforced scope.)
 
@@ -41,14 +41,14 @@ enforced scope.)
 
 **Бэкенд** (из корня репозитория; `pytest.ini` задаёт `pythonpath = backend .`):
 ```bash
-python -m pytest -q                 # полный прогон (в CI поднимаются сервисы Postgres + Redis)
+python -m pytest -q                 # полный прогон (в CI поднимаются сервисы Postgres + Redis; coverage ratchet: fail_under=55)
 python -m ruff check .              # линт
 python -m ruff format --check .     # формат
 python -m mypy --explicit-package-bases backend/config backend/db backend/bot/infra \
   backend/bot/middlewares backend/bot/utils \
   backend/bot/plugins backend/bot/keyboards backend/bot/payment_providers backend/bot/services \
   backend/bot/handlers backend/bot/app/factories backend/bot/app/controllers backend/bot/app/web \
-  backend/main_backend.py backend/main_worker.py
+  backend/main_backend.py backend/main_worker.py tests/contracts
 ```
 
 **Фронтенд** (`frontend/`):
@@ -66,6 +66,7 @@ npm run test:e2e     # Playwright docs-demo smoke: webapp+админка, окн
 | `docs/architecture/events.md` | `PYTHONPATH=backend python -m bot.infra.event_catalog` | `tests/test_contract_docs_accuracy.py` |
 | `frontend/src/lib/api/openapi.generated.ts` | `npm --prefix frontend run generate:api-types` | CI `git diff --exit-code` |
 | demo settings manifest | `python scripts/export_settings_manifest.py` (+ prettier) | `tests/test_settings_manifest_demo_sync.py` |
+| `backend/requirements.txt` | `python -m piptools compile --resolver=backtracking --no-emit-index-url --no-emit-trusted-host -o backend/requirements.txt backend/requirements.in` (Python 3.12) | CI install + `pip-audit` |
 
 Меняешь контракт API — регенерируй `openapi.json` **и** `openapi.generated.ts`.
 
@@ -128,9 +129,9 @@ HTTP-эндпоинт) — [docs/development/how-to.md](docs/development/how-to.
 - Каталог: [docs/architecture/events.md](docs/architecture/events.md).
 
 ### 3.3 Типобезопасность
-- `mypy` покрывает весь бэкенд и должен оставаться зелёным. Новые модули попадают в скоуп
-  автоматически (по каталогам). Строгость поднимай помодульно через `[[tool.mypy.overrides]]`,
-  а не глобальным `strict`.
+- `mypy` покрывает весь бэкенд и контрактные тесты (`tests/contracts`) и должен оставаться
+  зелёным. Новые backend-модули попадают в скоуп автоматически (по каталогам). Строгость
+  поднимай помодульно через `[[tool.mypy.overrides]]`, а не глобальным `strict`.
 
 ### 3.4 Миграции
 - Рукописный **идемпотентный** мигратор (`db/migrator.py`): интроспекция схемы, затем условный

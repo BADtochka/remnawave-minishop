@@ -2,7 +2,7 @@ import asyncio
 import logging
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from aiogram import Bot
@@ -99,7 +99,7 @@ class MessageQueue:
 
     async def _wait_if_needed(self, chat_id: Optional[int] = None) -> None:
         """Wait if we need to respect global and per-chat rate limits."""
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         waits: list[float] = []
 
         if self.last_send_times:
@@ -119,7 +119,7 @@ class MessageQueue:
 
     def _record_send_time(self, chat_id: Optional[int] = None) -> None:
         """Track sent message timestamps and purge old entries for rate limiting."""
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         self.last_send_times.append(now)
         self.total_sent += 1
 

@@ -1,7 +1,7 @@
 import csv
 import io
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from aiogram import F, Router, types
@@ -267,7 +267,7 @@ async def export_payments_csv_handler(
         output.close()
 
         # Generate filename with current date
-        current_time = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        current_time = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M")
         filename = f"payments_export_{current_time}.csv"
 
         # Send file

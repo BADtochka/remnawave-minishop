@@ -64,7 +64,7 @@ async def _core_state_policy(ctx: PromoRedemptionContext) -> PromoRedemptionDeci
         return PromoRedemptionDecision.deny("promo_code_exhausted")
     activation = await promo_code_dal.get_user_activation_for_promo(
         ctx.session,
-        int(getattr(promo, "promo_code_id")),
+        int(promo.promo_code_id),
         ctx.user_id,
     )
     if activation is not None:
@@ -76,7 +76,7 @@ async def _core_state_policy(ctx: PromoRedemptionContext) -> PromoRedemptionDeci
     has_pending = await promo_code_dal.user_has_pending_payment_with_promo(
         ctx.session,
         ctx.user_id,
-        int(getattr(promo, "promo_code_id")),
+        int(promo.promo_code_id),
         exclude_payment_id=ctx.payment_id,
     )
     if has_pending:

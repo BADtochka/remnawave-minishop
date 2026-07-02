@@ -39,6 +39,15 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
+
+async def _path_exists(path: Path) -> bool:
+    return await asyncio.to_thread(path.exists)
+
+
+async def _path_read_text(path: Path, *, encoding: str) -> str:
+    return await asyncio.to_thread(path.read_text, encoding=encoding)
+
+
 from config.settings import Settings  # noqa: E402
 from config.tariffs_config import TariffsConfig, normalize_currency_key  # noqa: E402
 from db.dal import user_dal  # noqa: E402
@@ -1706,9 +1715,9 @@ class RemnashopImporter:
 
         catalog_path = Path(self.tariffs_config_path)
         existing_catalog: Optional[dict[str, Any]] = None
-        if catalog_path.exists():
+        if await _path_exists(catalog_path):
             try:
-                decoded = json.loads(catalog_path.read_text(encoding="utf-8"))
+                decoded = json.loads(await _path_read_text(catalog_path, encoding="utf-8"))
                 if isinstance(decoded, dict):
                     existing_catalog = decoded
             except (OSError, json.JSONDecodeError) as exc:
@@ -1723,7 +1732,7 @@ class RemnashopImporter:
                     f"Перезаписываем нечитаемый каталог тарифов {catalog_path}: {exc}"
                 )
 
-        if catalog_path.exists() and self.on_conflict == "skip":
+        if await _path_exists(catalog_path) and self.on_conflict == "skip":
             self.summary["tariffs"]["catalog_write_skipped"] += 1
             self.summary["warnings"].append(
                 f"Запись каталога тарифов пропущена: {catalog_path} уже существует."

@@ -9,7 +9,7 @@ import {
   packageRowsFromPackageSet,
   packageSetFromRows,
   tariffFromDraft,
-} from "./tariffDraft.js";
+} from "./tariffDraft";
 
 describe("tariffDraft", () => {
   it("normalizes currency aliases and clones catalog defaults", () => {

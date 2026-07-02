@@ -143,6 +143,7 @@ async def _user_ids_with_active_subscription_never_connected(
         zip(
             panel_uuids,
             await asyncio.gather(*(lookup(uuid) for uuid in panel_uuids)),
+            strict=True,
         )
     )
 

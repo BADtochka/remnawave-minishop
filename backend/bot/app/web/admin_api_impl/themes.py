@@ -59,6 +59,13 @@ _IMAGE_URL_UPLOAD_SCHEMA = {
     "required": ["url"],
     "properties": {"url": STRING_SCHEMA},
 }
+
+
+def _webapp_themes_dir_status(themes_dir: str) -> tuple[bool, str]:
+    path = Path(themes_dir).expanduser()
+    return path.exists(), str(path)
+
+
 _IMAGE_MULTIPART_UPLOAD_SCHEMA = {
     "type": "object",
     "required": ["file"],
@@ -520,11 +527,15 @@ async def admin_themes_get_route(request: web.Request) -> web.Response:
         env_default_theme=settings.WEBAPP_DEFAULT_THEME,
         theme_dir=settings.WEBAPP_THEMES_DIR,
     )
+    themes_dir_exists, themes_dir = await asyncio.to_thread(
+        _webapp_themes_dir_status,
+        settings.WEBAPP_THEMES_DIR,
+    )
 
     return _ok(
         {
-            "exists": Path(settings.WEBAPP_THEMES_DIR).expanduser().exists(),
-            "themes_dir": str(Path(settings.WEBAPP_THEMES_DIR).expanduser()),
+            "exists": themes_dir_exists,
+            "themes_dir": themes_dir,
             "catalog": _webapp_themes_catalog_payload(catalog),
         }
     )
@@ -558,11 +569,15 @@ async def admin_themes_save_route(request: web.Request) -> web.Response:
         return _error(500, "write_failed", str(exc))
 
     await refresh_webapp_runtime_after_settings_change(request, updates={}, deletes=[])
+    _themes_dir_exists, themes_dir = await asyncio.to_thread(
+        _webapp_themes_dir_status,
+        settings.WEBAPP_THEMES_DIR,
+    )
 
     return _ok(
         {
             "exists": True,
-            "themes_dir": str(Path(settings.WEBAPP_THEMES_DIR).expanduser()),
+            "themes_dir": themes_dir,
             "catalog": _webapp_themes_catalog_payload(config),
         }
     )

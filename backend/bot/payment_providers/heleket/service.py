@@ -717,7 +717,7 @@ _DESCRIPTOR: LinkPaymentDescriptor[HeleketService] = LinkPaymentDescriptor(
     reuse=_reuse_payment,
     extract_url=lambda r: first_value(_unwrap_result(r), "url"),
     extract_provider_id=lambda r: first_value(_unwrap_result(r), "uuid"),
-    webapp_currency=lambda ctx, settings: (
+    webapp_currency=lambda ctx, settings, service: (
         ctx.currency or default_payment_currency_code_for_settings(settings)
     ),
 )

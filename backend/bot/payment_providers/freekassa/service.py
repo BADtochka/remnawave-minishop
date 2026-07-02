@@ -4,7 +4,7 @@ import hmac
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 from urllib.parse import parse_qsl
 
@@ -25,10 +25,7 @@ else:
     SubscriptionService = object
 from bot.utils.request_security import ip_in_allowlist, request_client_ip
 from config.settings import Settings
-from config.tariffs_config import (
-    default_currency_key_for_settings,
-    default_payment_currency_code_for_settings,
-)
+from config.tariffs_config import default_payment_currency_code_for_settings
 from db.dal import payment_dal
 
 from ..base import (
@@ -43,32 +40,23 @@ from ..base import (
 )
 from ..shared import (
     PAYMENT_STATUS_PENDING_FINALIZATION,
+    CreatePaymentRequest,
+    CreateResult,
     HttpClientMixin,
+    LinkPaymentDescriptor,
     PaymentSuccessRequest,
-    build_payment_record_payload,
-    create_webapp_payment_record,
     decimal_amounts_equal,
-    describe_payment,
     finalize_successful_payment,
-    finalize_webapp_link_payment,
     first_value,
     format_decimal_amount,
     make_translator,
-    notify_callback_parse_error,
-    notify_payment_record_failure,
-    notify_service_unavailable,
-    parse_payment_callback,
-    payment_failed,
-    payment_record_amounts,
-    payment_unavailable,
     payment_units_for_activation,
     post_json_request,
-    quote_hwid_callback_parts,
-    render_link_or_fail,
-    render_payment_link,
-    safe_callback_answer,
+    run_callback_payment,
+    run_reuse_webapp_payment,
+    run_webapp_payment,
 )
-from ..shared.app_context import app_optional, app_required
+from ..shared.app_context import app_required
 
 _LOG = "freekassa"
 FREEKASSA_SUPPORTED_CURRENCIES = ("RUB", "USD", "EUR", "UAH", "KZT")
@@ -483,7 +471,7 @@ class FreeKassaService(HttpClientMixin):
                 success_prefix = translator(
                     "free_kassa_order_full",
                     order_id=provider_payment_id,
-                    date=datetime.now().strftime("%Y-%m-%d"),
+                    date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 )
 
             outcome = await finalize_successful_payment(
@@ -530,147 +518,8 @@ async def pay_fk_callback_handler(
     freekassa_service: FreeKassaService,
     session: AsyncSession,
 ) -> None:
-    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
-    i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
-    translator = make_translator(i18n, current_lang)
-
-    if not i18n or not callback.message:
-        await notify_callback_parse_error(callback, translator)
-        return
-
-    if not SPEC.is_available_to_user(
-        settings,
-        user_id=callback.from_user.id,
-        require_configured=False,
-    ):
-        await notify_service_unavailable(callback, translator)
-        return
-
-    if not freekassa_service or not freekassa_service.configured:
-        logging.error("FreeKassa service is not configured or unavailable.")
-        await notify_service_unavailable(callback, translator)
-        return
-
-    parts = parse_payment_callback(callback.data or "")
-    if not parts:
-        logging.error("Invalid pay_fk data in callback: %s", callback.data)
-        await notify_callback_parse_error(callback, translator)
-        return
-    parts, hwid_quote = await quote_hwid_callback_parts(
-        session=session,
-        user_id=callback.from_user.id,
-        parts=parts,
-        subscription_service=freekassa_service.subscription_service,
-        currency=default_currency_key_for_settings(settings),
-    )
-    if not parts:
-        await notify_callback_parse_error(callback, translator)
-        return
-
-    currency_code = (
-        getattr(freekassa_service, "default_currency", None)
-        or default_payment_currency_code_for_settings(settings)
-        or "RUB"
-    )
-    payment_description = describe_payment(translator, parts)
-    record_payload = build_payment_record_payload(
-        user_id=callback.from_user.id,
-        amount=parts.price,
-        currency=currency_code,
-        status="pending_freekassa",
-        description=payment_description,
-        months=parts.months,
-        provider="freekassa",
-        sale_mode=parts.sale_mode,
-        hwid_quote=hwid_quote,
-    )
-
-    reuse_amounts = payment_record_amounts(
-        months=parts.months,
-        sale_mode=parts.sale_mode,
-        hwid_device_count=hwid_quote.get("device_count") if hwid_quote else None,
-    )
-    reusable_payment = await payment_dal.find_recent_pending_provider_payment(
-        session,
-        user_id=callback.from_user.id,
-        provider="freekassa",
-        pending_status="pending_freekassa",
-        amount=parts.price,
-        currency=currency_code,
-        sale_mode=parts.sale_mode,
-        months=reuse_amounts.months,
-        purchased_gb=reuse_amounts.purchased_gb,
-        purchased_hwid_devices=reuse_amounts.purchased_hwid_devices,
-        tariff_key=reuse_amounts.tariff_key,
-    )
-    if reusable_payment is not None:
-        reusable_url = await freekassa_service.try_reuse_pending_order(reusable_payment)
-        if reusable_url:
-            await safe_callback_answer(callback)
-            await render_payment_link(
-                callback,
-                translator=translator,
-                current_lang=current_lang,
-                i18n=i18n,
-                parts=parts,
-                payment_url=reusable_url,
-                log_prefix=_LOG,
-            )
-            return
-
-    try:
-        payment_record = await payment_dal.create_payment_record(session, record_payload)
-        await session.commit()
-    except Exception:
-        await session.rollback()
-        logging.exception(
-            "FreeKassa: failed to create payment record for user %s.", callback.from_user.id
-        )
-        await notify_payment_record_failure(callback, translator)
-        return
-
-    success, response_data = await freekassa_service.create_order(
-        payment_db_id=payment_record.payment_id,
-        user_id=payment_record.user_id,
-        months=parts.months,
-        amount=parts.price,
-        currency=freekassa_service.default_currency,
-        payment_method_id=freekassa_service.payment_method_id,
-        ip_address=freekassa_service.server_ip,
-        extra_params={
-            "us_method": freekassa_service.payment_method_id,
-        },
-    )
-
-    location = first_value(response_data, "location")
-    provider_identifier = first_value(response_data, "orderHash", "orderId")
-    lead_text: Optional[str] = None
-    if success and location:
-        order_id_display = (
-            first_value(response_data, "orderId")
-            or provider_identifier
-            or str(payment_record.payment_id)
-        )
-        lead_text = translator(
-            "free_kassa_order_info",
-            order_id=order_id_display,
-            date=datetime.now().strftime("%Y-%m-%d"),
-        )
-
-    await render_link_or_fail(
-        callback,
-        translator=translator,
-        current_lang=current_lang,
-        i18n=i18n,
-        parts=parts,
-        session=session,
-        payment=payment_record,
-        api_success=success,
-        payment_url=location,
-        provider_payment_id=provider_identifier,
-        provider_response=response_data,
-        lead_text=lead_text,
-        log_prefix=_LOG,
+    await run_callback_payment(
+        _DESCRIPTOR, callback, settings, i18n_data, freekassa_service, session
     )
 
 
@@ -693,51 +542,11 @@ def create_service(ctx: ServiceFactoryContext) -> FreeKassaService:
 
 
 async def create_webapp_payment(ctx: WebAppPaymentContext) -> web.Response:
-    service: FreeKassaService = app_required(ctx.request, "freekassa_service", FreeKassaService)
-    if not service or not service.configured or not service.payment_method_id:
-        return payment_unavailable()
-    currency = ctx.currency or service.default_currency
-
-    try:
-        payment = await create_webapp_payment_record(
-            ctx,
-            amount=ctx.price,
-            currency=currency,
-            status="pending_freekassa",
-            provider="freekassa",
-        )
-        success, response_data = await service.create_order(
-            payment_db_id=payment.payment_id,
-            user_id=ctx.user_id,
-            months=ctx.months,
-            amount=ctx.price,
-            currency=currency,
-            payment_method_id=service.payment_method_id,
-            ip_address=service.server_ip,
-            extra_params={"us_method": service.payment_method_id},
-        )
-    except Exception:
-        await ctx.session.rollback()
-        logging.exception("FreeKassa WebApp payment failed")
-        return payment_failed()
-
-    return await finalize_webapp_link_payment(
-        session=ctx.session,
-        payment=payment,
-        api_success=success,
-        payment_url=first_value(response_data, "location") if success else None,
-        provider_payment_id=first_value(response_data, "orderHash", "orderId"),
-        provider_response=response_data,
-        log_prefix="FreeKassa",
-    )
+    return await run_webapp_payment(_DESCRIPTOR, ctx)
 
 
 async def reuse_webapp_payment(ctx: WebAppPaymentContext, payment: Any) -> Optional[str]:
-    service = app_optional(ctx.request, "freekassa_service", FreeKassaService)
-    if not service or not service.configured:
-        return None
-
-    return await service.try_reuse_pending_order(payment)
+    return await run_reuse_webapp_payment(_DESCRIPTOR, ctx, payment)
 
 
 _PRESENTATION_MANIFEST = tuple(
@@ -896,4 +705,76 @@ SPEC = PaymentProviderSpec(
         "FreeKassa SCI documents the payment currency parameter as RUB, USD, EUR, UAH or KZT."
     ),
     currency_support_url="https://docs.freekassa.net/",
+)
+
+
+async def _create_payment(service: FreeKassaService, req: CreatePaymentRequest) -> CreateResult:
+    return await service.create_order(
+        payment_db_id=req.payment.payment_id,
+        user_id=req.user_id,
+        months=req.months,
+        amount=req.amount,
+        currency=req.currency,
+        payment_method_id=service.payment_method_id,
+        ip_address=service.server_ip,
+        extra_params={"us_method": service.payment_method_id},
+    )
+
+
+async def _reuse_payment(service: FreeKassaService, payment: Any) -> Optional[str]:
+    return await service.try_reuse_pending_order(payment)
+
+
+def _callback_currency(service: FreeKassaService, settings: Settings) -> str:
+    return (
+        getattr(service, "default_currency", None)
+        or default_payment_currency_code_for_settings(settings)
+        or "RUB"
+    )
+
+
+def _webapp_currency(
+    ctx: WebAppPaymentContext,
+    settings: Settings,
+    service: FreeKassaService,
+) -> str:
+    return ctx.currency or service.default_currency
+
+
+def _callback_lead_text(
+    req: CreatePaymentRequest,
+    response_data: dict,
+    translator: Any,
+) -> Optional[str]:
+    location = first_value(response_data, "location")
+    if not location:
+        return None
+    provider_identifier = first_value(response_data, "orderHash", "orderId")
+    order_id_display = (
+        first_value(response_data, "orderId") or provider_identifier or str(req.payment.payment_id)
+    )
+    return translator(
+        "free_kassa_order_info",
+        order_id=order_id_display,
+        date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+    )
+
+
+_DESCRIPTOR: LinkPaymentDescriptor[FreeKassaService] = LinkPaymentDescriptor(
+    spec=SPEC,
+    provider_key="freekassa",
+    pending_status="pending_freekassa",
+    display_name="FreeKassa",
+    log_prefix=_LOG,
+    service_app_key="freekassa_service",
+    service_type=FreeKassaService,
+    create=_create_payment,
+    reuse=_reuse_payment,
+    extract_url=lambda r: first_value(r, "location"),
+    extract_provider_id=lambda r: first_value(r, "orderHash", "orderId"),
+    callback_currency=_callback_currency,
+    callback_lead_text=_callback_lead_text,
+    callback_reuse_answer=True,
+    webapp_available=lambda service: bool(service.configured and service.payment_method_id),
+    webapp_currency=_webapp_currency,
 )

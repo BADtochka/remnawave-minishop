@@ -1,6 +1,7 @@
 import json
 import re
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -148,11 +149,14 @@ def _manifest_by_key() -> dict[str, dict]:
 
 
 def _manifest_items() -> list[dict]:
-    return manifest_payload()
+    return cast(list[dict], manifest_payload())
 
 
 def _locale(language: str) -> dict[str, str]:
-    return json.loads((REPO_ROOT / "locales" / f"{language}.json").read_text(encoding="utf-8"))
+    return cast(
+        dict[str, str],
+        json.loads((REPO_ROOT / "locales" / f"{language}.json").read_text(encoding="utf-8")),
+    )
 
 
 def _has_locale_key(messages: dict[str, str], key: str) -> bool:

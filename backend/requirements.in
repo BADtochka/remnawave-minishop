@@ -1,0 +1,21 @@
+# Official PyPI release with aiohttp<3.15 support.
+aiogram==3.29.0
+# Keep aiohttp below 3.15 until aiogram relaxes its runtime coupling.
+aiohttp>=3.14.1,<3.15
+python-dotenv==1.2.2
+pydantic==2.13.4
+yookassa==3.11.0
+httpx>=0.27.0
+pydantic-settings==2.14.2
+email-validator==2.3.0
+sqlalchemy[asyncio]==2.0.51
+asyncpg==0.31.0
+# NB: aiocryptopay 0.4.8 caps certifi at <2024 (metadata-only); the Dockerfile
+# force-upgrades certifi after install and pip-audit ignores PYSEC-2024-230 in CI.
+# Revisit when a release newer than 0.4.8 relaxes the pin.
+aiocryptopay==0.4.8
+certifi<2024
+PyJWT[crypto]==2.13.0
+Pillow==12.2.0
+# aiogram RedisStorage has not moved to redis-py 8 yet; keep this ceiling explicit.
+redis>=7.4.1,<8

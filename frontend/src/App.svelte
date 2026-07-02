@@ -15,7 +15,7 @@
     TELEGRAM_SDK_ACTION_TIMEOUT_MS,
     TELEGRAM_SDK_BOOT_TIMEOUT_MS,
     TELEGRAM_WEBAPP_SCRIPT_URL,
-  } from "./lib/webapp/constants.js";
+  } from "./lib/webapp/constants";
 
   import {
     applyFavicon,
@@ -55,7 +55,7 @@
   } from "./lib/webapp/context";
   import { createBillingDeeplinkEffects } from "./lib/webapp/billingDeeplinkEffects.js";
   import { createWebappSectionContext } from "./lib/webapp/webappSectionContext";
-  import { readThemePreviewDraft, syncThemeGoogleFonts } from "./lib/webapp/themeStyle.js";
+  import { readThemePreviewDraft, syncThemeGoogleFonts } from "./lib/webapp/themeStyle";
   import { computeAppShellView, type AppShellView } from "./lib/webapp/appShellView.js";
   import { createAppActionRuntime, type AppActionRuntime } from "./lib/webapp/appActionRuntime.js";
   import { createWebappSessionActions } from "./lib/webapp/webappSessionActions.js";
