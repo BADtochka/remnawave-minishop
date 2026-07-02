@@ -319,10 +319,10 @@ class ReferralService:
             # Count users who made successful payments (purchased subscription)
             purchased_count_result = await session.execute(
                 text("""
-                    SELECT COUNT(DISTINCT u.user_id) 
-                    FROM users u 
-                    JOIN payments p ON u.user_id = p.user_id 
-                    WHERE u.referred_by_id = :user_id 
+                    SELECT COUNT(DISTINCT u.user_id)
+                    FROM users u
+                    JOIN payments p ON u.user_id = p.user_id
+                    WHERE u.referred_by_id = :user_id
                     AND p.status = 'succeeded'
                 """),
                 {"user_id": user_id},

@@ -12,6 +12,7 @@ exclude = [
 [tool.ruff.lint]
 select = [
     "E", # pycodestyle errors
+    "W", # pycodestyle warnings
     "F", # pyflakes
     "I", # isort
     "ASYNC", # flake8-async
