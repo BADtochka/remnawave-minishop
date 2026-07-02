@@ -27,7 +27,7 @@ from bot.app.web.route_contracts import (
     BOOLEAN_SCHEMA,
     STRING_SCHEMA,
     RouteContract,
-    loose_object_schema,
+    ok_envelope_for,
     ok_envelope_with,
     register_contract,
 )
@@ -47,8 +47,8 @@ from .auth import (
 from .common import (
     _error,
     _ok,
-    _webapp_themes_catalog_payload,
 )
+from .response_schemas import AdminThemesOut
 from .schemas import ImageUrlUploadBody, ThemesSaveBody
 
 logger = logging.getLogger(__name__)
@@ -71,20 +71,18 @@ _IMAGE_MULTIPART_UPLOAD_SCHEMA = {
     "required": ["file"],
     "properties": {"file": BINARY_RESPONSE_SCHEMA},
 }
-_THEMES_RESPONSE_SCHEMA = ok_envelope_with(
-    {"exists": BOOLEAN_SCHEMA, "themes_dir": STRING_SCHEMA, "catalog": loose_object_schema()}
-)
+_THEMES_RESPONSE_SCHEMA = ok_envelope_for(AdminThemesOut)
 
 register_contract(
     "admin_themes_get_route",
-    RouteContract(response_schema=_THEMES_RESPONSE_SCHEMA, models=(WebappThemesConfig,)),
+    RouteContract(response_schema=_THEMES_RESPONSE_SCHEMA, models=(AdminThemesOut,)),
 )
 register_contract(
     "admin_themes_save_route",
     RouteContract(
         request_model=ThemesSaveBody,
         response_schema=_THEMES_RESPONSE_SCHEMA,
-        models=(WebappThemesConfig,),
+        models=(ThemesSaveBody, AdminThemesOut),
     ),
 )
 register_contract(
@@ -532,11 +530,11 @@ async def admin_themes_get_route(request: web.Request) -> web.Response:
     )
 
     return _ok(
-        {
-            "exists": themes_dir_exists,
-            "themes_dir": themes_dir,
-            "catalog": _webapp_themes_catalog_payload(catalog),
-        }
+        AdminThemesOut(
+            exists=themes_dir_exists,
+            themes_dir=themes_dir,
+            catalog=catalog,
+        ).to_legacy_payload()
     )
 
 
@@ -574,9 +572,5 @@ async def admin_themes_save_route(request: web.Request) -> web.Response:
     )
 
     return _ok(
-        {
-            "exists": True,
-            "themes_dir": themes_dir,
-            "catalog": _webapp_themes_catalog_payload(config),
-        }
+        AdminThemesOut(exists=True, themes_dir=themes_dir, catalog=config).to_legacy_payload()
     )

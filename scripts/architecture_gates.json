@@ -49,64 +49,7 @@
       "backend/bot/app/web/admin_api_impl",
       "backend/bot/app/web/webapp"
     ],
-    "allowlist": {
-      "backend/bot/app/web/admin_api_impl/backups.py": {
-        "loose_object_schema": [
-          "Backup command result is a filesystem operation payload shared with CLI internals.",
-          "Uploaded archive metadata preserves backend-specific fields until backup schemas are split.",
-          "Created archive metadata preserves backend-specific fields until backup schemas are split.",
-          "Restore result is an operational report with backend-specific details."
-        ],
-        "loose_array_schema": [
-          "Archive list items mirror backend backup inventory payloads."
-        ]
-      },
-      "backend/bot/app/web/admin_api_impl/broadcast.py": {
-        "loose_object_schema": [
-          "Audience count keys are derived from runtime targeting dimensions."
-        ]
-      },
-      "backend/bot/app/web/admin_api_impl/panel.py": {
-        "loose_array_schema": [
-          "Panel squad objects are provider payloads passed through for admin selection."
-        ]
-      },
-      "backend/bot/app/web/admin_api_impl/settings.py": {
-        "loose_array_schema": [
-          "Settings sections are generated from the settings manifest."
-        ]
-      },
-      "backend/bot/app/web/admin_api_impl/sync.py": {
-        "loose_object_schema": [
-          "Sync queue result is a small runtime status payload."
-        ]
-      },
-      "backend/bot/app/web/admin_api_impl/themes.py": {
-        "loose_object_schema": [
-          "Theme catalog is admin-authored config JSON."
-        ]
-      },
-      "backend/bot/app/web/admin_api_impl/translations.py": {
-        "loose_array_schema": [
-          "Language summaries are generated from locale files.",
-          "Translation group summaries are generated from locale keys."
-        ]
-      },
-      "backend/bot/app/web/webapp/assets_contracts.py": {
-        "loose_object_schema": [
-          "Bootstrap config is assembled from runtime settings and theme catalog.",
-          "Bootstrap i18n is a locale dictionary keyed by language and translation key.",
-          "I18n endpoint returns the same dynamic locale dictionary by requested scope."
-        ]
-      },
-      "backend/bot/app/web/webapp/guides_contracts.py": {
-        "loose_object_schema": [
-          "Authenticated guide config can come from admin JSON override or panel payload.",
-          "Public guide config can come from admin JSON override or panel payload.",
-          "Public guide subscription context is resolved from panel/share-token data."
-        ]
-      }
-    }
+    "allowlist": {}
   },
   "frontend_weak_typing": {
     "scopes": [

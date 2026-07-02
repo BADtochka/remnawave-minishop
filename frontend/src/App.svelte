@@ -80,6 +80,7 @@
   import { createTelegramRuntime, type TelegramWebApp } from "./lib/webapp/telegramRuntime.js";
   import { resetShellState, shellState } from "./lib/webapp/shellState.svelte";
   import {
+    FALLBACK_WEBAPP_CONFIG,
     asWebappRecord,
     asWebappRecordOrNull,
     type AdminPanelProps,
@@ -103,11 +104,8 @@
   const FALLBACK_BRAND_TITLE = "Subscription";
   const EMPTY_MOCK: WebappMockSource = {
     config: {
+      ...FALLBACK_WEBAPP_CONFIG,
       title: FALLBACK_BRAND_TITLE,
-      primaryColor: "#00fe7a",
-      apiBase: "/api",
-      language: "ru",
-      languages: [],
     },
     data: {
       plans: [],

@@ -67,6 +67,34 @@ export type WebappConfig = BootstrapResponse["config"] &
     registrationInviteOnlyEnabled?: boolean;
     themePreviewKey?: unknown;
   };
+export const FALLBACK_WEBAPP_CONFIG: WebappConfig = {
+  adminCssAsset: "",
+  adminJsAsset: "",
+  apiBase: "/api",
+  appRepositoryUrl: "",
+  appVersion: "",
+  currency: "RUB",
+  emailAuthEnabled: false,
+  faviconUrl: "",
+  faviconUseCustom: false,
+  language: "ru",
+  languages: [],
+  logoUrl: "",
+  primaryColor: "#00fe7a",
+  privacyPolicyUrl: "",
+  registrationInviteOnlyEnabled: false,
+  serverStatusUrl: "",
+  supportUrl: "",
+  telegramLoginBotId: 0,
+  telegramLoginBotUsername: "",
+  telegramOAuthClientId: 0,
+  telegramOAuthRequestAccess: "",
+  themePreviewKey: "",
+  themesCatalog: { default_theme: "dark", themes: [] },
+  themesDir: "",
+  title: "Subscription",
+  userAgreementUrl: "",
+};
 export type AppSettings = MeOkResponse["settings"] & WebappRecord;
 export type ReferralState = MeOkResponse["referral"] & WebappRecord;
 export type ReferralBonusDetail = NonNullable<ReferralState["bonus_details"]>[number] &

@@ -19,7 +19,7 @@ from bot.app.web.route_contracts import (
     INTEGER_SCHEMA,
     STRING_SCHEMA,
     RouteContract,
-    loose_object_schema,
+    ok_envelope_for,
     ok_envelope_with,
     register_contract,
 )
@@ -43,6 +43,7 @@ from .common import (
     _ok,
     _panel_user_connection_activity,
 )
+from .response_schemas import AdminBroadcastAudienceCountsOut
 from .schemas import AdminBroadcastBody
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,10 @@ register_contract(
 )
 register_contract(
     "admin_broadcast_audience_counts_route",
-    RouteContract(response_schema=ok_envelope_with({"counts": loose_object_schema()})),
+    RouteContract(
+        response_schema=ok_envelope_for(AdminBroadcastAudienceCountsOut),
+        models=(AdminBroadcastAudienceCountsOut,),
+    ),
 )
 
 
@@ -291,4 +295,4 @@ async def admin_broadcast_audience_counts_route(request: web.Request) -> web.Res
             panel_service,
         )
 
-    return _ok({"counts": counts})
+    return _ok(AdminBroadcastAudienceCountsOut(counts=counts).model_dump(mode="json"))

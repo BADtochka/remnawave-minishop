@@ -1537,6 +1537,66 @@ export interface components {
         [key: string]: number;
       };
     };
+    /** AdminBackupArchiveOut */
+    AdminBackupArchiveOut: {
+      /** Compose Files Count */
+      compose_files_count: number;
+      /**
+       * Created At
+       * @default null
+       */
+      created_at: string | null;
+      /**
+       * Created At Local
+       * @default null
+       */
+      created_at_local: string | null;
+      /**
+       * Database Name
+       * @default null
+       */
+      database_name: string | null;
+      /** Has Compose */
+      has_compose: boolean;
+      /** Has Database */
+      has_database: boolean;
+      /** Manifest */
+      manifest?: {
+        [key: string]: unknown;
+      };
+      /** Modified At */
+      modified_at: string;
+      /** Name */
+      name: string;
+      /** Size Bytes */
+      size_bytes: number;
+      /** Warnings */
+      warnings?: string[];
+    };
+    /** AdminBackupCreateOut */
+    AdminBackupCreateOut: {
+      archive: components["schemas"]["AdminBackupArchiveOut"];
+      result: components["schemas"]["AdminBackupCreateResultOut"];
+    };
+    /** AdminBackupCreateResultOut */
+    AdminBackupCreateResultOut: {
+      /** Archive Name */
+      archive_name: string;
+      /** Archive Path */
+      archive_path: string;
+      /** Completed At */
+      completed_at: string;
+      /** Compose Files Count */
+      compose_files_count: number;
+      /** Db Dump Included */
+      db_dump_included: boolean;
+      /** Size Bytes */
+      size_bytes: number;
+      /** Started At */
+      started_at: string;
+      /** Warnings */
+      warnings?: string[];
+    };
     /** AdminBackupRestoreBody */
     AdminBackupRestoreBody: {
       /**
@@ -1559,6 +1619,55 @@ export interface components {
        * @default false
        */
       restore_database: unknown;
+    };
+    /** AdminBackupRestoreOut */
+    AdminBackupRestoreOut: {
+      result: components["schemas"]["AdminBackupRestoreResultOut"];
+    };
+    /** AdminBackupRestoreResultOut */
+    AdminBackupRestoreResultOut: {
+      /** Archive Name */
+      archive_name: string;
+      /** Completed At */
+      completed_at: string;
+      /** Compose Files Restored */
+      compose_files_restored: number;
+      /**
+       * Compose Pre Restore Archive
+       * @default null
+       */
+      compose_pre_restore_archive: string | null;
+      /**
+       * Compose Target Dir
+       * @default null
+       */
+      compose_target_dir: string | null;
+      /** Database Migrations Applied */
+      database_migrations_applied?: string[];
+      /** Database Restored */
+      database_restored: boolean;
+      /** Started At */
+      started_at: string;
+      /** Warnings */
+      warnings?: string[];
+    };
+    /** AdminBackupUploadOut */
+    AdminBackupUploadOut: {
+      archive: components["schemas"]["AdminBackupArchiveOut"];
+    };
+    /** AdminBackupsListOut */
+    AdminBackupsListOut: {
+      /** Archives */
+      archives: components["schemas"]["AdminBackupArchiveOut"][];
+      /** Backup Dir */
+      backup_dir: string;
+    };
+    /** AdminBroadcastAudienceCountsOut */
+    AdminBroadcastAudienceCountsOut: {
+      /** Counts */
+      counts: {
+        [key: string]: number | null;
+      };
     };
     /** AdminBroadcastBody */
     AdminBroadcastBody: {
@@ -1603,6 +1712,23 @@ export interface components {
       /** User Id */
       user_id: number;
     };
+    /** AdminPanelInternalSquadOut */
+    AdminPanelInternalSquadOut: {
+      /**
+       * Active Inbounds Count
+       * @default null
+       */
+      active_inbounds_count: number | string | boolean | null;
+      /**
+       * Members Count
+       * @default null
+       */
+      members_count: number | string | boolean | null;
+      /** Name */
+      name: string;
+      /** Uuid */
+      uuid: string;
+    };
     /** AdminPanelSyncOut */
     AdminPanelSyncOut: {
       /**
@@ -1633,12 +1759,184 @@ export interface components {
       /** Total */
       total: number;
     };
+    /** AdminSettingChoiceOut */
+    AdminSettingChoiceOut: {
+      /**
+       * I18N Label Key
+       * @default null
+       */
+      i18n_label_key: string | null;
+      /** Label */
+      label: string;
+      /** Value */
+      value: unknown;
+    };
+    /** AdminSettingsFieldOut */
+    AdminSettingsFieldOut: {
+      /**
+       * Choices
+       * @default null
+       */
+      choices: components["schemas"]["AdminSettingChoiceOut"][] | null;
+      /**
+       * Default
+       * @default null
+       */
+      default: unknown;
+      /**
+       * Description
+       * @default null
+       */
+      description: string | null;
+      /**
+       * Has Value
+       * @default null
+       */
+      has_value: boolean | null;
+      /**
+       * I18N Description Key
+       * @default null
+       */
+      i18n_description_key: string | null;
+      /**
+       * I18N Label Key
+       * @default null
+       */
+      i18n_label_key: string | null;
+      /**
+       * I18N Placeholder Key
+       * @default null
+       */
+      i18n_placeholder_key: string | null;
+      /**
+       * I18N Subsection Key
+       * @default null
+       */
+      i18n_subsection_key: string | null;
+      /** Key */
+      key: string;
+      /** Label */
+      label: string;
+      /**
+       * Max
+       * @default null
+       */
+      max: number | null;
+      /**
+       * Min
+       * @default null
+       */
+      min: number | null;
+      /**
+       * Mutually Exclusive Key
+       * @default null
+       */
+      mutually_exclusive_key: string | null;
+      /** Optional */
+      optional: boolean;
+      /**
+       * Overridden
+       * @default null
+       */
+      overridden: boolean | null;
+      /**
+       * Placeholder
+       * @default null
+       */
+      placeholder: string | null;
+      /**
+       * Provider Id
+       * @default null
+       */
+      provider_id: string | null;
+      /**
+       * Read Error
+       * @default null
+       */
+      read_error: string | null;
+      /** Secret */
+      secret: boolean;
+      /** Section */
+      section: string;
+      /** Section Order */
+      section_order: number;
+      /**
+       * Source
+       * @default null
+       */
+      source: string | null;
+      /**
+       * Subsection
+       * @default null
+       */
+      subsection: string | null;
+      /** Type */
+      type: string;
+      /**
+       * Updated At
+       * @default null
+       */
+      updated_at: string | null;
+      /**
+       * Value
+       * @default null
+       */
+      value: unknown;
+      /**
+       * Webhook Base Url Configured
+       * @default null
+       */
+      webhook_base_url_configured: boolean | null;
+      /**
+       * Webhook Hint
+       * @default null
+       */
+      webhook_hint: string | null;
+      /**
+       * Webhook Hint I18N Key
+       * @default null
+       */
+      webhook_hint_i18n_key: string | null;
+      /**
+       * Webhook Path
+       * @default null
+       */
+      webhook_path: string | null;
+      /**
+       * Webhook Requires Base Url
+       * @default null
+       */
+      webhook_requires_base_url: boolean | null;
+      /**
+       * Webhook Url
+       * @default null
+       */
+      webhook_url: string | null;
+    } & {
+      [key: string]: unknown;
+    };
+    /** AdminSettingsOut */
+    AdminSettingsOut: {
+      /** Features */
+      features: string[];
+      /** Sections */
+      sections: components["schemas"]["AdminSettingsSectionOut"][];
+    };
     /** AdminSettingsPatchBody */
     AdminSettingsPatchBody: {
       /** Deletes */
       deletes?: unknown;
       /** Updates */
       updates?: unknown;
+    };
+    /** AdminSettingsSectionOut */
+    AdminSettingsSectionOut: {
+      /** Fields */
+      fields: components["schemas"]["AdminSettingsFieldOut"][];
+      /** Id */
+      id: string;
+      /** Order */
+      order: number;
     };
     /** AdminStatsOut */
     AdminStatsOut: {
@@ -2035,6 +2333,15 @@ export interface components {
        */
       username: string | null;
     };
+    /** AdminSyncOut */
+    AdminSyncOut: {
+      result: components["schemas"]["AdminSyncResultOut"];
+    };
+    /** AdminSyncResultOut */
+    AdminSyncResultOut: {
+      /** Status */
+      status: string;
+    };
     /** AdminTariffsCatalogOut */
     AdminTariffsCatalogOut: {
       /**
@@ -2058,6 +2365,14 @@ export interface components {
       path: string;
       /** Provider Currency Support */
       provider_currency_support: components["schemas"]["ProviderCurrencySupportOut"][];
+    };
+    /** AdminThemesOut */
+    AdminThemesOut: {
+      catalog: components["schemas"]["WebappThemesConfig"];
+      /** Exists */
+      exists: boolean;
+      /** Themes Dir */
+      themes_dir: string;
     };
     /** AdminTicketPatchPayload */
     AdminTicketPatchPayload: {
@@ -2091,6 +2406,79 @@ export interface components {
        * @default false
        */
       is_internal_note: boolean;
+    };
+    /** AdminTranslationGroupOut */
+    AdminTranslationGroupOut: {
+      /** Audience */
+      audience: string;
+      /** Description */
+      description: string;
+      /** Description Key */
+      description_key: string;
+      /** Id */
+      id: string;
+      /** Items */
+      items: components["schemas"]["AdminTranslationItemOut"][];
+      /** Title */
+      title: string;
+      /** Title Key */
+      title_key: string;
+    };
+    /** AdminTranslationItemOut */
+    AdminTranslationItemOut: {
+      /** Audience */
+      audience: string;
+      /** Key */
+      key: string;
+      /** Values */
+      values: {
+        [key: string]: components["schemas"]["AdminTranslationValueOut"];
+      };
+    };
+    /** AdminTranslationLanguageOut */
+    AdminTranslationLanguageOut: {
+      /** Base */
+      base: boolean;
+      /** Code */
+      code: string;
+      /** Flag */
+      flag: string;
+      /** Label */
+      label: string;
+    };
+    /** AdminTranslationValueOut */
+    AdminTranslationValueOut: {
+      /** Base */
+      base: string;
+      /** Effective */
+      effective: string;
+      /** Fallback */
+      fallback: string;
+      /** Overridden */
+      overridden: boolean;
+      /** Override */
+      override: string;
+      /**
+       * Updated At
+       * @default null
+       */
+      updated_at: string | null;
+      /**
+       * Updated By
+       * @default null
+       */
+      updated_by: number | null;
+    };
+    /** AdminTranslationsOut */
+    AdminTranslationsOut: {
+      /** Groups */
+      groups: components["schemas"]["AdminTranslationGroupOut"][];
+      /** Languages */
+      languages: components["schemas"]["AdminTranslationLanguageOut"][];
+      /** Override Count */
+      override_count: number;
+      /** Path */
+      path: string;
     };
     /** AdminTranslationsPatchBody */
     AdminTranslationsPatchBody: {
@@ -3038,6 +3426,72 @@ export interface components {
       /** Telegram Label */
       telegram_label: string;
     };
+    /** PublicSubscriptionContextOut */
+    PublicSubscriptionContextOut: {
+      /** Active */
+      active: boolean;
+      /** Config Link */
+      config_link: string;
+      /** Connect Url */
+      connect_url: string;
+      /** Install Share Token */
+      install_share_token: string;
+      /**
+       * Panel Short Uuid
+       * @default null
+       */
+      panel_short_uuid: string | null;
+      /** Share Url */
+      share_url: string;
+      /** Username */
+      username: string;
+    };
+    /** PublicSubscriptionGuidesOut */
+    PublicSubscriptionGuidesOut: {
+      /**
+       * Config
+       * @default null
+       */
+      config: {
+        [key: string]: unknown;
+      } | null;
+      /** Enabled */
+      enabled: boolean;
+      /**
+       * Error
+       * @default null
+       */
+      error: string | null;
+      /**
+       * Source
+       * @default null
+       */
+      source: string | null;
+      /** @default null */
+      subscription: components["schemas"]["PublicSubscriptionContextOut"] | null;
+    };
+    /** SubscriptionGuidesOut */
+    SubscriptionGuidesOut: {
+      /**
+       * Config
+       * @default null
+       */
+      config: {
+        [key: string]: unknown;
+      } | null;
+      /** Enabled */
+      enabled: boolean;
+      /**
+       * Error
+       * @default null
+       */
+      error: string | null;
+      /**
+       * Source
+       * @default null
+       */
+      source: string | null;
+    };
     /**
      * SupportCountsOut
      * @description Ticket counters keyed by known statuses, with room for future status keys.
@@ -3894,6 +4348,100 @@ export interface components {
        */
       start_param: string | null;
     };
+    /** WebappBootstrapConfigOut */
+    WebappBootstrapConfigOut: {
+      /** Admincssasset */
+      adminCssAsset: string;
+      /** Adminjsasset */
+      adminJsAsset: string;
+      /** Apibase */
+      apiBase: string;
+      /** Apprepositoryurl */
+      appRepositoryUrl: string;
+      /** Appversion */
+      appVersion: string;
+      /** Currency */
+      currency: string;
+      /** Emailauthenabled */
+      emailAuthEnabled: boolean;
+      /** Faviconurl */
+      faviconUrl: string;
+      /** Faviconusecustom */
+      faviconUseCustom: boolean;
+      /** Language */
+      language: string;
+      /** Languages */
+      languages: components["schemas"]["WebappBootstrapLanguageOut"][];
+      /** Logourl */
+      logoUrl: string;
+      /**
+       * Primarycolor
+       * @default null
+       */
+      primaryColor: string | null;
+      /** Privacypolicyurl */
+      privacyPolicyUrl: string;
+      /** Registrationinviteonlyenabled */
+      registrationInviteOnlyEnabled: boolean;
+      /** Serverstatusurl */
+      serverStatusUrl: string;
+      /** Supporturl */
+      supportUrl: string;
+      /** Telegramloginbotid */
+      telegramLoginBotId: number;
+      /** Telegramloginbotusername */
+      telegramLoginBotUsername: string;
+      /** Telegramoauthclientid */
+      telegramOAuthClientId: number;
+      /** Telegramoauthrequestaccess */
+      telegramOAuthRequestAccess: string;
+      /** Themepreviewkey */
+      themePreviewKey: string;
+      /** Themescatalog */
+      themesCatalog?: {
+        [key: string]: unknown;
+      };
+      /** Themesdir */
+      themesDir: string;
+      /** Title */
+      title: string;
+      /** Useragreementurl */
+      userAgreementUrl: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** WebappBootstrapLanguageOut */
+    WebappBootstrapLanguageOut: {
+      /** Base */
+      base: boolean;
+      /** Code */
+      code: string;
+      /** Flag */
+      flag: string;
+      /** Label */
+      label: string;
+    };
+    /** WebappBootstrapOut */
+    WebappBootstrapOut: {
+      config: components["schemas"]["WebappBootstrapConfigOut"];
+      /** I18N */
+      i18n: {
+        [key: string]: {
+          [key: string]: unknown;
+        };
+      };
+    };
+    /** WebappI18nOut */
+    WebappI18nOut: {
+      /** I18N */
+      i18n: {
+        [key: string]: {
+          [key: string]: unknown;
+        };
+      };
+      /** Scope */
+      scope: string;
+    };
     /**
      * WebappTheme
      * @description Single theme descriptor loaded from WEBAPP_THEMES_DIR/<key>/theme.json.
@@ -4416,13 +4964,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            archives: {
-              [key: string]: unknown;
-            }[];
-            backup_dir: string;
             /** @constant */
             ok: true;
-          };
+          } & components["schemas"]["AdminBackupsListOut"];
         };
       };
     };
@@ -4443,15 +4987,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            archive: {
-              [key: string]: unknown;
-            };
             /** @constant */
             ok: true;
-            result: {
-              [key: string]: unknown;
-            };
-          };
+          } & components["schemas"]["AdminBackupCreateOut"];
         };
       };
     };
@@ -4478,10 +5016,7 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-            result: {
-              [key: string]: unknown;
-            };
-          };
+          } & components["schemas"]["AdminBackupRestoreOut"];
         };
       };
     };
@@ -4509,12 +5044,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            archive: {
-              [key: string]: unknown;
-            };
             /** @constant */
             ok: true;
-          };
+          } & components["schemas"]["AdminBackupUploadOut"];
         };
       };
     };
@@ -4565,12 +5097,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            counts: {
-              [key: string]: unknown;
-            };
             /** @constant */
             ok: true;
-          };
+          } & components["schemas"]["AdminBroadcastAudienceCountsOut"];
         };
       };
     };
@@ -4662,9 +5191,7 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-            squads: {
-              [key: string]: unknown;
-            }[];
+            squads: components["schemas"]["AdminPanelInternalSquadOut"][];
           };
         };
       };
@@ -4894,13 +5421,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            features: string[];
             /** @constant */
             ok: true;
-            sections: {
-              [key: string]: unknown;
-            }[];
-          };
+          } & components["schemas"]["AdminSettingsOut"];
         };
       };
     };
@@ -5139,10 +5662,7 @@ export interface operations {
           "application/json": {
             /** @constant */
             ok: true;
-            result: {
-              [key: string]: unknown;
-            };
-          };
+          } & components["schemas"]["AdminSyncOut"];
         };
       };
     };
@@ -5213,14 +5733,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            catalog: {
-              [key: string]: unknown;
-            };
-            exists: boolean;
             /** @constant */
             ok: true;
-            themes_dir: string;
-          };
+          } & components["schemas"]["AdminThemesOut"];
         };
       };
     };
@@ -5245,14 +5760,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            catalog: {
-              [key: string]: unknown;
-            };
-            exists: boolean;
             /** @constant */
             ok: true;
-            themes_dir: string;
-          };
+          } & components["schemas"]["AdminThemesOut"];
         };
       };
     };
@@ -5273,17 +5783,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            groups: {
-              [key: string]: unknown;
-            }[];
-            languages: {
-              [key: string]: unknown;
-            }[];
             /** @constant */
             ok: true;
-            override_count: number;
-            path: string;
-          };
+          } & components["schemas"]["AdminTranslationsOut"];
         };
       };
     };
@@ -6060,17 +6562,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            /** @description Runtime Mini App config assembled from settings and theme catalog. */
-            config: {
-              [key: string]: unknown;
-            };
-            /** @description Locale dictionary keyed by language and translation key. */
-            i18n: {
-              [key: string]: unknown;
-            };
             /** @constant */
             ok: true;
-          };
+          } & components["schemas"]["WebappBootstrapOut"];
         };
       };
     };
@@ -6246,14 +6740,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            /** @description Locale dictionary keyed by language and translation key. */
-            i18n: {
-              [key: string]: unknown;
-            };
             /** @constant */
             ok: true;
-            scope: string;
-          };
+          } & components["schemas"]["WebappI18nOut"];
         };
       };
     };
@@ -6628,15 +7117,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            /** @description Resolved subscription guide config from admin override or panel. */
-            config?: {
-              [key: string]: unknown;
-            };
-            enabled: boolean;
             /** @constant */
             ok: true;
-            source?: string | null;
-          };
+          } & components["schemas"]["SubscriptionGuidesOut"];
         };
       };
     };
@@ -6659,19 +7142,9 @@ export interface operations {
         };
         content: {
           "application/json": {
-            /** @description Resolved subscription guide config from admin override or panel. */
-            config?: {
-              [key: string]: unknown;
-            };
-            enabled: boolean;
             /** @constant */
             ok: true;
-            source?: string | null;
-            /** @description Public install subscription context resolved by share token. */
-            subscription?: {
-              [key: string]: unknown;
-            };
-          };
+          } & components["schemas"]["PublicSubscriptionGuidesOut"];
         };
       };
     };

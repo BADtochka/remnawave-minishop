@@ -11,9 +11,8 @@ from bot.app.web.request_parsing import parse_body_or_400
 from bot.app.web.route_contracts import (
     BOOLEAN_SCHEMA,
     INTEGER_SCHEMA,
-    STRING_SCHEMA,
     RouteContract,
-    loose_array_schema,
+    ok_envelope_for,
     ok_envelope_with,
     register_contract,
 )
@@ -36,19 +35,14 @@ from .common import (
     _error_payload,
     _ok,
 )
+from .response_schemas import AdminTranslationsOut
 from .schemas import AdminTranslationsPatchBody
 
 register_contract(
     "admin_translations_get_route",
     RouteContract(
-        response_schema=ok_envelope_with(
-            {
-                "languages": loose_array_schema(),
-                "groups": loose_array_schema(),
-                "path": STRING_SCHEMA,
-                "override_count": INTEGER_SCHEMA,
-            }
-        )
+        response_schema=ok_envelope_for(AdminTranslationsOut),
+        models=(AdminTranslationsOut,),
     ),
 )
 register_contract(
@@ -164,7 +158,14 @@ async def admin_translations_get_route(request: web.Request) -> web.Response:
     async with async_session_factory() as session:
         overrides = await locale_overrides_dal.get_overrides_with_meta(session)
 
-    return _ok(_admin_translations_payload(i18n, overrides))
+    return _ok(
+        cast(
+            dict[str, Any],
+            AdminTranslationsOut.model_validate(
+                _admin_translations_payload(i18n, overrides)
+            ).model_dump(mode="json"),
+        )
+    )
 
 
 async def admin_translations_patch_route(request: web.Request) -> web.Response:
