@@ -459,8 +459,7 @@ async def create_bulk_promo_codes_final(
 
         if failed_codes:
             success_lines.append(f"\n❌ <b>Ошибки ({len(failed_codes)}):</b>")
-            for error in failed_codes[:5]:  # Show first 5 errors
-                success_lines.append(error)
+            success_lines.extend(failed_codes[:5])  # Show first 5 errors
             if len(failed_codes) > 5:
                 success_lines.append(f"... и еще {len(failed_codes) - 5} ошибок")
 

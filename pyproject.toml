@@ -22,6 +22,7 @@ select = [
     "C4", # flake8-comprehensions
     "SIM", # flake8-simplify
     "PIE", # flake8-pie
+    "PERF", # Perflint
 ]
 ignore = [
     "E731", # lambda assignment (common in handlers)

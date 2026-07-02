@@ -392,15 +392,15 @@ async def tariff_change_select_callback(
                 )
             ]
         )
-        for package in target.traffic_packages.for_currency(default_currency):
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        text=f"+ {package.gb:g} GB за {package.price:g} {currency_code}",
-                        callback_data=f"tariff:package:{target.key}:{package.gb:g}",
-                    )
-                ]
-            )
+        rows.extend(
+            [
+                InlineKeyboardButton(
+                    text=f"+ {package.gb:g} GB за {package.price:g} {currency_code}",
+                    callback_data=f"tariff:package:{target.key}:{package.gb:g}",
+                )
+            ]
+            for package in target.traffic_packages.for_currency(default_currency)
+        )
     else:
         for months in target.enabled_periods:
             price = target.period_price(months, default_currency)

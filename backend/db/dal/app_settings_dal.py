@@ -52,17 +52,15 @@ async def get_override_value(session: AsyncSession, key: str) -> tuple[bool, Any
 
 async def get_overrides_with_meta(session: AsyncSession) -> list[dict[str, Any]]:
     rows = (await session.execute(select(AppSettingOverride))).scalars().all()
-    items: list[dict[str, Any]] = []
-    for row in rows:
-        items.append(
-            {
-                "key": row.key,
-                "value": _decode(row.value),
-                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-                "updated_by": row.updated_by,
-            }
-        )
-    return items
+    return [
+        {
+            "key": row.key,
+            "value": _decode(row.value),
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            "updated_by": row.updated_by,
+        }
+        for row in rows
+    ]
 
 
 async def upsert_override(

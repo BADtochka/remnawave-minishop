@@ -156,21 +156,19 @@ async def get_hwid_device_value_entries(
             )
         )
     )
-    entries = []
     rows = await _resolve_result_value(result.all())
-    for row in rows:
-        entries.append(
-            {
-                "purchase_id": row[0],
-                "purchased_devices": row[1],
-                "valid_from": row[2],
-                "valid_until": row[3],
-                "created_at": row[4],
-                "amount": row[5],
-                "currency": row[6],
-            }
-        )
-    return entries
+    return [
+        {
+            "purchase_id": row[0],
+            "purchased_devices": row[1],
+            "valid_from": row[2],
+            "valid_until": row[3],
+            "created_at": row[4],
+            "amount": row[5],
+            "currency": row[6],
+        }
+        for row in rows
+    ]
 
 
 async def expire_hwid_device_purchases(

@@ -287,13 +287,13 @@ async def main() -> None:
         if spec.enabled is not None and not spec.enabled(settings):
             continue
         tasks.append(asyncio.create_task(spec.factory(ctx), name=spec.name))
-    for idx in range(max(1, settings.WEBHOOK_QUEUE_CONCURRENCY)):
-        tasks.append(
-            asyncio.create_task(
-                _webhook_consumer(ctx, handlers),
-                name=f"WebhookConsumer{idx + 1}",
-            )
+    tasks.extend(
+        asyncio.create_task(
+            _webhook_consumer(ctx, handlers),
+            name=f"WebhookConsumer{idx + 1}",
         )
+        for idx in range(max(1, settings.WEBHOOK_QUEUE_CONCURRENCY))
+    )
     try:
         await asyncio.gather(*tasks)
     finally:

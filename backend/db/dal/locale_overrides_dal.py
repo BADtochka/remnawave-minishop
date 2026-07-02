@@ -21,18 +21,16 @@ async def get_all_overrides(session: AsyncSession) -> dict[str, dict[str, str]]:
 
 async def get_overrides_with_meta(session: AsyncSession) -> list[dict[str, object]]:
     rows = (await session.execute(select(LocaleOverride))).scalars().all()
-    items: list[dict[str, object]] = []
-    for row in rows:
-        items.append(
-            {
-                "lang": row.lang,
-                "key": row.key,
-                "value": row.value,
-                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-                "updated_by": row.updated_by,
-            }
-        )
-    return items
+    return [
+        {
+            "lang": row.lang,
+            "key": row.key,
+            "value": row.value,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            "updated_by": row.updated_by,
+        }
+        for row in rows
+    ]
 
 
 async def upsert_override(

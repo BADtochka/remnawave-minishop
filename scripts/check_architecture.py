@@ -435,9 +435,11 @@ def _check_svelte_lang_ts(cfg: dict, issues: list[str]) -> None:
             if rel not in allowlist:
                 issues.append(f'[svelte-lang-ts] {rel}: missing <script lang="ts">')
 
-    for rel in sorted(allowlist):
-        if rel not in actual_untyped:
-            issues.append(f"[svelte-lang-ts] {rel}: allowlist entry is stale")
+    issues.extend(
+        f"[svelte-lang-ts] {rel}: allowlist entry is stale"
+        for rel in sorted(allowlist)
+        if rel not in actual_untyped
+    )
 
 
 def _check_frontend_api_calls(cfg: dict, issues: list[str]) -> None:
