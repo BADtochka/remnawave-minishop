@@ -26,6 +26,8 @@ from .manage_edit import (  # noqa: F401
     process_promo_edit_details,
     promo_edit_field_handler,
     promo_edit_select_handler,
+)
+from .manage_edit import (
     router as _edit_router,
 )
 from .manage_format import (  # noqa: F401
