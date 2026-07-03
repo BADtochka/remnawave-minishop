@@ -157,6 +157,24 @@ def test_callback_reuse_hit_short_circuits(monkeypatch):
     desc.create.assert_not_awaited()
 
 
+def test_callback_reuse_lookup_uses_descriptor_ttl(monkeypatch):
+    _patch_common(monkeypatch)
+    fake_dal = SimpleNamespace(
+        find_recent_pending_provider_payment=AsyncMock(return_value=None),
+        create_payment_record=AsyncMock(return_value=SimpleNamespace(payment_id=42)),
+    )
+    monkeypatch.setattr(link_flow, "payment_dal", fake_dal)
+
+    desc = _descriptor(callback_reuse_since_minutes=lambda service, context: 17)
+    asyncio.run(
+        run_callback_payment(
+            desc, _callback(), _settings(), {"i18n_instance": object()}, _FakeService(), _session()
+        )
+    )
+
+    assert fake_dal.find_recent_pending_provider_payment.await_args.kwargs["since_minutes"] == 17
+
+
 def test_callback_can_disable_reuse_lookup(monkeypatch):
     _patch_common(monkeypatch)
     fake_dal = SimpleNamespace(

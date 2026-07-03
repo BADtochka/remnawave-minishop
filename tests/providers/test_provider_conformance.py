@@ -40,7 +40,6 @@ LINKFLOW_BESPOKE = {
     "qa": "local signed webhook fixture for full-stack QA, not a real hosted provider",
     "stars": "Telegram Stars in-app invoice; no external payment link or webhook",
     "stripe": "card PaymentIntent / saved-card recurring, not a hosted-link redirect",
-    "wata": "multi-profile terminal routing with per-profile signature",
     "yookassa": "HWID variants + saved-card autopayments",
 }
 

@@ -131,6 +131,9 @@ class LinkPaymentDescriptor[ServiceT: LinkFlowService]:
     reuse_with_context: (
         Callable[[ServiceT, Any, dict[str, Any] | None], Awaitable[str | None]] | None
     ) = None
+    callback_reuse_since_minutes: Callable[[ServiceT, dict[str, Any] | None], int | None] | None = (
+        None
+    )
     callback_reuse_enabled: bool = True
     callback_reuse_answer: bool = False
     webapp_available: Callable[[ServiceT], bool] | None = None
@@ -269,6 +272,11 @@ async def run_callback_payment[ServiceT: LinkFlowService](
             sale_mode=parts.sale_mode,
             hwid_device_count=hwid_quote.get("device_count") if hwid_quote else None,
         )
+        reuse_since_minutes = (
+            descriptor.callback_reuse_since_minutes(service, provider_context)
+            if descriptor.callback_reuse_since_minutes is not None
+            else None
+        )
         reusable_payment = await payment_dal.find_recent_pending_provider_payment(
             session,
             user_id=callback.from_user.id,
@@ -281,6 +289,7 @@ async def run_callback_payment[ServiceT: LinkFlowService](
             purchased_gb=reuse_amounts.purchased_gb,
             purchased_hwid_devices=reuse_amounts.purchased_hwid_devices,
             tariff_key=reuse_amounts.tariff_key,
+            since_minutes=reuse_since_minutes,
         )
     if reusable_payment is not None:
         reusable_url = await _reuse_payment(
