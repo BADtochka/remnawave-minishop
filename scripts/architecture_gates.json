@@ -15,7 +15,6 @@
     ],
     "allowlist": [
       "backend/bot/app/web/templates/*.js",
-      "backend/db/migrator.py",
       "frontend/src/lib/api/openapi.generated.ts",
       "frontend/src/lib/webapp/demoDataset.js"
     ]
