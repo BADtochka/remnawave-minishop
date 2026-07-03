@@ -18,22 +18,15 @@ from config.settings import Settings
 from db.dal import tariff_dal
 from db.models import Subscription
 
+from .tariff_worker_shared import (
+    PREMIUM_WARNING_DEPLETED_LEVEL,
+    PREMIUM_WARNING_LEVEL_OFFSET,
+    TARIFF_WORKER_SQUAD_CONFIRMATION_CACHE_TTL_SECONDS,
+    deliver_traffic_warning,
+    fmt_bytes,
+)
+
 logger = logging.getLogger(__name__)
-
-PREMIUM_WARNING_LEVEL_OFFSET = 1000
-# Single warning per premium billing period when usage reached or exceeded the quota.
-PREMIUM_WARNING_DEPLETED_LEVEL = PREMIUM_WARNING_LEVEL_OFFSET + 100
-
-# Process active subscriptions in chunks and prefetch panel data concurrently
-# to avoid an N+1 serial chain to the Remnawave panel each tick.
-TARIFF_WORKER_BATCH_SIZE = 50
-TARIFF_WORKER_PANEL_CONCURRENCY = 10
-TARIFF_WORKER_BULK_PANEL_FETCH_THRESHOLD = 50
-TARIFF_WORKER_SQUAD_CONFIRMATION_CACHE_TTL_SECONDS = 900
-TARIFF_WORKER_DB_RETRY_ATTEMPTS = 3
-TARIFF_WORKER_DB_RETRY_BASE_SLEEP_SECONDS = 0.5
-POSTGRES_RETRYABLE_SQLSTATES = {"40001", "40P01"}
-POSTGRES_RETRYABLE_ERROR_NAMES = {"DeadlockDetectedError", "SerializationError"}
 
 
 class _PremiumTariff(Protocol):
@@ -622,14 +615,7 @@ class TariffWorkerPremiumMixin:
         bonus = int(getattr(sub, "premium_bonus_bytes", 0) or 0)
         return max(0, baseline) + max(0, topup_balance) + max(0, bonus)
 
-    @staticmethod
-    def _fmt_bytes(value: int) -> str:
-        size = float(max(0, int(value or 0)))
-        for unit in ("B", "KB", "MB", "GB", "TB"):
-            if size < 1024 or unit == "TB":
-                return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
-            size /= 1024
-        return f"{size:.1f} TB"
+    _fmt_bytes = staticmethod(fmt_bytes)
 
     async def _maybe_warn_premium_squad_limit(
         self,
@@ -672,16 +658,7 @@ class TariffWorkerPremiumMixin:
                 if self.i18n
                 else (lambda k, **kw: k)
             )
-            access = await self.subscription_service.premium_access_for_tariff(tariff)
-            labels = access.get("node_labels") or access.get("squad_labels") or []
-            if labels:
-                visible = [hd.quote(str(x)) for x in labels[:8]]
-                servers = "\n".join(f"• {label}" for label in visible)
-                if len(labels) > len(visible):
-                    more = len(labels) - len(visible)
-                    servers += "\n" + _("traffic_warning_premium_servers_more", count=more)
-            else:
-                servers = _("traffic_warning_premium_generic_servers")
+            servers = await self._premium_servers_text(tariff, _)
             usage = self._usage_placeholders(used_val, limit_val)
             reset_note = self._traffic_next_reset_note(
                 _,
@@ -704,35 +681,23 @@ class TariffWorkerPremiumMixin:
                 f"kind=premium warning_key={warning_key} "
                 f"used_bytes={used_val} limit_bytes={limit_val}"
             )
-            if self.bot:
-                try:
-                    markup = self._traffic_topup_markup(user_lang, "premium")
-                    await self.bot.send_message(
-                        sub.user_id,
-                        text,
-                        reply_markup=markup,
-                        parse_mode="HTML",
-                    )
-                    await log_user_message_delivery(
-                        session,
-                        target_user_id=sub.user_id,
-                        event_type="telegram_traffic_warning_sent",
-                        channel="telegram",
-                        recipient=str(sub.user_id),
-                        content=audit_content,
-                    )
-                except Exception:
-                    logger.exception(
-                        "Failed to send premium traffic depleted warning to user %s", sub.user_id
-                    )
-            await self._send_traffic_warning_email(
+            markup = self._traffic_topup_markup(user_lang, "premium") if self.bot else None
+            await deliver_traffic_warning(
                 session,
                 user_id=sub.user_id,
+                bot=self.bot,
+                text=text,
+                markup=markup,
+                audit_content=audit_content,
+                audit_logger=log_user_message_delivery,
+                email_sender=self._send_traffic_warning_email,
                 subject_key="email_traffic_warning_premium_depleted_subject",
-                message_text=text,
                 kind="premium",
                 warning_key=warning_key,
-                audit_content=audit_content,
+                logger=logger,
+                telegram_failure_message=(
+                    "Failed to send premium traffic depleted warning to user %s"
+                ),
             )
             return
 
@@ -763,16 +728,7 @@ class TariffWorkerPremiumMixin:
                 if self.i18n
                 else (lambda k, **kw: k)
             )
-            access = await self.subscription_service.premium_access_for_tariff(tariff)
-            labels = access.get("node_labels") or access.get("squad_labels") or []
-            if labels:
-                visible = [hd.quote(str(x)) for x in labels[:8]]
-                servers = "\n".join(f"• {label}" for label in visible)
-                if len(labels) > len(visible):
-                    more = len(labels) - len(visible)
-                    servers += "\n" + _("traffic_warning_premium_servers_more", count=more)
-            else:
-                servers = _("traffic_warning_premium_generic_servers")
+            servers = await self._premium_servers_text(tariff, _)
             left_pct = max(0, 100 - int(level))
             usage = self._usage_placeholders(used_val, limit_val)
             reset_note = self._traffic_next_reset_note(
@@ -797,35 +753,21 @@ class TariffWorkerPremiumMixin:
                 f"kind=premium warning_key={warning_key} level={int(level)} "
                 f"used_bytes={used_val} limit_bytes={limit_val}"
             )
-            if self.bot:
-                try:
-                    markup = self._traffic_topup_markup(user_lang, "premium")
-                    await self.bot.send_message(
-                        sub.user_id,
-                        text,
-                        reply_markup=markup,
-                        parse_mode="HTML",
-                    )
-                    await log_user_message_delivery(
-                        session,
-                        target_user_id=sub.user_id,
-                        event_type="telegram_traffic_warning_sent",
-                        channel="telegram",
-                        recipient=str(sub.user_id),
-                        content=audit_content,
-                    )
-                except Exception:
-                    logger.exception(
-                        "Failed to send premium traffic warning to user %s", sub.user_id
-                    )
-            await self._send_traffic_warning_email(
+            markup = self._traffic_topup_markup(user_lang, "premium") if self.bot else None
+            await deliver_traffic_warning(
                 session,
                 user_id=sub.user_id,
+                bot=self.bot,
+                text=text,
+                markup=markup,
+                audit_content=audit_content,
+                audit_logger=log_user_message_delivery,
+                email_sender=self._send_traffic_warning_email,
                 subject_key="email_traffic_warning_premium_almost_subject",
-                message_text=text,
                 kind="premium",
                 warning_key=warning_key,
-                audit_content=audit_content,
+                logger=logger,
+                telegram_failure_message="Failed to send premium traffic warning to user %s",
             )
 
     async def _premium_node_uuids_for_tariff(self, tariff: _PremiumTariff) -> list[str]:

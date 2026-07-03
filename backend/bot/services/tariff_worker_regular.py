@@ -20,22 +20,14 @@ from config.traffic_strategy import canonical_traffic_limit_strategy
 from db.dal import tariff_dal, user_dal
 from db.models import Subscription
 
+from .tariff_worker_shared import (
+    TARIFF_WORKER_BATCH_SIZE,
+    TARIFF_WORKER_BULK_PANEL_FETCH_THRESHOLD,
+    TARIFF_WORKER_PANEL_CONCURRENCY,
+    deliver_traffic_warning,
+)
+
 logger = logging.getLogger(__name__)
-
-PREMIUM_WARNING_LEVEL_OFFSET = 1000
-# Single warning per premium billing period when usage reached or exceeded the quota.
-PREMIUM_WARNING_DEPLETED_LEVEL = PREMIUM_WARNING_LEVEL_OFFSET + 100
-
-# Process active subscriptions in chunks and prefetch panel data concurrently
-# to avoid an N+1 serial chain to the Remnawave panel each tick.
-TARIFF_WORKER_BATCH_SIZE = 50
-TARIFF_WORKER_PANEL_CONCURRENCY = 10
-TARIFF_WORKER_BULK_PANEL_FETCH_THRESHOLD = 50
-TARIFF_WORKER_SQUAD_CONFIRMATION_CACHE_TTL_SECONDS = 900
-TARIFF_WORKER_DB_RETRY_ATTEMPTS = 3
-TARIFF_WORKER_DB_RETRY_BASE_SLEEP_SECONDS = 0.5
-POSTGRES_RETRYABLE_SQLSTATES = {"40001", "40P01"}
-POSTGRES_RETRYABLE_ERROR_NAMES = {"DeadlockDetectedError", "SerializationError"}
 
 
 class _RegularTariff(Protocol):
@@ -642,33 +634,21 @@ class TariffWorkerRegularMixin:
                 f"kind=regular warning_key={warning_key} level={level} "
                 f"used_bytes={used_val} limit_bytes={limit_val}"
             )
-            if self.bot:
-                try:
-                    markup = self._traffic_topup_markup(user_lang, "regular")
-                    await self.bot.send_message(
-                        sub.user_id,
-                        text,
-                        reply_markup=markup,
-                        parse_mode="HTML",
-                    )
-                    await log_user_message_delivery(
-                        session,
-                        target_user_id=sub.user_id,
-                        event_type="telegram_traffic_warning_sent",
-                        channel="telegram",
-                        recipient=str(sub.user_id),
-                        content=audit_content,
-                    )
-                except Exception:
-                    logger.exception("Failed to send traffic warning to user %s", sub.user_id)
-            await self._send_traffic_warning_email(
+            markup = self._traffic_topup_markup(user_lang, "regular") if self.bot else None
+            await deliver_traffic_warning(
                 session,
                 user_id=sub.user_id,
+                bot=self.bot,
+                text=text,
+                markup=markup,
+                audit_content=audit_content,
+                audit_logger=log_user_message_delivery,
+                email_sender=self._send_traffic_warning_email,
                 subject_key=subject_key,
-                message_text=text,
                 kind="regular",
                 warning_key=warning_key,
-                audit_content=audit_content,
+                logger=logger,
+                telegram_failure_message="Failed to send traffic warning to user %s",
             )
         if ratio >= 1.0 and not sub.is_throttled:
             logger.info(
