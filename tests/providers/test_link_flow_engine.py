@@ -251,6 +251,52 @@ def test_callback_before_create_hook_runs_after_record_creation(monkeypatch):
     assert events == ["record", "answer", "create"]
 
 
+def test_callback_context_is_passed_to_create_request(monkeypatch):
+    _patch_common(monkeypatch)
+    payment = SimpleNamespace(payment_id=42, status="pending_fake")
+    fake_dal = SimpleNamespace(
+        find_recent_pending_provider_payment=AsyncMock(return_value=None),
+        create_payment_record=AsyncMock(return_value=payment),
+    )
+    monkeypatch.setattr(link_flow, "payment_dal", fake_dal)
+
+    desc = _descriptor(callback_context=lambda callback, parts: {"variant": "sbp"})
+    asyncio.run(
+        run_callback_payment(
+            desc, _callback(), _settings(), {"i18n_instance": object()}, _FakeService(), _session()
+        )
+    )
+
+    _service, request = desc.create.await_args.args
+    assert request.provider_context == {"variant": "sbp"}
+
+
+def test_callback_reuse_validator_skips_stale_payment(monkeypatch):
+    _patch_common(monkeypatch)
+    existing = SimpleNamespace(payment_id=7)
+    created = SimpleNamespace(payment_id=42, status="pending_fake")
+    fake_dal = SimpleNamespace(
+        find_recent_pending_provider_payment=AsyncMock(return_value=existing),
+        create_payment_record=AsyncMock(return_value=created),
+    )
+    monkeypatch.setattr(link_flow, "payment_dal", fake_dal)
+
+    desc = _descriptor(
+        callback_context=lambda callback, parts: {"variant": "sbp"},
+        reuse=AsyncMock(return_value="https://pay/reused"),
+        reuse_payment_allowed=lambda payment, context: False,
+    )
+    asyncio.run(
+        run_callback_payment(
+            desc, _callback(), _settings(), {"i18n_instance": object()}, _FakeService(), _session()
+        )
+    )
+
+    desc.reuse.assert_not_awaited()
+    fake_dal.create_payment_record.assert_awaited_once()
+    desc.create.assert_awaited_once()
+
+
 def test_callback_unconfigured_service_notifies(monkeypatch):
     _patch_common(monkeypatch)
     monkeypatch.setattr(link_flow, "payment_dal", SimpleNamespace())

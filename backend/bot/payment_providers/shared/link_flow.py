@@ -91,6 +91,7 @@ class CreatePaymentRequest:
     description: str
     months: float
     sale_mode: str
+    provider_context: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,12 @@ class LinkPaymentDescriptor[ServiceT: LinkFlowService]:
         Callable[[CreatePaymentRequest, dict, Callable[..., str]], str | None] | None
     ) = None
     callback_before_create: Callable[[types.CallbackQuery], Awaitable[None]] | None = None
+    callback_context: Callable[[types.CallbackQuery, Any], dict[str, Any] | None] | None = None
+    webapp_context: Callable[[WebAppPaymentContext], dict[str, Any] | None] | None = None
+    reuse_payment_allowed: Callable[[Any, dict[str, Any] | None], bool] | None = None
+    reuse_with_context: (
+        Callable[[ServiceT, Any, dict[str, Any] | None], Awaitable[str | None]] | None
+    ) = None
     callback_reuse_enabled: bool = True
     callback_reuse_answer: bool = False
     webapp_available: Callable[[ServiceT], bool] | None = None
@@ -158,6 +165,22 @@ def _webapp_service_available[ServiceT: LinkFlowService](
     if descriptor.webapp_available is not None:
         return descriptor.webapp_available(service)
     return bool(service.configured)
+
+
+async def _reuse_payment[ServiceT: LinkFlowService](
+    descriptor: LinkPaymentDescriptor[ServiceT],
+    service: ServiceT,
+    payment: Any,
+    provider_context: dict[str, Any] | None,
+) -> str | None:
+    if descriptor.reuse_payment_allowed is not None and not descriptor.reuse_payment_allowed(
+        payment,
+        provider_context,
+    ):
+        return None
+    if descriptor.reuse_with_context is not None:
+        return await descriptor.reuse_with_context(service, payment, provider_context)
+    return await descriptor.reuse(service, payment)
 
 
 async def run_callback_payment[ServiceT: LinkFlowService](
@@ -218,6 +241,11 @@ async def run_callback_payment[ServiceT: LinkFlowService](
     ):
         await notify_service_unavailable(callback, translator)
         return
+    provider_context = (
+        descriptor.callback_context(callback, parts)
+        if descriptor.callback_context is not None
+        else None
+    )
     payment_description = describe_payment(translator, parts)
     record_payload = build_payment_record_payload(
         user_id=callback.from_user.id,
@@ -252,7 +280,12 @@ async def run_callback_payment[ServiceT: LinkFlowService](
             tariff_key=reuse_amounts.tariff_key,
         )
     if reusable_payment is not None:
-        reusable_url = await descriptor.reuse(service, reusable_payment)
+        reusable_url = await _reuse_payment(
+            descriptor,
+            service,
+            reusable_payment,
+            provider_context,
+        )
         if reusable_url:
             if descriptor.callback_reuse_answer:
                 await safe_callback_answer(callback)
@@ -291,6 +324,7 @@ async def run_callback_payment[ServiceT: LinkFlowService](
         description=payment_description,
         months=float(parts.months),
         sale_mode=str(parts.sale_mode),
+        provider_context=provider_context,
     )
     success, response_data = await descriptor.create(service, create_request)
     lead_text = (
@@ -326,6 +360,9 @@ async def run_webapp_payment[ServiceT: LinkFlowService](
         return payment_unavailable()
 
     currency = _resolve_webapp_currency(descriptor, ctx, settings, service)
+    provider_context = (
+        descriptor.webapp_context(ctx) if descriptor.webapp_context is not None else None
+    )
     try:
         payment = await create_webapp_payment_record(
             ctx,
@@ -344,6 +381,7 @@ async def run_webapp_payment[ServiceT: LinkFlowService](
                 description=ctx.description,
                 months=float(getattr(ctx, "months", 0) or 0),
                 sale_mode=str(getattr(ctx, "sale_mode", "") or ""),
+                provider_context=provider_context,
             ),
         )
     except Exception:
@@ -371,4 +409,7 @@ async def run_reuse_webapp_payment[ServiceT: LinkFlowService](
     service = app_optional(ctx.request, descriptor.service_app_key, descriptor.service_type)
     if not service or not service.configured:
         return None
-    return await descriptor.reuse(service, payment)
+    provider_context = (
+        descriptor.webapp_context(ctx) if descriptor.webapp_context is not None else None
+    )
+    return await _reuse_payment(descriptor, service, payment, provider_context)
