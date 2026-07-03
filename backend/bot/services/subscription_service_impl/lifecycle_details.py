@@ -1,6 +1,6 @@
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,15 +9,17 @@ from db.dal import subscription_dal, tariff_dal, user_dal
 
 from ._typing import SubscriptionServiceMixinContract
 
+logger = logging.getLogger(__name__)
+
 
 class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
     async def get_active_subscription_details(
         self, session: AsyncSession, user_id: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         db_user = await user_dal.get_user_by_id(session, user_id)
         if not db_user or not db_user.panel_user_uuid:
-            logging.info(
-                f"User {user_id} not found in DB or no panel_user_uuid for 'my_subscription'."
+            logger.info(
+                "User %s not found in DB or no panel_user_uuid for 'my_subscription'.", user_id
             )
             return None
 
@@ -33,7 +35,7 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
 
         if not panel_user_data:
             if panel_user_confirmed_absent:
-                logging.warning(
+                logger.warning(
                     "Panel user %s confirmed absent on panel for user %s. "
                     "Clearing local linkage. reason=%s",
                     panel_user_uuid,
@@ -43,7 +45,7 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
                 await subscription_dal.deactivate_all_user_subscriptions(session, user_id)
                 await user_dal.update_user(session, user_id, {"panel_user_uuid": None})
                 return None
-            logging.warning(
+            logger.warning(
                 "Panel user %s lookup failed for user %s; treating it as a panel access/API "
                 "problem and preserving local linkage/subscription. reason=%s",
                 panel_user_uuid,
@@ -106,7 +108,7 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
                 update_payload_local["panel_subscription_uuid"] = panel_sub_uuid_from_panel
 
             is_active_based_on_panel = panel_status == "ACTIVE" and (
-                panel_expire_dt > datetime.now(timezone.utc) if panel_expire_dt else False
+                panel_expire_dt > datetime.now(UTC) if panel_expire_dt else False
             )
             if local_active_sub.is_active != is_active_based_on_panel:
                 update_payload_local["is_active"] = is_active_based_on_panel
@@ -185,7 +187,7 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
             if local_active_sub
             else False
         )
-        hwid_entitlement_summary: Dict[str, Any] = {}
+        hwid_entitlement_summary: dict[str, Any] = {}
         active_extra_hwid_devices = (
             int(local_active_sub.extra_hwid_devices or 0) if local_active_sub else 0
         )
@@ -194,7 +196,7 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
                 hwid_entitlement_summary = await tariff_dal.get_hwid_device_entitlement_summary(
                     session,
                     subscription_id=local_active_sub.subscription_id,
-                    at=datetime.now(timezone.utc),
+                    at=datetime.now(UTC),
                 )
                 active_extra_hwid_devices = int(hwid_entitlement_summary.get("active_devices") or 0)
                 if active_extra_hwid_devices != int(local_active_sub.extra_hwid_devices or 0):
@@ -205,7 +207,7 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
                     )
                     local_active_sub.extra_hwid_devices = active_extra_hwid_devices
             except Exception:
-                logging.exception(
+                logger.exception(
                     "Failed to load HWID entitlement summary for subscription %s",
                     local_active_sub.subscription_id,
                 )
@@ -302,16 +304,14 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
 
     async def get_subscriptions_ending_soon(
         self, session: AsyncSession, days_threshold: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         subs_models_with_users = await subscription_dal.get_subscriptions_near_expiration(
             session, days_threshold
         )
         results = []
         for sub_model in subs_models_with_users:
             if sub_model.user and sub_model.end_date and not sub_model.skip_notifications:
-                days_left = (sub_model.end_date - datetime.now(timezone.utc)).total_seconds() / (
-                    24 * 3600
-                )
+                days_left = (sub_model.end_date - datetime.now(UTC)).total_seconds() / (24 * 3600)
                 results.append(
                     {
                         "user_id": sub_model.user_id,
@@ -319,7 +319,7 @@ class SubscriptionLifecycleDetailsMixin(SubscriptionServiceMixinContract):
                         "language_code": sub_model.user.language_code
                         or self.settings.DEFAULT_LANGUAGE,
                         "end_date_str": sub_model.end_date.strftime("%Y-%m-%d"),
-                        "days_left": max(0, int(round(days_left))),
+                        "days_left": max(0, round(days_left)),
                         "subscription_end_date_iso_for_update": sub_model.end_date,
                     }
                 )

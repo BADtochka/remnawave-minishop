@@ -119,7 +119,7 @@
     isDefaultTokenDirty: (tokenKey: string) => boolean;
     tokenTextValue: (tokenKey: string, tokens?: TokenMap) => string;
     fontItemsWithCurrent: (items: FontOption[], value: unknown) => FontOption[];
-    defaultFontSelectHandler: (tokenKey: string) => SelectCallback;
+    defaultFontSelectHandler: (tokenKey: string) => (value: string) => void;
     applyCustomGoogleFont: (tokenKey: string, kind?: "sans" | "mono") => void;
     radiusNumber: (tokens?: TokenMap) => number;
     defaultRadiusRangeHandler: SelectCallback;

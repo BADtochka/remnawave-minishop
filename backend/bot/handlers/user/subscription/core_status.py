@@ -1,7 +1,8 @@
+import contextlib
 import html
 import logging
-from datetime import datetime
-from typing import Any, Optional, Union
+from datetime import UTC, datetime
+from typing import Any
 
 from aiogram import Bot, F, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -13,6 +14,7 @@ from bot.keyboards.inline.user_keyboards import (
 from bot.middlewares.i18n import JsonI18n
 from bot.services.panel_api_service import PanelApiService
 from bot.services.subscription_service_impl.core import SubscriptionService
+from bot.services.traffic_topup_availability import resolve_traffic_topup_availability
 from bot.utils.callback_answer import (
     callback_message,
 )
@@ -36,6 +38,8 @@ from .core_common import (
     router,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _devices_list_from_panel_response(devices: Any) -> list[dict[str, Any]]:
     if isinstance(devices, dict):
@@ -56,7 +60,7 @@ def _devices_list_from_panel_response(devices: Any) -> list[dict[str, Any]]:
     return [device for device in raw_devices if isinstance(device, dict)]
 
 
-def _devices_count_from_panel_response(devices: Any) -> Optional[int]:
+def _devices_count_from_panel_response(devices: Any) -> int | None:
     if devices is None:
         return None
     if isinstance(devices, dict):
@@ -74,7 +78,7 @@ def _devices_count_from_panel_response(devices: Any) -> Optional[int]:
 
 
 async def my_subscription_command_handler(
-    event: Union[types.Message, types.CallbackQuery],
+    event: types.Message | types.CallbackQuery,
     i18n_data: dict,
     settings: Settings,
     panel_service: PanelApiService,
@@ -116,10 +120,8 @@ async def my_subscription_command_handler(
         kb = InlineKeyboardMarkup(inline_keyboard=[[buy_button], *back_markup.inline_keyboard])
 
         if isinstance(event, types.CallbackQuery):
-            try:
+            with contextlib.suppress(Exception):
                 await event.answer()
-            except Exception:
-                pass
             try:
                 await callback_message(event).edit_text(text, reply_markup=kb)
             except Exception:
@@ -129,13 +131,13 @@ async def my_subscription_command_handler(
         return
 
     end_date = active.get("end_date")
-    days_left = (end_date.date() - datetime.now().date()).days if end_date else 0
+    days_left = (end_date.date() - datetime.now(UTC).date()).days if end_date else 0
     traffic_mode = bool(settings.traffic_sale_mode)
     config_link_display = active.get("config_link")
     connect_button_url = active.get("connect_button_url")
     config_link_value = config_link_display or get_text("config_link_not_available")
 
-    def _fmt_gb(val: Optional[float]) -> str:
+    def _fmt_gb(val: float | None) -> str:
         if val is None:
             return str(get_text("traffic_na"))
         try:
@@ -146,7 +148,7 @@ async def my_subscription_command_handler(
             pass
         return str(val)
 
-    def _format_traffic_period(strategy: Optional[str]) -> Optional[str]:
+    def _format_traffic_period(strategy: str | None) -> str | None:
         if not strategy:
             return None
         strategy_upper = str(strategy).upper()
@@ -159,7 +161,7 @@ async def my_subscription_command_handler(
         label_key = key_map.get(strategy_upper)
         return get_text(label_key) if label_key else strategy_upper
 
-    def _format_used_with_period(used_display: str, period_label: Optional[str]) -> str:
+    def _format_used_with_period(used_display: str, period_label: str | None) -> str:
         if not period_label:
             return used_display
         return str(
@@ -273,7 +275,7 @@ async def my_subscription_command_handler(
                 text = append_install_share_link_text(text, get_text, install_share_url)
             except Exception:
                 await session.rollback()
-                logging.exception(
+                logger.exception(
                     "Failed to persist install guide share token for user %s.",
                     _event_user_id(event),
                 )
@@ -338,7 +340,7 @@ async def my_subscription_command_handler(
                 try:
                     devices_response = await panel_service.get_user_devices(user_uuid)
                 except Exception:
-                    logging.exception("Failed to load devices for user %s", user_uuid)
+                    logger.exception("Failed to load devices for user %s", user_uuid)
             if devices_response is not None:
                 devices_count = _devices_count_from_panel_response(devices_response)
                 if devices_count is not None:
@@ -422,16 +424,10 @@ async def my_subscription_command_handler(
                 tariff_actions.append(
                     InlineKeyboardButton(text="Сменить тариф", callback_data="tariff_change:list")
                 )
-            try:
-                tariff = settings.tariffs_config.require(local_sub.tariff_key)
-                topup_packages = settings.tariffs_config.topup_packages_for(tariff)
-                has_topup_packages = bool(
-                    (topup_packages and topup_packages.has_any())
-                    or (tariff.premium_topup_packages and tariff.premium_topup_packages.has_any())
-                )
-            except Exception:
-                has_topup_packages = False
-            if has_topup_packages:
+            # Mirror the web app: the top-up offer stays hidden until usage
+            # crosses the unlock threshold (unless the tariff allows it always).
+            topup_availability = resolve_traffic_topup_availability(settings, active)
+            if topup_availability.unlocked:
                 tariff_actions.append(
                     InlineKeyboardButton(text="Докупить трафик", callback_data="tariff_topup:list")
                 )
@@ -445,10 +441,8 @@ async def my_subscription_command_handler(
     markup = InlineKeyboardMarkup(inline_keyboard=kb)
 
     if isinstance(event, types.CallbackQuery):
-        try:
+        with contextlib.suppress(Exception):
             await event.answer()
-        except Exception:
-            pass
         try:
             await callback_message(event).edit_text(
                 text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True
@@ -469,7 +463,7 @@ async def my_subscription_command_handler(
 
 @router.callback_query(F.data == "main_action:my_devices")
 async def my_devices_command_handler(
-    event: Union[types.Message, types.CallbackQuery],
+    event: types.Message | types.CallbackQuery,
     i18n_data: dict,
     settings: Settings,
     panel_service: PanelApiService,
@@ -489,25 +483,20 @@ async def my_devices_command_handler(
 
     if not settings.MY_DEVICES_SECTION_ENABLED:
         if isinstance(event, types.CallbackQuery):
-            try:
+            with contextlib.suppress(Exception):
                 await event.answer(get_text("my_devices_feature_disabled"), show_alert=True)
-            except Exception:
-                pass
         else:
             await target.answer(get_text("my_devices_feature_disabled"))
         return
 
-    # TODO: context?
     active = await subscription_service.get_active_subscription_details(
         session, _event_user_id(event)
     )
     if not active or not active.get("user_id"):
         message = get_text("subscription_not_active")
         if isinstance(event, types.CallbackQuery):
-            try:
+            with contextlib.suppress(Exception):
                 await event.answer(message, show_alert=True)
-            except Exception:
-                pass
         else:
             await target.answer(message)
         return
@@ -515,10 +504,8 @@ async def my_devices_command_handler(
     devices = await panel_service.get_user_devices(active.get("user_id")) if active else None
     if devices is None:
         if isinstance(event, types.CallbackQuery):
-            try:
+            with contextlib.suppress(Exception):
                 await event.answer(get_text("no_devices_found"), show_alert=True)
-            except Exception:
-                pass
         else:
             await target.answer(get_text("no_devices_found"))
         return
@@ -621,10 +608,8 @@ async def my_devices_command_handler(
     markup = InlineKeyboardMarkup(inline_keyboard=kb)
 
     if isinstance(event, types.CallbackQuery):
-        try:
+        with contextlib.suppress(Exception):
             await event.answer()
-        except Exception:
-            pass
         try:
             await callback_message(event).edit_text(text, reply_markup=markup)
         except Exception:

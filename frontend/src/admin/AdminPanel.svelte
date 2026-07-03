@@ -1,37 +1,10 @@
-<script lang="ts">
-  import { QueryClient } from "@tanstack/svelte-query";
-  import { ArrowLeft, Check, ChevronsUpDown, Globe2, Menu } from "$components/ui/icons.js";
+﻿<script lang="ts">
   import { onMount } from "svelte";
-  import { MediaQuery } from "svelte/reactivity";
-  import { prefersReducedMotion } from "svelte/motion";
-  import { fade } from "svelte/transition";
-  import { Select } from "$components/ui/primitives.js";
-  import { AdminBadge, AdminButton } from "$components/patterns/admin/index.js";
 
-  import BrandMark from "$lib/webapp/BrandMark.svelte";
-  import AdminHeaderActions from "./AdminHeaderActions.svelte";
-  import AdminLazyModals from "./AdminLazyModals.svelte";
+  import AdminPanelLayout from "./AdminPanelLayout.svelte";
   import { ADMIN_SECTION_GROUPS, ADMIN_SECTIONS } from "./sections/registry";
-  import ConfigAlertsBanner from "./ConfigAlertsBanner.svelte";
-  import {
-    createAdminSectionComponentLoader,
-    dynamicComponent,
-    type DynamicComponent,
-  } from "./adminLazyComponents";
-  import { createAdsStore } from "../lib/admin/stores/adsStore.js";
-  import { createBackupsStore } from "../lib/admin/stores/backupsStore.js";
-  import { createBroadcastStore } from "../lib/admin/stores/broadcastStore.js";
-  import { createHealthStore } from "../lib/admin/stores/healthStore.js";
-  import { createLogsStore } from "../lib/admin/stores/logsStore.js";
-  import { createPaymentsStore } from "../lib/admin/stores/paymentsStore.js";
-  import { createPromosStore } from "../lib/admin/stores/promosStore.js";
-  import { createSettingsStore } from "../lib/admin/stores/settingsStore.js";
-  import { createStatsStore } from "../lib/admin/stores/statsStore.js";
-  import { createAdminSupportStore } from "../lib/admin/stores/supportStore.js";
-  import { createTariffsStore } from "../lib/admin/stores/tariffsStore.js";
-  import { createThemesStore } from "../lib/admin/stores/themesStore.js";
-  import { createTranslationsStore } from "../lib/admin/stores/translationsStore.js";
-  import { createUsersStore } from "../lib/admin/stores/usersStore.js";
+  import { createAdminSectionComponentLoader, type DynamicComponent } from "./adminLazyComponents";
+  import { createAdminStores, type AdminApi } from "./adminStores";
   import {
     fmtDate,
     fmtDateShort,
@@ -57,30 +30,12 @@
     withRoutePrefix,
   } from "../lib/webapp/routes.js";
   import { buildAdminPaymentsExportPath } from "../lib/webapp/publicApi";
-  import {
-    setAdsStore,
-    setAdminSupportStore,
-    setBackupsStore,
-    setBroadcastStore,
-    setHealthStore,
-    setLogsStore,
-    setPaymentsStore,
-    setPromosStore,
-    setSettingsStore,
-    setStatsStore,
-    setTariffsStore,
-    setThemesStore,
-    setTranslationsStore,
-    setUsersStore,
-  } from "../lib/admin/context";
   import type { AdminSectionDescriptor } from "./sections/registry";
   import type { SettingsSavedPayload } from "../lib/admin/stores/settingsStore";
   import type { TariffsCatalog } from "../lib/admin/stores/tariffsStore";
   import type { TranslationsSavedPayload } from "../lib/admin/stores/translationsStore";
   import type { AdminUser } from "../lib/admin/stores/usersStore";
 
-  type AdminApi = Parameters<typeof createAdsStore>[0]["api"] &
-    Parameters<typeof createThemesStore>[0]["api"];
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   type AdminSectionId = string;
   type SettingsPath = string[];
@@ -172,7 +127,26 @@
   const stableRoutePrefix = initialRoutePrefix();
   const stableOnTariffsSaved = initialTariffsSaved();
   const stableOnThemesSaved = initialThemesSaved();
-  const settingsStore = createSettingsStore({ api: stableApi, onToast: flash, at });
+  const {
+    adminQueryClient,
+    adsStore,
+    healthStore,
+    paymentsStore,
+    promosStore,
+    settingsStore,
+    statsStore,
+    supportStore,
+    tariffsStore,
+    translationsStore,
+    usersStore,
+  } = createAdminStores({
+    api: stableApi,
+    onToast: flash,
+    at,
+    routePrefix: stableRoutePrefix,
+    onTariffsSaved: stableOnTariffsSaved,
+    onThemesSaved: stableOnThemesSaved,
+  });
 
   const featureSet = $derived(new Set<string>((settingsStore.features || []) as string[]));
   const visibleSections: AdminSectionDescriptor[] = $derived(
@@ -249,30 +223,12 @@
     }
   });
 
-  const compactQuery = new MediaQuery("max-width: 720px", false);
   let sidebarOpen = $state(false);
-  const isCompact = $derived(compactQuery.current);
   let dismissedUserRouteKey = $state("");
   let lastUserRouteKey = $state("");
-  let adminLanguageMenuOpen = $state(false);
-  let adminLanguageClickGuard = $state(false);
-  let adminLanguageClickGuardArmed = $state(false);
-  let adminLanguageClickGuardTimer: ReturnType<typeof window.setTimeout> | null = null;
-  let adminLanguageClickGuardArmTimer: ReturnType<typeof window.setTimeout> | null = null;
-  const adminLanguageGuardActive = $derived(
-    isCompact && (adminLanguageMenuOpen || adminLanguageClickGuard)
-  );
 
   function flash(text: string): void {
     onToast(text);
-  }
-
-  function sectionFade() {
-    return { duration: prefersReducedMotion.current ? 0 : 200 };
-  }
-
-  function sidebarBackdropFade() {
-    return { duration: prefersReducedMotion.current ? 0 : 180 };
   }
 
   const sectionComponentLoader = createAdminSectionComponentLoader();
@@ -283,87 +239,6 @@
   function warmSectionComponent(section: AdminSectionDescriptor): void {
     sectionComponentLoader.warm(section);
   }
-
-  const adminQueryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        gcTime: 10 * 60 * 1000,
-        retry: false,
-        staleTime: 60 * 1000,
-      },
-    },
-  });
-
-  const adsStore = createAdsStore({ api: stableApi, onToast: flash, at });
-  const backupsStore = createBackupsStore({ api: stableApi, onToast: flash, at });
-  const broadcastStore = createBroadcastStore({ api: stableApi, onToast: flash, at });
-  const healthStore = createHealthStore({ api: stableApi, at, queryClient: adminQueryClient });
-  const logsStore = createLogsStore({
-    api: stableApi,
-    onToast: flash,
-    at,
-    queryClient: adminQueryClient,
-  });
-  const paymentsStore = createPaymentsStore({
-    api: stableApi,
-    onToast: flash,
-    at,
-    routePrefix: stableRoutePrefix,
-    queryClient: adminQueryClient,
-  });
-  const promosStore = createPromosStore({
-    api: stableApi,
-    onToast: flash,
-    at,
-    queryClient: adminQueryClient,
-  });
-  const statsStore = createStatsStore({
-    api: stableApi,
-    onToast: flash,
-    at,
-    queryClient: adminQueryClient,
-  });
-  const supportStore = createAdminSupportStore({
-    api: stableApi,
-    onToast: flash,
-    at,
-    routePrefix: stableRoutePrefix,
-  });
-  const tariffsStore = createTariffsStore({
-    api: stableApi,
-    onTariffsSaved: stableOnTariffsSaved,
-    flash,
-    at,
-  });
-  const themesStore = createThemesStore({
-    api: stableApi,
-    onThemesSaved: stableOnThemesSaved,
-    flash,
-    at,
-  });
-  const translationsStore = createTranslationsStore({ api: stableApi, onToast: flash, at });
-  const usersStore = createUsersStore({
-    api: stableApi,
-    onToast: flash,
-    at,
-    routePrefix: stableRoutePrefix,
-    queryClient: adminQueryClient,
-  });
-
-  setPromosStore(promosStore);
-  setAdsStore(adsStore);
-  setHealthStore(healthStore);
-  setBackupsStore(backupsStore);
-  setBroadcastStore(broadcastStore);
-  setLogsStore(logsStore);
-  setPaymentsStore(paymentsStore);
-  setStatsStore(statsStore);
-  setAdminSupportStore(supportStore);
-  setSettingsStore(settingsStore);
-  setUsersStore(usersStore);
-  setTariffsStore(tariffsStore);
-  setThemesStore(themesStore);
-  setTranslationsStore(translationsStore);
 
   $effect(() => {
     usersStore.setActive(active);
@@ -387,10 +262,6 @@
         ? openLogsUserCard
         : openUserCard
   );
-  const currentLanguageOption = $derived(
-    languageOptions.find((option) => option.value === currentLang) || languageOptions[0]
-  );
-
   const gravatarCache = createGravatarCache(() => usersStore.updateState({}));
 
   $effect(() => {
@@ -452,12 +323,6 @@
       }
     }
     onSectionChange(next);
-  }
-
-  function changeLanguage(value: string): void {
-    adminLanguageMenuOpen = false;
-    clearAdminLanguageClickGuard();
-    onLanguageChange(value, { section: "admin", adminSection: active });
   }
 
   function currentRoutePathname(): string {
@@ -632,45 +497,6 @@
     }
   }
 
-  function clearAdminLanguageClickGuard(): void {
-    if (adminLanguageClickGuardTimer) {
-      window.clearTimeout(adminLanguageClickGuardTimer);
-      adminLanguageClickGuardTimer = null;
-    }
-    if (adminLanguageClickGuardArmTimer) {
-      window.clearTimeout(adminLanguageClickGuardArmTimer);
-      adminLanguageClickGuardArmTimer = null;
-    }
-    adminLanguageClickGuard = false;
-    adminLanguageClickGuardArmed = false;
-  }
-
-  function setAdminLanguageMenuOpen(open: boolean): void {
-    adminLanguageMenuOpen = Boolean(open);
-    clearAdminLanguageClickGuard();
-    if (!isCompact) return;
-    if (adminLanguageMenuOpen) {
-      adminLanguageClickGuard = true;
-      adminLanguageClickGuardArmTimer = window.setTimeout(() => {
-        adminLanguageClickGuardArmed = true;
-        adminLanguageClickGuardArmTimer = null;
-      }, 220);
-      return;
-    }
-    adminLanguageClickGuard = true;
-    adminLanguageClickGuardArmed = false;
-    adminLanguageClickGuardTimer = window.setTimeout(() => {
-      adminLanguageClickGuard = false;
-      adminLanguageClickGuardTimer = null;
-    }, 260);
-  }
-
-  function closeAdminLanguageFromGuard(event: MouseEvent | PointerEvent): void {
-    event.preventDefault();
-    event.stopPropagation();
-    if (adminLanguageClickGuardArmed) setAdminLanguageMenuOpen(false);
-  }
-
   onMount(() => {
     adminQueryClient.mount();
     if (typeof window !== "undefined") {
@@ -689,7 +515,6 @@
       if (typeof window !== "undefined") window.removeEventListener("popstate", onPopState);
       if (healthTimer !== null) window.clearInterval(healthTimer);
       adminQueryClient.unmount();
-      clearAdminLanguageClickGuard();
     };
   });
 
@@ -734,227 +559,56 @@
   });
 </script>
 
-<div
-  class="admin-screen-wrap"
-  class:is-sidebar-open={sidebarOpen}
-  class:is-admin-language-open={adminLanguageGuardActive}
->
-  {#if sidebarOpen}
-    <button
-      type="button"
-      class="admin-sidebar-backdrop"
-      aria-label={at("close_menu", {}, "Закрыть меню")}
-      in:fade={sidebarBackdropFade()}
-      out:fade={sidebarBackdropFade()}
-      onclick={() => (sidebarOpen = false)}
-    ></button>
-  {/if}
-  {#if adminLanguageGuardActive}
-    <button
-      class="language-select-guard"
-      class:language-select-guard--armed={adminLanguageClickGuardArmed}
-      type="button"
-      aria-label={t("wa_close", {}, at("close", {}, "Закрыть"))}
-      onpointerdown={closeAdminLanguageFromGuard}
-      onclick={closeAdminLanguageFromGuard}
-    ></button>
-  {/if}
-  <aside class="admin-sidebar" aria-label={at("sidebar_navigation", {}, "Навигация админки")}>
-    <div class="admin-sidebar-brand">
-      <BrandMark class="admin-brand-mark" {brand} />
-      <div>
-        <strong class="admin-brand-title">{brandTitle}</strong>
-        <small>{at("panel_title", {}, "Админ-панель")}</small>
-      </div>
-      <AdminButton
-        variant="ghost"
-        size="icon"
-        onclick={onClose}
-        aria-label={at("exit", {}, "Выйти")}
-      >
-        <ArrowLeft size={16} />
-      </AdminButton>
-    </div>
-
-    {#each NAV_GROUPS as group}
-      <div class="admin-sidebar-section-label">{group.label}</div>
-      <nav class="admin-nav" aria-label={group.label}>
-        {#each group.items as item}
-          {@const NavIcon = dynamicComponent(item.icon)}
-          <button
-            type="button"
-            class="admin-nav-item"
-            class:active={active === item.id}
-            data-admin-section={item.id}
-            onfocus={() => warmSectionComponent(item)}
-            onpointerenter={() => warmSectionComponent(item)}
-            onclick={() => setActive(item.id)}
-          >
-            <NavIcon size={16} />
-            <span>{item.label}</span>
-            <span>
-              {#if item.id === "support" && supportStore.stats?.total_unread_admin}
-                <AdminBadge variant="danger">
-                  <span class="numeric-badge-value">{supportStore.stats.total_unread_admin}</span>
-                </AdminBadge>
-              {/if}
-            </span>
-          </button>
-        {/each}
-      </nav>
-    {/each}
-
-    <div class="admin-sidebar-footer">
-      {#if languageOptions.length}
-        <div class="admin-language-switch">
-          <Globe2 size={16} />
-          <Select.Root
-            type="single"
-            bind:open={adminLanguageMenuOpen}
-            value={currentLang}
-            items={languageOptions}
-            disabled={languageBusy}
-            onOpenChange={setAdminLanguageMenuOpen}
-            onValueChange={changeLanguage}
-          >
-            <Select.Trigger
-              class="admin-language-trigger"
-              aria-label={t("wa_settings_language", {}, at("language", {}, "Язык"))}
-            >
-              <span>
-                <strong>{t("wa_settings_language", {}, at("language", {}, "Язык"))}</strong>
-                <small>
-                  <span class="emoji-flag" aria-hidden="true"
-                    >{currentLanguageOption?.flag || "🏳️"}</span
-                  >
-                  {currentLanguageOption?.label || currentLang}
-                </small>
-              </span>
-              <ChevronsUpDown size={14} />
-            </Select.Trigger>
-            <Select.Content class="language-select-content" side="top" align="start" sideOffset={8}>
-              <Select.Viewport class="language-select-viewport">
-                {#each languageOptions as option (option.value)}
-                  <Select.Item
-                    value={option.value}
-                    label={option.label}
-                    class="language-select-item"
-                  >
-                    <span class="language-select-item-main">
-                      <span class="emoji-flag" aria-hidden="true">{option.flag}</span>
-                      <span>{option.label}</span>
-                    </span>
-                    <Check size={15} class="language-select-item-check" />
-                  </Select.Item>
-                {/each}
-              </Select.Viewport>
-            </Select.Content>
-          </Select.Root>
-        </div>
-      {/if}
-      <a
-        class="admin-version-link"
-        href={appRepositoryUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Documentation"
-      >
-        <span>remnawave-minishop</span>
-        <span>{appVersion || "dev+local"}</span>
-      </a>
-    </div>
-  </aside>
-
-  <section class="admin-content">
-    <header class="admin-header">
-      <div style="display:flex; align-items:center; gap:12px; min-width:0;">
-        <button
-          type="button"
-          class="admin-mobile-toggle"
-          onclick={() => (sidebarOpen = !sidebarOpen)}
-          aria-label={at("menu", {}, "Меню")}
-        >
-          <Menu size={18} />
-        </button>
-        <div class="admin-header-title">
-          <h2>{meta.title}</h2>
-          {#if meta.subtitle}<small>{meta.subtitle}</small>{/if}
-        </div>
-      </div>
-      <AdminHeaderActions
-        {active}
-        {at}
-        {dirtyCount}
-        {settingsSaving}
-        {syncBusy}
-        {translationsDirtyCount}
-        {translationsSaving}
-        onCreateAd={() => adsStore.setCreateOpen(true)}
-        onCreateCode={() => promosStore.setCreateOpen(true)}
-        onCreateTariff={tariffsStore.openCreateTariff}
-        onExportPayments={exportPayments}
-        onSaveSettings={() => settingsStore.saveSettings(onSettingsSaved)}
-        onSaveTranslations={() => translationsStore.saveTranslations(onTranslationsSaved)}
-        onSyncStats={statsStore.triggerSync}
-      />
-    </header>
-
-    <main class="admin-main">
-      <ConfigAlertsBanner {at} section={active} onNavigate={setActive} />
-      {#key active}
-        <div
-          class="admin-section-stage"
-          data-admin-active-section={active}
-          in:fade={sectionFade()}
-          out:fade={sectionFade()}
-        >
-          {#if activeSectionComponent}
-            {@const ActiveSectionComponent = activeSectionComponent}
-            <ActiveSectionComponent
-              {at}
-              {brand}
-              {currentLang}
-              {fmtDate}
-              {fmtDateShort}
-              {fmtMoney}
-              {onSettingsSaved}
-              {onTranslationsSaved}
-              {paymentStatusVariant}
-              {panelStatusBadge}
-              {resolvedAvatarUrl}
-              {routePrefix}
-              {settingsPath}
-              {userDisplayName}
-              {userInitials}
-              {userSecondaryName}
-              {appFaviconUrl}
-              {appFaviconUseCustom}
-              onOpenUserCard={openSectionUserCard}
-              onOpenSettingsPath={openSettingsPath}
-              onSettingsPathChange={(path: SettingsPath) => (settingsPath = path)}
-              initialTicketId={readSupportTicketIdFromPath()}
-            />
-          {:else if activeSectionLoading}
-            <div class="admin-section-loading" aria-busy="true" aria-live="polite">
-              <span class="admin-skeleton admin-skeleton-line admin-skeleton-line-short"></span>
-              <span class="admin-skeleton admin-skeleton-line admin-skeleton-line-strong"></span>
-              <span class="admin-skeleton admin-skeleton-line"></span>
-            </div>
-          {/if}
-        </div>
-      {/key}
-    </main>
-  </section>
-</div>
-
-<AdminLazyModals
+<AdminPanelLayout
+  {active}
+  {activeSectionComponent}
+  {activeSectionLoading}
+  {adsStore}
+  {appFaviconUrl}
+  {appFaviconUseCustom}
+  {appRepositoryUrl}
+  {appVersion}
   {at}
+  {brand}
+  {brandTitle}
+  {currentLang}
+  {dirtyCount}
   {fmtDate}
   {fmtDateShort}
   {fmtMoney}
+  initialTicketId={readSupportTicketIdFromPath()}
+  {languageBusy}
+  {languageOptions}
+  {meta}
+  {NAV_GROUPS}
+  {onClose}
+  {onLanguageChange}
+  onCloseUser={closeUserCard}
+  onExportPayments={exportPayments}
+  onOpenPaymentUserCard={openPaymentUserCard}
+  onOpenSettingsPath={openSettingsPath}
+  onOpenUserCard={openSectionUserCard}
+  onSaveSettings={onSettingsSaved}
+  onSaveTranslations={onTranslationsSaved}
+  onSetActive={setActive}
+  onSettingsPathChange={(path: SettingsPath) => (settingsPath = path)}
   {openTelegramProfileLink}
   {paymentStatusVariant}
+  {panelStatusBadge}
+  {promosStore}
   {resolvedAvatarUrl}
+  {routePrefix}
+  {settingsPath}
+  {settingsSaving}
+  {settingsStore}
+  bind:sidebarOpen
+  {statsStore}
+  {supportStore}
+  {syncBusy}
+  {tariffsStore}
+  {translationsDirtyCount}
+  {translationsSaving}
+  {translationsStore}
   {trafficLeftLabel}
   {trafficOfLabel}
   {trafficPercentValue}
@@ -963,6 +617,6 @@
   {userSecondaryName}
   {userTelegramProfileLink}
   {userTelegramProfileLinkKind}
-  onCloseUser={closeUserCard}
-  onOpenPaymentUserCard={openPaymentUserCard}
+  {warmSectionComponent}
+  {t}
 />

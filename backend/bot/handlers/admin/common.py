@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 from aiogram import Bot, F, Router, types
 from aiogram.filters import Command
@@ -30,6 +29,8 @@ from .promo import bulk as admin_promo_bulk_handlers
 from .promo import create as admin_promo_create_handlers
 from .promo import manage as admin_promo_manage_handlers
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="admin_common_router")
 
 
@@ -41,9 +42,9 @@ async def admin_panel_command_handler(
     i18n_data: dict,
 ) -> None:
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
-    i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
+    i18n: JsonI18n | None = i18n_data.get("i18n_instance")
     if not i18n:
-        logging.error("i18n missing in admin_panel_command_handler")
+        logger.error("i18n missing in admin_panel_command_handler")
         await message.answer("Language service error.")
         return
 
@@ -70,16 +71,19 @@ async def admin_panel_actions_callback_handler(
     action = action_parts[1]
 
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
-    i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
+    i18n: JsonI18n | None = i18n_data.get("i18n_instance")
     if not i18n:
-        logging.error("i18n missing in admin_panel_actions_callback_handler")
+        logger.error("i18n missing in admin_panel_actions_callback_handler")
         await callback.answer("Language error.", show_alert=True)
         return
     _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs)
 
     if not callback.message:
-        logging.error(
-            f"CallbackQuery {callback.id} from {callback.from_user.id} has no message for admin_action {action}"  # noqa: E501
+        logger.error(
+            "CallbackQuery %s from %s has no message for admin_action %s",
+            callback.id,
+            callback.from_user.id,
+            action,
         )
         await callback.answer("Error processing action: message context lost.", show_alert=True)
         return
@@ -179,7 +183,7 @@ async def admin_panel_actions_callback_handler(
             )
         await callback.answer()
     else:
-        logging.warning(f"Unknown admin_action received: {action} from callback {callback.data}")
+        logger.warning("Unknown admin_action received: %s from callback %s", action, callback.data)
         await callback.answer(_("admin_unknown_action"), show_alert=True)
 
 
@@ -193,7 +197,7 @@ async def admin_section_handler(
 ) -> None:
     section = callback_data(callback).split(":")[1]
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
-    i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
+    i18n: JsonI18n | None = i18n_data.get("i18n_instance")
     if not i18n:
         await callback.answer("Language error.", show_alert=True)
         return
@@ -235,7 +239,7 @@ async def admin_section_handler(
 
         await callback.answer()
     except Exception as e:
-        logging.error(f"Error handling admin section {section}: {e}")
+        logger.error("Error handling admin section %s: %s", section, e)
         await callback_message(callback).answer(
             _("error_occurred_try_again"),
             reply_markup=get_admin_panel_keyboard(i18n, current_lang, settings),
@@ -246,7 +250,7 @@ async def admin_section_handler(
 async def show_queue_status_handler(callback: types.CallbackQuery, i18n_data: dict) -> None:
     """Show message queue status to admin"""
     current_lang = i18n_data.get("current_language", "ru")
-    i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
+    i18n: JsonI18n | None = i18n_data.get("i18n_instance")
     if not i18n or not callback.message:
         await callback.answer("Error processing request.", show_alert=True)
         return
@@ -288,5 +292,5 @@ async def show_queue_status_handler(callback: types.CallbackQuery, i18n_data: di
         await callback.answer()
 
     except Exception as e:
-        logging.error(f"Error getting queue status: {e}")
+        logger.error("Error getting queue status: %s", e)
         await callback.answer("❌ Ошибка получения статуса очередей", show_alert=True)
