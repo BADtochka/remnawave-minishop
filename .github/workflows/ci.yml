@@ -236,6 +236,8 @@ jobs:
           backend/scripts
           scripts
           tests/contracts
+          tests/providers
+          tests/unit
 
   build:
     name: Docker build

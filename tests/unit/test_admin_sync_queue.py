@@ -41,7 +41,9 @@ def _make_settings() -> SimpleNamespace:
 
 
 def _parse(response: web.Response) -> dict:
-    return json.loads(response.body.decode())
+    assert isinstance(response.body, bytes)
+    data: dict = json.loads(response.body.decode())
+    return data
 
 
 def _patch_admin_auth(monkeypatch_target: Any) -> None:
