@@ -34,19 +34,24 @@ function startPublicInstallPreload(): PublicInstallPreload | null {
 async function loadBootstrap(): Promise<void> {
   if (document.getElementById("webapp-config")) return;
   const controller = typeof AbortController === "undefined" ? null : new AbortController();
-  const timeoutId = controller
-    ? window.setTimeout(() => {
-        controller.abort();
-      }, BOOTSTRAP_TIMEOUT_MS)
-    : 0;
-  try {
+  let timedOut = false;
+  let timeoutId: ReturnType<typeof window.setTimeout> | null = null;
+  const timeout = new Promise<void>((resolve) => {
+    timeoutId = window.setTimeout(() => {
+      timedOut = true;
+      if (controller) controller.abort();
+      resolve();
+    }, BOOTSTRAP_TIMEOUT_MS);
+  });
+  const bootstrap = (async () => {
     const response = await fetch("/api/bootstrap?i18n_scope=webapp", {
       credentials: "include",
       headers: { Accept: "application/json" },
       signal: controller?.signal,
     });
-    if (!response.ok) return;
+    if (!response.ok || timedOut) return;
     const payload: { config?: unknown; i18n?: unknown } = await response.json();
+    if (timedOut) return;
     for (const [id, value] of [
       ["webapp-config", payload.config],
       ["i18n", payload.i18n],
@@ -57,8 +62,11 @@ async function loadBootstrap(): Promise<void> {
       script.textContent = JSON.stringify(value || {});
       document.head.appendChild(script);
     }
-  } catch (_error) {
+  })().catch((_error) => {
     void _error;
+  });
+  try {
+    await Promise.race([bootstrap, timeout]);
   } finally {
     if (timeoutId) window.clearTimeout(timeoutId);
   }
