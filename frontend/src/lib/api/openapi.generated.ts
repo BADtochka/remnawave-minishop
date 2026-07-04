@@ -6967,6 +6967,8 @@ export interface operations {
               premium_is_limited?: boolean;
               premium_limit?: string;
               premium_limit_bytes?: number | null;
+              premium_next_reset_at?: string | null;
+              premium_next_reset_text?: string | null;
               premium_node_labels?: string[];
               premium_squad_labels?: string[];
               premium_title?: string | null;
@@ -6990,6 +6992,8 @@ export interface operations {
               traffic_limit?: string;
               traffic_limit_bytes?: number | null;
               traffic_limit_strategy?: string;
+              traffic_next_reset_at?: string | null;
+              traffic_next_reset_text?: string | null;
               traffic_used?: string;
               traffic_used_bytes?: number | null;
             };

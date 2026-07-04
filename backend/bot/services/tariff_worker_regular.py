@@ -14,7 +14,11 @@ from bot.middlewares.i18n import JsonI18n
 from bot.services.message_audit import log_user_message_delivery
 from bot.services.panel_api_service import PanelApiService
 from bot.services.subscription_service_impl.core import SubscriptionService
-from bot.utils.date_utils import add_months, month_start
+from bot.utils.traffic_reset import (
+    previous_traffic_reset,
+    traffic_accounting_period_start,
+    traffic_period_starts_match,
+)
 from config.settings import Settings
 from config.traffic_strategy import canonical_traffic_limit_strategy
 from db.dal import tariff_dal, user_dal
@@ -116,7 +120,6 @@ class TariffWorkerRegularMixin:
     async def traffic_period_tick(self, session: AsyncSession) -> None:
         now = datetime.now(UTC)
         self._premium_node_usage_tick_cache = {}
-        warning_period_start = month_start(now)
         tracked_subscriptions_filter = Subscription.tariff_key.is_not(None)
         if self._trial_premium_tariff() is not None:
             tracked_subscriptions_filter = or_(
@@ -216,6 +219,13 @@ class TariffWorkerRegularMixin:
 
                 if not trial_premium_subscription and tariff.billing_model == "period":
                     previous_regular_period_start = getattr(sub, "period_start_at", None)
+                    warning_period_start = traffic_accounting_period_start(
+                        self._period_tariff_traffic_strategy(),
+                        now,
+                        subscription_start_at=getattr(sub, "start_date", None),
+                        previous_period_start_at=previous_regular_period_start,
+                        panel_user_data=panel_data,
+                    )
                     await self._ensure_period_reset_strategy(sub, tariff, limit, panel_strategy)
                     await self._maybe_send_regular_reset_notice(
                         session,
@@ -227,6 +237,8 @@ class TariffWorkerRegularMixin:
                         previous_period_start=previous_regular_period_start,
                     )
                     sub.period_start_at = warning_period_start
+                else:
+                    warning_period_start = None
                 if not trial_premium_subscription:
                     panel_next_reset_at = self._panel_next_traffic_reset_at(panel_data, now=now)
                     await self._sync_hwid_device_limit(session, sub, tariff, panel_data)
@@ -236,9 +248,7 @@ class TariffWorkerRegularMixin:
                         tariff,
                         used,
                         limit,
-                        warning_period_start=warning_period_start
-                        if tariff.billing_model == "period"
-                        else None,
+                        warning_period_start=warning_period_start,
                         next_reset_at=panel_next_reset_at,
                     )
 
@@ -354,12 +364,15 @@ class TariffWorkerRegularMixin:
             )
         return {}
 
-    @staticmethod
-    def _same_regular_period(value: datetime | None, period_start: datetime) -> bool:
+    def _same_regular_period(self, value: datetime | None, period_start: datetime) -> bool:
         if value is None:
             return False
         try:
-            return bool(month_start(value) == period_start)
+            return traffic_period_starts_match(
+                value,
+                period_start,
+                self._period_tariff_traffic_strategy(),
+            )
         except Exception:
             return False
 
@@ -485,7 +498,12 @@ class TariffWorkerRegularMixin:
         if not self._traffic_reset_notice_is_reassuring(used_val, limit_val):
             return
 
-        expected_previous_period = add_months(period_start_at, -1)
+        expected_previous_period = previous_traffic_reset(
+            period_start_at,
+            self._period_tariff_traffic_strategy(),
+        )
+        if expected_previous_period is None:
+            return
         if not self._same_regular_period(previous_period_start, expected_previous_period):
             return
         was_warned_previous_period = await tariff_dal.has_warning_level_between(

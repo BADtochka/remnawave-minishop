@@ -1559,6 +1559,7 @@ class SubscriptionServiceActiveDetailsTests(unittest.IsolatedAsyncioTestCase):
                         "subscriptionUrl": "https://panel.example.test/sub/short-uuid",
                         "trafficLimitBytes": 1000,
                         "trafficLimitStrategy": "MONTH",
+                        "nextTrafficResetAt": "2099-01-01T00:00:00Z",
                         "userTraffic": {
                             "usedTrafficBytes": 100,
                             "lifetimeUsedTrafficBytes": 100,
@@ -1581,6 +1582,7 @@ class SubscriptionServiceActiveDetailsTests(unittest.IsolatedAsyncioTestCase):
             local_sub.tariff_key = "standard"
             local_sub.extra_hwid_devices = 0
             local_sub.hwid_device_limit = 3
+            local_sub.premium_baseline_bytes = 25 * GIB
 
             with (
                 patch(
@@ -1612,6 +1614,8 @@ class SubscriptionServiceActiveDetailsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["extra_hwid_devices"], 1)
         self.assertEqual(result["extra_hwid_devices_valid_until"], active_until)
         self.assertEqual(result["extra_hwid_devices_valid_until_text"], "02.01.2099 03:04")
+        self.assertEqual(result["traffic_next_reset_at"], datetime(2099, 1, 1, tzinfo=UTC))
+        self.assertEqual(result["premium_next_reset_at"], datetime(2099, 1, 1, tzinfo=UTC))
 
 
 class SubscriptionDalPayloadTests(unittest.TestCase):

@@ -12494,6 +12494,18 @@
                             "null"
                           ]
                         },
+                        "premium_next_reset_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "premium_next_reset_text": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "premium_node_labels": {
                           "items": {
                             "type": "string"
@@ -12601,6 +12613,18 @@
                         },
                         "traffic_limit_strategy": {
                           "type": "string"
+                        },
+                        "traffic_next_reset_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "traffic_next_reset_text": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         },
                         "traffic_used": {
                           "type": "string"

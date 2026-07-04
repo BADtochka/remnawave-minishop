@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.utils.date_utils import month_start
+from bot.utils.traffic_reset import traffic_accounting_period_start, traffic_period_starts_match
 from config.tariffs_config import (
     Tariff,
     TariffsConfig,
@@ -130,18 +130,20 @@ class TariffMixin(SubscriptionServiceMixinContract):
             default="MONTH",
         )
 
-    def _premium_accounting_period_start(self, sub: Any, now: datetime) -> datetime:
-        if self._period_tariff_traffic_strategy() == "NO_RESET":
-            sub_start = self._aware_utc(getattr(sub, "start_date", None))
-            if sub_start is not None:
-                if sub_start <= now:
-                    return sub_start
-                previous_period_start = self._aware_utc(
-                    getattr(sub, "premium_period_start_at", None)
-                )
-                if previous_period_start is not None and previous_period_start <= now:
-                    return previous_period_start
-        return month_start(now)
+    def _premium_accounting_period_start(
+        self,
+        sub: Any,
+        now: datetime,
+        *,
+        panel_user_data: dict[str, Any] | None = None,
+    ) -> datetime:
+        return traffic_accounting_period_start(
+            self._period_tariff_traffic_strategy(),
+            now,
+            subscription_start_at=self._aware_utc(getattr(sub, "start_date", None)),
+            previous_period_start_at=self._aware_utc(getattr(sub, "premium_period_start_at", None)),
+            panel_user_data=panel_user_data,
+        )
 
     def _same_premium_accounting_period(
         self,
@@ -152,13 +154,12 @@ class TariffMixin(SubscriptionServiceMixinContract):
         current_period_start = self._aware_utc(getattr(sub, "premium_period_start_at", None))
         if current_period_start is None:
             return False
-        if current_period_start == premium_period_start:
+        strategy = self._period_tariff_traffic_strategy()
+        if traffic_period_starts_match(current_period_start, premium_period_start, strategy):
             return True
         no_reset_anchor = self._aware_utc(getattr(sub, "start_date", None))
         return bool(
-            self._period_tariff_traffic_strategy() == "NO_RESET"
-            and no_reset_anchor is not None
-            and no_reset_anchor <= now
+            strategy == "NO_RESET" and no_reset_anchor is not None and no_reset_anchor <= now
         )
 
     @staticmethod

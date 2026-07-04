@@ -13,7 +13,8 @@ from bot.middlewares.i18n import JsonI18n
 from bot.services.message_audit import log_user_message_delivery
 from bot.services.panel_api_service import PanelApiService
 from bot.services.subscription_service_impl.core import SubscriptionService
-from bot.utils.date_utils import add_months, month_start
+from bot.utils.date_utils import month_start
+from bot.utils.traffic_reset import previous_traffic_reset, traffic_period_starts_match
 from config.settings import Settings
 from db.dal import tariff_dal
 from db.models import Subscription
@@ -134,6 +135,7 @@ class TariffWorkerPremiumMixin:
         premium_period_start = self.subscription_service._premium_accounting_period_start(
             sub,
             now,
+            panel_user_data=panel_user_dict,
         )
         is_trial_premium_tariff = bool(getattr(tariff, "key", "") == "trial")
         previous_premium_period_start = getattr(sub, "premium_period_start_at", None)
@@ -337,7 +339,12 @@ class TariffWorkerPremiumMixin:
         if not self._traffic_reset_notice_is_reassuring(used, limit):
             return
 
-        expected_previous_period = add_months(period_start_at, -1)
+        expected_previous_period = previous_traffic_reset(
+            period_start_at,
+            self._period_tariff_traffic_strategy(),
+        )
+        if expected_previous_period is None:
+            return
         if not self._same_premium_period(previous_period_start, expected_previous_period):
             return
         was_warned_previous_period = await tariff_dal.has_warning_level_between(
@@ -432,14 +439,15 @@ class TariffWorkerPremiumMixin:
             )
             return None
 
-    @staticmethod
-    def _same_premium_period(value: datetime | None, premium_period_start: datetime) -> bool:
+    def _same_premium_period(self, value: datetime | None, premium_period_start: datetime) -> bool:
         if value is None:
             return False
         try:
-            if month_start(premium_period_start) != premium_period_start:
-                return bool(value == premium_period_start)
-            return bool(month_start(value) == premium_period_start)
+            return traffic_period_starts_match(
+                value,
+                premium_period_start,
+                self._period_tariff_traffic_strategy(),
+            )
         except Exception:
             return False
 

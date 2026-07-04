@@ -738,6 +738,21 @@ a {
   overflow: hidden;
 }
 
+.traffic-reset-detail {
+  gap: 7px;
+}
+
+.premium-server-list > .traffic-reset-date-row {
+  display: grid;
+  gap: 2px;
+}
+
+.traffic-reset-date-row strong {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
 .premium-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

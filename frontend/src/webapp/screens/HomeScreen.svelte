@@ -23,9 +23,11 @@
     trafficPercent as trafficPercentFn,
     trafficLabel as trafficLabelFn,
     trafficResetLabel as trafficResetLabelFn,
+    trafficNextResetLabel as trafficNextResetLabelFn,
     regularTrafficLimitVisible as regularTrafficLimitVisibleFn,
     premiumTrafficPercent as premiumTrafficPercentFn,
     premiumTrafficLabel as premiumTrafficLabelFn,
+    premiumNextResetLabel as premiumNextResetLabelFn,
     premiumTrafficLimitVisible as premiumTrafficLimitVisibleFn,
     premiumTitle as premiumTitleFn,
     premiumServerLabels as premiumServerLabelsFn,
@@ -126,6 +128,9 @@
   function trafficResetLabel(sub: SubscriptionView) {
     return trafficResetLabelFn(sub, t);
   }
+  function trafficNextResetLabel(sub: SubscriptionView) {
+    return trafficNextResetLabelFn(sub, t);
+  }
   function regularTrafficLimitVisible(sub: SubscriptionView = subscription) {
     return regularTrafficLimitVisibleFn(sub);
   }
@@ -158,13 +163,16 @@
   function premiumTrafficLabel(sub: SubscriptionView) {
     return premiumTrafficLabelFn(sub, t);
   }
+  function premiumNextResetLabel(sub: SubscriptionView) {
+    return premiumNextResetLabelFn(sub, t);
+  }
   function premiumTitle(sub: SubscriptionView = subscription) {
     return premiumTitleFn(sub, t);
   }
   function premiumTrafficMetaLabel(sub: SubscriptionView = subscription) {
     return sub?.premium_is_limited
       ? t("wa_premium_access_limited", {}, "Доступ к premium временно ограничен")
-      : t("wa_premium_reset_monthly", {}, "Отдельный лимит на месяц");
+      : trafficResetLabel(sub);
   }
   function premiumServerLabels(sub: SubscriptionView) {
     return premiumServerLabelsFn(sub);
@@ -388,18 +396,31 @@
               aria-label={t("wa_add_traffic")}
             ></button>
           {/if}
-          <div class="traffic-summary-row">
-            <span class="traffic-summary-left">
-              {t("wa_home_traffic_used")}
-              <span class="traffic-summary-separator" aria-hidden="true">|</span>
-              {regularTrafficMetaLabel(subscription)}
-            </span>
-            <strong class="traffic-summary-right">
-              <span>{trafficLabel(subscription)}</span>
-              <span class="traffic-summary-separator" aria-hidden="true">|</span>
-              <span>{trafficPercent(subscription)}%</span>
-            </strong>
-          </div>
+          <details
+            class="premium-server-dropdown premium-server-dropdown-inline traffic-reset-dropdown"
+          >
+            <summary class="traffic-summary-row premium-server-summary">
+              <span class="traffic-summary-left premium-summary-trigger">
+                <span class="premium-summary-copy">
+                  {t("wa_home_traffic_used")}
+                  <span class="traffic-summary-separator" aria-hidden="true">|</span>
+                  {regularTrafficMetaLabel(subscription)}
+                </span>
+                <CircleQuestionMark class="premium-server-help-icon" size={15} />
+              </span>
+              <strong class="traffic-summary-right">
+                <span>{trafficLabel(subscription)}</span>
+                <span class="traffic-summary-separator" aria-hidden="true">|</span>
+                <span>{trafficPercent(subscription)}%</span>
+              </strong>
+            </summary>
+            <div class="premium-server-list premium-server-list-dropdown traffic-reset-detail">
+              <div class="traffic-reset-date-row">
+                <small>{t("wa_traffic_next_reset_label", {}, "Следующий сброс")}</small>
+                <strong>{trafficNextResetLabel(subscription)}</strong>
+              </div>
+            </div>
+          </details>
           <LinearProgress value={trafficPercent(subscription)} label={t("wa_home_traffic_used")} />
         </Card>
       {/if}
@@ -417,45 +438,39 @@
               aria-label={t("wa_add_traffic_premium", { target: premiumTitle(subscription) })}
             ></button>
           {/if}
-          {#if premiumServerLabels(subscription).length}
-            <details class="premium-server-dropdown premium-server-dropdown-inline">
-              <summary class="traffic-summary-row premium-server-summary">
-                <span class="traffic-summary-left premium-summary-trigger">
-                  <span class="premium-summary-copy">
-                    {premiumTitle(subscription)}
-                    <span class="traffic-summary-separator" aria-hidden="true">|</span>
-                    {premiumTrafficMetaLabel(subscription)}
-                  </span>
-                  <CircleQuestionMark class="premium-server-help-icon" size={15} />
-                </span>
-                <strong class="traffic-summary-right">
-                  <span>{premiumTrafficLabel(subscription)}</span>
+          <details
+            class="premium-server-dropdown premium-server-dropdown-inline traffic-reset-dropdown"
+          >
+            <summary class="traffic-summary-row premium-server-summary">
+              <span class="traffic-summary-left premium-summary-trigger">
+                <span class="premium-summary-copy">
+                  {premiumTitle(subscription)}
                   <span class="traffic-summary-separator" aria-hidden="true">|</span>
-                  <span>{premiumTrafficPercent(subscription)}%</span>
-                </strong>
-              </summary>
-              <div class="premium-server-list premium-server-list-dropdown">
-                <div>
-                  {#each premiumServerLabels(subscription).slice(0, 8) as label}
-                    <span>{label}</span>
-                  {/each}
-                </div>
-              </div>
-            </details>
-          {:else}
-            <div class="traffic-summary-row">
-              <span class="traffic-summary-left">
-                {premiumTitle(subscription)}
-                <span class="traffic-summary-separator" aria-hidden="true">|</span>
-                {premiumTrafficMetaLabel(subscription)}
+                  {premiumTrafficMetaLabel(subscription)}
+                </span>
+                <CircleQuestionMark class="premium-server-help-icon" size={15} />
               </span>
               <strong class="traffic-summary-right">
                 <span>{premiumTrafficLabel(subscription)}</span>
                 <span class="traffic-summary-separator" aria-hidden="true">|</span>
                 <span>{premiumTrafficPercent(subscription)}%</span>
               </strong>
+            </summary>
+            <div class="premium-server-list premium-server-list-dropdown traffic-reset-detail">
+              <div class="traffic-reset-date-row">
+                <small>{t("wa_traffic_next_reset_label", {}, "Следующий сброс")}</small>
+                <strong>{premiumNextResetLabel(subscription)}</strong>
+              </div>
+              {#if premiumServerLabels(subscription).length}
+                <small>{t("wa_premium_servers_scope_label", {}, "Лимит действует на")}</small>
+                <div>
+                  {#each premiumServerLabels(subscription).slice(0, 8) as label}
+                    <span>{label}</span>
+                  {/each}
+                </div>
+              {/if}
             </div>
-          {/if}
+          </details>
           <LinearProgress
             class="premium-progress"
             value={premiumTrafficPercent(subscription)}
