@@ -85,12 +85,6 @@ RUN useradd -u 10001 -m appuser
 COPY backend/requirements.txt backend/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r backend/requirements.txt
-# Checked 2026-07-02: aiocryptopay 0.4.8 is still latest on PyPI and still caps
-# certifi at <2024, which resolves to a version with PYSEC-2024-230. The cap is
-# metadata-only, so force-upgrade certifi after the main resolve until upstream
-# relaxes the pin.
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir --upgrade "certifi>=2024.7.4"
 
 COPY locales ./locales
 COPY data ./data

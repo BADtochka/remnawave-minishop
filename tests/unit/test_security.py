@@ -19,6 +19,7 @@ from bot.app.web.webapp_auth import (
     create_webapp_session_token,
     verify_telegram_oauth_nonce,
 )
+from bot.payment_providers.base import ProviderWebhookPayload
 from bot.payment_providers.cryptopay import CryptoPayService
 from bot.payment_providers.freekassa import FreeKassaService
 from bot.payment_providers.heleket import HeleketConfig, HeleketService, _compute_signature
@@ -256,6 +257,49 @@ class CryptoPayServiceTests(unittest.TestCase):
         service = self._make_service()
 
         self.assertFalse(service._validate_webhook_signature(b"payload", "not-a-signature"))
+
+    def test_handle_verified_webhook_dispatches_invoice_paid_update(self):
+        service = self._make_service()
+        raw_body = json.dumps(
+            {
+                "update_id": 1,
+                "update_type": "invoice_paid",
+                "request_date": "2026-07-05T12:00:00Z",
+                "payload": {
+                    "invoice_id": 9001,
+                    "status": "paid",
+                    "amount": "100",
+                    "asset": "USDT",
+                    "payload": "{}",
+                },
+            }
+        ).encode()
+        service._invoice_paid_handler = AsyncMock()
+
+        response = asyncio_run(
+            service.handle_verified_webhook(
+                SimpleNamespace(app={"settings": object()}),
+                ProviderWebhookPayload(raw_body=raw_body),
+            )
+        )
+
+        self.assertEqual(response.status, 200)
+        service._invoice_paid_handler.assert_awaited_once()
+        update = service._invoice_paid_handler.await_args.args[0]
+        self.assertEqual(update.update_type, "invoice_paid")
+        self.assertEqual(update.payload.invoice_id, 9001)
+
+    def test_handle_verified_webhook_rejects_malformed_json(self):
+        service = self._make_service()
+
+        response = asyncio_run(
+            service.handle_verified_webhook(
+                SimpleNamespace(app={}),
+                ProviderWebhookPayload(raw_body=b"not-json"),
+            )
+        )
+
+        self.assertEqual(response.status, 400)
 
 
 class HeleketServiceTests(unittest.TestCase):
