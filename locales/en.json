@@ -823,7 +823,7 @@
   "wa_home_subscription_inactive": "Subscription inactive",
   "wa_until_date": "until {date}",
   "wa_subscription_remaining_countdown": "left: {countdown}",
-  "wa_home_traffic_used": "Traffic used",
+  "wa_home_traffic_used": "Traffic",
   "wa_premium_traffic_title": "Premium servers",
   "wa_premium_reset_monthly": "Separate monthly limit",
   "wa_premium_access_limited": "Premium access is temporarily limited",

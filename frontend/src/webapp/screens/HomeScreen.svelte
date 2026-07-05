@@ -25,7 +25,6 @@
     trafficLabel as trafficLabelFn,
     trafficResetLabel as trafficResetLabelFn,
     trafficResetScheduled as trafficResetScheduledFn,
-    trafficSummaryTitle as trafficSummaryTitleFn,
     trafficNextResetLabel as trafficNextResetLabelFn,
     regularTrafficLimitVisible as regularTrafficLimitVisibleFn,
     premiumTrafficPercent as premiumTrafficPercentFn,
@@ -138,9 +137,6 @@
   }
   function trafficResetScheduled(sub: SubscriptionView = subscription) {
     return trafficResetScheduledFn(sub);
-  }
-  function trafficSummaryTitle(sub: SubscriptionView = subscription) {
-    return trafficSummaryTitleFn(sub, t);
   }
   function trafficNextResetLabel(sub: SubscriptionView) {
     return trafficNextResetLabelFn(sub, t);
@@ -422,7 +418,7 @@
             >
               <span class="traffic-summary-left premium-summary-trigger">
                 <span class="premium-summary-copy">
-                  {trafficSummaryTitle(subscription)}
+                  {t("wa_home_traffic_used")}
                 </span>
                 <CircleQuestionMark class="premium-server-help-icon" size={15} />
               </span>

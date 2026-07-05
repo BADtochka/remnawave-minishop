@@ -72,13 +72,6 @@ export function trafficResetLabel(
   return t("wa_traffic_reset_policy");
 }
 
-export function trafficSummaryTitle(
-  sub: SubscriptionTraffic | null | undefined,
-  t: TranslateFn
-): string {
-  return trafficResetScheduled(sub) ? trafficResetLabel(sub, t) : t("wa_home_traffic_used");
-}
-
 function nextResetText(value: unknown, t: TranslateFn): string {
   const text = String(value || "").trim();
   return text || t("wa_traffic_next_reset_none");
