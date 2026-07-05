@@ -97,25 +97,43 @@ describe("actionsStore", () => {
     expect(deps.startCheckoutPromo).not.toHaveBeenCalled();
   });
 
-  it("shows the confirmation dialog for standalone codes instead of checkout", async () => {
-    const { deps, store } = makeActionsStore({
-      api: vi.fn().mockResolvedValue({
+  it("activates standalone codes immediately and shows the success dialog", async () => {
+    const api = vi
+      .fn()
+      .mockResolvedValueOnce({
         ok: true,
         status: "standalone",
         code: "GIFT7",
         effect_summary: "+7 days",
-      }),
-    });
+      })
+      .mockResolvedValueOnce({ ok: true, end_date_text: "31.05.2026" });
+    const { deps, store } = makeActionsStore({ api });
 
     await store.handlePromoDeeplink("gift7");
 
+    expect(api).toHaveBeenCalledTimes(2);
+    expect(api.mock.calls[1][0]).toBe("/promo/apply");
     expect(store).toMatchObject({
       promoDeeplinkOpen: true,
-      promoDeeplinkStatus: "standalone",
+      promoDeeplinkStatus: "activated",
       promoDeeplinkCode: "GIFT7",
       promoDeeplinkEffectSummary: "+7 days",
     });
+    expect(deps.loadData).toHaveBeenCalledWith({ fresh: true });
     expect(deps.startCheckoutPromo).not.toHaveBeenCalled();
+  });
+
+  it("falls back to checkout when the code turns checkout-only during activation", async () => {
+    const api = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, status: "standalone", code: "GIFT7" })
+      .mockResolvedValueOnce({ ok: true, requires_checkout: true, code: "GIFT7" });
+    const { deps, store } = makeActionsStore({ api });
+
+    await store.handlePromoDeeplink("gift7");
+
+    expect(deps.startCheckoutPromo).toHaveBeenCalledWith("GIFT7");
+    expect(store.promoDeeplinkOpen).toBe(false);
   });
 
   it("shows an explanatory dialog when the code was already used", async () => {
@@ -171,33 +189,20 @@ describe("actionsStore", () => {
     });
   });
 
-  it("activates a standalone code from the dialog and refreshes data", async () => {
-    const api = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, status: "standalone", code: "GIFT7" })
-      .mockResolvedValueOnce({ ok: true, end_date_text: "31.05.2026" });
-    const { deps, store } = makeActionsStore({ api });
-
-    await store.handlePromoDeeplink("gift7");
-    await store.activatePromoDeeplink();
-
-    expect(store.promoDeeplinkOpen).toBe(false);
-    expect(deps.showToast).toHaveBeenCalledOnce();
-    expect(deps.loadData).toHaveBeenCalledWith({ fresh: true });
-  });
-
-  it("keeps the dialog open with an error when activation fails", async () => {
+  it("shows the invalid dialog when immediate activation fails", async () => {
     const api = vi
       .fn()
       .mockResolvedValueOnce({ ok: true, status: "standalone", code: "GIFT7" })
       .mockRejectedValueOnce(new Error("used up"));
-    const { store } = makeActionsStore({ api });
+    const { deps, store } = makeActionsStore({ api });
 
     await store.handlePromoDeeplink("gift7");
-    await store.activatePromoDeeplink();
 
-    expect(store.promoDeeplinkOpen).toBe(true);
-    expect(store.promoDeeplinkError).toBe("used up");
-    expect(store.promoDeeplinkBusy).toBe(false);
+    expect(store).toMatchObject({
+      promoDeeplinkOpen: true,
+      promoDeeplinkStatus: "invalid",
+      promoDeeplinkMessage: "used up",
+    });
+    expect(deps.loadData).not.toHaveBeenCalled();
   });
 });

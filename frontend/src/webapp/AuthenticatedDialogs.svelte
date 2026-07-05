@@ -85,11 +85,9 @@
   const promoDeeplinkCode = $derived(actionsStore.promoDeeplinkCode);
   const promoDeeplinkMessage = $derived(actionsStore.promoDeeplinkMessage);
   const promoDeeplinkEffectSummary = $derived(actionsStore.promoDeeplinkEffectSummary);
-  const promoDeeplinkError = $derived(actionsStore.promoDeeplinkError);
-  const promoDeeplinkBusy = $derived(actionsStore.promoDeeplinkBusy);
   const promoDeeplinkTitle = $derived.by(() => {
-    if (promoDeeplinkStatus === "standalone") {
-      return t("wa_promo_deeplink_title_confirm", {}, "Activate promo code?");
+    if (promoDeeplinkStatus === "activated") {
+      return t("wa_promo_deeplink_title_activated", {}, "Promo code activated");
     }
     if (promoDeeplinkStatus === "already_used") {
       return t("wa_promo_deeplink_title_already_used", {}, "Promo code already activated");
@@ -98,17 +96,6 @@
       return t("wa_promo_deeplink_title_invalid", {}, "Promo code unavailable");
     }
     return t("wa_promo_deeplink_title_error", {}, "Could not check the promo code");
-  });
-  const promoDeeplinkDescription = $derived.by(() => {
-    if (promoDeeplinkStatus !== "standalone") return promoDeeplinkMessage;
-    return (
-      promoDeeplinkMessage ||
-      t(
-        "wa_promo_deeplink_confirm_hint",
-        { code: promoDeeplinkCode },
-        `Promo code ${promoDeeplinkCode} will be activated on your account.`
-      )
-    );
   });
 </script>
 
@@ -253,13 +240,13 @@
 <Dialog
   open={promoDeeplinkOpen}
   title={promoDeeplinkTitle}
-  description={promoDeeplinkDescription}
+  description={promoDeeplinkMessage}
   closeLabel={t("wa_close")}
   onclose={actionsStore.closePromoDeeplink}
   class="promo-deeplink-dialog"
 >
   {#snippet titleIcon()}
-    {#if promoDeeplinkStatus === "standalone"}
+    {#if promoDeeplinkStatus === "activated"}
       <Gift size={23} />
     {:else if promoDeeplinkStatus === "already_used"}
       <Info size={23} />
@@ -268,29 +255,14 @@
     {/if}
   {/snippet}
   <div class="promo-deeplink-dialog-body">
-    {#if promoDeeplinkStatus === "standalone" && promoDeeplinkEffectSummary}
+    {#if promoDeeplinkStatus === "activated" && promoDeeplinkEffectSummary}
       <p class="promo-deeplink-effect">
         <strong>{promoDeeplinkCode}</strong> · {promoDeeplinkEffectSummary}
       </p>
     {/if}
-    {#if promoDeeplinkError}
-      <p class="promo-deeplink-error">{promoDeeplinkError}</p>
-    {/if}
-    {#if promoDeeplinkStatus === "standalone"}
-      <Button
-        class="wide"
-        disabled={promoDeeplinkBusy}
-        onclick={() => void actionsStore.activatePromoDeeplink()}
-      >
-        {promoDeeplinkBusy
-          ? t("wa_loading", {}, "Loading...")
-          : t("wa_promo_deeplink_activate", {}, "Activate")}
-      </Button>
-    {:else}
-      <Button class="wide" onclick={actionsStore.closePromoDeeplink}>
-        {t("wa_ok", {}, "OK")}
-      </Button>
-    {/if}
+    <Button class="wide" onclick={actionsStore.closePromoDeeplink}>
+      {t("wa_ok", {}, "OK")}
+    </Button>
   </div>
 </Dialog>
 
@@ -307,11 +279,5 @@
     border-radius: 10px;
     background: color-mix(in srgb, var(--accent, #00fe7a) 8%, transparent);
     font-size: 14px;
-  }
-
-  .promo-deeplink-error {
-    margin: 0;
-    color: var(--danger, #ff6b6b);
-    font-size: 13px;
   }
 </style>

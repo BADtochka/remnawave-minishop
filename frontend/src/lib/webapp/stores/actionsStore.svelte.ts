@@ -10,7 +10,7 @@ import {
 
 type Translate = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 type MaybeRecord = Record<string, unknown>;
-export type PromoDeeplinkStatus = "" | "standalone" | "already_used" | "invalid" | "error";
+export type PromoDeeplinkStatus = "" | "activated" | "already_used" | "invalid" | "error";
 export type PromoDeeplinkContext = { modalOpened?: boolean };
 export type ActionsState = {
   promoCode: string;
@@ -25,8 +25,6 @@ export type ActionsState = {
   promoDeeplinkCode: string;
   promoDeeplinkMessage: string;
   promoDeeplinkEffectSummary: string;
-  promoDeeplinkError: string;
-  promoDeeplinkBusy: boolean;
   trialBusy: boolean;
   trialActivationResult: Extract<TrialActivateResponse, { ok: true }> | null;
   trialActivationError: string;
@@ -47,7 +45,6 @@ export type ActionsStore = ActionsState & {
   applyPromo(): Promise<void>;
   openPromoCheckout(): void;
   handlePromoDeeplink(code: string, context?: PromoDeeplinkContext): Promise<void>;
-  activatePromoDeeplink(): Promise<void>;
   closePromoDeeplink(): void;
   claimReferralWelcomeBonus(): Promise<void>;
   activateTrial(): Promise<void>;
@@ -83,8 +80,6 @@ export function createActionsStore({
     promoDeeplinkCode: "",
     promoDeeplinkMessage: "",
     promoDeeplinkEffectSummary: "",
-    promoDeeplinkError: "",
-    promoDeeplinkBusy: false,
     trialBusy: false,
     trialActivationResult: null,
     trialActivationError: "",
@@ -94,7 +89,6 @@ export function createActionsStore({
     applyPromo,
     openPromoCheckout,
     handlePromoDeeplink,
-    activatePromoDeeplink,
     closePromoDeeplink,
     claimReferralWelcomeBonus,
     activateTrial,
@@ -212,8 +206,6 @@ export function createActionsStore({
     state.promoDeeplinkCode = code;
     state.promoDeeplinkMessage = message;
     state.promoDeeplinkEffectSummary = effectSummary;
-    state.promoDeeplinkError = "";
-    state.promoDeeplinkBusy = false;
   }
 
   function closePromoDeeplink() {
@@ -222,8 +214,6 @@ export function createActionsStore({
     state.promoDeeplinkCode = "";
     state.promoDeeplinkMessage = "";
     state.promoDeeplinkEffectSummary = "";
-    state.promoDeeplinkError = "";
-    state.promoDeeplinkBusy = false;
   }
 
   async function handlePromoDeeplink(code: string, context: PromoDeeplinkContext = {}) {
@@ -251,7 +241,9 @@ export function createActionsStore({
         return;
       }
       if (status === "standalone") {
-        openPromoDeeplinkDialog("standalone", resolvedCode, message, effectSummary);
+        // Bonus-days codes need no confirmation step: activate right away and
+        // show the outcome in the dialog.
+        await activatePromoDeeplinkCode(resolvedCode, effectSummary);
         return;
       }
       if (status === "already_used") {
@@ -279,11 +271,7 @@ export function createActionsStore({
     }
   }
 
-  async function activatePromoDeeplink() {
-    const code = String(state.promoDeeplinkCode || "").trim();
-    if (!code || state.promoDeeplinkBusy) return;
-    state.promoDeeplinkBusy = true;
-    state.promoDeeplinkError = "";
+  async function activatePromoDeeplinkCode(code: string, effectSummary: string) {
     try {
       const payload: PostPayload<"/api/promo/apply"> = { code };
       const response = await api(buildPromoApplyPath(), {
@@ -293,21 +281,27 @@ export function createActionsStore({
       const responsePayload = asRecord(unwrap(response));
       if (responsePayload.requires_checkout === true) {
         // Race: the code switched to checkout-only between check and apply.
-        closePromoDeeplink();
         startCheckoutPromo(stringField(responsePayload.code) || code);
         return;
       }
-      closePromoDeeplink();
       const endDateText = stringField(responsePayload.end_date_text);
-      showToast(
-        endDateText ? t("wa_promo_activated_until", { date: endDateText }) : t("wa_promo_activated")
+      openPromoDeeplinkDialog(
+        "activated",
+        code,
+        endDateText
+          ? t("wa_promo_activated_until", { date: endDateText })
+          : t("wa_promo_activated"),
+        effectSummary
       );
       await loadData({ fresh: true });
     } catch (error: unknown) {
-      state.promoDeeplinkError =
-        stringField(asRecord(error).message) || t("wa_promo_activation_failed");
-    } finally {
-      state.promoDeeplinkBusy = false;
+      // Race (used up / deactivated meanwhile) or transport failure: the
+      // backend message explains it best.
+      openPromoDeeplinkDialog(
+        "invalid",
+        code,
+        stringField(asRecord(error).message) || t("wa_promo_activation_failed")
+      );
     }
   }
 
