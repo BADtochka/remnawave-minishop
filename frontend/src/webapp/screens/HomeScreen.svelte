@@ -419,6 +419,10 @@
               <span class="traffic-summary-left premium-summary-trigger">
                 <span class="premium-summary-copy">
                   {t("wa_home_traffic_used")}
+                  {#if trafficResetScheduled(subscription)}
+                    <span class="traffic-summary-separator" aria-hidden="true">|</span>
+                    {trafficResetLabel(subscription)}
+                  {/if}
                 </span>
                 <CircleQuestionMark class="premium-server-help-icon" size={15} />
               </span>
