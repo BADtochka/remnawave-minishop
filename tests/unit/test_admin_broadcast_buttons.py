@@ -112,9 +112,13 @@ class BroadcastButtonsTest(unittest.TestCase):
             )
         self.assertEqual(ctx.exception.code, "bot_username_unavailable")
 
-    def test_promo_webapp_prefers_mini_app_url(self):
+    def test_promo_webapp_prefers_mini_app_url_and_opens_as_web_app(self):
         resolved = self.resolve([_button(kind="promo_webapp", promo_code="SUMMER25", url="")])
-        self.assertEqual(resolved[0].url, "https://app.example.test/?promo=SUMMER25")
+        self.assertEqual(resolved[0].url, "https://app.example.test/?startapp=promo_SUMMER25")
+        self.assertEqual(
+            resolved[0].telegram_web_app_url,
+            "https://app.example.test/?startapp=promo_SUMMER25",
+        )
 
     def test_promo_webapp_falls_back_to_startapp_deeplink(self):
         settings = settings_stub(SUBSCRIPTION_MINI_APP_URL="")
@@ -123,6 +127,18 @@ class BroadcastButtonsTest(unittest.TestCase):
             settings=settings,
         )
         self.assertEqual(resolved[0].url, "https://t.me/demo_bot?startapp=promo_SUMMER25")
+        self.assertIsNone(resolved[0].telegram_web_app_url)
+
+    def test_promo_webapp_http_mini_app_uses_startapp_deeplink(self):
+        # Telegram rejects http:// web_app targets; keep the Mini App context
+        # via the t.me startapp deep link instead.
+        settings = settings_stub(SUBSCRIPTION_MINI_APP_URL="http://app.example.test/")
+        resolved = self.resolve(
+            [_button(kind="promo_webapp", promo_code="SUMMER25", url="")],
+            settings=settings,
+        )
+        self.assertEqual(resolved[0].url, "https://t.me/demo_bot?startapp=promo_SUMMER25")
+        self.assertIsNone(resolved[0].telegram_web_app_url)
 
     def test_promo_webapp_without_any_entrypoint_rejected(self):
         settings = settings_stub(SUBSCRIPTION_MINI_APP_URL="")
@@ -162,19 +178,28 @@ class BroadcastButtonsTest(unittest.TestCase):
             [
                 _button(),
                 _button(kind="promo_bot", label="Activate", promo_code="GIFT", url=""),
+                _button(kind="promo_webapp", label="In app", promo_code="GIFT", url=""),
             ]
         )
         markup = telegram_markup_for_buttons(resolved)
         assert markup is not None
-        self.assertEqual(len(markup.inline_keyboard), 2)
+        self.assertEqual(len(markup.inline_keyboard), 3)
         self.assertEqual(markup.inline_keyboard[1][0].text, "Activate")
         self.assertEqual(markup.inline_keyboard[1][0].url, "https://t.me/demo_bot?start=promo_GIFT")
+        web_app_button = markup.inline_keyboard[2][0]
+        self.assertIsNone(web_app_button.url)
+        assert web_app_button.web_app is not None
+        self.assertEqual(
+            web_app_button.web_app.url,
+            "https://app.example.test/?startapp=promo_GIFT",
+        )
         self.assertIsNone(telegram_markup_for_buttons([]))
         self.assertEqual(
             email_links_for_buttons(resolved),
             [
                 ("Open", "https://example.com"),
                 ("Activate", "https://t.me/demo_bot?start=promo_GIFT"),
+                ("In app", "https://app.example.test/?startapp=promo_GIFT"),
             ],
         )
         self.assertEqual(broadcast_promo_codes(resolved), ["GIFT"])

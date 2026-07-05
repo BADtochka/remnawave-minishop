@@ -2,11 +2,14 @@ import { adminErrorMessage } from "../errors.js";
 import {
   buildAdminBroadcastAudienceCountsPath,
   buildAdminBroadcastPath,
+  buildAdminPromosPath,
   unwrap,
   type ApiClient,
   type ApiResponse,
+  type GetResponse,
   type PostPayload,
 } from "../../webapp/publicApi";
+import type { components } from "../../api/openapi.generated";
 import { snapshotForPayload } from "./snapshotForPayload.svelte";
 
 type AdminErrorResponse = { ok?: false; error?: string; message?: string; detail?: string };
@@ -22,11 +25,13 @@ type BroadcastTargetOption = { value: string; label: string };
 type StoredCounts = { counts: BroadcastCounts; loadedAt: number };
 export type BroadcastButtonKind = "url" | "promo_bot" | "promo_webapp";
 export type BroadcastButtonDraft = {
+  id: number;
   kind: BroadcastButtonKind;
   label: string;
   url: string;
   promoCode: string;
 };
+export type BroadcastPromoOption = { value: string; label: string };
 export type BroadcastState = {
   broadcastTarget: string;
   broadcastText: string;
@@ -40,6 +45,9 @@ export type BroadcastState = {
   broadcastEmailAvailable: boolean;
   broadcastEmailSubject: string;
   broadcastButtons: BroadcastButtonDraft[];
+  broadcastPromoOptions: BroadcastPromoOption[];
+  broadcastPromoOptionsLoading: boolean;
+  broadcastPromoOptionsLoaded: boolean;
 };
 type BroadcastStoreOptions = {
   api: AdminApi;
@@ -53,6 +61,8 @@ export type BroadcastStore = BroadcastState & {
   addButton: () => void;
   removeButton: (index: number) => void;
   updateButton: (index: number, fields: Partial<BroadcastButtonDraft>) => void;
+  moveButton: (from: number, to: number) => void;
+  loadPromoOptions: () => Promise<void>;
   canSubmit: () => boolean;
   BROADCAST_TARGET_OPTIONS: BroadcastTargetOption[];
   MAX_BROADCAST_BUTTONS: number;
@@ -67,6 +77,34 @@ function buttonDraftValid(button: BroadcastButtonDraft): boolean {
     return url.startsWith("https://") || url.startsWith("http://");
   }
   return /^[A-Za-z0-9_-]{1,58}$/.test(button.promoCode.trim());
+}
+
+type PromoListItem = components["schemas"]["PromoOut"];
+type PromosListResponse = GetResponse<"/api/admin/promos">;
+
+// Only codes a user can still redeem belong in the button dropdown.
+function promoUsable(promo: PromoListItem): boolean {
+  if (!promo.is_active) return false;
+  const validUntil = promo.valid_until ? Date.parse(String(promo.valid_until)) : NaN;
+  if (Number.isFinite(validUntil) && validUntil <= Date.now()) return false;
+  const max = Number(promo.max_activations);
+  const current = Number(promo.current_activations);
+  if (Number.isFinite(max) && max > 0 && Number.isFinite(current) && current >= max) return false;
+  return true;
+}
+
+function promoOptionLabel(promo: PromoListItem): string {
+  const code = String(promo.code || "");
+  const max = Number(promo.max_activations);
+  const current = Number(promo.current_activations);
+  if (Number.isFinite(max) && max > 0 && Number.isFinite(current)) {
+    return `${code} · ${current}/${max}`;
+  }
+  return code;
+}
+
+function isPromosListResponse(value: unknown): value is PromosListResponse {
+  return Boolean(value && typeof value === "object" && (value as { ok?: unknown }).ok === true);
 }
 
 function asBroadcastCounts(value: unknown): BroadcastCounts | null {
@@ -84,6 +122,8 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
   const COUNTS_DISPLAY_CACHE_TTL_MS = 5 * 60_000;
   const COUNTS_STORAGE_KEY = "remnawave-admin:broadcast-audience-counts";
   let countsPromise: Promise<void> | null = null;
+  let promoOptionsPromise: Promise<void> | null = null;
+  let buttonIdCounter = 0;
   const cachedCounts = readStoredCounts();
 
   const state = $state<BroadcastStore>({
@@ -99,12 +139,17 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
     broadcastEmailAvailable: false,
     broadcastEmailSubject: "",
     broadcastButtons: [],
+    broadcastPromoOptions: [],
+    broadcastPromoOptionsLoading: false,
+    broadcastPromoOptionsLoaded: false,
     runBroadcast,
     updateField,
     loadCounts,
     addButton,
     removeButton,
     updateButton,
+    moveButton,
+    loadPromoOptions,
     canSubmit,
     BROADCAST_TARGET_OPTIONS: [],
     MAX_BROADCAST_BUTTONS,
@@ -291,9 +336,13 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
 
   function addButton(): void {
     if (state.broadcastButtons.length >= MAX_BROADCAST_BUTTONS) return;
+    buttonIdCounter += 1;
     updateState((s) => ({
       ...s,
-      broadcastButtons: [...s.broadcastButtons, { kind: "url", label: "", url: "", promoCode: "" }],
+      broadcastButtons: [
+        ...s.broadcastButtons,
+        { id: buttonIdCounter, kind: "url", label: "", url: "", promoCode: "" },
+      ],
     }));
   }
 
@@ -311,6 +360,59 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
         i === index ? { ...button, ...fields } : button
       ),
     }));
+    if (fields.kind && fields.kind !== "url") {
+      void loadPromoOptions();
+    }
+  }
+
+  function moveButton(from: number, to: number): void {
+    updateState((s) => {
+      if (
+        from === to ||
+        from < 0 ||
+        to < 0 ||
+        from >= s.broadcastButtons.length ||
+        to >= s.broadcastButtons.length
+      ) {
+        return s;
+      }
+      const buttons = [...s.broadcastButtons];
+      const [moved] = buttons.splice(from, 1);
+      buttons.splice(to, 0, moved);
+      return { ...s, broadcastButtons: buttons };
+    });
+  }
+
+  async function loadPromoOptions(): Promise<void> {
+    if (state.broadcastPromoOptionsLoaded || promoOptionsPromise) {
+      return promoOptionsPromise || Promise.resolve();
+    }
+    updateState((s) => ({ ...s, broadcastPromoOptionsLoading: true }));
+    promoOptionsPromise = (async () => {
+      try {
+        const params = new URLSearchParams({ page: "0", page_size: "100" });
+        const res = await api(buildAdminPromosPath(params));
+        if (isPromosListResponse(res)) {
+          const promos = res.promos || [];
+          const options = promos
+            .filter(promoUsable)
+            .map((promo) => ({ value: String(promo.code || ""), label: promoOptionLabel(promo) }))
+            .filter((option) => option.value);
+          updateState((s) => ({
+            ...s,
+            broadcastPromoOptions: options,
+            broadcastPromoOptionsLoaded: true,
+          }));
+        }
+      } catch {
+        // Leave options empty; the dropdown shows the "no codes" hint and the
+        // backend still validates codes on submit.
+      } finally {
+        updateState((s) => ({ ...s, broadcastPromoOptionsLoading: false }));
+        promoOptionsPromise = null;
+      }
+    })();
+    return promoOptionsPromise;
   }
 
   return state;

@@ -1,11 +1,14 @@
 <script lang="ts">
   import { getBroadcastStore } from "$lib/admin/context";
-  import { Checkbox, Input, Textarea } from "$components/ui/index.js";
+  import { Checkbox, Input, Sortable, Textarea } from "$components/ui/index.js";
   import { Plus, Send, Trash2 } from "$components/ui/icons.js";
   import { onMount } from "svelte";
   import { Label } from "$components/ui/primitives.js";
   import { AdminButton, AdminSelect } from "$components/patterns/admin/index.js";
-  import type { BroadcastButtonKind } from "$lib/admin/stores/broadcastStore.svelte";
+  import type {
+    BroadcastButtonDraft,
+    BroadcastButtonKind,
+  } from "$lib/admin/stores/broadcastStore.svelte";
 
   type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: string) => string;
 
@@ -23,6 +26,10 @@
   const emailAvailable = $derived(broadcastStore.broadcastEmailAvailable);
   const emailSubject = $derived(broadcastStore.broadcastEmailSubject);
   const broadcastButtons = $derived(broadcastStore.broadcastButtons);
+  const promoOptions = $derived(broadcastStore.broadcastPromoOptions);
+  const promoOptionsLoading = $derived(Boolean(broadcastStore.broadcastPromoOptionsLoading));
+  const promoOptionsLoaded = $derived(Boolean(broadcastStore.broadcastPromoOptionsLoaded));
+  const hasPromoButtons = $derived(broadcastButtons.some((button) => button.kind !== "url"));
   const submitEnabled = $derived(broadcastStore.canSubmit());
   const handleTargetChange = (value: string) => {
     broadcastStore.updateField({ broadcastTarget: value });
@@ -54,6 +61,9 @@
 
   onMount(() => {
     broadcastStore.loadCounts();
+    if (broadcastStore.broadcastButtons.some((button) => button.kind !== "url")) {
+      broadcastStore.loadPromoOptions();
+    }
   });
 </script>
 
@@ -145,8 +155,14 @@
             "До 4 кнопок: в Telegram — инлайн-кнопки, в email — кнопки-ссылки. Промокод активируется в один клик."
           )}</small
         >
-        {#each broadcastButtons as button, index (index)}
-          <div class="broadcast-button-row">
+        <Sortable
+          items={broadcastButtons}
+          class="broadcast-button-row"
+          getKey={(button: BroadcastButtonDraft) => button.id}
+          handleLabel={at("broadcast_button_reorder", {}, "Перетащите, чтобы изменить порядок")}
+          onReorder={broadcastStore.moveButton}
+        >
+          {#snippet children(button: BroadcastButtonDraft, index: number)}
             <AdminSelect
               class="broadcast-button-kind"
               value={button.kind}
@@ -176,15 +192,15 @@
                   })}
               />
             {:else}
-              <Input
-                class="broadcast-button-input"
+              <AdminSelect
+                class="broadcast-button-promo"
                 value={button.promoCode}
-                maxlength={58}
-                placeholder={at("broadcast_button_promo_placeholder", {}, "ПРОМОКОД")}
-                oninput={(e) =>
-                  broadcastStore.updateButton(index, {
-                    promoCode: (e.currentTarget as HTMLInputElement).value,
-                  })}
+                items={promoOptions}
+                placeholder={promoOptionsLoading
+                  ? at("broadcast_button_promo_loading", {}, "Загрузка промокодов...")
+                  : at("broadcast_button_promo_select", {}, "Выберите промокод")}
+                ariaLabel={at("broadcast_button_promo_select", {}, "Выберите промокод")}
+                onValueChange={(value) => broadcastStore.updateButton(index, { promoCode: value })}
               />
             {/if}
             <AdminButton
@@ -194,8 +210,17 @@
             >
               <Trash2 size={14} />
             </AdminButton>
-          </div>
-        {/each}
+          {/snippet}
+        </Sortable>
+        {#if hasPromoButtons && promoOptionsLoaded && !promoOptions.length}
+          <small class="admin-muted"
+            >{at(
+              "broadcast_no_promos_hint",
+              {},
+              "Нет активных промокодов — создайте код в разделе «Промокоды»"
+            )}</small
+          >
+        {/if}
         {#if broadcastButtons.length < broadcastStore.MAX_BROADCAST_BUTTONS}
           <div>
             <AdminButton variant="ghost" onclick={broadcastStore.addButton}>
@@ -246,18 +271,21 @@
     cursor: pointer;
   }
 
-  .broadcast-button-row {
+  /* Rendered inside the Sortable child component, so target them globally. */
+  :global(.ui-sortable-item.broadcast-button-row) {
     display: flex;
     gap: 8px;
     align-items: center;
     flex-wrap: wrap;
+    padding: 2px 0;
   }
 
-  .broadcast-button-row :global(.broadcast-button-kind) {
+  :global(.broadcast-button-row .broadcast-button-kind) {
     min-width: 190px;
   }
 
-  .broadcast-button-row :global(.broadcast-button-input) {
+  :global(.broadcast-button-row .broadcast-button-input),
+  :global(.broadcast-button-row .broadcast-button-promo) {
     flex: 1 1 160px;
     min-width: 140px;
   }

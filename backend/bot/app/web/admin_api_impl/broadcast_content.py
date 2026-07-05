@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from urllib.parse import quote
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from config.settings import Settings
 
+from .common import _build_admin_promo_bot_link, _build_admin_promo_webapp_link
 from .schemas import AdminBroadcastButtonBody
 
 BROADCAST_CHANNELS = ("telegram", "email")
@@ -42,10 +42,19 @@ class BroadcastValidationError(ValueError):
 
 @dataclass(frozen=True)
 class BroadcastButton:
+    """A resolved broadcast button.
+
+    ``url`` is the universal link used for email CTAs and as the Telegram URL
+    button fallback. ``telegram_web_app_url`` (when set) makes the Telegram
+    button a ``web_app`` one, so the target opens inside the Telegram Mini App
+    with its native authorization instead of an external browser tab.
+    """
+
     label: str
     url: str
     kind: str
     promo_code: str = ""
+    telegram_web_app_url: str | None = None
 
 
 def normalize_broadcast_channels(raw: list[str] | None) -> list[str]:
@@ -65,23 +74,23 @@ def _clean_bot_username(bot_username: str | None) -> str:
     return username
 
 
-def _webapp_base_url(settings: Settings) -> str:
-    return str(settings.SUBSCRIPTION_MINI_APP_URL or "").strip().rstrip("/")
+def _startapp_deeplink(username: str, code: str) -> str:
+    return f"https://t.me/{username}?startapp=promo_{code}"
 
 
-def _resolve_button_url(
+def _resolve_button(
     button: AdminBroadcastButtonBody,
     *,
     settings: Settings,
     bot_username: str | None,
-) -> str:
+) -> BroadcastButton:
     if button.kind == BUTTON_KIND_URL:
         url = button.url
         if not url:
             raise BroadcastValidationError("button_url_required", button.label)
         if not url.lower().startswith(("https://", "http://")):
             raise BroadcastValidationError("button_url_invalid", url)
-        return url
+        return BroadcastButton(label=button.label, url=url, kind=button.kind)
 
     code = button.promo_code
     if not code:
@@ -91,15 +100,44 @@ def _resolve_button_url(
 
     username = _clean_bot_username(bot_username)
     if button.kind == BUTTON_KIND_PROMO_BOT:
-        if not username:
+        bot_link = _build_admin_promo_bot_link(username, code)
+        if not bot_link:
             raise BroadcastValidationError("bot_username_unavailable")
-        return f"https://t.me/{username}?start=promo_{code}"
+        return BroadcastButton(label=button.label, url=bot_link, kind=button.kind, promo_code=code)
 
-    webapp_base = _webapp_base_url(settings)
-    if webapp_base:
-        return f"{webapp_base}/?promo={quote(code, safe='')}"
+    # promo_webapp: same code-prefill link the Promos section shows for a code.
+    webapp_link = _build_admin_promo_webapp_link(settings.SUBSCRIPTION_MINI_APP_URL, code)
+    if webapp_link:
+        # Telegram only accepts https targets for web_app buttons; with a
+        # plain-http Mini App URL fall back to a t.me startapp deep link so the
+        # code still opens inside the Mini App (authorized), not a browser tab.
+        if webapp_link.lower().startswith("https://"):
+            telegram_web_app_url = webapp_link
+        elif username:
+            telegram_web_app_url = None
+            webapp_link_for_telegram = _startapp_deeplink(username, code)
+            return BroadcastButton(
+                label=button.label,
+                url=webapp_link_for_telegram,
+                kind=button.kind,
+                promo_code=code,
+            )
+        else:
+            telegram_web_app_url = None
+        return BroadcastButton(
+            label=button.label,
+            url=webapp_link,
+            kind=button.kind,
+            promo_code=code,
+            telegram_web_app_url=telegram_web_app_url,
+        )
     if username:
-        return f"https://t.me/{username}?startapp=promo_{code}"
+        return BroadcastButton(
+            label=button.label,
+            url=_startapp_deeplink(username, code),
+            kind=button.kind,
+            promo_code=code,
+        )
     raise BroadcastValidationError("webapp_url_unavailable")
 
 
@@ -120,15 +158,7 @@ def resolve_broadcast_buttons(
             raise BroadcastValidationError("button_label_required")
         if len(button.label) > MAX_BUTTON_LABEL_LENGTH:
             raise BroadcastValidationError("button_label_too_long", button.label)
-        url = _resolve_button_url(button, settings=settings, bot_username=bot_username)
-        resolved.append(
-            BroadcastButton(
-                label=button.label,
-                url=url,
-                kind=button.kind,
-                promo_code=button.promo_code,
-            )
-        )
+        resolved.append(_resolve_button(button, settings=settings, bot_username=bot_username))
     return resolved
 
 
@@ -137,16 +167,21 @@ def broadcast_promo_codes(buttons: list[BroadcastButton]) -> list[str]:
     return list(dict.fromkeys(button.promo_code for button in buttons if button.promo_code))
 
 
+def _telegram_button(button: BroadcastButton) -> InlineKeyboardButton:
+    if button.telegram_web_app_url:
+        return InlineKeyboardButton(
+            text=button.label,
+            web_app=WebAppInfo(url=button.telegram_web_app_url),
+        )
+    return InlineKeyboardButton(text=button.label, url=button.url)
+
+
 def telegram_markup_for_buttons(
     buttons: list[BroadcastButton],
 ) -> InlineKeyboardMarkup | None:
     if not buttons:
         return None
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=button.label, url=button.url)] for button in buttons
-        ]
-    )
+    return InlineKeyboardMarkup(inline_keyboard=[[_telegram_button(button)] for button in buttons])
 
 
 def email_links_for_buttons(buttons: list[BroadcastButton]) -> list[tuple[str, str]]:
