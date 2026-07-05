@@ -319,11 +319,14 @@ async def admin_broadcast_route(request: web.Request) -> web.Response:
             return promo_error
 
         if telegram_enabled and queue_manager is not None:
-            for uid in user_ids:
+            telegram_recipients = await user_dal.get_telegram_recipients_for_broadcast(
+                session, user_ids
+            )
+            for uid, chat_id in telegram_recipients:
                 try:
                     await send_message_via_queue(
                         queue_manager,
-                        uid,
+                        chat_id,
                         MessageContent(content_type="text", text=text),
                         parse_mode="HTML",
                         disable_web_page_preview=True,
@@ -332,7 +335,12 @@ async def admin_broadcast_route(request: web.Request) -> web.Response:
                     sent += 1
                 except Exception as exc:
                     failed += 1
-                    logger.debug("Broadcast queue failed for %s: %s", uid, exc)
+                    logger.debug(
+                        "Broadcast queue failed for user %s chat %s: %s",
+                        uid,
+                        chat_id,
+                        exc,
+                    )
 
         if email_enabled:
             recipients = [

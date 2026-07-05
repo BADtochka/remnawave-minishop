@@ -1,11 +1,12 @@
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
 from sqlalchemy.orm import sessionmaker
 
+from bot.app.web.admin_api_impl import broadcast as broadcast_route_module
 from bot.app.web.admin_api_impl.broadcast_content import (
     BroadcastValidationError,
     broadcast_promo_codes,
@@ -32,6 +33,44 @@ def _button(**overrides):
     payload = {"kind": "url", "label": "Open", "url": "https://example.com", "promo_code": ""}
     payload.update(overrides)
     return AdminBroadcastButtonBody.model_validate(payload)
+
+
+class _FakeBroadcastRequest:
+    def __init__(self, payload: dict[str, object], app: dict[str, object]) -> None:
+        self._payload = payload
+        self.app = app
+
+    async def json(self) -> dict[str, object]:
+        return self._payload
+
+    def get(self, key: str, default: object = None) -> object:
+        return default
+
+
+class _FakeSessionContext:
+    async def __aenter__(self) -> object:
+        return object()
+
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> bool:
+        return False
+
+
+class _FakeSessionFactory:
+    def __call__(self) -> _FakeSessionContext:
+        return _FakeSessionContext()
+
+
+class _FakeAudienceService:
+    async def resolve_user_ids(self, target: str) -> list[int]:
+        return [-555]
+
+
+class _FakeQueue:
+    def __init__(self) -> None:
+        self.messages: list[dict[str, object]] = []
+
+    async def send_message(self, **kwargs: object) -> None:
+        self.messages.append(kwargs)
 
 
 class BroadcastChannelsTest(unittest.TestCase):
@@ -212,6 +251,72 @@ class AdminsAudienceTest(unittest.IsolatedAsyncioTestCase):
             admin_ids=[10, 20, 10],
         )
         self.assertEqual(await service.resolve_user_ids("admins"), [10, 20])
+
+
+class AdminBroadcastRouteTest(unittest.IsolatedAsyncioTestCase):
+    async def test_linked_email_user_uses_telegram_id_for_telegram_delivery(self):
+        settings = settings_stub(email_auth_configured=True)
+        request = _FakeBroadcastRequest(
+            {
+                "target": "all",
+                "text": "Hello",
+                "channels": ["telegram", "email"],
+                "email_subject": "Subject",
+                "buttons": [],
+            },
+            {
+                "settings": settings,
+                "async_session_factory": _FakeSessionFactory(),
+                "i18n": None,
+                "bot_username": "demo_bot",
+            },
+        )
+        queue = _FakeQueue()
+        scheduled: list[dict[str, Any]] = []
+
+        def schedule_emails(**kwargs: Any) -> int:
+            scheduled.append(kwargs)
+            recipients = cast(list[BroadcastEmailRecipient], kwargs["recipients"])
+            return len(recipients)
+
+        with (
+            patch.object(broadcast_route_module, "_require_admin_user_id", return_value=999),
+            patch.object(
+                broadcast_route_module,
+                "_resolve_audience_service",
+                return_value=_FakeAudienceService(),
+            ),
+            patch.object(broadcast_route_module, "get_queue_manager", return_value=queue),
+            patch.object(
+                broadcast_route_module.user_dal,
+                "get_telegram_recipients_for_broadcast",
+                AsyncMock(return_value=[(-555, 123456789)]),
+            ) as telegram_recipients,
+            patch.object(
+                broadcast_route_module.user_dal,
+                "get_email_recipients_for_broadcast",
+                AsyncMock(return_value=[(-555, "linked@example.com", "ru")]),
+            ) as email_recipients,
+            patch.object(
+                broadcast_route_module.message_log_dal,
+                "create_message_log",
+                AsyncMock(),
+            ),
+            patch.object(
+                broadcast_route_module,
+                "schedule_broadcast_emails",
+                side_effect=schedule_emails,
+            ),
+        ):
+            response = await broadcast_route_module.admin_broadcast_route(cast(Any, request))
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(queue.messages[0]["chat_id"], 123456789)
+        self.assertEqual(queue.messages[0]["text"], "Hello")
+        self.assertEqual(scheduled[0]["recipients"][0].user_id, -555)
+        self.assertEqual(scheduled[0]["recipients"][0].email, "linked@example.com")
+        telegram_recipients.assert_awaited_once()
+        email_recipients.assert_awaited_once()
 
 
 class BroadcastEmailRenderTest(unittest.TestCase):

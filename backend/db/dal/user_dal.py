@@ -32,6 +32,7 @@ from .user_broadcast_dal import (  # noqa: F401
     get_all_users_with_panel_uuid,
     get_email_recipients_for_broadcast,
     get_enhanced_user_statistics,
+    get_telegram_recipients_for_broadcast,
     get_top_users_by_lifetime_traffic_used,
     get_top_users_by_referral_revenue,
     get_top_users_by_referrals_count,
