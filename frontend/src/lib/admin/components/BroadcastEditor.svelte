@@ -118,17 +118,19 @@
   }
 
   async function enterSourceMode(): Promise<void> {
-    sourceText = value;
+    sourceText = editor ? serialize(editor) : value;
     sourceMode = true;
     await tick();
     sourceArea?.focus();
   }
 
-  function exitSourceMode(): void {
+  async function exitSourceMode(): Promise<void> {
     sourceMode = false;
     onInput(sourceText);
     const current = editor;
     if (current) current.commands.setContent(telegramHtmlToDoc(sourceText), { emitUpdate: false });
+    await tick();
+    current?.commands.focus("end");
   }
 
   function onSourceInput(event: Event): void {
@@ -280,7 +282,7 @@
       type="button"
       class="broadcast-tool broadcast-tool-source"
       class:is-active={sourceMode}
-      onclick={() => (sourceMode ? exitSourceMode() : void enterSourceMode())}
+      onclick={() => void (sourceMode ? exitSourceMode() : enterSourceMode())}
     >
       {sourceMode
         ? at("broadcast_source_mode_off", {}, "Редактор")
@@ -315,9 +317,13 @@
       rows="6"
       value={sourceText}
       oninput={onSourceInput}></textarea>
-  {:else}
-    <div bind:this={host} class="broadcast-surface"></div>
   {/if}
+  <div
+    bind:this={host}
+    class="broadcast-surface"
+    class:is-hidden={sourceMode}
+    aria-hidden={sourceMode}
+  ></div>
 </div>
 
 <style>
@@ -436,6 +442,10 @@
     border: 1px solid var(--admin-border, #2a2f3a);
     border-radius: 10px;
     background: var(--admin-surface-2, #10141b);
+  }
+
+  .broadcast-surface.is-hidden {
+    display: none;
   }
 
   .broadcast-surface :global(.ProseMirror) {

@@ -24,7 +24,7 @@ type TranslateFn = (key: string, params?: Record<string, unknown>, fallback?: st
 type BroadcastCounts = Record<string, number>;
 type BroadcastResult = { queued: number; failed: number; emailQueued: number; channels: string[] };
 type BroadcastTargetOption = { value: string; label: string };
-type StoredCounts = { counts: BroadcastCounts; loadedAt: number };
+type StoredCounts = { counts: BroadcastCounts; loadedAt: number; emailAvailable: boolean | null };
 export type BroadcastButtonKind = "url" | "promo_bot" | "promo_webapp";
 export type BroadcastButtonDraft = {
   id: number;
@@ -53,6 +53,7 @@ export type BroadcastState = {
   broadcastTelegramEnabled: boolean;
   broadcastEmailEnabled: boolean;
   broadcastEmailAvailable: boolean;
+  broadcastEmailAvailabilityKnown: boolean;
   broadcastEmailSubject: string;
   broadcastButtons: BroadcastButtonDraft[];
   broadcastPromoOptions: BroadcastPromoOption[];
@@ -155,7 +156,8 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
     broadcastCountsLoadedAt: cachedCounts?.loadedAt || 0,
     broadcastTelegramEnabled: true,
     broadcastEmailEnabled: false,
-    broadcastEmailAvailable: false,
+    broadcastEmailAvailable: cachedCounts?.emailAvailable ?? false,
+    broadcastEmailAvailabilityKnown: typeof cachedCounts?.emailAvailable === "boolean",
     broadcastEmailSubject: "",
     broadcastButtons: [],
     broadcastPromoOptions: [],
@@ -215,6 +217,7 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
   function countsAreFresh(stateSnapshot: BroadcastState): boolean {
     return Boolean(
       stateSnapshot.broadcastCounts &&
+      stateSnapshot.broadcastEmailAvailabilityKnown &&
       Date.now() - Number(stateSnapshot.broadcastCountsLoadedAt || 0) < COUNTS_CACHE_TTL_MS
     );
   }
@@ -227,19 +230,25 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
       const payload = JSON.parse(raw);
       const loadedAt = Number(payload?.loadedAt || 0);
       const counts = asBroadcastCounts(payload?.counts);
+      const rawEmailAvailable = payload?.emailAvailable;
+      const emailAvailable = typeof rawEmailAvailable === "boolean" ? rawEmailAvailable : null;
       if (!counts || Date.now() - loadedAt > COUNTS_DISPLAY_CACHE_TTL_MS) return null;
-      return { counts, loadedAt };
+      return { counts, loadedAt, emailAvailable };
     } catch {
       return null;
     }
   }
 
-  function writeStoredCounts(counts: BroadcastCounts, loadedAt: number): void {
+  function writeStoredCounts(
+    counts: BroadcastCounts,
+    loadedAt: number,
+    emailAvailable: boolean
+  ): void {
     try {
       if (typeof window === "undefined" || !window.sessionStorage) return;
       window.sessionStorage.setItem(
         COUNTS_STORAGE_KEY,
-        JSON.stringify(snapshotForPayload({ counts, loadedAt }))
+        JSON.stringify(snapshotForPayload({ counts, loadedAt, emailAvailable }))
       );
     } catch {
       // Ignore storage quota/privacy errors; in-memory counts still work.
@@ -268,6 +277,7 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
             updateState((s) => ({
               ...s,
               broadcastEmailAvailable: emailAvailable,
+              broadcastEmailAvailabilityKnown: true,
               broadcastEmailEnabled: s.broadcastEmailEnabled && emailAvailable,
             }));
             return;
@@ -278,9 +288,10 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
             broadcastCounts: counts,
             broadcastCountsLoadedAt: loadedAt,
             broadcastEmailAvailable: emailAvailable,
+            broadcastEmailAvailabilityKnown: true,
             broadcastEmailEnabled: s.broadcastEmailEnabled && emailAvailable,
           }));
-          writeStoredCounts(counts, loadedAt);
+          writeStoredCounts(counts, loadedAt, emailAvailable);
         }
       } catch {
         // Counts are advisory; ignore failures and keep existing/plain labels.
@@ -296,7 +307,12 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
   function channelsForPayload(snapshot: BroadcastState): string[] {
     const channels: string[] = [];
     if (snapshot.broadcastTelegramEnabled) channels.push("telegram");
-    if (snapshot.broadcastEmailEnabled && snapshot.broadcastEmailAvailable) channels.push("email");
+    if (
+      snapshot.broadcastEmailEnabled &&
+      (!snapshot.broadcastEmailAvailabilityKnown || snapshot.broadcastEmailAvailable)
+    ) {
+      channels.push("email");
+    }
     return channels;
   }
 

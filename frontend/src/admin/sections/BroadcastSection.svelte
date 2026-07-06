@@ -59,6 +59,8 @@
   const telegramEnabled = $derived(broadcastStore.broadcastTelegramEnabled);
   const emailEnabled = $derived(broadcastStore.broadcastEmailEnabled);
   const emailAvailable = $derived(broadcastStore.broadcastEmailAvailable);
+  const emailAvailabilityKnown = $derived(broadcastStore.broadcastEmailAvailabilityKnown);
+  const emailSelectable = $derived(!emailAvailabilityKnown || emailAvailable);
   const emailSubject = $derived(broadcastStore.broadcastEmailSubject);
   const broadcastButtons = $derived(broadcastStore.broadcastButtons);
   const promoOptions = $derived(broadcastStore.broadcastPromoOptions);
@@ -132,8 +134,8 @@
           </label>
           <label class="broadcast-channel">
             <Checkbox
-              checked={emailEnabled && emailAvailable}
-              disabled={!emailAvailable}
+              checked={emailEnabled && emailSelectable}
+              disabled={emailAvailabilityKnown && !emailAvailable}
               ariaLabel={at("broadcast_channel_email", {}, "Email")}
               onCheckedChange={(checked) =>
                 broadcastStore.updateField({ broadcastEmailEnabled: checked })}
@@ -141,7 +143,7 @@
             <span>{at("broadcast_channel_email", {}, "Email")}</span>
           </label>
         </div>
-        {#if !emailAvailable}
+        {#if emailAvailabilityKnown && !emailAvailable}
           <small class="admin-muted"
             >{at(
               "broadcast_email_unavailable_hint",
@@ -151,7 +153,7 @@
           >
         {/if}
       </div>
-      {#if emailEnabled && emailAvailable}
+      {#if emailEnabled && emailSelectable}
         <Label.Root class="admin-field-label">
           <span>{at("broadcast_email_subject_label", {}, "Тема письма")}</span>
           <Input
