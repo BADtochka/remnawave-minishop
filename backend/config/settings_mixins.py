@@ -642,6 +642,7 @@ class SettingsComputedMixin(_SettingsComputedMixinBase):
             "lava",
             "pally",
             "cloudpayments",
+            "overpay",
             "stripe",
         ]
         # Make sure default_order itself includes every registered spec.

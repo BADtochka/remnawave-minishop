@@ -257,6 +257,7 @@ proxy/Docker gateway и может отклонить валидный webhook. 
 | `LAVA_ENABLED` | Включает LAVA. |
 | `PALLY_ENABLED` | Включает Pally / PayPalych. |
 | `CLOUDPAYMENTS_ENABLED` | Включает CloudPayments. |
+| `OVERPAY_ENABLED` | Включает Overpay. |
 
 Конкретные ключи отображения:
 
@@ -339,6 +340,12 @@ PAYMENT_CLOUDPAYMENTS_WEBAPP_ICON
 PAYMENT_CLOUDPAYMENTS_TELEGRAM_LABEL_RU
 PAYMENT_CLOUDPAYMENTS_TELEGRAM_LABEL_EN
 PAYMENT_CLOUDPAYMENTS_TELEGRAM_EMOJI
+PAYMENT_OVERPAY_WEBAPP_LABEL_RU
+PAYMENT_OVERPAY_WEBAPP_LABEL_EN
+PAYMENT_OVERPAY_WEBAPP_ICON
+PAYMENT_OVERPAY_TELEGRAM_LABEL_RU
+PAYMENT_OVERPAY_TELEGRAM_LABEL_EN
+PAYMENT_OVERPAY_TELEGRAM_EMOJI
 PAYMENT_STRIPE_WEBAPP_LABEL_RU
 PAYMENT_STRIPE_WEBAPP_LABEL_EN
 PAYMENT_STRIPE_WEBAPP_ICON
@@ -507,6 +514,26 @@ CloudPayments принимает оплату картами через Orders A
 | `CLOUDPAYMENTS_RECURRING_ENABLED` | Включает списания по сохранённому CloudPayments `Token` для автопродления подписок. |
 | `CLOUDPAYMENTS_VERIFY_WEBHOOK_SIGNATURE` | Проверять заголовок `Content-HMAC` у уведомлений. |
 | `CLOUDPAYMENTS_TRUSTED_IPS` | Необязательный список доверенных IP webhook-источников. |
+
+### Overpay
+
+Overpay построен на платформе BeGateway: бот создаёт hosted-checkout (payment token) и перенаправляет пользователя на `redirect_url`. Исходящие запросы авторизуются HTTP Basic auth (`OVERPAY_SHOP_ID`/`OVERPAY_SECRET_KEY`); уведомления приходят JSON POST'ом с теми же HTTP Basic-кредами. Автопродление списывает сохранённый `credit_card.token` через gateway API. Настройте notification URL: `WEBHOOK_BASE_URL` + `/webhook/overpay`.
+
+| Переменная | Назначение |
+| --- | --- |
+| `OVERPAY_SHOP_ID` | Shop ID из кабинета Overpay (логин HTTP Basic auth). |
+| `OVERPAY_SECRET_KEY` | Secret Key из кабинета Overpay (пароль HTTP Basic auth и проверка входящих webhook'ов). |
+| `OVERPAY_CHECKOUT_URL` | Базовый URL checkout API, по умолчанию `https://checkout.overpay.io`. |
+| `OVERPAY_GATEWAY_URL` | Базовый URL gateway API для списаний по токену, по умолчанию `https://gateway.overpay.io`. |
+| `OVERPAY_RETURN_URL` | URL "Вернуться в магазин" на платёжной странице. |
+| `OVERPAY_SUCCESS_URL` | URL успешного возврата после оплаты. |
+| `OVERPAY_DECLINE_URL` | URL возврата при отклонении оплаты. |
+| `OVERPAY_FAIL_URL` | URL возврата при ошибке оплаты. |
+| `OVERPAY_LANGUAGE` | Язык платёжной формы (например `ru`, `en`); если пусто, бот пробует передать язык пользователя. |
+| `OVERPAY_TEST_MODE` | Отправлять транзакции в песочницу Overpay. |
+| `OVERPAY_RECURRING_ENABLED` | Запрашивать токен карты на checkout и списывать его для автопродления подписок. |
+| `OVERPAY_VERIFY_WEBHOOK_SIGNATURE` | Требовать HTTP Basic auth (Shop ID / Secret Key) у входящих webhook'ов. |
+| `OVERPAY_TRUSTED_IPS` | Необязательный список доверенных IP webhook-источников. |
 
 ### Stripe
 

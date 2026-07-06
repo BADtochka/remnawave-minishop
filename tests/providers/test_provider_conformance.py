@@ -65,6 +65,7 @@ WEBHOOK_PROFILES = {
         "freekassa",
         "heleket",
         "lava",
+        "overpay",
         "pally",
         "paykilla",
         "platega",
