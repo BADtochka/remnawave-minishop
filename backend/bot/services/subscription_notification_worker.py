@@ -187,6 +187,47 @@ class SubscriptionNotificationWorker:
         threshold = sub_end if sub_end is not None else now
         return covered_until is not None and covered_until > threshold
 
+    def _should_suppress_early_expiry_stage(
+        self,
+        sub: Subscription,
+        end_date: datetime,
+    ) -> bool:
+        if not bool(getattr(sub, "suppress_early_expiry_notifications", False)):
+            return False
+
+        max_before_window = self._max_before_window()
+        if max_before_window <= timedelta(0):
+            return False
+
+        start_date = self._as_utc(getattr(sub, "start_date", None))
+        if start_date is not None and end_date > start_date:
+            # Keep the suppression only when the whole grant is shorter than
+            # the early reminder window. Once a trial/bonus row is extended
+            # into a normal-length subscription, the worker becomes the safety
+            # net for 3d/2d/1d reminders.
+            return (end_date - start_date) <= max_before_window + timedelta(hours=1)
+
+        duration_months = getattr(sub, "duration_months", None)
+        try:
+            if duration_months is not None and int(duration_months) > 0:
+                return False
+        except (TypeError, ValueError):
+            pass
+
+        tariff_key = str(getattr(sub, "tariff_key", "") or "").strip()
+        if tariff_key:
+            return False
+
+        provider = str(getattr(sub, "provider", "") or "").strip().lower()
+        status = str(getattr(sub, "status_from_panel", "") or "").strip().upper()
+        if provider == "trial" or status in {"TRIAL", "ACTIVE_BONUS"}:
+            return True
+
+        try:
+            return duration_months is not None and int(duration_months) == 0
+        except (TypeError, ValueError):
+            return False
+
     def stage_for_subscription(
         self,
         sub: Subscription,
@@ -206,13 +247,12 @@ class SubscriptionNotificationWorker:
                     hours_before=hours_before,
                 )
 
-            # Trial and registration/referral-bonus subscriptions last only a
-            # few days, so a multi-day "ending soon" reminder would fire almost
-            # the moment they are granted and needlessly alarm newcomers. Skip
-            # the day-before stages for them — they still get the hours-before
-            # reminder above and the expiry/after-expiry notices below. Paying
-            # for a real subscription clears the flag and restores all stages.
-            if bool(getattr(sub, "suppress_early_expiry_notifications", False)):
+            # Trial and registration/referral-bonus subscriptions can be very
+            # short, so a multi-day reminder would fire almost immediately.
+            # Treat the flag as a guard for short periods only; long or later
+            # extended rows must still get the local fallback reminders when
+            # panel webhooks are delayed or missing.
+            if self._should_suppress_early_expiry_stage(sub, end_date):
                 return None
 
             days_before_limit = max(

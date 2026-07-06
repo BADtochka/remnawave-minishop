@@ -23,12 +23,28 @@ def _worker(**overrides):
     )
 
 
-def _sub(end_date, *, suppress_early_expiry_notifications=False, user_id=123, subscription_id=1):
+def _sub(
+    end_date,
+    *,
+    suppress_early_expiry_notifications=False,
+    user_id=123,
+    subscription_id=1,
+    start_date=None,
+    duration_months=None,
+    provider=None,
+    status_from_panel=None,
+    tariff_key=None,
+):
     return SimpleNamespace(
         end_date=end_date,
         suppress_early_expiry_notifications=suppress_early_expiry_notifications,
         user_id=user_id,
         subscription_id=subscription_id,
+        start_date=start_date,
+        duration_months=duration_months,
+        provider=provider,
+        status_from_panel=status_from_panel,
+        tariff_key=tariff_key,
     )
 
 
@@ -67,9 +83,42 @@ def test_stage_sends_yesterday_notice_only_after_first_day():
 
 def test_promo_subscription_skips_day_before_reminders():
     now = datetime(2026, 5, 28, 12, tzinfo=UTC)
-    sub = _sub(now + timedelta(hours=23), suppress_early_expiry_notifications=True)
+    sub = _sub(
+        now + timedelta(hours=23),
+        suppress_early_expiry_notifications=True,
+        start_date=now - timedelta(days=2),
+        status_from_panel="ACTIVE_BONUS",
+    )
 
     assert _worker().stage_for_subscription(sub, now) is None
+
+
+def test_extended_suppressed_subscription_gets_day_before_reminder():
+    now = datetime(2026, 5, 28, 12, tzinfo=UTC)
+    sub = _sub(
+        now + timedelta(days=2, hours=23),
+        suppress_early_expiry_notifications=True,
+        start_date=now - timedelta(days=27),
+        duration_months=0,
+        status_from_panel="ACTIVE_EXTENDED_BY_BOT",
+    )
+    stage = _worker().stage_for_subscription(sub, now)
+
+    assert stage.key == "before_3d"
+    assert stage.message_key == "subscription_72h_notification"
+
+
+def test_paid_subscription_with_stale_suppression_gets_day_before_reminder():
+    now = datetime(2026, 5, 28, 12, tzinfo=UTC)
+    sub = _sub(
+        now + timedelta(hours=23),
+        suppress_early_expiry_notifications=True,
+        duration_months=1,
+    )
+    stage = _worker().stage_for_subscription(sub, now)
+
+    assert stage.key == "before_1d"
+    assert stage.message_key == "subscription_24h_notification"
 
 
 def test_promo_subscription_still_gets_hours_before_reminder():
