@@ -84,6 +84,25 @@ class AdminBroadcastAudienceCountsOut(HttpResponseModel):
     email_enabled: bool = False
 
 
+class AdminBroadcastShortcodeOut(HttpResponseModel):
+    name: str
+    cost: str
+    description: str
+
+
+class AdminBroadcastShortcodesOut(HttpResponseModel):
+    shortcodes: list[AdminBroadcastShortcodeOut]
+    allowed_tags: list[str]
+
+
+class AdminBroadcastPreviewOut(HttpResponseModel):
+    rendered_text: str = ""
+    rendered_subject: str | None = None
+    unknown_shortcodes: list[str] = Field(default_factory=list)
+    length: int = 0
+    sent: bool = False
+
+
 class AdminPanelInternalSquadOut(HttpResponseModel):
     uuid: str
     name: str

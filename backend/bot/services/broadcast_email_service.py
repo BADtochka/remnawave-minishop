@@ -32,6 +32,11 @@ class BroadcastEmailRecipient:
     user_id: int
     email: str
     language_code: str | None = None
+    # Per-recipient rendered overrides (shortcode personalization). When ``None``
+    # the shared ``message_text`` / ``subject`` passed to the sender are used, so
+    # plain broadcasts and existing callers keep working unchanged.
+    message_text: str | None = None
+    subject: str | None = None
 
 
 async def _send_one(
@@ -50,8 +55,10 @@ async def _send_one(
             content = render_broadcast_email(
                 settings,
                 language_code=recipient.language_code,
-                subject=subject,
-                message_text=message_text,
+                subject=recipient.subject if recipient.subject is not None else subject,
+                message_text=(
+                    recipient.message_text if recipient.message_text is not None else message_text
+                ),
                 buttons=buttons,
                 i18n=i18n,
             )

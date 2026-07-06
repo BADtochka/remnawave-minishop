@@ -33,6 +33,7 @@ const ADMIN_ERROR_KEYS: Record<string, string> = {
   invalid_bonus: "error_invalid_amount",
   invalid_deletes: "error_invalid_payload",
   invalid_days: "error_invalid_days",
+  invalid_telegram_html: "broadcast_invalid_telegram_html",
   invalid_favicon: "error_invalid_favicon",
   invalid_kind: "error_invalid_payload",
   invalid_logo: "error_invalid_logo",
@@ -66,6 +67,7 @@ const ADMIN_ERROR_KEYS: Record<string, string> = {
   tariff_required: "error_tariff_required",
   traffic_strategy_locked: "error_traffic_strategy_locked",
   too_many_buttons: "error_too_many_buttons",
+  unknown_shortcode: "broadcast_unknown_shortcode",
   webapp_url_unavailable: "error_webapp_url_unavailable",
   write_failed: "error_write_failed",
 };

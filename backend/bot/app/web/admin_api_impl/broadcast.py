@@ -35,6 +35,14 @@ from bot.services.broadcast_email_service import (
     BroadcastEmailRecipient,
     schedule_broadcast_emails,
 )
+from bot.services.broadcast_personalization import (
+    BroadcastUserContext,
+    known_shortcodes,
+    load_broadcast_contexts,
+    render_broadcast_text,
+    telegram_html_error,
+    unknown_shortcodes,
+)
 from bot.utils import MessageContent, send_message_via_queue
 from bot.utils.message_queue import get_queue_manager
 from bot.utils.ttl_cache import AsyncTTLCache
@@ -66,6 +74,10 @@ logger = logging.getLogger(__name__)
 BROADCAST_TARGET_ACTIVE_NEVER_CONNECTED = AUDIENCE_ACTIVE_NEVER_CONNECTED
 BROADCAST_TARGETS = AUDIENCE_TARGETS
 PANEL_ACTIVITY_LOOKUP_CONCURRENCY = 10
+# Telegram rejects messages over 4096 chars; a shortcode expansion can push a
+# per-recipient message past the limit, so we skip+count those rather than let
+# the queue fail them later with an opaque error.
+TELEGRAM_MESSAGE_MAX_LENGTH = 4096
 _ADMIN_BROADCAST_AUDIENCE_COUNT_CACHES: dict[tuple[int, int], AsyncTTLCache] = {}
 
 register_contract(
@@ -304,6 +316,22 @@ async def admin_broadcast_route(request: web.Request) -> web.Response:
     ):
         return _error(503, "panel_service_unavailable")
 
+    email_subject = str(body.email_subject or "")
+    unknown = unknown_shortcodes(text)
+    if email_enabled:
+        unknown |= unknown_shortcodes(email_subject)
+    if unknown:
+        return _error(400, "unknown_shortcode", ", ".join(sorted(unknown)))
+    html_error = telegram_html_error(text)
+    if html_error:
+        return _error(400, "invalid_telegram_html", html_error)
+    needed = known_shortcodes(text)
+    if email_enabled:
+        needed |= known_shortcodes(email_subject)
+    personalize = bool(needed)
+    i18n = get_i18n(request)
+    bot_username = get_bot_username(request)
+
     audience_service = _resolve_audience_service(request)
     user_ids = [int(uid) for uid in await audience_service.resolve_user_ids(target)]
     promo_codes = broadcast_promo_codes(buttons)
@@ -318,16 +346,50 @@ async def admin_broadcast_route(request: web.Request) -> web.Response:
         if promo_error is not None:
             return promo_error
 
+        contexts: dict[int, BroadcastUserContext] = {}
+        if personalize:
+            contexts = await load_broadcast_contexts(
+                session,
+                settings,
+                user_ids,
+                needed,
+                _resolve_panel_service(request),
+            )
+
+        def _render(template: str, uid: int, fallback_lang: str | None, *, escape: bool) -> str:
+            ctx = contexts.get(uid)
+            lang = (
+                (ctx.language_code if ctx else None) or fallback_lang or settings.DEFAULT_LANGUAGE
+            )
+            return render_broadcast_text(
+                template,
+                ctx,
+                lang=lang,
+                i18n=i18n,
+                settings=settings,
+                bot_username=bot_username,
+                escape=escape,
+            )
+
         if telegram_enabled and queue_manager is not None:
             telegram_recipients = await user_dal.get_telegram_recipients_for_broadcast(
                 session, user_ids
             )
             for uid, chat_id in telegram_recipients:
+                message_text = _render(text, uid, None, escape=True) if personalize else text
+                if len(message_text) > TELEGRAM_MESSAGE_MAX_LENGTH:
+                    failed += 1
+                    logger.warning(
+                        "Broadcast skipped for user %s: rendered text %s chars exceeds limit",
+                        uid,
+                        len(message_text),
+                    )
+                    continue
                 try:
                     await send_message_via_queue(
                         queue_manager,
                         chat_id,
-                        MessageContent(content_type="text", text=text),
+                        MessageContent(content_type="text", text=message_text),
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                         reply_markup=markup,
@@ -343,17 +405,35 @@ async def admin_broadcast_route(request: web.Request) -> web.Response:
                     )
 
         if email_enabled:
-            recipients = [
-                BroadcastEmailRecipient(user_id=uid, email=email, language_code=language)
-                for uid, email, language in await user_dal.get_email_recipients_for_broadcast(
-                    session, user_ids
-                )
-            ]
+            recipients: list[BroadcastEmailRecipient] = []
+            for uid, email, language in await user_dal.get_email_recipients_for_broadcast(
+                session, user_ids
+            ):
+                if personalize:
+                    rendered_text = _render(text, uid, language, escape=True)
+                    rendered_subject = (
+                        _render(email_subject, uid, language, escape=False)
+                        if email_subject
+                        else None
+                    )
+                    recipients.append(
+                        BroadcastEmailRecipient(
+                            user_id=uid,
+                            email=email,
+                            language_code=language,
+                            message_text=rendered_text,
+                            subject=rendered_subject,
+                        )
+                    )
+                else:
+                    recipients.append(
+                        BroadcastEmailRecipient(user_id=uid, email=email, language_code=language)
+                    )
             email_queued = schedule_broadcast_emails(
                 settings=settings,
-                i18n=get_i18n(request),
+                i18n=i18n,
                 recipients=recipients,
-                subject=str(body.email_subject or ""),
+                subject=email_subject,
                 message_text=text,
                 buttons=email_links_for_buttons(buttons),
                 session_factory=async_session_factory,

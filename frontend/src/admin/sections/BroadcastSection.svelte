@@ -1,10 +1,12 @@
 <script lang="ts">
   import { getBroadcastStore } from "$lib/admin/context";
-  import { Checkbox, Input, Sortable, Textarea } from "$components/ui/index.js";
+  import { Checkbox, Input, Sortable } from "$components/ui/index.js";
   import { Plus, Send, Trash2 } from "$components/ui/icons.js";
   import { onMount } from "svelte";
   import { Label } from "$components/ui/primitives.js";
   import { AdminButton, AdminSelect } from "$components/patterns/admin/index.js";
+  import BroadcastEditor from "$lib/admin/components/BroadcastEditor.svelte";
+  import { previewHtmlFromWire } from "$lib/admin/telegramHtml";
   import type {
     BroadcastButtonDraft,
     BroadcastButtonKind,
@@ -14,6 +16,39 @@
 
   let { at }: { at: TranslateFn } = $props();
   const broadcastStore = getBroadcastStore();
+
+  // Sample values for the client-side live preview only; the server preview
+  // uses real recipient data.
+  const PREVIEW_SAMPLES: Record<string, string> = {
+    first_name: "Alex",
+    last_name: "Petrov",
+    username: "@alex",
+    user_id: "100245",
+    email: "alex@example.com",
+    end_date: "2030-05-01",
+    days_left: "42",
+    subscription_status: "active",
+    tariff_name: "Premium",
+    tariff_price: "299 RUB",
+    traffic_used: "30",
+    traffic_limit: "100",
+    traffic_left: "70",
+    install_link: "https://app.example/s/demo",
+    miniapp_link: "https://app.example/",
+    config_link: "happ://crypt4/demo",
+    referral_code: "AB12CD",
+    referral_bot_link: "https://t.me/demo_bot?start=ref_uAB12CD",
+    referral_webapp_link: "https://app.example/?ref=uAB12CD",
+  };
+
+  const shortcodes = $derived(broadcastStore.broadcastShortcodes);
+  const previewBusy = $derived(Boolean(broadcastStore.broadcastPreviewBusy));
+  const previewResult = $derived(broadcastStore.broadcastPreviewResult);
+  const clientPreviewHtml = $derived(
+    broadcastStore.broadcastText.trim()
+      ? previewHtmlFromWire(broadcastStore.broadcastText, PREVIEW_SAMPLES)
+      : ""
+  );
 
   const broadcastTarget = $derived(broadcastStore.broadcastTarget);
   const broadcastText = $derived(broadcastStore.broadcastText);
@@ -133,19 +168,67 @@
           />
         </Label.Root>
       {/if}
-      <Label.Root class="admin-field-label">
+      <div class="admin-field-label">
         <span>{at("broadcast_label_text", {}, "Текст сообщения")}</span>
-        <small>{at("broadcast_hint_text", {}, "Поддерживается HTML-разметка Telegram")}</small>
-        <Textarea
-          class="admin-textarea"
-          rows={6}
+        <small
+          >{at(
+            "broadcast_hint_text",
+            {},
+            "Поддерживается HTML-разметка Telegram и шорткоды персонализации"
+          )}</small
+        >
+        <BroadcastEditor
           value={broadcastText}
-          oninput={(e) =>
-            broadcastStore.updateField({
-              broadcastText: (e.currentTarget as HTMLTextAreaElement).value,
-            })}
+          onInput={(next) => broadcastStore.updateField({ broadcastText: next })}
+          {shortcodes}
+          onRequestShortcodes={broadcastStore.loadShortcodes}
+          {at}
+          placeholder={at("broadcast_editor_placeholder", {}, "Текст рассылки...")}
         />
-      </Label.Root>
+      </div>
+
+      <div class="admin-field-label">
+        <div class="broadcast-preview-head">
+          <span>{at("broadcast_preview_title", {}, "Предпросмотр")}</span>
+          <div class="broadcast-preview-actions">
+            <AdminButton
+              size="sm"
+              variant="ghost"
+              disabled={previewBusy || !broadcastText.trim()}
+              onclick={() => broadcastStore.sendPreview("render")}
+            >
+              {at("broadcast_preview_render", {}, "Обновить по данным")}
+            </AdminButton>
+            <AdminButton
+              size="sm"
+              variant="ghost"
+              disabled={previewBusy || !broadcastText.trim()}
+              onclick={() => broadcastStore.sendPreview("send_telegram")}
+            >
+              {at("broadcast_preview_send", {}, "Отправить себе в Telegram")}
+            </AdminButton>
+          </div>
+        </div>
+        {#if clientPreviewHtml}
+          <!-- previewHtmlFromWire escapes all text and emits only whitelisted tags -->
+          <div class="broadcast-preview">{@html clientPreviewHtml}</div>
+        {:else}
+          <div class="broadcast-preview broadcast-preview-empty">
+            {at("broadcast_preview_placeholder", {}, "Здесь появится предпросмотр сообщения")}
+          </div>
+        {/if}
+        {#if previewResult}
+          {#if previewResult.unknownShortcodes.length}
+            <small class="admin-muted broadcast-preview-warn"
+              >{at("broadcast_preview_unknown", {}, "Неизвестные шорткоды")}:
+              {previewResult.unknownShortcodes.join(", ")}</small
+            >
+          {/if}
+          <small class="admin-muted"
+            >{at("broadcast_preview_length", {}, "Длина")}: {previewResult.length}</small
+          >
+        {/if}
+      </div>
       <div class="admin-field-label">
         <span>{at("broadcast_buttons_label", {}, "Кнопки")}</span>
         <small class="admin-muted"
@@ -271,5 +354,71 @@
     gap: 8px;
     align-items: center;
     cursor: pointer;
+  }
+
+  .broadcast-preview-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .broadcast-preview-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .broadcast-preview {
+    padding: 12px 14px;
+    border: 1px solid var(--admin-border, #2a2f3a);
+    border-radius: 10px;
+    background: var(--admin-surface-2, #10141b);
+    font-size: 14px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .broadcast-preview-empty {
+    color: var(--admin-text-dim, #5d6573);
+  }
+
+  .broadcast-preview :global(p) {
+    margin: 0 0 8px 0;
+  }
+
+  .broadcast-preview :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  .broadcast-preview :global(pre) {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--admin-surface, #0b0e14);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 13px;
+  }
+
+  .broadcast-preview :global(blockquote) {
+    margin: 0 0 8px 0;
+    padding-left: 10px;
+    border-left: 3px solid var(--admin-border, #2a2f3a);
+    color: var(--admin-text-muted, #9aa3b2);
+  }
+
+  .broadcast-preview :global(.broadcast-preview-chip) {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--admin-accent, #00fe7a) 18%, transparent);
+    color: var(--admin-accent, #00fe7a);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12px;
+  }
+
+  .broadcast-preview-warn {
+    color: #f4b740;
   }
 </style>

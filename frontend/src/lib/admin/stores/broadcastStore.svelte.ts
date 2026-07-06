@@ -2,6 +2,8 @@ import { adminErrorMessage } from "../errors.js";
 import {
   buildAdminBroadcastAudienceCountsPath,
   buildAdminBroadcastPath,
+  buildAdminBroadcastPreviewPath,
+  buildAdminBroadcastShortcodesPath,
   buildAdminPromosPath,
   unwrap,
   type ApiClient,
@@ -32,6 +34,14 @@ export type BroadcastButtonDraft = {
   promoCode: string;
 };
 export type BroadcastPromoOption = { value: string; label: string };
+export type BroadcastShortcodeInfo = { name: string; cost: string; description: string };
+export type BroadcastPreviewResult = {
+  renderedText: string;
+  renderedSubject: string | null;
+  unknownShortcodes: string[];
+  length: number;
+  sent: boolean;
+};
 export type BroadcastState = {
   broadcastTarget: string;
   broadcastText: string;
@@ -48,6 +58,12 @@ export type BroadcastState = {
   broadcastPromoOptions: BroadcastPromoOption[];
   broadcastPromoOptionsLoading: boolean;
   broadcastPromoOptionsLoaded: boolean;
+  broadcastShortcodes: BroadcastShortcodeInfo[];
+  broadcastAllowedTags: string[];
+  broadcastShortcodesLoading: boolean;
+  broadcastShortcodesLoaded: boolean;
+  broadcastPreviewBusy: boolean;
+  broadcastPreviewResult: BroadcastPreviewResult | null;
 };
 type BroadcastStoreOptions = {
   api: AdminApi;
@@ -63,6 +79,8 @@ export type BroadcastStore = BroadcastState & {
   updateButton: (index: number, fields: Partial<BroadcastButtonDraft>) => void;
   moveButton: (from: number, to: number) => void;
   loadPromoOptions: () => Promise<void>;
+  loadShortcodes: () => Promise<void>;
+  sendPreview: (mode: "render" | "send_telegram", userId?: number | null) => Promise<void>;
   canSubmit: () => boolean;
   BROADCAST_TARGET_OPTIONS: BroadcastTargetOption[];
   MAX_BROADCAST_BUTTONS: number;
@@ -123,6 +141,7 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
   const COUNTS_STORAGE_KEY = "remnawave-admin:broadcast-audience-counts";
   let countsPromise: Promise<void> | null = null;
   let promoOptionsPromise: Promise<void> | null = null;
+  let shortcodesPromise: Promise<void> | null = null;
   let buttonIdCounter = 0;
   const cachedCounts = readStoredCounts();
 
@@ -142,6 +161,12 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
     broadcastPromoOptions: [],
     broadcastPromoOptionsLoading: false,
     broadcastPromoOptionsLoaded: false,
+    broadcastShortcodes: [],
+    broadcastAllowedTags: [],
+    broadcastShortcodesLoading: false,
+    broadcastShortcodesLoaded: false,
+    broadcastPreviewBusy: false,
+    broadcastPreviewResult: null,
     runBroadcast,
     updateField,
     loadCounts,
@@ -150,6 +175,8 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
     updateButton,
     moveButton,
     loadPromoOptions,
+    loadShortcodes,
+    sendPreview,
     canSubmit,
     BROADCAST_TARGET_OPTIONS: [],
     MAX_BROADCAST_BUTTONS,
@@ -332,6 +359,91 @@ export function createBroadcastStore({ api, onToast, at }: BroadcastStoreOptions
 
   function updateField(fields: Partial<BroadcastState>): void {
     updateState((s) => ({ ...s, ...fields }));
+  }
+
+  async function loadShortcodes(): Promise<void> {
+    if (state.broadcastShortcodesLoaded || shortcodesPromise) {
+      return shortcodesPromise || Promise.resolve();
+    }
+    updateState((s) => ({ ...s, broadcastShortcodesLoading: true }));
+    shortcodesPromise = (async () => {
+      try {
+        const res = await api(buildAdminBroadcastShortcodesPath());
+        if (res?.ok) {
+          const payload = unwrap(res);
+          const shortcodes = Array.isArray(payload.shortcodes)
+            ? payload.shortcodes.map((item) => ({
+                name: String(item.name || ""),
+                cost: String(item.cost || "db"),
+                description: String(item.description || ""),
+              }))
+            : [];
+          const allowedTags = Array.isArray(payload.allowed_tags)
+            ? payload.allowed_tags.map((tag) => String(tag))
+            : [];
+          updateState((s) => ({
+            ...s,
+            broadcastShortcodes: shortcodes,
+            broadcastAllowedTags: allowedTags,
+            broadcastShortcodesLoaded: true,
+          }));
+        }
+      } catch {
+        // Picker is advisory; leave it empty and let the backend validate on submit.
+      } finally {
+        updateState((s) => ({ ...s, broadcastShortcodesLoading: false }));
+        shortcodesPromise = null;
+      }
+    })();
+    return shortcodesPromise;
+  }
+
+  async function sendPreview(
+    mode: "render" | "send_telegram",
+    userId: number | null = null
+  ): Promise<void> {
+    if (state.broadcastPreviewBusy) return;
+    const text = state.broadcastText.trim();
+    if (!text) {
+      onToast(at("broadcast_preview_empty", {}, "Введите текст для превью"));
+      return;
+    }
+    updateState((s) => ({ ...s, broadcastPreviewBusy: true }));
+    try {
+      const body = {
+        text,
+        email_subject: state.broadcastEmailSubject.trim(),
+        user_id: userId,
+        mode,
+      } satisfies PostPayload<"/api/admin/broadcast/preview">;
+      const res = await api(buildAdminBroadcastPreviewPath(), {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      if (res?.ok) {
+        const payload = unwrap(res);
+        updateState((s) => ({
+          ...s,
+          broadcastPreviewResult: {
+            renderedText: String(payload.rendered_text || ""),
+            renderedSubject:
+              payload.rendered_subject == null ? null : String(payload.rendered_subject),
+            unknownShortcodes: Array.isArray(payload.unknown_shortcodes)
+              ? payload.unknown_shortcodes.map((code) => String(code))
+              : [],
+            length: Number(payload.length || 0),
+            sent: Boolean(payload.sent),
+          },
+        }));
+        if (mode === "send_telegram") {
+          onToast(at("broadcast_preview_sent", {}, "Превью отправлено в Telegram"));
+        }
+      } else {
+        onToast(adminErrorMessage(res, at, at("broadcast_preview_failed", {}, "Ошибка превью")));
+      }
+    } finally {
+      updateState((s) => ({ ...s, broadcastPreviewBusy: false }));
+    }
   }
 
   function addButton(): void {

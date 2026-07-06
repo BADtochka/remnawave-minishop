@@ -328,6 +328,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/admin/broadcast/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Admin Broadcast Preview */
+    post: operations["post_admin_broadcast_preview_route"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/admin/broadcast/shortcodes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Admin Broadcast Shortcodes */
+    get: operations["get_admin_broadcast_shortcodes_route"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/admin/health": {
     parameters: {
       query?: never;
@@ -1760,6 +1794,70 @@ export interface components {
        * @default
        */
       url: string;
+    };
+    /** AdminBroadcastPreviewBody */
+    AdminBroadcastPreviewBody: {
+      /**
+       * Email Subject
+       * @default
+       */
+      email_subject: unknown;
+      /**
+       * Mode
+       * @default render
+       */
+      mode: string;
+      /**
+       * Text
+       * @default
+       */
+      text: unknown;
+      /**
+       * User Id
+       * @default null
+       */
+      user_id: number | null;
+    };
+    /** AdminBroadcastPreviewOut */
+    AdminBroadcastPreviewOut: {
+      /**
+       * Length
+       * @default 0
+       */
+      length: number;
+      /**
+       * Rendered Subject
+       * @default null
+       */
+      rendered_subject: string | null;
+      /**
+       * Rendered Text
+       * @default
+       */
+      rendered_text: string;
+      /**
+       * Sent
+       * @default false
+       */
+      sent: boolean;
+      /** Unknown Shortcodes */
+      unknown_shortcodes?: string[];
+    };
+    /** AdminBroadcastShortcodeOut */
+    AdminBroadcastShortcodeOut: {
+      /** Cost */
+      cost: string;
+      /** Description */
+      description: string;
+      /** Name */
+      name: string;
+    };
+    /** AdminBroadcastShortcodesOut */
+    AdminBroadcastShortcodesOut: {
+      /** Allowed Tags */
+      allowed_tags: string[];
+      /** Shortcodes */
+      shortcodes: components["schemas"]["AdminBroadcastShortcodeOut"][];
     };
     /** AdminHealthOut */
     AdminHealthOut: {
@@ -5219,6 +5317,56 @@ export interface operations {
             /** @constant */
             ok: true;
           } & components["schemas"]["AdminBroadcastAudienceCountsOut"];
+        };
+      };
+    };
+  };
+  post_admin_broadcast_preview_route: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AdminBroadcastPreviewBody"];
+      };
+    };
+    responses: {
+      /** @description JSON response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            ok: true;
+          } & components["schemas"]["AdminBroadcastPreviewOut"];
+        };
+      };
+    };
+  };
+  get_admin_broadcast_shortcodes_route: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description JSON response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            ok: true;
+          } & components["schemas"]["AdminBroadcastShortcodesOut"];
         };
       };
     };

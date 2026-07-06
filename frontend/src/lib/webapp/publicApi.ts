@@ -524,6 +524,16 @@ export function buildAdminBroadcastAudienceCountsPath(): AdminBroadcastAudienceC
   return "/admin/broadcast/audience-counts";
 }
 
+export type AdminBroadcastShortcodesPath = "/admin/broadcast/shortcodes";
+export function buildAdminBroadcastShortcodesPath(): AdminBroadcastShortcodesPath {
+  return "/admin/broadcast/shortcodes";
+}
+
+export type AdminBroadcastPreviewPath = "/admin/broadcast/preview";
+export function buildAdminBroadcastPreviewPath(): AdminBroadcastPreviewPath {
+  return "/admin/broadcast/preview";
+}
+
 export type AdminLogsPath = "/admin/logs" | `/admin/logs?${string}`;
 export function buildAdminLogsPath(params?: URLSearchParams): AdminLogsPath {
   const query = params?.toString();

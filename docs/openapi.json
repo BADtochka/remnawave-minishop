@@ -500,6 +500,124 @@
         "title": "AdminBroadcastButtonBody",
         "type": "object"
       },
+      "AdminBroadcastPreviewBody": {
+        "properties": {
+          "email_subject": {
+            "default": "",
+            "title": "Email Subject"
+          },
+          "mode": {
+            "default": "render",
+            "title": "Mode",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Id"
+          }
+        },
+        "title": "AdminBroadcastPreviewBody",
+        "type": "object"
+      },
+      "AdminBroadcastPreviewOut": {
+        "properties": {
+          "length": {
+            "default": 0,
+            "title": "Length",
+            "type": "integer"
+          },
+          "rendered_subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rendered Subject"
+          },
+          "rendered_text": {
+            "default": "",
+            "title": "Rendered Text",
+            "type": "string"
+          },
+          "sent": {
+            "default": false,
+            "title": "Sent",
+            "type": "boolean"
+          },
+          "unknown_shortcodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknown Shortcodes",
+            "type": "array"
+          }
+        },
+        "title": "AdminBroadcastPreviewOut",
+        "type": "object"
+      },
+      "AdminBroadcastShortcodeOut": {
+        "properties": {
+          "cost": {
+            "title": "Cost",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "cost",
+          "description"
+        ],
+        "title": "AdminBroadcastShortcodeOut",
+        "type": "object"
+      },
+      "AdminBroadcastShortcodesOut": {
+        "properties": {
+          "allowed_tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Tags",
+            "type": "array"
+          },
+          "shortcodes": {
+            "items": {
+              "$ref": "#/components/schemas/AdminBroadcastShortcodeOut"
+            },
+            "title": "Shortcodes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "shortcodes",
+          "allowed_tags"
+        ],
+        "title": "AdminBroadcastShortcodesOut",
+        "type": "object"
+      },
       "AdminHealthOut": {
         "properties": {
           "alerts": {
@@ -8298,6 +8416,108 @@
           }
         ],
         "summary": "Admin Broadcast Audience Counts",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/broadcast/preview": {
+      "post": {
+        "operationId": "post_admin_broadcast_preview_route",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminBroadcastPreviewBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "ok": {
+                          "const": true,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AdminBroadcastPreviewOut"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "JSON response"
+          }
+        },
+        "security": [
+          {
+            "AdminSession": []
+          },
+          {
+            "AdminBearer": []
+          }
+        ],
+        "summary": "Admin Broadcast Preview",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/broadcast/shortcodes": {
+      "get": {
+        "operationId": "get_admin_broadcast_shortcodes_route",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "ok": {
+                          "const": true,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AdminBroadcastShortcodesOut"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "JSON response"
+          }
+        },
+        "security": [
+          {
+            "AdminSession": []
+          },
+          {
+            "AdminBearer": []
+          }
+        ],
+        "summary": "Admin Broadcast Shortcodes",
         "tags": [
           "admin"
         ]

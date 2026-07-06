@@ -707,6 +707,16 @@ test("webapp and admin sections, dialogs, tabs stay interactive without console 
     await openAdminSection(page, id);
   }
 
+  setPhase("admin-broadcast:shortcode-picker");
+  await openAdminSection(page, "broadcast");
+  const shortcodeToggle = page.locator(".broadcast-tool-shortcode");
+  await expect(shortcodeToggle).toBeVisible();
+  await shortcodeToggle.click();
+  const shortcodeList = page.locator(".broadcast-shortcode-list");
+  await expect(shortcodeList).toBeVisible();
+  await shortcodeList.locator(".broadcast-shortcode-item").first().click();
+  await expect(page.locator(".broadcast-surface .broadcast-chip").first()).toBeVisible();
+
   setPhase("admin-users:filter-dialog");
   await openAdminSection(page, "users");
   await page.setViewportSize(MOBILE_VIEWPORT);

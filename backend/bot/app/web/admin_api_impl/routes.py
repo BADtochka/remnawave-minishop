@@ -16,6 +16,10 @@ from .broadcast import (
     admin_broadcast_audience_counts_route,
     admin_broadcast_route,
 )
+from .broadcast_shortcodes import (
+    admin_broadcast_preview_route,
+    admin_broadcast_shortcodes_route,
+)
 from .health import (
     admin_health_route,
 )
@@ -158,6 +162,8 @@ def setup_admin_routes(app: web.Application) -> None:
     router.add_get("/api/admin/support/stats", admin_support_stats_route)
 
     router.add_get("/api/admin/broadcast/audience-counts", admin_broadcast_audience_counts_route)
+    router.add_get("/api/admin/broadcast/shortcodes", admin_broadcast_shortcodes_route)
+    router.add_post("/api/admin/broadcast/preview", admin_broadcast_preview_route)
     router.add_post("/api/admin/broadcast", admin_broadcast_route)
     router.add_post("/api/admin/sync", admin_sync_route)
 

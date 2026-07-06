@@ -305,6 +305,34 @@ class AdminBroadcastBody(HttpBodyModel):
         return [item for item in normalized if item]
 
 
+class AdminBroadcastPreviewBody(HttpBodyModel):
+    text: Any = ""
+    email_subject: Any = ""
+    user_id: int | None = None
+    mode: str = "render"
+
+    @field_validator("text", "email_subject", mode="before")
+    @classmethod
+    def _normalize_preview_text(cls, value: Any) -> str:
+        return _strip_text(value)
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _normalize_mode(cls, value: Any) -> str:
+        mode = _strip_text(value).lower()
+        return mode if mode in {"render", "send_telegram"} else "render"
+
+    @field_validator("user_id", mode="before")
+    @classmethod
+    def _coerce_user_id(cls, value: Any) -> int | None:
+        if value is None or value == "":
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+
 class AdminUserBanBody(HttpBodyModel):
     banned: Any = False
 
