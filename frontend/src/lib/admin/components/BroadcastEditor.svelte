@@ -2,6 +2,8 @@
   import { Editor } from "@tiptap/core";
   import { onMount, tick } from "svelte";
 
+  import { ScrollArea } from "$components/ui/index.js";
+
   import {
     applyLink,
     broadcastExtensions,
@@ -45,6 +47,8 @@
   let linkOpen = $state(false);
   let linkHref = $state("");
   let selectionTick = $state(0);
+  let editorMounted = false;
+  let lastEditorSyncValue = "";
 
   const active = $derived.by(() => {
     selectionTick;
@@ -74,6 +78,7 @@
 
   onMount(() => {
     if (!host) return;
+    editorMounted = true;
     const instance = new Editor({
       element: host,
       extensions: broadcastExtensions(placeholder),
@@ -89,7 +94,11 @@
       },
     });
     editor = instance;
-    return () => instance.destroy();
+    return () => {
+      editorMounted = false;
+      if (editor === instance) editor = null;
+      instance.destroy();
+    };
   });
 
   // Keep the editor in sync when the value changes from outside (e.g. after a
@@ -97,16 +106,25 @@
   // loops by comparing the serialized form.
   $effect(() => {
     const current = editor;
-    if (!current || sourceMode) return;
-    if (serialize(current) === value) return;
+    if (!current || current.isDestroyed || sourceMode) return;
+    if (serialize(current) === value) {
+      lastEditorSyncValue = value;
+      return;
+    }
+    if (lastEditorSyncValue === value) return;
+    lastEditorSyncValue = value;
     current.commands.setContent(telegramHtmlToDoc(value), { emitUpdate: false });
+  });
+
+  $effect(() => {
+    if (shortcodesOpen) onRequestShortcodes();
   });
 
   $effect(() => {
     if (!shortcodesOpen) return;
     const close = (event: PointerEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && target.closest(".broadcast-shortcode-menu")) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest(".broadcast-shortcode-menu")) return;
       shortcodesOpen = false;
     };
     window.addEventListener("pointerdown", close);
@@ -114,7 +132,7 @@
   });
 
   function withEditor(action: (instance: Editor) => void): void {
-    if (editor) action(editor);
+    if (editor && !editor.isDestroyed) action(editor);
   }
 
   async function enterSourceMode(): Promise<void> {
@@ -125,11 +143,18 @@
   }
 
   async function exitSourceMode(): Promise<void> {
-    sourceMode = false;
-    onInput(sourceText);
+    shortcodesOpen = false;
+    linkOpen = false;
     const current = editor;
-    if (current) current.commands.setContent(telegramHtmlToDoc(sourceText), { emitUpdate: false });
+    if (current && !current.isDestroyed) {
+      current.commands.setContent(telegramHtmlToDoc(sourceText), { emitUpdate: false });
+      sourceText = serialize(current);
+    }
+    lastEditorSyncValue = sourceText;
+    onInput(sourceText);
+    sourceMode = false;
     await tick();
+    if (!editorMounted || editor !== current || current?.isDestroyed) return;
     current?.commands.focus("end");
   }
 
@@ -138,8 +163,7 @@
     onInput(sourceText);
   }
 
-  function openShortcodes(): void {
-    if (!shortcodesOpen) onRequestShortcodes();
+  function toggleShortcodes(): void {
     shortcodesOpen = !shortcodesOpen;
   }
 
@@ -165,6 +189,80 @@
       return;
     }
     withEditor((instance) => insertShortcode(instance, name));
+  }
+
+  async function wrapSourceSelection(
+    openTag: string,
+    closeTag: string,
+    options: { fallbackText?: string; selectHref?: boolean } = {}
+  ): Promise<void> {
+    const area = sourceArea;
+    const start = area?.selectionStart ?? sourceText.length;
+    const end = area?.selectionEnd ?? sourceText.length;
+    const selected = sourceText.slice(start, end);
+    const innerText = selected || options.fallbackText || "";
+    sourceText = `${sourceText.slice(0, start)}${openTag}${innerText}${closeTag}${sourceText.slice(end)}`;
+    onInput(sourceText);
+    await tick();
+    const currentArea = sourceArea;
+    if (!currentArea) return;
+    currentArea.focus();
+    if (options.selectHref) {
+      const hrefStart = openTag.indexOf("https://");
+      if (hrefStart >= 0) {
+        const selectionStart = start + hrefStart;
+        currentArea.setSelectionRange(selectionStart, selectionStart + "https://".length);
+        return;
+      }
+    }
+    const caret = innerText
+      ? start + openTag.length + innerText.length + closeTag.length
+      : start + openTag.length;
+    currentArea.setSelectionRange(caret, caret);
+  }
+
+  function sourceTagForMark(mark: ToolbarMark): string {
+    if (mark === "bold") return "b";
+    if (mark === "italic") return "i";
+    if (mark === "underline") return "u";
+    if (mark === "strike") return "s";
+    return "code";
+  }
+
+  function handleMarkButton(mark: ToolbarMark): void {
+    if (sourceMode) {
+      const tag = sourceTagForMark(mark);
+      void wrapSourceSelection(`<${tag}>`, `</${tag}>`);
+      return;
+    }
+    withEditor((instance) => toggleMark(instance, mark));
+  }
+
+  function handlePreButton(): void {
+    if (sourceMode) {
+      void wrapSourceSelection("<pre>", "</pre>");
+      return;
+    }
+    withEditor(toggleCodeBlock);
+  }
+
+  function handleQuoteButton(): void {
+    if (sourceMode) {
+      void wrapSourceSelection("<blockquote>", "</blockquote>");
+      return;
+    }
+    withEditor(toggleBlockquote);
+  }
+
+  function handleLinkButton(): void {
+    if (sourceMode) {
+      void wrapSourceSelection('<a href="https://">', "</a>", {
+        fallbackText: "https://",
+        selectHref: true,
+      });
+      return;
+    }
+    openLink();
   }
 
   function openLink(): void {
@@ -193,51 +291,53 @@
     role="toolbar"
     aria-label={at("broadcast_toolbar", {}, "Форматирование")}
   >
-    {#if !sourceMode}
-      {#each markButtons as button (button.mark)}
-        <button
-          type="button"
-          class="broadcast-tool"
-          class:is-active={active[button.mark]}
-          title={button.label}
-          aria-label={button.label}
-          aria-pressed={active[button.mark]}
-          onclick={() => withEditor((instance) => toggleMark(instance, button.mark))}
-        >
-          {button.icon}
-        </button>
-      {/each}
+    {#each markButtons as button (button.mark)}
       <button
         type="button"
         class="broadcast-tool"
-        class:is-active={active.codeBlock}
-        title={at("broadcast_format_pre", {}, "Блок кода")}
-        aria-label={at("broadcast_format_pre", {}, "Блок кода")}
-        onclick={() => withEditor(toggleCodeBlock)}
+        class:is-active={!sourceMode && active[button.mark]}
+        title={button.label}
+        aria-label={button.label}
+        aria-pressed={!sourceMode && active[button.mark]}
+        data-broadcast-format={button.mark}
+        onclick={() => handleMarkButton(button.mark)}
       >
-        ⌗
+        {button.icon}
       </button>
-      <button
-        type="button"
-        class="broadcast-tool"
-        class:is-active={active.blockquote}
-        title={at("broadcast_format_quote", {}, "Цитата")}
-        aria-label={at("broadcast_format_quote", {}, "Цитата")}
-        onclick={() => withEditor(toggleBlockquote)}
-      >
-        ❝
-      </button>
-      <button
-        type="button"
-        class="broadcast-tool"
-        class:is-active={active.link}
-        title={at("broadcast_format_link", {}, "Ссылка")}
-        aria-label={at("broadcast_format_link", {}, "Ссылка")}
-        onclick={openLink}
-      >
-        🔗
-      </button>
-    {/if}
+    {/each}
+    <button
+      type="button"
+      class="broadcast-tool"
+      class:is-active={!sourceMode && active.codeBlock}
+      title={at("broadcast_format_pre", {}, "Блок кода")}
+      aria-label={at("broadcast_format_pre", {}, "Блок кода")}
+      data-broadcast-format="pre"
+      onclick={handlePreButton}
+    >
+      ⌗
+    </button>
+    <button
+      type="button"
+      class="broadcast-tool"
+      class:is-active={!sourceMode && active.blockquote}
+      title={at("broadcast_format_quote", {}, "Цитата")}
+      aria-label={at("broadcast_format_quote", {}, "Цитата")}
+      data-broadcast-format="blockquote"
+      onclick={handleQuoteButton}
+    >
+      ❝
+    </button>
+    <button
+      type="button"
+      class="broadcast-tool"
+      class:is-active={!sourceMode && active.link}
+      title={at("broadcast_format_link", {}, "Ссылка")}
+      aria-label={at("broadcast_format_link", {}, "Ссылка")}
+      data-broadcast-format="link"
+      onclick={handleLinkButton}
+    >
+      🔗
+    </button>
 
     <div class="broadcast-shortcode-menu">
       <button
@@ -245,35 +345,39 @@
         class="broadcast-tool broadcast-tool-shortcode"
         aria-haspopup="listbox"
         aria-expanded={shortcodesOpen}
-        onclick={openShortcodes}
+        onclick={toggleShortcodes}
       >
         {at("broadcast_insert_shortcode", {}, "{ } Шорткод")}
       </button>
       {#if shortcodesOpen}
         <div class="broadcast-shortcode-list" role="listbox">
-          {#if shortcodes.length}
-            {#each shortcodes as item (item.name)}
-              <button
-                type="button"
-                class="broadcast-shortcode-item"
-                role="option"
-                aria-selected="false"
-                onclick={() => pickShortcode(item.name)}
-              >
-                <span class="broadcast-shortcode-token">{`{${item.name}}`}</span>
-                <span class="broadcast-shortcode-desc">{item.description || item.name}</span>
-                {#if item.cost === "panel"}
-                  <span class="broadcast-shortcode-badge"
-                    >{at("broadcast_shortcode_panel_badge", {}, "панель")}</span
+          <ScrollArea class="broadcast-shortcode-scroll" maxHeight="min(320px, 48vh)" type="auto">
+            {#if shortcodes.length}
+              <div class="broadcast-shortcode-items">
+                {#each shortcodes as item (item.name)}
+                  <button
+                    type="button"
+                    class="broadcast-shortcode-item"
+                    role="option"
+                    aria-selected="false"
+                    onclick={() => pickShortcode(item.name)}
                   >
-                {/if}
-              </button>
-            {/each}
-          {:else}
-            <div class="broadcast-shortcode-empty">
-              {at("broadcast_shortcodes_loading", {}, "Загрузка...")}
-            </div>
-          {/if}
+                    <span class="broadcast-shortcode-token">{`{${item.name}}`}</span>
+                    <span class="broadcast-shortcode-desc">{item.description || item.name}</span>
+                    {#if item.cost === "panel"}
+                      <span class="broadcast-shortcode-badge"
+                        >{at("broadcast_shortcode_panel_badge", {}, "панель")}</span
+                      >
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+            {:else}
+              <div class="broadcast-shortcode-empty">
+                {at("broadcast_shortcodes_loading", {}, "Загрузка...")}
+              </div>
+            {/if}
+          </ScrollArea>
         </div>
       {/if}
     </div>
@@ -282,6 +386,7 @@
       type="button"
       class="broadcast-tool broadcast-tool-source"
       class:is-active={sourceMode}
+      data-broadcast-source-toggle
       onclick={() => void (sourceMode ? exitSourceMode() : enterSourceMode())}
     >
       {sourceMode
@@ -370,17 +475,23 @@
 
   .broadcast-shortcode-list {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 6px);
     left: 0;
-    z-index: 30;
-    min-width: 260px;
-    max-height: 280px;
-    overflow-y: auto;
+    z-index: 120;
+    width: min(440px, calc(100vw - 32px));
+    min-width: min(300px, calc(100vw - 32px));
     padding: 6px;
     border: 1px solid var(--admin-border, #2a2f3a);
     border-radius: 10px;
     background: var(--admin-surface, #0e1116);
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  }
+
+  .broadcast-shortcode-items {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-right: 4px;
   }
 
   .broadcast-shortcode-item {

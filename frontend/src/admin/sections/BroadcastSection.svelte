@@ -41,7 +41,6 @@
     referral_webapp_link: "https://app.example/?ref=uAB12CD",
   };
 
-  const shortcodes = $derived(broadcastStore.broadcastShortcodes);
   const previewBusy = $derived(Boolean(broadcastStore.broadcastPreviewBusy));
   const previewResult = $derived(broadcastStore.broadcastPreviewResult);
   const clientPreviewHtml = $derived(
@@ -182,7 +181,7 @@
         <BroadcastEditor
           value={broadcastText}
           onInput={(next) => broadcastStore.updateField({ broadcastText: next })}
-          {shortcodes}
+          shortcodes={broadcastStore.broadcastShortcodes}
           onRequestShortcodes={broadcastStore.loadShortcodes}
           {at}
           placeholder={at("broadcast_editor_placeholder", {}, "Текст рассылки...")}
