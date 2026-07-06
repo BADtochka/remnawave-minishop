@@ -598,6 +598,7 @@ SPEC = PaymentProviderSpec(
     webapp_label="SeverPay",
     webapp_labels={"ru": "SeverPay", "en": "SeverPay"},
     webapp_icon="CreditCard",
+    logo_url="/provider-logos/severpay.png",
     telegram_labels={"ru": "SeverPay", "en": "SeverPay"},
     telegram_emoji="💳",
     pending_status="pending_severpay",

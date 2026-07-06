@@ -693,6 +693,7 @@ SPEC = PaymentProviderSpec(
     webapp_label="FreeKassa / СБП",
     webapp_labels={"ru": "FreeKassa / СБП", "en": "FreeKassa / SBP"},
     webapp_icon="Smartphone",
+    logo_url="/provider-logos/freekassa.png",
     telegram_labels={"ru": "СБП", "en": "SBP"},
     telegram_emoji="📱",
     pending_status="pending_freekassa",

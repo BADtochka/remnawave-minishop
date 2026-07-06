@@ -2027,6 +2027,21 @@ export interface components {
        */
       provider_id: string | null;
       /**
+       * Provider Info Url
+       * @default null
+       */
+      provider_info_url: string | null;
+      /**
+       * Provider Label
+       * @default null
+       */
+      provider_label: string | null;
+      /**
+       * Provider Logo Url
+       * @default null
+       */
+      provider_logo_url: string | null;
+      /**
        * Read Error
        * @default null
        */

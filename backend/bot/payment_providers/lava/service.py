@@ -703,6 +703,7 @@ SPEC = PaymentProviderSpec(
     webapp_label="LAVA",
     webapp_labels={"ru": "LAVA", "en": "LAVA"},
     webapp_icon="CreditCard",
+    logo_url="/provider-logos/lava.png",
     telegram_labels={"ru": "LAVA", "en": "LAVA"},
     telegram_emoji="💳",
     pending_status="pending_lava",

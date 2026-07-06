@@ -96,6 +96,7 @@ from .assets_static import (
     css_asset_route,
     health_route,
     js_asset_route,
+    provider_logo_asset_route,
     robots_txt_route,
 )
 from .assets_theme import (
@@ -774,6 +775,7 @@ __all__ = [
     "i18n_route",
     "index_route",
     "js_asset_route",
+    "provider_logo_asset_route",
     "robots_txt_route",
     "theme_asset_route",
     "theme_css_asset_route",

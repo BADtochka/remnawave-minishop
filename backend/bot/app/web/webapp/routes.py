@@ -31,6 +31,7 @@ from .assets import (
     i18n_route,
     index_route,
     js_asset_route,
+    provider_logo_asset_route,
     robots_txt_route,
     theme_asset_route,
     theme_css_asset_route,
@@ -152,6 +153,10 @@ def setup_subscription_webapp_routes(app: web.Application) -> None:
     app.router.add_get("/subscription_webapp_admin.css", admin_css_asset_route)
     app.router.add_get(r"/webapp-theme-css/{path:.+}", theme_css_asset_route)
     app.router.add_get(r"/webapp-theme-assets/{path:.+}", theme_asset_route)
+    app.router.add_get(
+        r"/provider-logos/{filename:[A-Za-z0-9_-]+\.png}",
+        provider_logo_asset_route,
+    )
     app.router.add_get("/subscription_webapp.min.{asset_hash}.js", js_asset_route)
     app.router.add_get("/subscription_webapp.js", js_asset_route)
     app.router.add_get(

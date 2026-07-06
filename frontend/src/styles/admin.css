@@ -2046,11 +2046,48 @@
 }
 
 .admin-accordion-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-size: 13px;
   font-weight: 600;
   color: var(--admin-text);
   word-break: break-word;
   min-width: 0;
+}
+
+.admin-disclosure-title-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-provider-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--admin-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--admin-bg) 78%, #ffffff);
+  color: var(--admin-text);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0;
+  overflow: hidden;
+}
+
+.admin-provider-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  object-fit: contain;
+}
+
+.admin-provider-logo span {
+  line-height: 1;
 }
 
 .admin-accordion-meta {
@@ -2150,6 +2187,7 @@
   align-items: center;
 }
 
+.admin-provider-info,
 .admin-webhook-hint {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
@@ -2158,15 +2196,24 @@
   min-width: 0;
   padding: 14px 18px;
   border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-provider-info {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.admin-webhook-hint {
   background: color-mix(in srgb, var(--info) 7%, transparent);
 }
 
+.admin-provider-info-meta,
 .admin-webhook-hint-meta {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
 
+.admin-provider-info-meta strong,
 .admin-webhook-hint-meta strong {
   color: var(--admin-text);
   font-size: 12px;
@@ -2175,11 +2222,23 @@
   letter-spacing: 0.04em;
 }
 
+.admin-provider-info-meta small,
 .admin-webhook-hint-meta small {
   color: var(--admin-muted);
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
+}
+
+.admin-provider-info-link {
+  justify-self: end;
+  max-width: 100%;
+}
+
+.admin-provider-info-link span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .admin-webhook-value {
@@ -3989,10 +4048,15 @@
     padding: 14px 14px;
   }
 
+  .admin-provider-info,
   .admin-webhook-hint {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     padding: 14px;
+  }
+
+  .admin-provider-info-link {
+    justify-self: start;
   }
 
   .admin-webhook-value {
@@ -5006,7 +5070,14 @@
   box-shadow: inset 0 0 0 2px var(--admin-ring);
 }
 
-.admin-settings-subsection-trigger strong {
+.admin-settings-subsection-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-settings-subsection-title strong {
   font-size: 12px;
   font-weight: 700;
   color: var(--admin-text);
@@ -5046,7 +5117,7 @@
     row-gap: 4px;
   }
 
-  .admin-settings-subsection-trigger strong {
+  .admin-settings-subsection-title {
     grid-area: title;
   }
 

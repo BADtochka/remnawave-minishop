@@ -208,6 +208,7 @@ SPEC = PaymentProviderSpec(
     webapp_label="Stripe",
     webapp_labels={"ru": "Stripe", "en": "Stripe"},
     webapp_icon="CreditCard",
+    logo_url="/provider-logos/stripe.png",
     telegram_labels={"ru": "Stripe", "en": "Stripe"},
     emoji="",
     telegram_emoji="",

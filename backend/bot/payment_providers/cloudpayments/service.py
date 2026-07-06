@@ -755,6 +755,7 @@ SPEC = PaymentProviderSpec(
     webapp_label="CloudPayments",
     webapp_labels={"ru": "CloudPayments", "en": "CloudPayments"},
     webapp_icon="CreditCard",
+    logo_url="/provider-logos/cloudpayments.png",
     telegram_labels={"ru": "CloudPayments", "en": "CloudPayments"},
     telegram_emoji="💳",
     pending_status="pending_cloudpayments",

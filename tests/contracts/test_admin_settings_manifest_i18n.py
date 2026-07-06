@@ -9,6 +9,7 @@ from bot.app.web.admin_settings_manifest import coerce_value, get_field_by_key, 
 from bot.middlewares.i18n import resolve_locale_key
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 SUPPORT_RELATED_SETTINGS = (
     "LOG_SUPPORT_THREAD_ID",
@@ -375,9 +376,36 @@ def test_payment_provider_settings_include_webhook_metadata():
 
     assert manifest["FREEKASSA_ENABLED"]["webhook_path"] == "/webhook/freekassa"
     assert manifest["FREEKASSA_ENABLED"]["provider_id"] == "freekassa"
+    assert manifest["FREEKASSA_ENABLED"]["provider_info_url"] == "https://docs.freekassa.net/"
+    assert manifest["FREEKASSA_ENABLED"]["provider_logo_url"] == "/provider-logos/freekassa.png"
     assert manifest["PAYMENT_PLATEGA_CRYPTO_WEBAPP_LABEL_RU"]["webhook_path"] == "/webhook/platega"
     assert manifest["YOOKASSA_SHOP_ID"]["webhook_requires_base_url"] is True
     assert "webhook_path" not in manifest["PAYMENT_STARS_WEBAPP_LABEL_RU"]
+    assert (
+        manifest["PAYMENT_STARS_WEBAPP_LABEL_RU"]["provider_info_url"]
+        == "https://core.telegram.org/bots/payments-stars"
+    )
+    assert (
+        manifest["PAYMENT_STARS_WEBAPP_LABEL_RU"]["provider_logo_url"]
+        == "/provider-logos/telegram-stars.png"
+    )
+
+
+def test_payment_provider_logo_assets_are_local_png_files():
+    logo_urls = {
+        str(item["provider_logo_url"])
+        for item in _manifest_items()
+        if item.get("provider_logo_url")
+    }
+
+    assert "/provider-logos/cryptopay.png" in logo_urls
+    assert len(logo_urls) >= 13
+    for logo_url in logo_urls:
+        assert re.fullmatch(r"/provider-logos/[A-Za-z0-9_-]+\.png", logo_url)
+        logo_path = REPO_ROOT / "frontend" / "public" / logo_url.removeprefix("/")
+        assert logo_path.is_file()
+        with logo_path.open("rb") as fh:
+            assert fh.read(len(PNG_SIGNATURE)) == PNG_SIGNATURE
 
 
 def test_remnawave_settings_include_panel_webhook_metadata():

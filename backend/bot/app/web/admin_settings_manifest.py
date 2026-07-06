@@ -128,8 +128,8 @@ def manifest_payload() -> list[dict]:
     from bot.payment_providers import (
         find_manifest_owner,
         manifest_field_default,
+        provider_admin_metadata,
         provider_admin_only_pairs,
-        provider_webhook_metadata,
     )
 
     sections_order = {
@@ -169,7 +169,7 @@ def manifest_payload() -> list[dict]:
         if owner is not None:
             spec, manifest_field = owner
             default_value = manifest_field_default(spec, manifest_field)
-            webhook_metadata = provider_webhook_metadata(spec)
+            webhook_metadata = provider_admin_metadata(spec)
 
         placeholder = field.placeholder
         if not placeholder and default_value:

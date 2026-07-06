@@ -726,6 +726,7 @@ SPEC = PaymentProviderSpec(
     webapp_label="Pally",
     webapp_labels={"ru": "Pally", "en": "Pally"},
     webapp_icon="WalletCards",
+    logo_url="/provider-logos/pally.png",
     telegram_labels={"ru": "Pally", "en": "Pally"},
     telegram_emoji="\U0001f4b3",
     pending_status="pending_pally",

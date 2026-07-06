@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ColorInput, FileInput, Input, Textarea } from "$components/ui/index.js";
-  import { Check, Copy, Eye, EyeOff, FileText, X } from "$components/ui/icons.js";
+  import { Check, Copy, ExternalLink, Eye, EyeOff, FileText, X } from "$components/ui/icons.js";
   import { Switch } from "$components/ui/primitives.js";
   import {
     AdminBadge,
@@ -27,6 +27,7 @@
   import type {
     AdminSettingField,
     AdminSettingsSection,
+    GroupProviderInfo,
     GroupWebhook,
     SemanticFieldGroup,
     SettingsSubsection,
@@ -124,6 +125,32 @@
     resetField: (field: AdminSettingField) => void;
   } = $props();
 </script>
+
+{#snippet renderProviderInfo(provider: NonNullable<GroupProviderInfo>)}
+  {#if provider.infoUrl}
+    <div class="admin-provider-info">
+      <div class="admin-provider-info-meta">
+        <strong>{at("settings_provider_info_title", {}, "Provider information")}</strong>
+        <small>
+          {at(
+            "settings_provider_info_hint",
+            { provider: provider.label },
+            `Official ${provider.label} website and documentation.`
+          )}
+        </small>
+      </div>
+      <a
+        class="admin-btn admin-btn-sm admin-btn-ghost admin-provider-info-link"
+        href={provider.infoUrl}
+        target="_blank"
+        rel="noreferrer noopener"
+      >
+        <ExternalLink size={13} />
+        <span>{at("settings_provider_info_open", {}, "Open provider site")}</span>
+      </a>
+    </div>
+  {/if}
+{/snippet}
 
 {#snippet renderWebhookHint(webhook: NonNullable<GroupWebhook>)}
   {@const displayValue = webhook.url || webhook.path}
@@ -415,6 +442,9 @@
           <div id={sectionContentId} class="admin-accordion-content" data-state="open">
             <div class="admin-settings-fields">
               {#if rootGroup}
+                {#if rootGroup.providerInfo}
+                  {@render renderProviderInfo(rootGroup.providerInfo)}
+                {/if}
                 {#if rootGroup.webhook}
                   {@render renderWebhookHint(rootGroup.webhook)}
                 {/if}
@@ -445,6 +475,9 @@
                         onToggle={() => toggleSettingsSubsection(section.id, group.id)}
                         open={subsectionIsOpen}
                         overriddenLabel={settingsOverriddenCountLabel(at, subOverridden)}
+                        logoFallback={group.providerInfo?.logoFallback || ""}
+                        logoLabel={group.providerInfo?.label || subsectionTitle(group)}
+                        logoUrl={group.providerInfo?.logoUrl || ""}
                         title={subsectionTitle(group)}
                       />
                       {#if subsectionIsOpen}
@@ -454,6 +487,9 @@
                           data-state="open"
                         >
                           <div class="admin-settings-subsection-body">
+                            {#if group.providerInfo}
+                              {@render renderProviderInfo(group.providerInfo)}
+                            {/if}
                             {#if group.webhook}
                               {@render renderWebhookHint(group.webhook)}
                             {/if}

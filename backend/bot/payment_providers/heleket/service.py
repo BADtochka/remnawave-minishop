@@ -667,6 +667,7 @@ SPEC = PaymentProviderSpec(
     webapp_label="Heleket",
     webapp_labels={"ru": "Heleket", "en": "Heleket"},
     webapp_icon="Bitcoin",
+    logo_url="/provider-logos/heleket.png",
     telegram_labels={"ru": "Heleket", "en": "Heleket"},
     telegram_emoji="🪙",
     pending_status="pending_heleket",

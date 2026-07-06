@@ -12,7 +12,7 @@ from bot.app.web.context import (
 )
 from config.settings import Settings
 
-from .asset_paths import ASSET_DIR
+from .asset_paths import APP_ROOT, ASSET_DIR
 from .constants import ROBOTS_TX
 from .response_helpers import json_response
 
@@ -24,6 +24,8 @@ _I18N_PAYLOAD_CACHE: dict[tuple[int, str, tuple[tuple[str, int, int], ...]], dic
 _ASSET_NAME_CACHE_TTL_SECONDS = 30.0
 WEBAPP_HTML_CACHE_CONTROL = "no-store, no-cache, must-revalidate, max-age=0"
 WEBAPP_LEGACY_ASSET_CACHE_CONTROL = "no-store, no-cache, must-revalidate, max-age=0"
+PROVIDER_LOGO_MAX_BYTES = 128 * 1024
+PROVIDER_LOGO_SOURCE_DIR = APP_ROOT / "frontend" / "public" / "provider-logos"
 
 
 async def health_route(request: web.Request) -> web.Response:
@@ -34,6 +36,36 @@ async def robots_txt_route(request: web.Request) -> web.Response:
     response = web.Response(text=ROBOTS_TX, content_type="text/plain")
     response.headers["Cache-Control"] = "public, max-age=3600"
     return response
+
+
+async def provider_logo_asset_route(request: web.Request) -> web.Response:
+    settings: Settings = get_settings(request)
+    if not settings.WEBAPP_ENABLED:
+        raise web.HTTPNotFound(text="webapp_disabled")
+
+    filename = str(request.match_info.get("filename") or "")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+\.png", filename):
+        raise web.HTTPNotFound(text="provider_logo_not_found")
+
+    path = _provider_logo_asset_path(filename)
+    try:
+        body = _read_template_binary_cached(path)
+    except OSError:
+        raise web.HTTPNotFound(text="provider_logo_not_found") from None
+    if not body or len(body) > PROVIDER_LOGO_MAX_BYTES:
+        raise web.HTTPNotFound(text="provider_logo_not_found")
+
+    response = web.Response(body=body, content_type="image/png")
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _provider_logo_asset_path(filename: str) -> Path:
+    built_path = ASSET_DIR / "provider-logos" / filename
+    if built_path.is_file():
+        return built_path
+    return PROVIDER_LOGO_SOURCE_DIR / filename
 
 
 async def css_asset_route(request: web.Request) -> web.Response:

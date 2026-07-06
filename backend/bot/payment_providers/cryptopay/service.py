@@ -683,6 +683,7 @@ SPEC = PaymentProviderSpec(
     webapp_label="CryptoPay",
     webapp_labels={"ru": "CryptoPay", "en": "CryptoPay"},
     webapp_icon="Bitcoin",
+    logo_url="/provider-logos/cryptopay.png",
     telegram_labels={"ru": "CryptoBot", "en": "CryptoBot"},
     pending_status="pending_cryptopay",
     enabled=lambda config: bool(getattr(config, "ENABLED", False)),

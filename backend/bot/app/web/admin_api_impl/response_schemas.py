@@ -162,6 +162,9 @@ class AdminSettingsFieldOut(HttpResponseModel):
     webhook_hint_i18n_key: str | None = None
     webhook_hint: str | None = None
     provider_id: str | None = None
+    provider_label: str | None = None
+    provider_info_url: str | None = None
+    provider_logo_url: str | None = None
     value: Any = None
     overridden: bool | None = None
     updated_at: str | None = None

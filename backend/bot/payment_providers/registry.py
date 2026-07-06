@@ -469,6 +469,25 @@ def provider_webhook_metadata(spec: PaymentProviderSpec) -> dict[str, Any] | Non
     }
 
 
+def provider_admin_metadata(spec: PaymentProviderSpec) -> dict[str, Any]:
+    """Return admin UI metadata shared by all manifest fields of a provider."""
+
+    metadata: dict[str, Any] = {
+        "provider_id": spec.id,
+        "provider_label": spec.label,
+    }
+    info_url = str(spec.info_url or spec.currency_support_url or "").strip()
+    logo_url = str(spec.logo_url or "").strip()
+    if info_url:
+        metadata["provider_info_url"] = info_url
+    if logo_url:
+        metadata["provider_logo_url"] = logo_url
+    webhook_metadata = provider_webhook_metadata(spec)
+    if webhook_metadata:
+        metadata.update(webhook_metadata)
+    return metadata
+
+
 def manifest_field_default(
     spec: PaymentProviderSpec,
     manifest_field: ProviderManifestField,

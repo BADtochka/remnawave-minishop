@@ -199,6 +199,7 @@ SPEC = PaymentProviderSpec(
     webapp_label="ЮKassa",
     webapp_labels={"ru": "ЮKassa", "en": "YooKassa"},
     webapp_icon="CreditCard",
+    logo_url="/provider-logos/yookassa.png",
     telegram_labels={"ru": "ЮKassa", "en": "YooKassa"},
     telegram_emoji="💳",
     pending_status="pending_yookassa",
