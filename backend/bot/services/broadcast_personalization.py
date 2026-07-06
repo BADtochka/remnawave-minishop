@@ -450,8 +450,9 @@ def _tariff_price_value(
 
     price: float | None = ctx.effective_monthly_price_rub
     if price is None and ctx.tariff_key:
+        tariffs_config = settings.tariffs_config
         try:
-            tariff = settings.tariffs_config.get(ctx.tariff_key)  # type: ignore[union-attr]
+            tariff = tariffs_config.get(ctx.tariff_key) if tariffs_config else None
         except Exception:
             tariff = None
         if tariff is not None and ctx.duration_months:
@@ -466,8 +467,9 @@ def _tariff_price_value(
 def _tariff_name_value(ctx: BroadcastUserContext, settings: Settings, lang: str, dash: str) -> str:
     if not ctx.tariff_key:
         return dash
+    tariffs_config = settings.tariffs_config
     try:
-        tariff = settings.tariffs_config.get(ctx.tariff_key)  # type: ignore[union-attr]
+        tariff = tariffs_config.get(ctx.tariff_key) if tariffs_config else None
     except Exception:
         tariff = None
     if tariff is None:
