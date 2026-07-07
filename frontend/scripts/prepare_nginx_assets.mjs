@@ -17,6 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..", "..");
 const templatesDir = path.join(repoRoot, "backend", "bot", "app", "web", "templates");
 const DEFAULT_OUT_DIR = path.join(repoRoot, "frontend-nginx-dist");
+const WEBAPP_API_BASE_URL_PLACEHOLDER = "__RW_WEBAPP_API_BASE_URL__";
 const outDir = resolveOutDir();
 
 function resolveOutDir() {
@@ -93,6 +94,10 @@ async function copyRuntimeAsset({ hashedName, stableName }) {
   }
 }
 
+function inlineRuntimeConfigScript() {
+  return `    <script>window.__RW_WEBAPP_RUNTIME_CONFIG__=Object.assign(window.__RW_WEBAPP_RUNTIME_CONFIG__||{},{apiBaseUrl:"${WEBAPP_API_BASE_URL_PLACEHOLDER}"});</script>`;
+}
+
 function prepareIndexHtml(rawHtml, { cssName, jsName }) {
   const jsPreload = `    <link rel="preload" href="/${jsName}" as="script">`;
   const html = rawHtml
@@ -104,6 +109,7 @@ function prepareIndexHtml(rawHtml, { cssName, jsName }) {
     .map((line) =>
       line.includes("WEBAPP_JS_SCRIPT")
         ? [
+            inlineRuntimeConfigScript(),
             '    <script src="/webapp-runtime-config.js"></script>',
             `    <script src="/${jsName}" defer></script>`,
           ].join("\n")
