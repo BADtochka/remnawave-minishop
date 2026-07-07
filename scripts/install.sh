@@ -2501,7 +2501,12 @@ connect_local_source_db_to_target_network() {
         return 0
     fi
 
-    target_network="$(target_compose_project)_remnawave-shop"
+    compose_project_name="$(target_compose_project)"
+    compose_project_override=$(env_get COMPOSE_PROJECT_NAME "")
+    if [ -n "$compose_project_override" ]; then
+        compose_project_name="$compose_project_override"
+    fi
+    target_network="${compose_project_name}-network"
     if ! docker network inspect "$target_network" >/dev/null 2>&1; then
         warn "Целевая Docker-сеть $target_network не найдена; исходный контейнер $source_host не подключен автоматически."
         return 0

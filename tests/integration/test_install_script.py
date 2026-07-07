@@ -240,7 +240,7 @@ def test_shell_installer_connects_local_remnashop_db_container_for_import():
     assert "connect_local_source_db_to_target_network" in script
     assert "dsn_hostname" in script
     assert "docker network connect" in script
-    assert "_remnawave-shop" in script
+    assert 'target_network="${compose_project_name}-network"' in script
 
 
 def test_shell_installer_supports_legacy_tgshop_volume_and_dsn_paths():
