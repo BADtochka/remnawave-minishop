@@ -1,5 +1,4 @@
 import { readCookie } from "./session.js";
-import { buildApiUrl, normalizeApiBase } from "./apiBase.js";
 import type { paths } from "../api/openapi.generated";
 
 type HttpMethod = "get" | "put" | "post" | "delete" | "patch";
@@ -95,6 +94,7 @@ export type AuthEmailPasswordResponse = PostResponse<"/api/auth/email/password">
 export type AuthEmailRequestResponse = PostResponse<"/api/auth/email/request">;
 export type AuthEmailVerifyResponse = PostResponse<"/api/auth/email/verify">;
 export type AuthLogoutResponse = PostResponse<"/api/auth/logout">;
+export type AuthSessionResponse = GetResponse<"/api/auth/session">;
 export type AuthTokenResponse = PostResponse<"/api/auth/token">;
 export type DevicesResponse = GetResponse<"/api/devices">;
 export type DevicesDisconnectResponse = PostResponse<"/api/devices/disconnect">;
@@ -159,7 +159,6 @@ export type MockApi = (
 ) => unknown | Promise<unknown>;
 
 type ApiClientOptions = {
-  apiBase?: string;
   csrfCookieName?: string;
   getAuthToken?: () => string;
   getCsrfToken?: () => string;
@@ -170,6 +169,14 @@ type ApiClientOptions = {
 };
 
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 15000;
+const WEBAPP_API_BASE = "/api";
+
+export function buildApiUrl(path: string): string {
+  const value = String(path || "").trim();
+  if (!value) return WEBAPP_API_BASE;
+  if (value.startsWith("/api")) return value;
+  return `${WEBAPP_API_BASE}/${value.replace(/^\/+/, "")}`;
+}
 
 function apiTimeoutError(): Error {
   const error = new Error("api_request_timeout");
@@ -671,7 +678,6 @@ export function unwrap<T extends { ok: boolean }>(response: T): Extract<T, { ok:
 }
 
 export function createApiClient({
-  apiBase = "",
   csrfCookieName = "rw_webapp_csrf",
   getAuthToken = () => "",
   getCsrfToken = () => "",
@@ -680,7 +686,6 @@ export function createApiClient({
   getMockContext = () => ({}),
   requestTimeoutMs = DEFAULT_API_REQUEST_TIMEOUT_MS,
 }: ApiClientOptions = {}): ApiClient {
-  const normalizedApiBase = normalizeApiBase(apiBase);
   const isFormDataBody = (body: BodyInit | null | undefined) =>
     typeof FormData !== "undefined" && body instanceof FormData;
 
@@ -707,10 +712,10 @@ export function createApiClient({
 
     const { signal, cleanup } = requestSignal(options.signal, requestTimeoutMs);
     try {
-      const response = await fetch(buildApiUrl(path, normalizedApiBase), {
+      const response = await fetch(buildApiUrl(path), {
         ...options,
         headers,
-        credentials: "include",
+        credentials: "same-origin",
         signal,
       });
       const payload = await response.json().catch(() => ({}));
@@ -749,12 +754,12 @@ export function createApiClient({
     }
     const { signal, cleanup } = requestSignal(options.signal, requestTimeoutMs);
     try {
-      const response = await fetch(buildApiUrl(path, normalizedApiBase), {
+      const response = await fetch(buildApiUrl(path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
         signal,
-        credentials: "include",
+        credentials: "same-origin",
       });
       return (await response.json()) as Record<string, unknown>;
     } finally {

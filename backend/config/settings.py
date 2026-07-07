@@ -647,14 +647,20 @@ class Settings(SettingsComputedMixin, SettingsValidationMixin, BaseSettings):
         default="/api",
         description=(
             "Base URL used by the Mini App frontend for backend API requests. "
-            "Use /api for same-origin proxying or a full backend URL for split domains."
+            "Keep /api; split deployments configure the frontend nginx upstream instead."
         ),
     )
-    WEBAPP_CORS_ALLOWED_ORIGINS: str = Field(
+    MINISHOP_EDGE_TOKEN: str = Field(
         default="",
         description=(
-            "Comma-separated extra browser origins allowed to call the Web App API with "
-            "credentials. SUBSCRIPTION_MINI_APP_URL origin is allowed automatically."
+            "Optional server-side token required on protected Web App API upstream routes. "
+            "It must be injected by a trusted reverse proxy, never by browser JavaScript."
+        ),
+    )
+    MINISHOP_EDGE_TOKEN_HEADER: str = Field(
+        default="X-Minishop-Edge-Token",
+        description=(
+            "HTTP header name used by frontend nginx or an API edge to pass MINISHOP_EDGE_TOKEN."
         ),
     )
     TELEGRAM_BOT_MENU_DISABLED: bool = Field(

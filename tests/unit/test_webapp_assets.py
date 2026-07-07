@@ -388,7 +388,6 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             SUPPORT_LINK="https://t.me/support",
             PRIVACY_POLICY_URL="https://example.com/privacy",
             USER_AGREEMENT_URL="https://example.com/agreement",
-            WEBAPP_API_BASE_URL="https://bot.example.com/api/",
         )
         i18n = SimpleNamespace(
             locales_data={
@@ -413,7 +412,7 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         payload = subscription_webapp._build_webapp_bootstrap_payload(request)
 
         self.assertEqual(payload["config"]["serverStatusUrl"], "https://status.example.com")
-        self.assertEqual(payload["config"]["apiBase"], "https://bot.example.com/api")
+        self.assertEqual(payload["config"]["apiBase"], "/api")
         self.assertEqual(
             request.app["webapp_settings_cache"]["data"]["server_status_url"],
             "https://status.example.com",
@@ -432,19 +431,10 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         install_markup = webapp_assets._webapp_shell_preload_markup(
             "subscription_webapp.min.abcdef12.js"
         )
-        split_domain_markup = webapp_assets._webapp_shell_preload_markup(
-            "subscription_webapp.min.abcdef12.js",
-            token,
-            "https://bot.example.com/api/",
-        )
 
         self.assertIn('href="/subscription_webapp.min.abcdef12.js"', markup)
         self.assertIn('as="script"', markup)
         self.assertIn(f'href="/api/subscription-guides/public/{token}"', markup)
-        self.assertIn(
-            f'href="https://bot.example.com/api/subscription-guides/public/{token}"',
-            split_domain_markup,
-        )
         self.assertIn('as="fetch"', markup)
         self.assertIn('crossorigin="use-credentials"', markup)
         self.assertNotIn("/api/subscription-guides/public/", install_markup)
@@ -743,7 +733,8 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("apple-touch-icon", nginx_conf)
         self.assertIn("favicon\\.ico", nginx_conf)
         self.assertIn("/webapp-default-logo.webp", nginx_conf)
-        self.assertIn("proxy_pass http://backend:8081;", nginx_conf)
+        self.assertIn("proxy_pass ${WEBAPP_BACKEND_UPSTREAM};", nginx_conf)
+        self.assertIn("proxy_set_header ${MINISHOP_EDGE_TOKEN_HEADER_VALUE}", nginx_conf)
 
     def test_frontend_nginx_serves_shell_routes_from_static_index(self):
         nginx_conf = Path("deploy/docker/frontend/nginx.conf").read_text(encoding="utf-8")
@@ -754,7 +745,7 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         shell_block = nginx_conf[start : nginx_conf.index("\n\n", start)]
 
         self.assertIn("try_files /index.html =404;", shell_block)
-        self.assertNotIn("proxy_pass http://backend:8081;", shell_block)
+        self.assertNotIn("proxy_pass ${WEBAPP_BACKEND_UPSTREAM};", shell_block)
         self.assertIn("devices$", shell_block)
         self.assertIn("admin(?:/.*)?$", shell_block)
 

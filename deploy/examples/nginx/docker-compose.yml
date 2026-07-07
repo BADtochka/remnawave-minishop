@@ -126,6 +126,10 @@ services:
       IMAGE_TAG: ${IMAGE_TAG:-latest}
       FRONTEND_PUBLIC: https://${MINIAPP_HOST:?set MINIAPP_HOST in .env}/
       WEBAPP_API_BASE_URL: ${WEBAPP_API_BASE_URL:-/api}
+      WEBAPP_BACKEND_UPSTREAM: ${WEBAPP_BACKEND_UPSTREAM:-http://backend:8081}
+      WEBAPP_BACKEND_UPSTREAM_HOST: ${WEBAPP_BACKEND_UPSTREAM_HOST:-backend}
+      MINISHOP_EDGE_TOKEN: ${MINISHOP_EDGE_TOKEN:-}
+      MINISHOP_EDGE_TOKEN_HEADER: ${MINISHOP_EDGE_TOKEN_HEADER:-X-Minishop-Edge-Token}
     networks:
       - remnawave-minishop
     depends_on:

@@ -31,7 +31,7 @@ from .assets import (
     _ensure_shared_http_session,
     _security_headers_middleware,
     _warm_webapp_logo_cache,
-    _webapp_cors_middleware,
+    _webapp_edge_token_middleware,
 )
 from .guides import warm_subscription_guides_config
 from .routes import (
@@ -51,7 +51,7 @@ def create_subscription_webapp_application(
         middlewares=[
             observability_error_middleware,
             _security_headers_middleware,
-            _webapp_cors_middleware,
+            _webapp_edge_token_middleware,
             _csrf_protection_middleware,
             admin_auth_middleware,
         ]
