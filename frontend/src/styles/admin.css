@@ -2066,13 +2066,10 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--admin-border);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--admin-bg) 78%, #ffffff);
+  width: 32px;
+  height: 32px;
   color: var(--admin-text);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0;
   overflow: hidden;
@@ -2082,12 +2079,23 @@
   display: block;
   width: 100%;
   height: 100%;
-  padding: 4px;
   object-fit: contain;
 }
 
 .admin-provider-logo span {
   line-height: 1;
+}
+
+/* Keep a chip backdrop only for the text-initials fallback (no real logo). */
+.admin-provider-logo-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--admin-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--admin-bg) 78%, #ffffff);
 }
 
 .admin-accordion-meta {

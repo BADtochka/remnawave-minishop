@@ -405,6 +405,48 @@ def test_payment_provider_logo_assets_are_local_png_files():
             assert fh.read(len(PNG_SIGNATURE)) == PNG_SIGNATURE
 
 
+def test_payment_provider_settings_i18n_keys_exist_in_admin_locales():
+    provider_items = [item for item in _manifest_items() if item.get("provider_id")]
+    assert provider_items
+
+    for language in ("ru", "en"):
+        messages = _locale(language)
+        missing: list[str] = []
+        for field in provider_items:
+            for key_name in (
+                "i18n_label_key",
+                "i18n_description_key",
+                "i18n_subsection_key",
+            ):
+                key = field.get(key_name)
+                if key and key not in messages:
+                    missing.append(str(key))
+
+        assert sorted(set(missing)) == []
+
+
+def test_shared_payment_provider_option_i18n_does_not_bake_provider_names():
+    provider_names = {
+        str(item["provider_label"])
+        for item in _manifest_items()
+        if item.get("provider_id") and item.get("provider_label")
+    }
+
+    for language in ("ru", "en"):
+        messages = _locale(language)
+        baked_names: dict[str, list[str]] = {}
+        for key, value in messages.items():
+            if not key.startswith("admin_settings_provider_opt_"):
+                continue
+            if "{provider}" in value:
+                continue
+            offenders = sorted(name for name in provider_names if name and name in value)
+            if offenders:
+                baked_names[key] = offenders
+
+        assert baked_names == {}
+
+
 def test_remnawave_settings_include_panel_webhook_metadata():
     manifest = _manifest_by_key()
     field = manifest["PANEL_WEBHOOK_SECRET"]
