@@ -498,6 +498,12 @@
     return key ? at(adminLocaleKey(key), params, fallback) : fallback;
   }
 
+  function fieldI18nParams(field: AdminSettingField): Record<string, unknown> {
+    return {
+      provider: field.provider_label || field.subsection || field.provider_id || "",
+    };
+  }
+
   function sectionTitle(id: string): string {
     const map = {
       general: "Общие",
@@ -539,20 +545,22 @@
       .toLowerCase()
       .startsWith("en");
     const fallback = isEnglish ? englishFieldLabelFallback(field.key, field.label) : field.label;
-    return field.i18n_label_key ? adminText(field.i18n_label_key, {}, fallback) : fallback;
+    return field.i18n_label_key
+      ? adminText(field.i18n_label_key, fieldI18nParams(field), fallback)
+      : fallback;
   }
 
   function fieldDescriptionText(field: AdminSettingField): string {
     if (!field.description) return "";
     return field.i18n_description_key
-      ? adminText(field.i18n_description_key, {}, field.description)
+      ? adminText(field.i18n_description_key, fieldI18nParams(field), field.description)
       : field.description;
   }
 
   function fieldPlaceholderText(field: AdminSettingField): string {
     const fallback = field.placeholder || "";
     return field.i18n_placeholder_key
-      ? adminText(field.i18n_placeholder_key, {}, fallback)
+      ? adminText(field.i18n_placeholder_key, fieldI18nParams(field), fallback)
       : fallback;
   }
 
