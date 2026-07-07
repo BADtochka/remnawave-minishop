@@ -125,6 +125,7 @@ services:
     environment:
       IMAGE_TAG: ${IMAGE_TAG:-latest}
       FRONTEND_PUBLIC: https://${MINIAPP_HOST:?set MINIAPP_HOST in .env}/
+      WEBAPP_API_BASE_URL: ${WEBAPP_API_BASE_URL:-/api}
     networks:
       - remnawave-shop
     depends_on:

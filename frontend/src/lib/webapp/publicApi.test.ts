@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { buildApiUrl, normalizeApiBase } from "./apiBase";
 import { createApiClient } from "./publicApi";
 
 function jsonResponse(payload = {}, status = 200) {
@@ -15,6 +16,19 @@ afterEach(() => {
 });
 
 describe("createApiClient", () => {
+  it("normalizes API base URLs without duplicating the /api prefix", () => {
+    expect(normalizeApiBase("https://bot.example.com/api/")).toBe("https://bot.example.com/api");
+    expect(buildApiUrl("/me", "https://bot.example.com/api/")).toBe(
+      "https://bot.example.com/api/me"
+    );
+    expect(buildApiUrl("/api/me", "https://bot.example.com/api/")).toBe(
+      "https://bot.example.com/api/me"
+    );
+    expect(buildApiUrl("/bootstrap?i18n_scope=webapp", "/api")).toBe(
+      "/api/bootstrap?i18n_scope=webapp"
+    );
+  });
+
   it("adds the in-memory session token to authenticated API requests", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
     vi.stubGlobal("fetch", fetchMock);
@@ -27,7 +41,7 @@ describe("createApiClient", () => {
 
     const fetchCalls = fetchMock.mock.calls as unknown as [string, RequestInit][];
     const requestOptions = fetchCalls[0][1];
-    expect(requestOptions.credentials).toBe("same-origin");
+    expect(requestOptions.credentials).toBe("include");
     expect((requestOptions.headers as Headers).get("Authorization")).toBe("Bearer session-token");
   });
 

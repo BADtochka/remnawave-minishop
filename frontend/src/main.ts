@@ -1,6 +1,7 @@
 import { mount } from "svelte";
 
 import App from "./App.svelte";
+import { buildApiUrl, runtimeApiBase } from "./lib/webapp/apiBase";
 import "./styles.css";
 
 const PUBLIC_INSTALL_PRELOAD_KEY = "__RW_PUBLIC_INSTALL_PRELOAD__";
@@ -20,8 +21,8 @@ function startPublicInstallPreload(): PublicInstallPreload | null {
   const shareToken = publicInstallTokenFromPath();
   if (!shareToken) return null;
   const path = `/subscription-guides/public/${encodeURIComponent(shareToken)}`;
-  const promise = fetch(`/api${path}`, {
-    credentials: "same-origin",
+  const promise = fetch(buildApiUrl(path, runtimeApiBase()), {
+    credentials: "include",
     headers: { Accept: "application/json" },
   })
     .then((response) => (response.ok ? response.json() : null))
@@ -44,11 +45,14 @@ async function loadBootstrap(): Promise<void> {
     }, BOOTSTRAP_TIMEOUT_MS);
   });
   const bootstrap = (async () => {
-    const response = await fetch("/api/bootstrap?i18n_scope=webapp", {
-      credentials: "include",
-      headers: { Accept: "application/json" },
-      signal: controller?.signal,
-    });
+    const response = await fetch(
+      buildApiUrl("/bootstrap?i18n_scope=webapp", runtimeApiBase()),
+      {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        signal: controller?.signal,
+      }
+    );
     if (!response.ok || timedOut) return;
     const payload: { config?: unknown; i18n?: unknown } = await response.json();
     if (timedOut) return;

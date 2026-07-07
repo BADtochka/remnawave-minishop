@@ -1,5 +1,6 @@
 #!/bin/sh
 PUBLISHED="${FRONTEND_PUBLIC:-127.0.0.1:${FRONTEND_PORT:-8082}->80}"
+WEBAPP_API_BASE_URL_VALUE="${WEBAPP_API_BASE_URL:-/api}"
 IMAGE_TAG_VALUE="${IMAGE_TAG:-local}"
 BUILD_TAG="${REMNAWAVE_MINISHOP_TAG:-${GIT_TAG:-${BUILD_TAG:-}}}"
 if [ -z "$BUILD_TAG" ] && [ -r /build-tag ]; then
@@ -24,6 +25,17 @@ elif [ "$IMAGE_TAG_VALUE" = "dev" ]; then
   fi
 fi
 
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+WEBAPP_RUNTIME_CONFIG_PATH="/usr/share/nginx/html/webapp-runtime-config.js"
+cat > "$WEBAPP_RUNTIME_CONFIG_PATH" <<EOF
+window.__RW_WEBAPP_RUNTIME_CONFIG__ = {
+  apiBaseUrl: "$(json_escape "$WEBAPP_API_BASE_URL_VALUE")"
+};
+EOF
+
 cat <<EOF
 
               ~ ~ ~  r e m n a w a v e  ~ ~ ~
@@ -40,6 +52,7 @@ cat <<EOF
               commit :: ${BUILD_COMMIT}
               listen :: :80
               published :: ${PUBLISHED}
+              api base :: ${WEBAPP_API_BASE_URL_VALUE}
               upstream :: backend:8081
               healthcheck :: /health
          https://github.com/3252a8/remnawave-minishop

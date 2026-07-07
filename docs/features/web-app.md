@@ -25,6 +25,7 @@ WEBAPP_ENABLED=True
 WEBAPP_SERVER_HOST=0.0.0.0
 WEBAPP_SERVER_PORT=8081
 SUBSCRIPTION_MINI_APP_URL=https://app.domain.com/
+WEBAPP_API_BASE_URL=/api
 SUBSCRIPTION_GUIDES_ENABLED=True
 SUBSCRIPTION_GUIDES_BOT_MENU_ENABLED=True
 SUBSCRIPTION_PAGE_CONFIG_PANEL_ENABLED=True
@@ -44,6 +45,8 @@ SUPPORT_TICKET_RATE_LIMIT_PER_HOUR=5
 ```
 
 `SUBSCRIPTION_MINI_APP_URL` - это публичный HTTPS URL именно frontend/Mini App, обычно отдельный домен вроде `https://app.domain.com/`. Его указывают в BotFather в Mini Apps, а бот использует его для кнопок личного кабинета, реферальных ссылок и входа по email. Не добавляйте в него `/api`, `/webhook` или путь конкретной страницы.
+
+`WEBAPP_API_BASE_URL` - это base URL backend API для frontend-запросов. В штатной схеме оставьте `/api`: frontend nginx сам проксирует этот путь в backend. Если frontend и backend доступны на разных публичных доменах без общего reverse proxy, укажите полный URL backend API, например `https://bot.domain.com/api`.
 
 ## Инструкции установки
 

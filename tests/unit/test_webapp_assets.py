@@ -388,6 +388,7 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
             SUPPORT_LINK="https://t.me/support",
             PRIVACY_POLICY_URL="https://example.com/privacy",
             USER_AGREEMENT_URL="https://example.com/agreement",
+            WEBAPP_API_BASE_URL="https://bot.example.com/api/",
         )
         i18n = SimpleNamespace(
             locales_data={
@@ -412,6 +413,7 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         payload = subscription_webapp._build_webapp_bootstrap_payload(request)
 
         self.assertEqual(payload["config"]["serverStatusUrl"], "https://status.example.com")
+        self.assertEqual(payload["config"]["apiBase"], "https://bot.example.com/api")
         self.assertEqual(
             request.app["webapp_settings_cache"]["data"]["server_status_url"],
             "https://status.example.com",
@@ -430,10 +432,19 @@ class WebAppAssetTests(unittest.IsolatedAsyncioTestCase):
         install_markup = webapp_assets._webapp_shell_preload_markup(
             "subscription_webapp.min.abcdef12.js"
         )
+        split_domain_markup = webapp_assets._webapp_shell_preload_markup(
+            "subscription_webapp.min.abcdef12.js",
+            token,
+            "https://bot.example.com/api/",
+        )
 
         self.assertIn('href="/subscription_webapp.min.abcdef12.js"', markup)
         self.assertIn('as="script"', markup)
         self.assertIn(f'href="/api/subscription-guides/public/{token}"', markup)
+        self.assertIn(
+            f'href="https://bot.example.com/api/subscription-guides/public/{token}"',
+            split_domain_markup,
+        )
         self.assertIn('as="fetch"', markup)
         self.assertIn('crossorigin="use-credentials"', markup)
         self.assertNotIn("/api/subscription-guides/public/", install_markup)

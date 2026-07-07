@@ -102,7 +102,12 @@ function prepareIndexHtml(rawHtml, { cssName, jsName }) {
   const lines = html.split("\n");
   const output = lines
     .map((line) =>
-      line.includes("WEBAPP_JS_SCRIPT") ? `    <script src="/${jsName}" defer></script>` : line
+      line.includes("WEBAPP_JS_SCRIPT")
+        ? [
+            '    <script src="/webapp-runtime-config.js"></script>',
+            `    <script src="/${jsName}" defer></script>`,
+          ].join("\n")
+        : line
     )
     .filter(
       (line) =>

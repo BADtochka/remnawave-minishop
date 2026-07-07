@@ -34,6 +34,7 @@
 | `WEB_SERVER_PORT` | `.env` / Compose | Хостовый порт backend-сервера вебхуков. По умолчанию `8080`. |
 | `WEBAPP_SERVER_HOST` | `.env` | Внутренний хост Web App API-сервера. Обычно `0.0.0.0`. |
 | `WEBAPP_SERVER_PORT` | `.env` | Внутренний порт Web App API-сервера. По умолчанию `8081`. |
+| `WEBAPP_API_BASE_URL` | `.env` / frontend runtime | Base URL backend API для Mini App frontend. По умолчанию `/api`, когда frontend nginx проксирует `/api` в backend. Для раздельных серверов укажите полный публичный адрес backend API, например `https://bot.domain.com/api`. |
 | `POSTGRES_HOST` | Compose | Host PostgreSQL. В штатном Compose задается как `postgres`. |
 | `POSTGRES_PORT` | `.env` | Порт PostgreSQL. |
 | `DB_POOL_SIZE` | `.env` | Размер async SQLAlchemy pool. |
@@ -182,6 +183,7 @@ proxy/Docker gateway и может отклонить валидный webhook. 
 | --- | --- | --- |
 | `WEBAPP_ENABLED` | `.env` / админка | Включает Web App. Если `False`, пользовательский Web App и админка недоступны до включения через `.env` и рестарта. |
 | `SUBSCRIPTION_MINI_APP_URL` | `.env` / админка | Публичный HTTPS URL Mini App/frontend, например `https://app.domain.com/`. Используется в Telegram-кнопках, реферальных ссылках, входе по email и настройках BotFather Mini App. Не указывайте здесь `/api` или webhook-пути. |
+| `WEBAPP_API_BASE_URL` | `.env` | Base URL backend API, который frontend использует для `/bootstrap`, `/me`, платежей и админки. Оставьте `/api` для штатного frontend nginx; задайте полный backend URL только если API живет на другом домене. |
 | `SUBSCRIPTION_GUIDES_ENABLED` | `.env` / админка | Включает встроенные инструкции установки в Web App. По умолчанию `True`; если конфиг недоступен или невалиден, кнопка подключения открывает обычную финальную ссылку подписки. |
 | `SUBSCRIPTION_GUIDES_BOT_MENU_ENABLED` | `.env` / админка | Включает открытие Mini App `/install` из кнопок бота и показ публичной ссылки инструкции `/s/<token>`. По умолчанию `True`; если выключить, бот ведет на финальную Remnawave Subscription Page. |
 | `SUBSCRIPTION_PAGE_CONFIG_PANEL_ENABLED` | `.env` / админка | Читать Remnawave Subscription Page config из панели для встроенных инструкций. По умолчанию `True`; для активной подписки сначала используется resolved config по `shortUuid`, включая настройки External Squad, затем default config панели. |

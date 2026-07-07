@@ -643,6 +643,20 @@ class Settings(SettingsComputedMixin, SettingsValidationMixin, BaseSettings):
     SUPPORT_ADMIN_NOTIFICATION_COOLDOWN_SECONDS: int = Field(default=5 * 60)
     SUPPORT_ADMIN_EMAIL_COOLDOWN_SECONDS: int = Field(default=30 * 60)
     SUBSCRIPTION_MINI_APP_URL: str | None = Field(default=None)
+    WEBAPP_API_BASE_URL: str = Field(
+        default="/api",
+        description=(
+            "Base URL used by the Mini App frontend for backend API requests. "
+            "Use /api for same-origin proxying or a full backend URL for split domains."
+        ),
+    )
+    WEBAPP_CORS_ALLOWED_ORIGINS: str = Field(
+        default="",
+        description=(
+            "Comma-separated extra browser origins allowed to call the Web App API with "
+            "credentials. SUBSCRIPTION_MINI_APP_URL origin is allowed automatically."
+        ),
+    )
     TELEGRAM_BOT_MENU_DISABLED: bool = Field(
         default=False,
         description=(

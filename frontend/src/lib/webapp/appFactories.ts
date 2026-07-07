@@ -3,6 +3,7 @@ import { createBillingStore } from "./stores/billingStore";
 import { createAccountStore } from "./stores/accountStore";
 import { createActionsStore } from "./stores/actionsStore";
 import { createWebappDataClient } from "./dataClient";
+import { buildApiUrl, normalizeApiBase } from "./apiBase";
 import { createWebappActivationContext } from "./webappActivationContext";
 import { createAuthRuntime } from "./authRuntime.js";
 import { createResumeLifecycle } from "./resumeLifecycle.js";
@@ -188,11 +189,14 @@ export function createAppFactories({
 
   const adminRuntime = createAdminRuntime({
     fetchI18nScope: async (scope) => {
-      const apiBase = String(CFG.apiBase || "/api").replace(/\/+$/, "");
-      const response = await fetch(`${apiBase}/i18n?scope=${encodeURIComponent(scope)}`, {
-        credentials: "same-origin",
-        headers: { Accept: "application/json" },
-      });
+      const apiBase = normalizeApiBase(CFG.apiBase);
+      const response = await fetch(
+        buildApiUrl(`/i18n?scope=${encodeURIComponent(scope)}`, apiBase),
+        {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        }
+      );
       return response.ok ? response.json() : null;
     },
     getAdminAssets: () => ({

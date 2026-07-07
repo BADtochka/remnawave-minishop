@@ -1,4 +1,5 @@
 import { readCookie } from "./session.js";
+import { buildApiUrl, normalizeApiBase } from "./apiBase.js";
 import type { paths } from "../api/openapi.generated";
 
 type HttpMethod = "get" | "put" | "post" | "delete" | "patch";
@@ -679,6 +680,7 @@ export function createApiClient({
   getMockContext = () => ({}),
   requestTimeoutMs = DEFAULT_API_REQUEST_TIMEOUT_MS,
 }: ApiClientOptions = {}): ApiClient {
+  const normalizedApiBase = normalizeApiBase(apiBase);
   const isFormDataBody = (body: BodyInit | null | undefined) =>
     typeof FormData !== "undefined" && body instanceof FormData;
 
@@ -705,10 +707,10 @@ export function createApiClient({
 
     const { signal, cleanup } = requestSignal(options.signal, requestTimeoutMs);
     try {
-      const response = await fetch(`${apiBase}${path}`, {
+      const response = await fetch(buildApiUrl(path, normalizedApiBase), {
         ...options,
         headers,
-        credentials: "same-origin",
+        credentials: "include",
         signal,
       });
       const payload = await response.json().catch(() => ({}));
@@ -747,12 +749,12 @@ export function createApiClient({
     }
     const { signal, cleanup } = requestSignal(options.signal, requestTimeoutMs);
     try {
-      const response = await fetch(`${apiBase}${path}`, {
+      const response = await fetch(buildApiUrl(path, normalizedApiBase), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
         signal,
-        credentials: "same-origin",
+        credentials: "include",
       });
       return (await response.json()) as Record<string, unknown>;
     } finally {

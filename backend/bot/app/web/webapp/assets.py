@@ -9,7 +9,7 @@ import subprocess
 import time
 from collections import deque
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from aiohttp import web
 from aiohttp.typedefs import Handler
@@ -153,10 +153,42 @@ _APP_VERSION_CACHE: str | None = None
 logger = logging.getLogger(__name__)
 
 
+def _webapp_origin_from_url(value: str) -> str:
+    parsed = urlsplit(str(value or "").strip())
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _webapp_cors_allowed_origins(settings: Settings) -> set[str]:
+    origins: set[str] = set()
+    raw_origins = getattr(settings, "WEBAPP_CORS_ALLOWED_ORIGINS", "")
+    for raw in str(raw_origins or "").replace("\n", ",").split(","):
+        origin = raw.strip().rstrip("/")
+        if origin:
+            origins.add(origin)
+    mini_app_origin = _webapp_origin_from_url(
+        getattr(settings, "SUBSCRIPTION_MINI_APP_URL", "") or ""
+    )
+    if mini_app_origin:
+        origins.add(mini_app_origin)
+    return origins
+
+
+def _webapp_connect_src(settings: Settings) -> str:
+    origins = _webapp_cors_allowed_origins(settings)
+    api_origin = _webapp_origin_from_url(getattr(settings, "WEBAPP_API_BASE_URL", "") or "")
+    if api_origin:
+        origins.add(api_origin)
+    extras = " ".join(sorted(origins))
+    return f"connect-src 'self' https://oauth.telegram.org{f' {extras}' if extras else ''}; "
+
+
 @web.middleware
 async def _security_headers_middleware(
     request: web.Request, handler: Handler
 ) -> web.StreamResponse:
+    settings = get_settings(request)
     request["csp_nonce"] = secrets.token_urlsafe(16)
     try:
         response = await handler(request)
@@ -173,7 +205,7 @@ async def _security_headers_middleware(
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "  # noqa: E501
             "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; "
             "img-src 'self' data: blob: https:; "
-            "connect-src 'self' https://oauth.telegram.org; "
+            f"{_webapp_connect_src(settings)}"
             "object-src 'none'; "
             "base-uri 'self'; "
             "form-action 'self'"
@@ -190,6 +222,34 @@ async def _security_headers_middleware(
             "microphone=(), midi=(), payment=(), usb=()"
         ),
     )
+    return response
+
+
+def _apply_webapp_cors_headers(request: web.Request, response: web.StreamResponse) -> None:
+    origin = request.headers.get("Origin", "").strip().rstrip("/")
+    if not origin:
+        return
+    if origin not in _webapp_cors_allowed_origins(get_settings(request)):
+        return
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Headers"] = (
+        "Authorization, Content-Type, X-CSRF-Token, X-Requested-With"
+    )
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    vary_parts = {part.strip() for part in response.headers.get("Vary", "").split(",") if part}
+    if "Origin" not in vary_parts:
+        vary_parts.add("Origin")
+        response.headers["Vary"] = ", ".join(sorted(vary_parts))
+
+
+@web.middleware
+async def _webapp_cors_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
+    if request.method == "OPTIONS":
+        response = web.Response(status=204)
+    else:
+        response = await handler(request)
+    _apply_webapp_cors_headers(request, response)
     return response
 
 
@@ -448,7 +508,7 @@ def _build_webapp_bootstrap_payload(request: web.Request) -> dict[str, Any]:
             "logoUrl": cached["logo_url"],
             "faviconUrl": cached["favicon_url"],
             "faviconUseCustom": bool(webapp_settings.favicon_use_custom),
-            "apiBase": "/api",
+            "apiBase": settings.WEBAPP_API_BASE_URL,
             "adminJsAsset": f"/{_resolve_webapp_admin_js_asset_name()}",
             "adminCssAsset": f"/{_resolve_webapp_admin_css_asset_name()}",
             "telegramLoginBotUsername": get_bot_username(request),
@@ -563,12 +623,29 @@ def _apply_webapp_head_metadata(html_text: str, page_title: str, favicon_url: st
     return _replace_webapp_favicon(html_text, _favicon_head_markup(favicon_url))
 
 
-def _webapp_shell_preload_markup(js_asset_name: str, share_token: str = "") -> str:
+def _webapp_api_url(path: str, api_base: str) -> str:
+    base = str(api_base or "/api").strip().rstrip("/") or "/api"
+    normalized_path = "/" + str(path or "").lstrip("/")
+    if base.endswith("/api") and normalized_path == "/api":
+        normalized_path = ""
+    elif base.endswith("/api") and normalized_path.startswith("/api/"):
+        normalized_path = normalized_path[4:]
+    return f"{base}{normalized_path}"
+
+
+def _webapp_shell_preload_markup(
+    js_asset_name: str,
+    share_token: str = "",
+    api_base: str = "/api",
+) -> str:
     js_href = "/" + quote(str(js_asset_name or "").lstrip("/"), safe="/.-_")
     lines = [f'<link rel="preload" href="{js_href}" as="script">']
     normalized_share_token = subscription_dal.normalize_install_share_token(share_token)
     if normalized_share_token:
-        fetch_href = f"/api/subscription-guides/public/{quote(normalized_share_token, safe='')}"
+        fetch_href = _webapp_api_url(
+            f"/subscription-guides/public/{quote(normalized_share_token, safe='')}",
+            api_base,
+        )
         lines.append(
             f'<link rel="preload" href="{fetch_href}" as="fetch" '
             'crossorigin="use-credentials" fetchpriority="high">'
@@ -599,6 +676,7 @@ async def index_route(request: web.Request) -> web.Response:
     preload_markup = _webapp_shell_preload_markup(
         js_asset_name,
         str(getattr(request, "match_info", {}).get("share_token") or ""),
+        settings.WEBAPP_API_BASE_URL,
     )
     if preload_markup:
         html = html.replace("</head>", f"{preload_markup}\n</head>", 1)
@@ -712,6 +790,7 @@ __all__ = [
     "_csrf_protection_middleware",
     "_enforce_webapp_rate_limit",
     "_ensure_shared_http_session",
+    "_webapp_cors_middleware",
     "_favicon_head_markup",
     "_fetch_webapp_logo",
     "_get_cached_asset_name",
@@ -755,6 +834,7 @@ __all__ = [
     "_uploaded_webapp_logo_filename",
     "_uploaded_webapp_logo_response",
     "_warm_webapp_logo_cache",
+    "_webapp_api_url",
     "_webapp_default_brand_file_response",
     "_webapp_default_favicon_file_response",
     "_webapp_favicon_file_response",

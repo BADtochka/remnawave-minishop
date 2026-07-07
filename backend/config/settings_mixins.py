@@ -774,6 +774,7 @@ class SettingsValidationMixin:
         "PRIVACY_POLICY_URL",
         "USER_AGREEMENT_URL",
         "SUBSCRIPTION_MINI_APP_URL",
+        "WEBAPP_API_BASE_URL",
         "WEBAPP_LOGO_URL",
         "TELEGRAM_OAUTH_CLIENT_SECRET",
         "TELEGRAM_OAUTH_REQUEST_ACCESS",
@@ -792,6 +793,12 @@ class SettingsValidationMixin:
         if isinstance(v, str) and not v.strip():
             return None
         return v
+
+    @field_validator("WEBAPP_API_BASE_URL", mode="before")
+    @classmethod
+    def normalize_webapp_api_base_url(cls, v):
+        value = str(v or "/api").strip().rstrip("/")
+        return value or "/api"
 
     @field_validator("USER_HWID_DEVICE_LIMIT", mode="before")
     @classmethod
